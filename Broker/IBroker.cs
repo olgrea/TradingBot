@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker
 {
-    internal interface IBrokerClient
+    internal interface IBroker
     {
         void Connect();
     }

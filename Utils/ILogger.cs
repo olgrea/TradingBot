@@ -6,14 +6,8 @@ namespace TradingBot.Utils
 {
     public interface ILogger
     {
-        void Log(string message);
-    }
-
-    public class ConsoleLogger : ILogger
-    {
-        public void Log(string message)
-        {
-            Console.WriteLine(message);
-        }
+        void LogDebug(string message);
+        void LogInfo(string message);
+        void LogError(string message);
     }
 }

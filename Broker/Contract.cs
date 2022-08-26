@@ -1,0 +1,33 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using IBApi;
+
+namespace TradingBot.Broker
+{
+    internal enum OptionType
+    {
+        Call, Put
+    }
+
+    internal abstract class Contract
+    {
+        public int Id { get; set; }
+        public string Symbol { get; set; }
+        public string Exchange { get; set; }
+        public string Currency { get; set; }
+    }
+
+    internal class Stock : Contract
+    {
+        public string LastTradeDate { get; set; }
+    }
+
+    internal class Option : Contract
+    {
+        public Decimal Strike { get; set; }
+        public Decimal Multiplier { get; set; }
+        public string ContractMonth { get; set; }
+        public OptionType OptionType { get; set; }
+    }
+}
