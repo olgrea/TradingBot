@@ -27,6 +27,11 @@ namespace TradingBot.Broker
             _client.Connect();
         }
 
+        public void Disconnect()
+        {
+            _client.Disconnect();
+        }
+
         public bool IsConnected => _client.IsConnected;
 
         public void GetAccount()

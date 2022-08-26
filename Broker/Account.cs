@@ -8,10 +8,26 @@ namespace TradingBot.Broker
     {
         public string Code { get; set; }
         public DateTime Time { get; set; }
-        public string Currency { get; set; }
-        public Decimal Cash { get; set; }
+        public List<CashBalance> CashBalances { get; set; } = new List<CashBalance>();
         public List<Position> Positions { get; set; } = new List<Position>();
-        public Decimal RealizedPnL { get; set; }
-        public Decimal UnrealizedPnL { get; set; }
+        public CashBalance RealizedPnL { get; set; }
+        public CashBalance UnrealizedPnL { get; set; }
+    }
+
+    internal class CashBalance
+    {
+        public CashBalance(decimal amount, string currency)
+        {
+            Amount = amount;
+            Currency = currency;
+        }
+
+        public Decimal Amount { get; set; }
+        public string Currency { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Amount:C} {Currency}";
+        }
     }
 }
