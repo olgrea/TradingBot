@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using IBApi;
 using TradingBot.Utils;
@@ -40,6 +41,12 @@ namespace TradingBot.Broker.Client
             _reader.Start();
             _processMsgTask = Task.Run(ProcessMsg);
             _logger.LogDebug($"Reader started and is listening to messages from TWS");
+        }
+
+        public void Disconnect()
+        {
+            _clientSocket.reqAccountUpdates(false, _accountCode);
+            _clientSocket.eConnect(DefaultIP, DefaultPort, _clientId);
         }
 
         public bool IsConnected => _clientSocket.IsConnected();
@@ -93,25 +100,48 @@ namespace TradingBot.Broker.Client
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
-            //_logger.LogDebug($"Getting account value : \n {key} {value} {currency}");
-            //_tmpAccount.Currency = currency;
-            //_tmpAccount.Cash = Decimal.Parse(value);
+            _logger.LogDebug($"account value : {key} {value} {currency}");
+
+            switch (key)
+            {
+                case "AccountReady":
+                    if (!bool.Parse(value))
+                        _logger.LogError("Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate. Try again later");
+                    break;
+
+                case "CashBalance":
+                    _tmpAccount.CashBalances.Add(new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency));
+                    break;
+
+                case "RealizedPnL":
+                    if (currency == "USD")
+                        _tmpAccount.RealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                    break;
+
+                case "UnrealizedPnL":
+                    if(currency == "USD")
+                        _tmpAccount.UnrealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                    break;
+            }
+
         }
         
         public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
-            _logger.LogDebug($"Getting portfolio : contract id {contract.ConId}");
-
-            _tmpAccount.Positions.Add(new Position()
+            var pos = new Position()
             {
                 Contract = ConvertContract(contract),
-                Price = Convert.ToDecimal(position),
+                PositionAmount = Convert.ToDecimal(position),
                 MarketPrice = Convert.ToDecimal(marketPrice),
                 MarketValue = Convert.ToDecimal(marketValue),
                 AverageCost = Convert.ToDecimal(averageCost),
                 UnrealizedPNL = Convert.ToDecimal(unrealizedPNL),
                 RealizedPNL = Convert.ToDecimal(realizedPNL),
-            });
+            };
+
+            _logger.LogDebug($"Getting portfolio : \n{pos}");
+
+            _tmpAccount.Positions.Add(pos);
         }
 
         Contract ConvertContract(IBApi.Contract ibc)
@@ -140,7 +170,7 @@ namespace TradingBot.Broker.Client
                         Symbol = ibc.Symbol,
                         ContractMonth = ibc.LastTradeDateOrContractMonth,
                         Strike = Convert.ToDecimal(ibc.Strike),
-                        Multiplier = Decimal.Parse(ibc.Multiplier),
+                        Multiplier = Decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
                         OptionType = (ibc.Right == "C" || ibc.Right == "CALL") ? OptionType.Call : OptionType.Put,
                     };
                     break;

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using TradingBot.Broker;
 using TradingBot.Utils;
 
@@ -12,12 +13,13 @@ namespace TradingBot
             var client = new IBBroker(new ConsoleLogger());
             client.Connect();
 
+            while (!client.IsConnected) ;
 
-
-            //client.GetAccount();
+            client.GetAccount();
 
 
             Console.ReadKey();
+            client.Disconnect();
         }
     }
 
@@ -25,6 +27,7 @@ namespace TradingBot
     {
         public void LogDebug(string message) => Console.WriteLine(message);
         public void LogInfo(string message) => Console.WriteLine(message);
+        public void LogWarning(string message) => Console.Error.WriteLine(message);
         public void LogError(string message) => Console.Error.WriteLine(message);
     }
 }

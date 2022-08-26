@@ -21,6 +21,11 @@ namespace TradingBot.Broker
     internal class Stock : Contract
     {
         public string LastTradeDate { get; set; }
+
+        public override string ToString()
+        {
+            return Symbol;
+        }
     }
 
     internal class Option : Contract
@@ -29,5 +34,10 @@ namespace TradingBot.Broker
         public Decimal Multiplier { get; set; }
         public string ContractMonth { get; set; }
         public OptionType OptionType { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Symbol} {ContractMonth} {Strike} {OptionType}";
+        }
     }
 }
