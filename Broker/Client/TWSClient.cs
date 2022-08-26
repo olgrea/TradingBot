@@ -36,10 +36,6 @@ namespace TradingBot.Broker.Client
         public void Connect()
         {
             _clientSocket.eConnect(DefaultIP, DefaultPort, _clientId);
-            StartReader();
-        }
-        private void StartReader()
-        {
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
             _processMsgTask = Task.Run(ProcessMsg);
@@ -78,7 +74,6 @@ namespace TradingBot.Broker.Client
             if (_nextValidId < 0)
             {
                 _logger.LogInfo($"Client {_clientId} connected.");
-                StartReader();
             }
 
             _nextValidId = orderId;
