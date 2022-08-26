@@ -4,92 +4,189 @@ using System.Threading.Tasks;
 using IBApi;
 using TradingBot.Utils;
 
-namespace TradingBot.Broker
+
+namespace TradingBot.Broker.Client
 {
-    internal class TWSClient : EWrapper, IBrokerClient
+    internal partial class TWSClient : EWrapper
     {
-        const int DefaultPort = 7497;
+        const int DefaultPort = 7496;
         const string DefaultIP = "127.0.0.1";
-        int _clientId = 0;
+        int _clientId = 1337;
 
         int _nextValidId = -1;
 
         EClientSocket _clientSocket;
         EReaderSignal _signal;
-        ILogger _logger;
+        EReader _reader;
 
-        public TWSClient()
+        ILogger _logger;
+        Task _processMsgTask;
+
+        string _accountCode = null;
+        public Action<Account> AccountReceived;
+        Account _tmpAccount;
+
+        public TWSClient(ILogger logger)
         {
             _signal = new EReaderMonitorSignal();
             _clientSocket = new EClientSocket(this, _signal);
-            _logger = new ConsoleLogger();
+            _logger = logger;
         }
 
         public void Connect()
         {
             _clientSocket.eConnect(DefaultIP, DefaultPort, _clientId);
+            StartReader();
+        }
+        private void StartReader()
+        {
+            _reader = new EReader(_clientSocket, _signal);
+            _reader.Start();
+            _processMsgTask = Task.Run(ProcessMsg);
+            _logger.LogDebug($"Reader started and is listening to messages from TWS");
         }
 
-        void InitProcessMsg()
+        public bool IsConnected => _clientSocket.IsConnected();
+
+        void ProcessMsg()
         {
-            var reader = new EReader(_clientSocket, _signal);
-            reader.Start();
-            Task.Run(() => 
+            while (_clientSocket.IsConnected())
             {
-                while(_clientSocket.IsConnected())
-                {
-                    _signal.waitForSignal();
-                    reader.processMsgs();
-                }
-            });
+                _signal.waitForSignal();
+                _reader.processMsgs();
+            }
         }
 
         public void connectAck()
         {
-            _logger.Log($"Connecting client {_clientId} to TWS on {DefaultIP}:{_clientId}...");
-        }
-
-        public void nextValidId(int orderId)
-        {
-            if(_nextValidId == -1 && orderId >= 0)
-            {
-                _logger.Log($"Client {_clientId} connected.");
-                InitProcessMsg();
-            }
-
-            _nextValidId = orderId;
+            _logger.LogDebug($"Connecting client {_clientId} to TWS on {DefaultIP}:{DefaultPort}...");
         }
 
         public void connectionClosed()
         {
-            throw new NotImplementedException();
+            _logger.LogDebug($"Connection closed");
         }
 
+        public void managedAccounts(string accountsList)
+        {
+            _logger.LogDebug($"Account list : {accountsList}");
+            _accountCode = accountsList;
+        }
+
+        public void nextValidId(int orderId)
+        {
+            if (_nextValidId < 0)
+            {
+                _logger.LogInfo($"Client {_clientId} connected.");
+                StartReader();
+            }
+
+            _nextValidId = orderId;
+        }
+        
+        public void GetAccount()
+        {
+            _clientSocket.reqAccountUpdates(true, _accountCode);
+            _tmpAccount = new Account() { Code = _accountCode };
+        }
+
+        public void updateAccountTime(string timestamp)
+        {
+            _logger.LogDebug($"Getting account time : {timestamp}");
+            _tmpAccount.Time = DateTime.Parse(timestamp);
+        }
+
+        public void updateAccountValue(string key, string value, string currency, string accountName)
+        {
+            //_logger.LogDebug($"Getting account value : \n {key} {value} {currency}");
+            //_tmpAccount.Currency = currency;
+            //_tmpAccount.Cash = Decimal.Parse(value);
+        }
+        
+        public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
+        {
+            _logger.LogDebug($"Getting portfolio : contract id {contract.ConId}");
+
+            _tmpAccount.Positions.Add(new Position()
+            {
+                Contract = ConvertContract(contract),
+                Price = Convert.ToDecimal(position),
+                MarketPrice = Convert.ToDecimal(marketPrice),
+                MarketValue = Convert.ToDecimal(marketValue),
+                AverageCost = Convert.ToDecimal(averageCost),
+                UnrealizedPNL = Convert.ToDecimal(unrealizedPNL),
+                RealizedPNL = Convert.ToDecimal(realizedPNL),
+            });
+        }
+
+        Contract ConvertContract(IBApi.Contract ibc)
+        {
+            Contract contract = null;
+
+            switch(ibc.SecType)
+            {
+                case "STK":
+                    contract = new Stock()
+                    {
+                        Id = ibc.ConId,
+                        Currency = ibc.Currency,
+                        Exchange = ibc.Exchange,
+                        Symbol = ibc.Symbol,
+                        LastTradeDate = ibc.LastTradeDateOrContractMonth
+                    };
+                    break;
+
+                case "OPT":
+                    contract = new Option()
+                    {
+                        Id = ibc.ConId,
+                        Currency = ibc.Currency,
+                        Exchange = ibc.Exchange,
+                        Symbol = ibc.Symbol,
+                        ContractMonth = ibc.LastTradeDateOrContractMonth,
+                        Strike = Convert.ToDecimal(ibc.Strike),
+                        Multiplier = Decimal.Parse(ibc.Multiplier),
+                        OptionType = (ibc.Right == "C" || ibc.Right == "CALL") ? OptionType.Call : OptionType.Put,
+                    };
+                    break;
+
+                default: 
+                    throw new NotSupportedException($"This type of contract is not supported : {ibc.SecType}");
+            }
+
+            return contract;
+        }
+
+        public void accountDownloadEnd(string account)
+        {
+            AccountReceived?.Invoke(_tmpAccount);
+        }
 
         public void error(Exception e)
         {
-            _logger.Log(e.Message);
+            _logger.LogError(e.Message);
         }
 
         public void error(string str)
         {
-            _logger.Log(str);
+            _logger.LogError(str);
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            _logger.Log($"{id} {errorCode} {errorMsg}");
-            if(errorCode == 502)
-                _logger.Log($"Make sure the API is enabled in Trader Workstation");
+            var str = $"{id} {errorCode} {errorMsg}";
+            if (errorCode == 502)
+                str += $"\nMake sure the API is enabled in Trader Workstation";
+
+            if (errorCode < 0)
+                _logger.LogDebug(str);
+            else
+                _logger.LogError(str);
         }
+    }
 
-
-
-        public void accountDownloadEnd(string account)
-        {
-            throw new NotImplementedException();
-        }
-
+    internal partial class TWSClient : EWrapper
+    {
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
             throw new NotImplementedException();
@@ -120,7 +217,7 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void completedOrder(Contract contract, Order order, OrderState orderState)
+        public void completedOrder(IBApi.Contract contract, Order order, OrderState orderState)
         {
             throw new NotImplementedException();
         }
@@ -129,7 +226,6 @@ namespace TradingBot.Broker
         {
             throw new NotImplementedException();
         }
-
 
         public void contractDetails(int reqId, ContractDetails contractDetails)
         {
@@ -161,7 +257,7 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void execDetails(int reqId, Contract contract, Execution execution)
+        public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
             throw new NotImplementedException();
         }
@@ -231,11 +327,6 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void managedAccounts(string accountsList)
-        {
-            throw new NotImplementedException();
-        }
-
         public void marketDataType(int reqId, int marketDataType)
         {
             throw new NotImplementedException();
@@ -261,8 +352,7 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-
-        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
+        public void openOrder(int orderId, IBApi.Contract contract, Order order, OrderState orderState)
         {
             throw new NotImplementedException();
         }
@@ -292,7 +382,7 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void position(string account, Contract contract, double pos, double avgCost)
+        public void position(string account, IBApi.Contract contract, double pos, double avgCost)
         {
             throw new NotImplementedException();
         }
@@ -302,7 +392,7 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void positionMulti(int requestId, string account, string modelCode, Contract contract, double pos, double avgCost)
+        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, double pos, double avgCost)
         {
             throw new NotImplementedException();
         }
@@ -437,16 +527,6 @@ namespace TradingBot.Broker
             throw new NotImplementedException();
         }
 
-        public void updateAccountTime(string timestamp)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void updateAccountValue(string key, string value, string currency, string accountName)
-        {
-            throw new NotImplementedException();
-        }
-
         public void updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
         {
             throw new NotImplementedException();
@@ -458,11 +538,6 @@ namespace TradingBot.Broker
         }
 
         public void updateNewsBulletin(int msgId, int msgType, string message, string origExchange)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
             throw new NotImplementedException();
         }
