@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 using TradingBot.Broker;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Strategies
 {
-    public interface IStrategy
+    internal interface IState
     {
-        public bool Evaluate(out Order order);
+        //IState Evaluate(MarketData.Bar marketData);
     }
 }

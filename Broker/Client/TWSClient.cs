@@ -1,20 +1,19 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using IBApi;
 using TradingBot.Utils;
-
+using TradingBot.Broker.MarketData;
+using System.Reflection.Metadata;
 
 namespace TradingBot.Broker.Client
 {
     internal partial class TWSClient : EWrapper
     {
-        const int DefaultPort = 7496;
-        const string DefaultIP = "127.0.0.1";
-        int _clientId = 1337;
-
-        int _nextValidId = -1;
+        int _nextValidOrderId = -1;
+        int _reqId = 0;
 
         EClientSocket _clientSocket;
         EReaderSignal _signal;
@@ -25,7 +24,13 @@ namespace TradingBot.Broker.Client
 
         string _accountCode = null;
         public Action<Account> AccountReceived;
-        Account _tmpAccount;
+        Account _account = new Account();
+
+        public Action<BidAsk> BidAskReceived;
+        Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
+        
+        public Action<Contract, MarketData.Bar> FiveSecBarReceived;
+        Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
 
         public TWSClient(ILogger logger)
         {
@@ -34,9 +39,13 @@ namespace TradingBot.Broker.Client
             _logger = logger;
         }
 
-        public void Connect()
+        int NextRequestId => _reqId++;
+
+        public void Connect(string host, int port, int clientId)
         {
-            _clientSocket.eConnect(DefaultIP, DefaultPort, _clientId);
+            //TODO: Handle IB server resets
+
+            _clientSocket.eConnect(host, port, clientId);
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
             _processMsgTask = Task.Run(ProcessMsg);
@@ -46,7 +55,7 @@ namespace TradingBot.Broker.Client
         public void Disconnect()
         {
             _clientSocket.reqAccountUpdates(false, _accountCode);
-            _clientSocket.eConnect(DefaultIP, DefaultPort, _clientId);
+            _clientSocket.eDisconnect();
         }
 
         public bool IsConnected => _clientSocket.IsConnected();
@@ -62,7 +71,7 @@ namespace TradingBot.Broker.Client
 
         public void connectAck()
         {
-            _logger.LogDebug($"Connecting client {_clientId} to TWS on {DefaultIP}:{DefaultPort}...");
+            _logger.LogDebug($"Connecting client to TWS...");
         }
 
         public void connectionClosed()
@@ -78,24 +87,24 @@ namespace TradingBot.Broker.Client
 
         public void nextValidId(int orderId)
         {
-            if (_nextValidId < 0)
+            if (_nextValidOrderId < 0)
             {
-                _logger.LogInfo($"Client {_clientId} connected.");
+                _logger.LogInfo($"Client connected.");
             }
 
-            _nextValidId = orderId;
+            _nextValidOrderId = orderId;
         }
         
         public void GetAccount()
         {
             _clientSocket.reqAccountUpdates(true, _accountCode);
-            _tmpAccount = new Account() { Code = _accountCode };
+            _account.Code = _accountCode;
         }
 
         public void updateAccountTime(string timestamp)
         {
             _logger.LogDebug($"Getting account time : {timestamp}");
-            _tmpAccount.Time = DateTime.Parse(timestamp);
+            _account.Time = DateTime.Parse(timestamp);
         }
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
@@ -110,17 +119,17 @@ namespace TradingBot.Broker.Client
                     break;
 
                 case "CashBalance":
-                    _tmpAccount.CashBalances.Add(new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency));
+                    _account.CashBalances.Add(new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency));
                     break;
 
                 case "RealizedPnL":
                     if (currency == "USD")
-                        _tmpAccount.RealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                        _account.RealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
                     break;
 
                 case "UnrealizedPnL":
                     if(currency == "USD")
-                        _tmpAccount.UnrealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                        _account.UnrealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
                     break;
             }
 
@@ -141,7 +150,7 @@ namespace TradingBot.Broker.Client
 
             _logger.LogDebug($"Getting portfolio : \n{pos}");
 
-            _tmpAccount.Positions.Add(pos);
+            _account.Positions.Add(pos);
         }
 
         Contract ConvertContract(IBApi.Contract ibc)
@@ -184,12 +193,60 @@ namespace TradingBot.Broker.Client
 
         public void accountDownloadEnd(string account)
         {
-            AccountReceived?.Invoke(_tmpAccount);
+            AccountReceived?.Invoke(_account);
+        }
+
+        public void RequestFiveSecondsBars(Contract contract)
+        {
+            if (_fiveSecSubscriptions.ContainsKey(contract))
+                return;
+
+            // TODO : enough??
+            var ibc = new IBApi.Contract()
+            {
+                ConId = contract.Id,
+                Symbol = contract.Symbol,
+                Exchange = contract.Exchange,
+            };
+
+            // TODO : Or contract id ???
+            int reqId = NextRequestId;
+            _fiveSecSubscriptions[contract] = reqId;
+
+            // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
+            _clientSocket.reqRealTimeBars(reqId, ibc, 5, "TRADES", true, null);
+        }
+
+        // called at 5 sec intervals
+        public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
+        {
+            var contract = _fiveSecSubscriptions.First(c => c.Value == reqId).Key;
+
+            FiveSecBarReceived?.Invoke(contract, new MarketData.Bar()
+            {
+                Open = Convert.ToDecimal(open),
+                Close = Convert.ToDecimal(close),
+                High = Convert.ToDecimal(high),
+                Low = Convert.ToDecimal(low),
+                Volume = volume,
+                TradeAmount = count,
+                Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime,
+            });
+        }
+
+        public void CancelFiveSecondsBarsRequest(Contract contract)
+        {
+            if(_fiveSecSubscriptions.ContainsKey(contract))
+            {
+                _clientSocket.cancelRealTimeBars(_fiveSecSubscriptions[contract]);
+                _fiveSecSubscriptions.Remove(contract);
+            }
         }
 
         public void error(Exception e)
         {
             _logger.LogError(e.Message);
+            throw e;
         }
 
         public void error(string str)
@@ -242,7 +299,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void completedOrder(IBApi.Contract contract, Order order, OrderState orderState)
+        public void completedOrder(IBApi.Contract contract, IBApi.Order order, OrderState orderState)
         {
             throw new NotImplementedException();
         }
@@ -312,7 +369,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void historicalData(int reqId, Bar bar)
+        public void historicalData(int reqId, IBApi.Bar bar)
         {
             throw new NotImplementedException();
         }
@@ -322,7 +379,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void historicalDataUpdate(int reqId, Bar bar)
+        public void historicalDataUpdate(int reqId, IBApi.Bar bar)
         {
             throw new NotImplementedException();
         }
@@ -377,7 +434,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void openOrder(int orderId, IBApi.Contract contract, Order order, OrderState orderState)
+        public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, OrderState orderState)
         {
             throw new NotImplementedException();
         }
@@ -423,11 +480,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void positionMultiEnd(int requestId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
             throw new NotImplementedException();
         }
