@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Text;
 using TradingBot.Broker;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Strategies
 {
     public interface IStrategy
     {
-        public bool Evaluate(out Order order);
+        bool Evaluate(Bar bar, BidAsk bidAsk, out Order order);
+
+        Contract Contract { get; }
     }
 }

@@ -2,23 +2,39 @@
 using System.Collections.Generic;
 using System.Text;
 using TradingBot.Broker;
+using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
+using TradingBot.Utils;
 
 namespace TradingBot
 {
     public class Trader
     {
+        ILogger _logger;
         IBroker _broker;
-        List<IStrategy> _strategies;
+        List<IStrategy> _strategies = new List<IStrategy>();
+        Dictionary<Contract, MarketData> MarketData = new Dictionary<Contract, MarketData>();
 
-        public Trader()
+
+        public Trader(ILogger logger)
         {
-
+            _logger = logger;
+            _broker = new IBBroker(logger);
+            _broker.Connect();
         }
 
         public void Start()
         {
-            
+            Contract contract = _broker.GetContract("GME");
+            _broker.RequestBars(contract, OnBarsReceived);
+        }
+
+        void OnBarsReceived(Contract contract, Bar bar)
+        {
+            if (!MarketData.ContainsKey(contract))
+                MarketData.Add(contract, new MarketData());
+
+            MarketData[contract].Bar = bar;
         }
 
         void Trade()
@@ -29,7 +45,8 @@ namespace TradingBot
                 {
                     foreach(IStrategy strategy in _strategies)
                     {
-                        if(strategy.Evaluate(out Order order))
+                        var data = MarketData[strategy.Contract];
+                        if(strategy.Evaluate(data.Bar, data.BidAsk, out Order order))
                         {
                             //_broker.PlaceOrder(order);
                         }
@@ -39,12 +56,14 @@ namespace TradingBot
             catch(Exception e)
             {
                 //_broker.SellEverything();
+                _logger.LogError(e.Message);
             }
         }
 
         public void Stop()
         {
-
+            // Kill task
+            //_broker.SellEverything();
         }
     }
 }

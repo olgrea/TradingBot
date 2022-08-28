@@ -8,6 +8,6 @@ namespace TradingBot.Strategies
 {
     internal interface IState
     {
-        //IState Evaluate(MarketData.Bar marketData);
+        IState Evaluate(Bar bar, BidAsk bidAsk);
     }
 }
