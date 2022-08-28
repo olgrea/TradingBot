@@ -7,6 +7,7 @@ using IBApi;
 using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
 using System.Reflection.Metadata;
+using System.Threading;
 
 namespace TradingBot.Broker.Client
 {
@@ -23,7 +24,6 @@ namespace TradingBot.Broker.Client
         Task _processMsgTask;
 
         string _accountCode = null;
-        public Action<Account> AccountReceived;
         Account _account = new Account();
 
         public Action<BidAsk> BidAskReceived;
@@ -31,6 +31,9 @@ namespace TradingBot.Broker.Client
         
         public Action<Contract, MarketData.Bar> FiveSecBarReceived;
         Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
+
+        AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
+        Contract _contract;
 
         public TWSClient(ILogger logger)
         {
@@ -50,6 +53,7 @@ namespace TradingBot.Broker.Client
             _reader.Start();
             _processMsgTask = Task.Run(ProcessMsg);
             _logger.LogDebug($"Reader started and is listening to messages from TWS");
+            _autoResetEvent.WaitOne();
         }
 
         public void Disconnect()
@@ -89,16 +93,19 @@ namespace TradingBot.Broker.Client
         {
             if (_nextValidOrderId < 0)
             {
+                _autoResetEvent.Set();
                 _logger.LogInfo($"Client connected.");
             }
 
             _nextValidOrderId = orderId;
         }
         
-        public void GetAccount()
+        public Account GetAccount()
         {
             _clientSocket.reqAccountUpdates(true, _accountCode);
             _account.Code = _accountCode;
+            _autoResetEvent.WaitOne();
+            return _account;
         }
 
         public void updateAccountTime(string timestamp)
@@ -193,7 +200,7 @@ namespace TradingBot.Broker.Client
 
         public void accountDownloadEnd(string account)
         {
-            AccountReceived?.Invoke(_account);
+            _autoResetEvent.Set();
         }
 
         public void RequestFiveSecondsBars(Contract contract)
@@ -205,6 +212,8 @@ namespace TradingBot.Broker.Client
             var ibc = new IBApi.Contract()
             {
                 ConId = contract.Id,
+                Currency = contract.Currency,
+                SecType = contract is Stock ? "STK" : "OPT",
                 Symbol = contract.Symbol,
                 Exchange = contract.Exchange,
             };
@@ -241,6 +250,31 @@ namespace TradingBot.Broker.Client
                 _clientSocket.cancelRealTimeBars(_fiveSecSubscriptions[contract]);
                 _fiveSecSubscriptions.Remove(contract);
             }
+        }
+
+        public Contract GetContract(string ticker)
+        {
+            var sampleContract = new IBApi.Contract()
+            {
+                Currency = "USD",
+                Exchange = "SMART",
+                Symbol = ticker,
+                SecType = "STK"
+            };
+
+            _clientSocket.reqContractDetails(NextRequestId, sampleContract);
+            _autoResetEvent.WaitOne();
+            return _contract;
+        }
+
+        public void contractDetails(int reqId, ContractDetails contractDetails)
+        {
+            _contract = ConvertContract(contractDetails.Contract);
+        }
+
+        public void contractDetailsEnd(int reqId)
+        {
+            _autoResetEvent.Set();
         }
 
         public void error(Exception e)
@@ -305,16 +339,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void completedOrdersEnd()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void contractDetails(int reqId, ContractDetails contractDetails)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void contractDetailsEnd(int reqId)
         {
             throw new NotImplementedException();
         }

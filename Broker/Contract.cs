@@ -5,17 +5,19 @@ using IBApi;
 
 namespace TradingBot.Broker
 {
-    internal enum OptionType
+    public enum OptionType
     {
         Call, Put
     }
 
-    internal abstract class Contract
+    public abstract class Contract
     {
-        public int Id { get; set; }
+        public int Id { get; set; } = -1;
         public string Symbol { get; set; }
         public string Exchange { get; set; }
         public string Currency { get; set; }
+
+        public override int GetHashCode() => Id;
     }
 
     internal class Stock : Contract

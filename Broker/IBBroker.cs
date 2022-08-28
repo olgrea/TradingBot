@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-
+using System.Threading;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
@@ -17,7 +17,7 @@ namespace TradingBot.Broker
         Account _account;
         ILogger _logger;
 
-        Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars;
+        Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<Bar>>();
         Dictionary<Contract, uint> _counters = new Dictionary<Contract, uint>();
 
         public IBBroker(ILogger logger)
@@ -25,13 +25,10 @@ namespace TradingBot.Broker
             _logger = logger;
             
             _client = new TWSClient(logger);
-            _client.AccountReceived += OnAccountReceived;
             _client.FiveSecBarReceived += OnFiveSecondsBarReceived;
         }
 
-        public Account Account => _account;
-
-        public Dictionary<Contract, Action<MarketData.Bar>> FiveSecBarReceived;
+        Dictionary<Contract, Action<Contract, MarketData.Bar>> _fiveSecBarReceived;
 
         public void Connect()
         {
@@ -43,21 +40,23 @@ namespace TradingBot.Broker
             _client.Disconnect();
         }
 
-        public bool IsConnected => _client.IsConnected;
-
-        public void GetAccount()
+        public Account GetAccount()
         {
-            _client.GetAccount();
+            return _client.GetAccount();
         }
 
-        void OnAccountReceived(Account account)
+        public Contract GetContract(string ticker)
         {
-            _account = account;
+            return _client.GetContract(ticker);
         }
 
-        public void RequestFiveSecondsBars(Contract contract)
+        public void RequestBars(Contract contract, Action<Contract, Bar> callback)
         {
-            _client.RequestFiveSecondsBars(contract);
+            if(!_fiveSecBarReceived.ContainsKey(contract))
+            {
+                _fiveSecBarReceived[contract] = callback;
+                _client.RequestFiveSecondsBars(contract);
+            }
         }
 
         void OnFiveSecondsBarReceived(Contract contract, MarketData.Bar bar)
@@ -75,8 +74,7 @@ namespace TradingBot.Broker
                 list.RemoveLast();
             }
 
-
-            //FiveSecBarReceived?.Invoke(contract, bar);
+            _fiveSecBarReceived[contract]?.Invoke(contract, bar);
         }
 
         Bar MakeBar(LinkedList<Bar> list, int seconds)
@@ -106,9 +104,13 @@ namespace TradingBot.Broker
             return bar;
         }
 
-        public void CancelFiveSecondsBarsRequest(Contract contract)
+        public void CancelBarsRequest(Contract contract)
         {
-            _client.CancelFiveSecondsBarsRequest(contract);
+            if(_fiveSecBarReceived.ContainsKey(contract))
+            {
+                _client.CancelFiveSecondsBarsRequest(contract);
+                _fiveSecBarReceived.Remove(contract);
+            }
         }
     }
 }
