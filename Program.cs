@@ -13,10 +13,9 @@ namespace TradingBot
             var client = new IBBroker(new ConsoleLogger());
             client.Connect();
 
-            while (!client.IsConnected) ;
+            var account = client.GetAccount();
 
-            client.GetAccount();
-
+            var contract = client.GetContract("GME");
 
             Console.ReadKey();
             client.Disconnect();
