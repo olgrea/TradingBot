@@ -20,7 +20,12 @@ namespace TradingBot.Broker
         public override int GetHashCode() => Id;
     }
 
-    internal class Stock : Contract
+    public class Cash : Contract
+    {
+
+    }
+
+    public class Stock : Contract
     {
         public string LastTradeDate { get; set; }
 
@@ -30,7 +35,7 @@ namespace TradingBot.Broker
         }
     }
 
-    internal class Option : Contract
+    public class Option : Contract
     {
         public Decimal Strike { get; set; }
         public Decimal Multiplier { get; set; }
