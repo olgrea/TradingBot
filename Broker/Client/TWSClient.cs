@@ -6,9 +6,7 @@ using System.Threading.Tasks;
 using IBApi;
 using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
-using System.Reflection.Metadata;
 using System.Threading;
-using System.Drawing;
 
 namespace TradingBot.Broker.Client
 {
