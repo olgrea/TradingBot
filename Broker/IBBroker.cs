@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using TradingBot.Broker.Client;
@@ -15,6 +16,7 @@ namespace TradingBot.Broker
 
         TWSClient _client;
         ILogger _logger;
+        int _counter = 0;
 
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
         Dictionary<Contract, uint> _counters = new Dictionary<Contract, uint>();
@@ -28,8 +30,10 @@ namespace TradingBot.Broker
             _client.BidAskReceived += OnBidAskReceived;
         }
 
-        Dictionary<Contract, Action<Contract, MarketData.Bar>> _fiveSecBarReceived;
-        Dictionary<Contract, Action<Contract, BidAsk>> _bidAskReceived;
+        Dictionary<Contract, Dictionary<BarLength, Action<Contract, MarketData.Bar>>> _barReceived = new Dictionary<Contract, Dictionary<BarLength, Action<Contract, Bar>>>();
+        
+        Dictionary<Contract, Action<Contract, MarketData.Bar>> _oneMinuteBarReceived = new Dictionary<Contract, Action<Contract, Bar>>();
+        Dictionary<Contract, Action<Contract, BidAsk>> _bidAskReceived = new Dictionary<Contract, Action<Contract, BidAsk>>();
 
         public void Connect()
         {
@@ -74,13 +78,16 @@ namespace TradingBot.Broker
             }
         }
 
-        public void RequestBars(Contract contract, Action<Contract, Bar> callback)
+        public void RequestBars(Contract contract, BarLength barLength, Action<Contract, Bar> callback)
         {
-            if(!_fiveSecBarReceived.ContainsKey(contract))
-            {
-                _fiveSecBarReceived[contract] = callback;
+            if (!_barReceived.ContainsKey(contract))
+                _barReceived[contract] = new Dictionary<BarLength, Action<Contract, Bar>>();
+
+            if (!_barReceived[contract].ContainsKey(barLength))
+                _barReceived[contract][barLength] = callback;
+
+            if(_barReceived.Count == 1)
                 _client.RequestFiveSecondsBars(contract);
-            }
         }
 
         void OnFiveSecondsBarReceived(Contract contract, MarketData.Bar bar)
@@ -98,13 +105,28 @@ namespace TradingBot.Broker
                 list.RemoveLast();
             }
 
-            _fiveSecBarReceived[contract]?.Invoke(contract, bar);
+            if(_barReceived[contract].ContainsKey(BarLength.FiveSec))
+                _barReceived[contract][BarLength.FiveSec]?.Invoke(contract, bar);
+
+            //++_counter;
+            //if (_barReceived[contract].ContainsKey(BarLength.OneMinute) && (_counter % (60 / 5)) == 0)
+
+            if (_barReceived[contract].ContainsKey(BarLength.OneMinute) && list.Count > (60 / 5)+1 && bar.Time.Second == 0)
+            {
+                var oneMinBar = MakeBar(list, 60);
+                oneMinBar.BarLength = BarLength.OneMinute;
+                _barReceived[contract][BarLength.OneMinute]?.Invoke(contract, oneMinBar);
+            }
         }
 
         Bar MakeBar(LinkedList<Bar> list, int seconds)
         {
             Bar bar = new Bar() { High = Decimal.MinValue, Low = Decimal.MaxValue};
             var e = list.GetEnumerator();
+            e.MoveNext();
+
+            // The 1st bar shouldn't be included.
+            e.MoveNext();
 
             int nbBars = seconds / 5;
             for (int i = 0; i < nbBars; i++, e.MoveNext())
@@ -112,8 +134,7 @@ namespace TradingBot.Broker
                 Bar current = e.Current;
                 if(i == 0)
                 {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
+                    bar.Close = current.Close;
                 }
 
                 bar.High = Math.Max(bar.High, current.High);
@@ -122,18 +143,37 @@ namespace TradingBot.Broker
                 bar.TradeAmount += current.TradeAmount;
 
                 if (i == nbBars - 1)
-                    bar.Close = current.Close;
+                {
+                    bar.Open = current.Open;
+                    bar.Time = current.Time;
+                }
             }
 
             return bar;
         }
 
-        public void CancelBarsRequest(Contract contract)
+        public void CancelAllBarsRequest(Contract contract)
         {
-            if(_fiveSecBarReceived.ContainsKey(contract))
+            if(!_barReceived.ContainsKey(contract))
+                return;
+
+            _barReceived[contract].Clear();
+            _barReceived.Remove(contract);
+            _client.CancelFiveSecondsBarsRequest(contract);
+        }
+
+        public void CancelBarsRequest(Contract contract, BarLength barLength)
+        {
+            if (!_barReceived.ContainsKey(contract))
+                return;
+
+            if (_barReceived[contract].ContainsKey(barLength))
+                _barReceived[contract].Remove(barLength);
+
+            if(_barReceived[contract].Count == 0)
             {
+                _barReceived.Remove(contract);
                 _client.CancelFiveSecondsBarsRequest(contract);
-                _fiveSecBarReceived.Remove(contract);
             }
         }
     }

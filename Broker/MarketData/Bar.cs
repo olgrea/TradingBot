@@ -4,6 +4,12 @@ using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
+    public enum BarLength
+    {
+        FiveSec,
+        OneMinute
+    }
+
     public class Bar
     {
         public Decimal Open { get; set; }
@@ -13,6 +19,7 @@ namespace TradingBot.Broker.MarketData
         public long Volume { get; set; }
         public int TradeAmount { get; set; }
         public DateTime Time { get; set; }
+        public BarLength BarLength { get; set; }
 
         public override bool Equals(object obj)
         {

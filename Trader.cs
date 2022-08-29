@@ -26,7 +26,7 @@ namespace TradingBot
         public void Start()
         {
             Contract contract = _broker.GetContract("GME");
-            _broker.RequestBars(contract, OnBarsReceived);
+            _broker.RequestBars(contract, BarLength.FiveSec, OnBarsReceived);
             _broker.RequestBidAsk(contract, OnBidAskReceived);
         }
 
