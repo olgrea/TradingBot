@@ -12,4 +12,9 @@ namespace TradingBot.Strategies
 
         Contract Contract { get; }
     }
+
+    public interface IState
+    {
+        IState Evaluate(Bar bar, BidAsk bidAsk, out Order order);
+    }
 }
