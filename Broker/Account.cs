@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker
 {
-    internal class Account
+    public class Account
     {
         public string Code { get; set; }
         public DateTime Time { get; set; }
@@ -14,7 +14,7 @@ namespace TradingBot.Broker
         public CashBalance UnrealizedPnL { get; set; }
     }
 
-    internal class CashBalance
+    public class CashBalance
     {
         public CashBalance(decimal amount, string currency)
         {

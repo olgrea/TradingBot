@@ -7,7 +7,7 @@ using TradingBot.Utils;
 
 namespace TradingBot.Broker
 {
-    internal class IBBroker : IBroker
+    public class IBBroker : IBroker
     {
         const int DefaultPort = 7496;
         const string DefaultIP = "127.0.0.1";

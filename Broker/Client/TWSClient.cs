@@ -60,6 +60,12 @@ namespace TradingBot.Broker.Client
         public void Disconnect()
         {
             _clientSocket.reqAccountUpdates(false, _accountCode);
+            foreach (var kvp in _bidAskSubscriptions)
+                _clientSocket.cancelTickByTickData(kvp.Value);
+
+            foreach (var kvp in _fiveSecSubscriptions)
+                _clientSocket.cancelTickByTickData(kvp.Value);
+
             _clientSocket.eDisconnect();
         }
 
@@ -170,10 +176,6 @@ namespace TradingBot.Broker.Client
                 case "STK":
                     contract = new Stock()
                     {
-                        Id = ibc.ConId,
-                        Currency = ibc.Currency,
-                        Exchange = ibc.Exchange,
-                        Symbol = ibc.Symbol,
                         LastTradeDate = ibc.LastTradeDateOrContractMonth
                     };
                     break;
@@ -181,10 +183,6 @@ namespace TradingBot.Broker.Client
                 case "OPT":
                     contract = new Option()
                     {
-                        Id = ibc.ConId,
-                        Currency = ibc.Currency,
-                        Exchange = ibc.Exchange,
-                        Symbol = ibc.Symbol,
                         ContractMonth = ibc.LastTradeDateOrContractMonth,
                         Strike = Convert.ToDecimal(ibc.Strike),
                         Multiplier = Decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
@@ -192,9 +190,18 @@ namespace TradingBot.Broker.Client
                     };
                     break;
 
+                case "CASH":
+                    contract = new Cash();
+                    break;
+
                 default: 
                     throw new NotSupportedException($"This type of contract is not supported : {ibc.SecType}");
             }
+
+            contract.Id = ibc.ConId;
+            contract.Currency = ibc.Currency;
+            contract.Exchange = ibc.Exchange ?? ibc.PrimaryExch;
+            contract.Symbol = ibc.Symbol;
 
             return contract;
         }
@@ -240,7 +247,7 @@ namespace TradingBot.Broker.Client
                 Low = Convert.ToDecimal(low),
                 Volume = volume,
                 TradeAmount = count,
-                Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime,
+                Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime.ToLocalTime(),
             });
         }
 
@@ -286,7 +293,7 @@ namespace TradingBot.Broker.Client
                 BidSize = bidSize,
                 Ask = Convert.ToDecimal(askPrice),
                 AskSize = askSize,
-                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime,
+                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
             });
         }
 

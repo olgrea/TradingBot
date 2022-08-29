@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker
 {
-    internal class Position
+    public class Position
     {
         public Contract Contract { get; set; }
         public Decimal PositionAmount { get; set; }
