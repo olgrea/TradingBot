@@ -22,6 +22,8 @@ namespace TradingBot.Strategies
 
         public void Update(Bar bar)
         {
+            // TODO : make sure that metrics are still valid when bars are not of the same length
+
             _bars.AddLast(bar);
             if(_bars.Count > nbPeriods)
                 _bars.RemoveFirst();

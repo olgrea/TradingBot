@@ -46,28 +46,28 @@ namespace TradingBot
             MarketData[contract].Bar = bar;
         }
 
-        void Trade()
-        {
-            try
-            {
-                while(true)
-                {
-                    foreach(IStrategy strategy in _strategies)
-                    {
-                        var data = MarketData[strategy.Contract];
-                        if(strategy.Evaluate(data.Bar, data.BidAsk, out Order order))
-                        {
-                            //_broker.PlaceOrder(order);
-                        }
-                    }
-                }
-            }
-            catch(Exception e)
-            {
-                //_broker.SellEverything();
-                _logger.LogError(e.Message);
-            }
-        }
+        //void Trade()
+        //{
+        //    try
+        //    {
+        //        while(true)
+        //        {
+        //            foreach(IStrategy strategy in _strategies)
+        //            {
+        //                var data = MarketData[strategy.Contract];
+        //                if(strategy.Evaluate(data.Bar, data.BidAsk, out Order order))
+        //                {
+        //                    //_broker.PlaceOrder(order);
+        //                }
+        //            }
+        //        }
+        //    }
+        //    catch(Exception e)
+        //    {
+        //        //_broker.SellEverything();
+        //        _logger.LogError(e.Message);
+        //    }
+        //}
 
         public void Stop()
         {

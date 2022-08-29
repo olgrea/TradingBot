@@ -10,49 +10,92 @@ namespace TradingBot.Strategies
     {
         IState _currentState = null;
 
-        public LowerBBStrategy(Contract contract)
+        public LowerBBStrategy(Contract contract, IBroker broker)
         {
             Contract = contract;
+            Broker = broker;
 
             States = new Dictionary<string, IState>()
             {
-                { nameof(StartState), new StartState(this)},
+                { nameof(InitState), new InitState(this)},
                 { nameof(MonitoringState), new MonitoringState(this)},
                 { nameof(OversoldState), new OversoldState(this)},
                 { nameof(RisingState), new RisingState(this)},
                 { nameof(SubmitBuyOrderState), new SubmitBuyOrderState(this)},
+                { nameof(BoughtState), new BoughtState(this)},
             };
         }
 
         public Contract Contract { get; private set; }
+        public IBroker Broker { get; private set; }
 
-        public bool Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+        void IStrategy.Start()
         {
-            _currentState = _currentState.Evaluate(bar, bidAsk, out order);
-            return order != null;
+            if (CurrentState == null)
+            {
+                CurrentState = States[nameof(InitState)];
+            }
+            Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
+        }
+
+        void IStrategy.Stop()
+        {
+            CurrentState = null;
+            Broker.CancelBarsRequest(Contract, BarLength._5Sec, OnBarReceived);
+        } 
+
+        void OnBarReceived(Contract contract, Bar bar)
+        {
+            BB.Update(bar);
         }
 
         public BollingerBands BB = new BollingerBands();
 
         public readonly Dictionary<string, IState> States;
 
-        class StartState : IState
+        public IState CurrentState
+        {
+            get => _currentState;
+            set
+            {
+                if(value != _currentState)
+                {
+                    value?.SubscribeToMarketData();
+                    _currentState?.UnsubscribeToMarketData();
+                    _currentState = value;
+                }
+            }
+        }
+
+        class InitState : IState
         {
             LowerBBStrategy _strat;
-            public StartState(LowerBBStrategy strat)
+            public InitState(LowerBBStrategy strat)
             {
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                order = null;
-
-                _strat.BB.Update(bar);
                 if (!_strat.BB.IsReady)
-                    return this;
+                    _strat.CurrentState = this;
                 else
-                    return _strat.States[nameof(MonitoringState)];
+                    _strat.CurrentState = _strat.States[nameof(MonitoringState)];
+            }
+
+            void OnBarReceived(Contract contract, Bar bar)
+            {
+                Evaluate(bar, null);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
         }
 
@@ -64,15 +107,27 @@ namespace TradingBot.Strategies
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                order = null;
-                _strat.BB.Update(bar);
-
                 if(bar.Low <= _strat.BB.LowerBB)
-                    return _strat.States[nameof(OversoldState)];
+                    _strat.CurrentState = _strat.States[nameof(OversoldState)];
                 else
-                    return this;
+                    _strat.CurrentState = this;
+            }
+
+            void OnBarReceived(Contract contract, Bar bar)
+            {
+                Evaluate(bar, null);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBars(_strat.Contract, BarLength._1Min, OnBarReceived);
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._1Min, OnBarReceived);
             }
         }
 
@@ -84,35 +139,67 @@ namespace TradingBot.Strategies
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                order = null;
-                _strat.BB.Update(bar);
-
                 if (bar.Low <= _strat.BB.LowerBB)
-                    return this;
+                    _strat.CurrentState = this;
                 else
-                    return _strat.States[nameof(RisingState)];
+                    _strat.CurrentState = _strat.States[nameof(RisingState)];
+            }
+
+            void OnBarReceived(Contract contract, Bar bar)
+            {
+                Evaluate(bar, null);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
             }
         }
 
         class RisingState : IState
         {
+            int _counter = 0;
+
             LowerBBStrategy _strat;
             public RisingState(LowerBBStrategy strat)
             {
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                order = null;
-                _strat.BB.Update(bar);
+                _counter++;
 
                 if (bar.Low <= _strat.BB.LowerBB)
-                    return _strat.States[nameof(OversoldState)]; 
+                    _strat.CurrentState = _strat.States[nameof(OversoldState)]; 
+                else if(_counter < 3)
+                    _strat.CurrentState = this;
                 else
-                    return _strat.States[nameof(SubmitBuyOrderState)];
+                    _strat.CurrentState = _strat.States[nameof(SubmitBuyOrderState)];
+            }
+
+            void OnBarReceived(Contract contract, Bar bar)
+            {
+                Evaluate(bar, null);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _counter = 0;
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _counter = 0;
             }
         }
 
@@ -124,17 +211,28 @@ namespace TradingBot.Strategies
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                _strat.BB.Update(bar);
-                
-                
-                order = new Order();
 
                 //if (/*order is filled*/)
-                    return _strat.States[nameof(BoughtState)];
+                //_strat.CurrentState = _strat.States[nameof(BoughtState)];
                 //else
                 //    return _strat.States[nameof(MonitoringState)];
+            }
+
+            void OnBidAskReceived(Contract contract, BidAsk bidAsk)
+            {
+                Evaluate(null, bidAsk);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBidAsk(_strat.Contract, OnBidAskReceived);
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBidAskRequest(_strat.Contract, OnBidAskReceived);
             }
         }
 
@@ -146,15 +244,27 @@ namespace TradingBot.Strategies
                 _strat = strat;
             }
 
-            public IState Evaluate(Bar bar, BidAsk bidAsk, out Order order)
+            public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                _strat.BB.Update(bar);
-                order = null;
-
                 //if (/*order is opened*/)
-                    return this;
+                _strat.CurrentState = this;
                 //else
                 //    return _strat.States[nameof(MonitoringState)];
+            }
+
+            void OnBarReceived(Contract contract, Bar bar)
+            {
+                Evaluate(bar, null);
+            }
+
+            public void SubscribeToMarketData()
+            {
+                _strat.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
+            }
+
+            public void UnsubscribeToMarketData()
+            {
+                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
         }
     }
