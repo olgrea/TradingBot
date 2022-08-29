@@ -14,10 +14,9 @@ namespace TradingBot.Broker
         int _clientId = 1337;
 
         TWSClient _client;
-        Account _account;
         ILogger _logger;
 
-        Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<Bar>>();
+        Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
         Dictionary<Contract, uint> _counters = new Dictionary<Contract, uint>();
 
         public IBBroker(ILogger logger)
@@ -26,9 +25,11 @@ namespace TradingBot.Broker
             
             _client = new TWSClient(logger);
             _client.FiveSecBarReceived += OnFiveSecondsBarReceived;
+            _client.BidAskReceived += OnBidAskReceived;
         }
 
         Dictionary<Contract, Action<Contract, MarketData.Bar>> _fiveSecBarReceived;
+        Dictionary<Contract, Action<Contract, BidAsk>> _bidAskReceived;
 
         public void Connect()
         {
@@ -48,6 +49,20 @@ namespace TradingBot.Broker
         public Contract GetContract(string ticker)
         {
             return _client.GetContract(ticker);
+        }
+
+        public void RequestBidAsk(Contract contract, Action<Contract, BidAsk> callback)
+        {
+            if (!_bidAskReceived.ContainsKey(contract))
+            {
+                _bidAskReceived[contract] = callback;
+                _client.RequestBidAsk(contract);
+            }
+        }
+
+        void OnBidAskReceived(Contract contract, BidAsk bidAsk)
+        {
+            _bidAskReceived[contract]?.Invoke(contract, bidAsk);
         }
 
         public void RequestBars(Contract contract, Action<Contract, Bar> callback)
