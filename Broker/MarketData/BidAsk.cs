@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
-    public struct BidAsk
+    public class BidAsk
     {
         public Decimal Bid { get; set; }
         public int BidSize { get; set; }
