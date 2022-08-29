@@ -20,7 +20,7 @@ namespace TradingBot
 
             var contract = client.GetContract("GME");
 
-            client.RequestBars(contract, BarLength.OneMinute, OnBarReceived);
+            client.RequestBars(contract, BarLength.ThirtySec, OnBarReceived);
             //client.RequestBidAsk(contract, OnBidAskReceived);
 
             Console.ReadKey();
