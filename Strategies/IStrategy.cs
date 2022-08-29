@@ -1,20 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
+﻿using TradingBot.Broker;
 
 namespace TradingBot.Strategies
 {
     public interface IStrategy
     {
-        bool Evaluate(Bar bar, BidAsk bidAsk, out Order order);
+        void Start();
+        void Stop();
 
         Contract Contract { get; }
-    }
-
-    public interface IState
-    {
-        IState Evaluate(Bar bar, BidAsk bidAsk, out Order order);
+        IBroker Broker { get; }
     }
 }
