@@ -8,6 +8,7 @@ using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
 using System.Reflection.Metadata;
 using System.Threading;
+using System.Drawing;
 
 namespace TradingBot.Broker.Client
 {
@@ -26,7 +27,7 @@ namespace TradingBot.Broker.Client
         string _accountCode = null;
         Account _account = new Account();
 
-        public Action<BidAsk> BidAskReceived;
+        public Action<Contract, BidAsk> BidAskReceived;
         Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
         
         public Action<Contract, MarketData.Bar> FiveSecBarReceived;
@@ -249,6 +250,52 @@ namespace TradingBot.Broker.Client
             {
                 _clientSocket.cancelRealTimeBars(_fiveSecSubscriptions[contract]);
                 _fiveSecSubscriptions.Remove(contract);
+            }
+        }
+
+        public void RequestBidAsk(Contract contract)
+        {
+            if (_bidAskSubscriptions.ContainsKey(contract))
+                return;
+
+            // TODO : enough??
+            var ibc = new IBApi.Contract()
+            {
+                ConId = contract.Id,
+                Currency = contract.Currency,
+                SecType = contract is Stock ? "STK" : "OPT",
+                Symbol = contract.Symbol,
+                Exchange = contract.Exchange,
+            };
+
+            // TODO : Or contract id ???
+            int reqId = NextRequestId;
+            _bidAskSubscriptions[contract] = reqId;
+
+            // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
+            _clientSocket.reqTickByTickData(reqId, ibc, "BidAsk", 0, false);
+        }
+
+        public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
+        {
+            var contract = _bidAskSubscriptions.First(c => c.Value == reqId).Key;
+
+            BidAskReceived?.Invoke(contract, new MarketData.BidAsk()
+            {
+                Bid = Convert.ToDecimal(bidPrice),
+                BidSize = bidSize,
+                Ask = Convert.ToDecimal(askPrice),
+                AskSize = askSize,
+                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime,
+            });
+        }
+
+        public void CancelBidAskRequest(Contract contract)
+        {
+            if (_bidAskSubscriptions.ContainsKey(contract))
+            {
+                _clientSocket.cancelTickByTickData(_bidAskSubscriptions[contract]);
+                _bidAskSubscriptions.Remove(contract);
             }
         }
 
@@ -569,11 +616,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
             throw new NotImplementedException();
         }
