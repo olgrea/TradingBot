@@ -27,6 +27,15 @@ namespace TradingBot
         {
             Contract contract = _broker.GetContract("GME");
             _broker.RequestBars(contract, OnBarsReceived);
+            _broker.RequestBidAsk(contract, OnBidAskReceived);
+        }
+
+        void OnBidAskReceived(Contract contract, BidAsk bidAsk)
+        {
+            if (!MarketData.ContainsKey(contract))
+                MarketData.Add(contract, new MarketData());
+
+            MarketData[contract].BidAsk= bidAsk;
         }
 
         void OnBarsReceived(Contract contract, Bar bar)
@@ -64,6 +73,9 @@ namespace TradingBot
         {
             // Kill task
             //_broker.SellEverything();
+
+            //_broker.CancelBarsRequest()
+            //_broker.CancelBidAskRequest();
         }
     }
 }

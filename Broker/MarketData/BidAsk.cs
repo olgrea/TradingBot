@@ -10,5 +10,6 @@ namespace TradingBot.Broker.MarketData
         public int BidSize { get; set; }
         public Decimal Ask { get; set; }
         public int AskSize { get; set; }
+        public DateTime Time { get; set; }
     }
 }
