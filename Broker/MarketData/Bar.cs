@@ -7,6 +7,7 @@ namespace TradingBot.Broker.MarketData
     public enum BarLength
     {
         FiveSec,
+        ThirtySec,
         OneMinute
     }
 

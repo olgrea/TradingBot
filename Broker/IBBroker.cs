@@ -16,7 +16,6 @@ namespace TradingBot.Broker
 
         TWSClient _client;
         ILogger _logger;
-        int _counter = 0;
 
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
         Dictionary<Contract, uint> _counters = new Dictionary<Contract, uint>();
@@ -108,8 +107,12 @@ namespace TradingBot.Broker
             if(_barReceived[contract].ContainsKey(BarLength.FiveSec))
                 _barReceived[contract][BarLength.FiveSec]?.Invoke(contract, bar);
 
-            //++_counter;
-            //if (_barReceived[contract].ContainsKey(BarLength.OneMinute) && (_counter % (60 / 5)) == 0)
+            if (_barReceived[contract].ContainsKey(BarLength.ThirtySec) && list.Count > (30 / 5) + 1 && (bar.Time.Second % 30) == 0 )
+            {
+                var thirtySecBar = MakeBar(list, 30);
+                thirtySecBar.BarLength = BarLength.ThirtySec;
+                _barReceived[contract][BarLength.ThirtySec]?.Invoke(contract, thirtySecBar);
+            }
 
             if (_barReceived[contract].ContainsKey(BarLength.OneMinute) && list.Count > (60 / 5)+1 && bar.Time.Second == 0)
             {
