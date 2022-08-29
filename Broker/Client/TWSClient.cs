@@ -27,7 +27,8 @@ namespace TradingBot.Broker.Client
 
         public Action<Contract, BidAsk> BidAskReceived;
         Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
-        
+        MarketData.BidAsk _bidAsk = new BidAsk();
+
         public Action<Contract, MarketData.Bar> FiveSecBarReceived;
         Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
 
@@ -285,14 +286,13 @@ namespace TradingBot.Broker.Client
         {
             var contract = _bidAskSubscriptions.First(c => c.Value == reqId).Key;
 
-            BidAskReceived?.Invoke(contract, new MarketData.BidAsk()
-            {
-                Bid = Convert.ToDecimal(bidPrice),
-                BidSize = bidSize,
-                Ask = Convert.ToDecimal(askPrice),
-                AskSize = askSize,
-                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
-            });
+            _bidAsk.Bid = Convert.ToDecimal(bidPrice);
+            _bidAsk.BidSize = bidSize;
+            _bidAsk.Ask = Convert.ToDecimal(askPrice);
+            _bidAsk.AskSize = askSize;
+            _bidAsk.Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime();
+
+            BidAskReceived?.Invoke(contract, _bidAsk);
         }
 
         public void CancelBidAskRequest(Contract contract)
