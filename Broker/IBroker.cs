@@ -12,7 +12,8 @@ namespace TradingBot.Broker
         Contract GetContract(string ticker);
         void RequestBidAsk(Contract contract, Action<Contract, BidAsk> callback);
         void CancelBidAskRequest(Contract contract);
-        void RequestBars(Contract contract, Action<Contract, Bar> callback);
-        void CancelBarsRequest(Contract contract);
+        void RequestBars(Contract contract, BarLength barLength, Action<Contract, Bar> callback);
+        void CancelBarsRequest(Contract contract, BarLength barLength);
+        void CancelAllBarsRequest(Contract contract);
     }
 }
