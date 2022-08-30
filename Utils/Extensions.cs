@@ -79,20 +79,20 @@ namespace TradingBot.Utils
             {
                 case "MKT": break;
                 case "LMT":
-                    ibo.LmtPrice = Convert.ToDouble((order as Limit).LmtPrice);
+                    ibo.LmtPrice = Convert.ToDouble((order as LimitOrder).LmtPrice);
                     break;
 
                 case "STP": 
-                    ibo.AuxPrice = Convert.ToDouble((order as Stop).StopPrice);
+                    ibo.AuxPrice = Convert.ToDouble((order as StopOrder).StopPrice);
                     break;
 
                 case "TRAIL": 
-                    ibo.AuxPrice = Convert.ToDouble((order as TrailingStop).StopPrice);
-                    ibo.TrailingPercent = (order as TrailingStop).TrailingPercent;
+                    ibo.AuxPrice = Convert.ToDouble((order as TrailingStopOrder).StopPrice);
+                    ibo.TrailingPercent = (order as TrailingStopOrder).TrailingPercent;
                     break;
 
                 case "MIT": 
-                    ibo.AuxPrice = Convert.ToDouble((order as MarketIfTouched).TouchPrice);
+                    ibo.AuxPrice = Convert.ToDouble((order as MarketIfTouchedOrder).TouchPrice);
                     break;
                 
                 default:
@@ -109,19 +109,19 @@ namespace TradingBot.Utils
             switch (ibo.OrderType)
             {
                 case "MKT": 
-                    tbo = new Market();
+                    tbo = new MarketOrder();
                     break;
 
                 case "LMT":
-                    tbo = new Limit() { LmtPrice = Convert.ToDecimal(ibo.LmtPrice) };
+                    tbo = new LimitOrder() { LmtPrice = Convert.ToDecimal(ibo.LmtPrice) };
                     break;
 
                 case "STP":
-                    tbo = new Stop() { StopPrice = Convert.ToDecimal(ibo.AuxPrice) };
+                    tbo = new StopOrder() { StopPrice = Convert.ToDecimal(ibo.AuxPrice) };
                     break;
 
                 case "TRAIL":
-                    tbo = new TrailingStop() 
+                    tbo = new TrailingStopOrder() 
                     {
                         StopPrice = Convert.ToDecimal(ibo.AuxPrice) ,
                         TrailingPercent = ibo.TrailingPercent,
@@ -129,7 +129,7 @@ namespace TradingBot.Utils
                     break;
 
                 case "MIT":
-                    tbo = new MarketIfTouched() { TouchPrice = Convert.ToDecimal(ibo.AuxPrice) };
+                    tbo = new MarketIfTouchedOrder() { TouchPrice = Convert.ToDecimal(ibo.AuxPrice) };
                     break;
 
                 default:
