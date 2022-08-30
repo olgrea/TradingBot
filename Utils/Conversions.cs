@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Linq;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using TradingBot.Broker;
 
 namespace TradingBot.Utils
@@ -65,15 +62,22 @@ namespace TradingBot.Utils
             var ibo = new IBApi.Order()
             {
                 OrderType = order.OrderType,
-                ClientId = order.OrderRequest.ClientId, 
                 Action = order.Action.ToString(),
                 TotalQuantity = order.TotalQuantity,
                 OcaGroup = order.OcaGroup, 
                 OcaType = (int)order.OcaType,
-                Transmit = order.OrderRequest.Transmit,
                 OutsideRth = true,
                 Tif = "DAY"
             };
+
+            if(order.OrderRequest != null)
+            {
+                ibo.OrderId = order.OrderRequest.OrderId;
+                ibo.ClientId = order.OrderRequest.ClientId;
+                ibo.ParentId = order.OrderRequest.ParentId;
+                ibo.PermId = order.OrderRequest.PermId;
+                ibo.Transmit = order.OrderRequest.Transmit;
+            }
 
             switch(order.OrderType)
             {
@@ -141,7 +145,8 @@ namespace TradingBot.Utils
                 OrderId = ibo.OrderId,
                 ClientId = ibo.ClientId,
                 Transmit = ibo.Transmit,
-                ParentId = ibo.ParentId
+                ParentId = ibo.ParentId,
+                PermId = ibo.PermId,
             };
             
             tbo.Action = Enum.Parse<OrderAction>(ibo.Action);

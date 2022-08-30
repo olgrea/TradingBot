@@ -7,6 +7,7 @@ using IBApi;
 using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
 using System.Threading;
+using System.Diagnostics;
 
 namespace TradingBot.Broker.Client
 {
@@ -77,7 +78,7 @@ namespace TradingBot.Broker.Client
             _clientId = -1;
         }
 
-        public bool IsConnected => _clientSocket.IsConnected();
+        public bool IsConnected => _clientSocket.IsConnected() && _nextValidOrderId > 0;
 
         void ProcessMsg()
         {
@@ -104,16 +105,26 @@ namespace TradingBot.Broker.Client
             _accountCode = accountsList;
         }
 
+        public int GetNextValidOrderId(bool fromTWS = false)
+        {
+            if(fromTWS)
+            {
+                _clientSocket.reqIds(-1); // param is deprecated
+                _autoResetEvent.WaitOne();
+            }
+            return NextValidOrderId;   
+        }
+
         // The next valid identifier is persistent between TWS sessions
         public void nextValidId(int orderId)
         {
             if (_nextValidOrderId < 0)
             {
-                _autoResetEvent.Set();
                 _logger.LogInfo($"Client connected.");
             }
 
             _nextValidOrderId = orderId;
+            _autoResetEvent.Set();
         }
         
         public Account GetAccount()
@@ -280,20 +291,68 @@ namespace TradingBot.Broker.Client
             _autoResetEvent.Set();
         }
 
-        public void PlaceOrders(Contract contract, IList<Order> orders)
+        List<Order> AssignOrderIdsAndFlatten(Order order, List<Order> list = null)
         {
-            // We need to send orders with Transmit == false first;
-            foreach(var order in orders.OrderBy(o => Convert.ToInt32(o.Transmit)))
+            if (order == null) 
+                return null;
+
+            list ??= new List<Order>();
+
+            order.OrderRequest.OrderId = GetNextValidOrderId();
+            order.OrderRequest.Transmit = false;
+            list.Add(order);
+
+            if(order.AttachedOrders.Any())
             {
-                PlaceOrder(contract, order);
+
+                int parentId = order.OrderRequest.OrderId;
+                
+                int count = order.AttachedOrders.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    var child = order.AttachedOrders[i];
+
+                    child.OrderRequest.ParentId = parentId;
+
+                    //// only the last child must be set to true
+                    //child.OrderRequest.Transmit = i == count - 1;
+
+                    AssignOrderIdsAndFlatten(child, list);
+                }
             }
+
+            return list;
         }
+
+        //List<Order> Flatten(Order order)
+        //{
+        //    var list = new List<Order>();
+        //    list.Add(order);
+        //    if(order.AttachedOrders.Any())
+        //    {
+        //        foreach(var child in order.AttachedOrders)
+        //            list.AddRange(Flatten(child));
+        //    }
+
+        //    return list;
+        //}
 
         public void PlaceOrder(Contract contract, Order order)
         {
-            var ibo = order.ToIBApiOrder();
-            ibo.OrderId = NextValidOrderId;
-            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+            if (contract == null || order == null)
+                return;
+
+            var list = AssignOrderIdsAndFlatten(order);
+
+            // only the last child must be set to true
+            list.Last().OrderRequest.Transmit = true;
+
+            foreach(var o in list)
+            {
+                var ibo = o.ToIBApiOrder();
+                Debug.Assert(ibo.OrderId > 0);
+                _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+            }
         }
 
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)

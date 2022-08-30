@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using IBApi;
 
 namespace TradingBot.Broker
 {
@@ -18,27 +16,31 @@ namespace TradingBot.Broker
         REDUCE_NON_BLOCK = 3,
     }
 
+    public class OrderRequest
+    {
+        // TODO : handle order id better?
+        public int OrderId { get; set; }
+        public int ClientId { get; set; }
+        // if false, order will be created but not transmitted
+        public bool Transmit { get; set; } 
+        public int ParentId { get; set; }
+        public int PermId { get; set; }
+    }
+
     public abstract class Order
     {
         public readonly string OrderType;
         protected Order(string orderType) => OrderType = orderType;
 
-        // TODO : handle order id better?
-        public int ClientId { get; set; }
-
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
-
         public string OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
 
-        // if false, order will be created but not transmitted
-        public bool Transmit { get; set; } = true;
-        
-        public int ParentId { get; set; }
+        public List<Order> AttachedOrders { get; set; } = new List<Order>();
 
-        // TODO : handle attached order better and test this
-        //public List<Order> Children { get; set; } = new List<Order>();
+        // Filled in TWS client 
+        public OrderRequest OrderRequest { get; set; } = new OrderRequest();
     }
 
     public class MarketOrder : Order 
