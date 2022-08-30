@@ -152,7 +152,7 @@ namespace TradingBot.Broker.Client
         {
             var pos = new Position()
             {
-                Contract = ConvertContract(contract),
+                Contract = contract.ToTBContract(),
                 PositionAmount = Convert.ToDecimal(position),
                 MarketPrice = Convert.ToDecimal(marketPrice),
                 MarketValue = Convert.ToDecimal(marketValue),
@@ -166,45 +166,6 @@ namespace TradingBot.Broker.Client
             _account.Positions.Add(pos);
         }
 
-        Contract ConvertContract(IBApi.Contract ibc)
-        {
-            Contract contract = null;
-
-            switch(ibc.SecType)
-            {
-                case "STK":
-                    contract = new Stock()
-                    {
-                        LastTradeDate = ibc.LastTradeDateOrContractMonth
-                    };
-                    break;
-
-                case "OPT":
-                    contract = new Option()
-                    {
-                        ContractMonth = ibc.LastTradeDateOrContractMonth,
-                        Strike = Convert.ToDecimal(ibc.Strike),
-                        Multiplier = Decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
-                        OptionType = (ibc.Right == "C" || ibc.Right == "CALL") ? OptionType.Call : OptionType.Put,
-                    };
-                    break;
-
-                case "CASH":
-                    contract = new Cash();
-                    break;
-
-                default: 
-                    throw new NotSupportedException($"This type of contract is not supported : {ibc.SecType}");
-            }
-
-            contract.Id = ibc.ConId;
-            contract.Currency = ibc.Currency;
-            contract.Exchange = ibc.Exchange ?? ibc.PrimaryExch;
-            contract.Symbol = ibc.Symbol;
-
-            return contract;
-        }
-
         public void accountDownloadEnd(string account)
         {
             _autoResetEvent.Set();
@@ -215,15 +176,7 @@ namespace TradingBot.Broker.Client
             if (_fiveSecSubscriptions.ContainsKey(contract))
                 return;
 
-            var ibc = new IBApi.Contract()
-            {
-                ConId = contract.Id,
-                Currency = contract.Currency,
-                SecType = contract.SecType,
-                Symbol = contract.Symbol,
-                Exchange = contract.Exchange,
-            };
-
+            var ibc = contract.ToIBApiContract();
             int reqId = NextRequestId;
             _fiveSecSubscriptions[contract] = reqId;
 
@@ -262,15 +215,7 @@ namespace TradingBot.Broker.Client
             if (_bidAskSubscriptions.ContainsKey(contract))
                 return;
 
-            var ibc = new IBApi.Contract()
-            {
-                ConId = contract.Id,
-                Currency = contract.Currency,
-                SecType = contract.SecType,
-                Symbol = contract.Symbol,
-                Exchange = contract.Exchange,
-            };
-
+            var ibc = contract.ToIBApiContract();
             int reqId = NextRequestId;
             _bidAskSubscriptions[contract] = reqId;
 
@@ -317,7 +262,7 @@ namespace TradingBot.Broker.Client
 
         public void contractDetails(int reqId, ContractDetails contractDetails)
         {
-            _contract = ConvertContract(contractDetails.Contract);
+            _contract = contractDetails.Contract.ToTBContract();
         }
 
         public void contractDetailsEnd(int reqId)
@@ -381,7 +326,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void completedOrder(IBApi.Contract contract, IBApi.Order order, OrderState orderState)
+        public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
             throw new NotImplementedException();
         }
