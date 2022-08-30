@@ -7,7 +7,7 @@ using TradingBot.Broker;
 
 namespace TradingBot.Utils
 {
-    public static class Extensions
+    public static class Conversions
     {
         public static Contract ToTBContract(this IBApi.Contract ibc)
         {
@@ -65,12 +65,12 @@ namespace TradingBot.Utils
             var ibo = new IBApi.Order()
             {
                 OrderType = order.OrderType,
-                ClientId = order.ClientId, 
+                ClientId = order.OrderRequest.ClientId, 
                 Action = order.Action.ToString(),
                 TotalQuantity = order.TotalQuantity,
                 OcaGroup = order.OcaGroup, 
                 OcaType = (int)order.OcaType,
-                Transmit = order.Transmit,
+                Transmit = order.OrderRequest.Transmit,
                 OutsideRth = true,
                 Tif = "DAY"
             };
@@ -136,12 +136,18 @@ namespace TradingBot.Utils
                     throw new NotImplementedException($"{ibo.OrderType}");
             }
 
-            tbo.ClientId = ibo.ClientId;
+            tbo.OrderRequest = new OrderRequest()
+            {
+                OrderId = ibo.OrderId,
+                ClientId = ibo.ClientId,
+                Transmit = ibo.Transmit,
+                ParentId = ibo.ParentId
+            };
+            
             tbo.Action = Enum.Parse<OrderAction>(ibo.Action);
             tbo.TotalQuantity = ibo.TotalQuantity;
             tbo.OcaGroup = ibo.OcaGroup;
             tbo.OcaType = (OcaType)ibo.OcaType;
-            tbo.Transmit = ibo.Transmit;
 
             return tbo;
         }
