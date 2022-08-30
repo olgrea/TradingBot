@@ -63,7 +63,7 @@ namespace TradingBot.Broker.Client
                 _clientSocket.cancelTickByTickData(kvp.Value);
 
             foreach (var kvp in _fiveSecSubscriptions)
-                _clientSocket.cancelTickByTickData(kvp.Value);
+                _clientSocket.cancelRealTimeBars(kvp.Value);
 
             _clientSocket.eDisconnect();
         }

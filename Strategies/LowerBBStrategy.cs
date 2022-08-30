@@ -34,8 +34,8 @@ namespace TradingBot.Strategies
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
+                Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
             }
-            Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
         }
 
         void IStrategy.Stop()
