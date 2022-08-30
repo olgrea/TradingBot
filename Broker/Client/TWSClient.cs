@@ -15,6 +15,7 @@ namespace TradingBot.Broker.Client
         int _nextValidOrderId = -1;
         int _reqId = 0;
 
+        int _clientId = -1;
         EClientSocket _clientSocket;
         EReaderSignal _signal;
         EReader _reader;
@@ -35,6 +36,8 @@ namespace TradingBot.Broker.Client
         AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
         Contract _contract;
 
+        public Action<Contract, List<Order>, OrderState> OrdersOpened;
+
         public TWSClient(ILogger logger)
         {
             _signal = new EReaderMonitorSignal();
@@ -43,11 +46,16 @@ namespace TradingBot.Broker.Client
         }
 
         int NextRequestId => _reqId++;
+        int NextValidOrderId => _nextValidOrderId++;
 
         public void Connect(string host, int port, int clientId)
         {
             //TODO: Handle IB server resets
 
+            if (_clientId >= 0)
+                throw new NotImplementedException("Implement Next Valid Identifier logic with IBApi.EClient.reqIds ");
+
+            _clientId = clientId;
             _clientSocket.eConnect(host, port, clientId);
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
@@ -66,6 +74,7 @@ namespace TradingBot.Broker.Client
                 _clientSocket.cancelRealTimeBars(kvp.Value);
 
             _clientSocket.eDisconnect();
+            _clientId = -1;
         }
 
         public bool IsConnected => _clientSocket.IsConnected();
@@ -95,6 +104,7 @@ namespace TradingBot.Broker.Client
             _accountCode = accountsList;
         }
 
+        // The next valid identifier is persistent between TWS sessions
         public void nextValidId(int orderId)
         {
             if (_nextValidOrderId < 0)
@@ -270,6 +280,80 @@ namespace TradingBot.Broker.Client
             _autoResetEvent.Set();
         }
 
+        public void PlaceOrders(Contract contract, IList<Order> orders)
+        {
+            // We need to send orders with Transmit == false first;
+            foreach(var order in orders.OrderBy(o => Convert.ToInt32(o.Transmit)))
+            {
+                PlaceOrder(contract, order);
+            }
+        }
+
+        public void PlaceOrder(Contract contract, Order order)
+        {
+            var ibo = order.ToIBApiOrder();
+            ibo.OrderId = NextValidOrderId;
+            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+        }
+
+        public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        {
+            // orderState only used then IBApi.Order.WhatIf = true ?? 
+
+            // TODO test multiple sent order
+            _logger.LogDebug($"openOrder {orderId} : {orderState.Status}");
+        }
+
+        public void openOrderEnd()
+        {
+            _logger.LogDebug($"openOrderEnd");
+        }
+
+        public void orderBound(long orderId, int apiClientId, int apiOrderId)
+        {
+            _logger.LogDebug($"orderBound : orderId={orderId} apiClientId={apiClientId} apiOrderId={apiOrderId}");
+        }
+
+        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
+        {
+            _logger.LogDebug($"orderStatus {orderId} : status={status} filled={filled} remaining={remaining} avgFillprice={avgFillPrice} avgFillPrice={lastFillPrice}");
+        }
+
+        public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
+        {
+            _logger.LogDebug($"execDetails : reqId={reqId}");
+        }
+
+        public void execDetailsEnd(int reqId)
+        {
+            _logger.LogDebug($"execDetailsEnd : reqId={reqId}");
+        }
+
+        public void commissionReport(CommissionReport commissionReport)
+        {
+            _logger.LogDebug($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+        }
+
+        public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        {
+            _logger.LogDebug($"completedOrder {order.OrderId} : {orderState.Status}");
+        }
+
+        public void completedOrdersEnd()
+        {
+            _logger.LogDebug($"completedOrdersEnd");
+        }
+
+        public void CancelOrder(int orderId)
+        {
+            _clientSocket.cancelOrder(orderId);
+        }
+
+        public void CancelAllOrders()
+        {
+            _clientSocket.reqGlobalCancel();
+        }
+
         public void error(Exception e)
         {
             _logger.LogError(e.Message);
@@ -321,21 +405,6 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void commissionReport(CommissionReport commissionReport)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void completedOrdersEnd()
-        {
-            throw new NotImplementedException();
-        }
-
         public void currentTime(long time)
         {
             throw new NotImplementedException();
@@ -352,16 +421,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void displayGroupUpdated(int reqId, string contractInfo)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void execDetailsEnd(int reqId)
         {
             throw new NotImplementedException();
         }
@@ -447,26 +506,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void newsProviders(NewsProvider[] newsProviders)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, OrderState orderState)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void openOrderEnd()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void orderBound(long orderId, int apiClientId, int apiOrderId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
             throw new NotImplementedException();
         }

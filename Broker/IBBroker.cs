@@ -200,5 +200,15 @@ namespace TradingBot.Broker
                 _fiveSecBars.Remove(contract);
             }
         }
+
+        public void PlaceOrder(Contract contract, Order order)
+        {
+            _client.PlaceOrder(contract, order);
+        }
+
+        public void PlaceOrders(Contract contract, IList<Order> orders)
+        {
+            _client.PlaceOrders(contract, orders);
+        }
     }
 }

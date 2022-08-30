@@ -23,45 +23,50 @@ namespace TradingBot.Broker
         public readonly string OrderType;
         protected Order(string orderType) => OrderType = orderType;
 
+        // TODO : handle order id better?
         public int ClientId { get; set; }
+
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
 
         public string OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
-        
+
         // if false, order will be created but not transmitted
-        public bool Transmit { get; set; }
+        public bool Transmit { get; set; } = true;
         
         public int ParentId { get; set; }
+
+        // TODO : handle attached order better and test this
+        //public List<Order> Children { get; set; } = new List<Order>();
     }
 
-    public class Market : Order 
+    public class MarketOrder : Order 
     {
-        public Market() : base("MKT") { }
+        public MarketOrder() : base("MKT") { }
     }
 
-    public class MarketIfTouched : Order
+    public class MarketIfTouchedOrder : Order
     {
-        public MarketIfTouched() : base("MIT") { }
+        public MarketIfTouchedOrder() : base("MIT") { }
         public Decimal TouchPrice { get; set; }
     }
     
-    public class Limit : Order 
+    public class LimitOrder : Order 
     {
-        public Limit() : base("LMT") { }
+        public LimitOrder() : base("LMT") { }
         public Decimal LmtPrice { get; set; }
     }
 
-    public class Stop : Order
+    public class StopOrder : Order
     {
-        public Stop() : base("STP") { }
+        public StopOrder() : base("STP") { }
         public Decimal StopPrice { get; set; }
     }
 
-    public class TrailingStop : Order
+    public class TrailingStopOrder : Order
     {
-        public TrailingStop() : base("TRAIL") { }
+        public TrailingStopOrder() : base("TRAIL") { }
         public Decimal StopPrice { get; set; }
 
         // Ignored if StopPrice is set

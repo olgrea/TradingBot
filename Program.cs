@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
-using IBApi;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
@@ -20,8 +20,32 @@ namespace TradingBot
 
             var contract = client.GetContract("GME");
 
-            client.RequestBars(contract, BarLength._30Sec, OnBarReceived);
+            //client.RequestBars(contract, BarLength._30Sec, OnBarReceived);
             //client.RequestBidAsk(contract, OnBidAskReceived);
+
+            var o1 = new MarketOrder()
+            {
+                Action = OrderAction.BUY,
+                TotalQuantity = 100,
+            };
+
+            var o2 = new MarketOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = 125,
+            };
+
+            var o3 = new MarketOrder()
+            {
+                Action = OrderAction.BUY,
+                TotalQuantity = 25,
+                Transmit = false;
+            };
+
+            var l = new List<Order>() { o1, o2, o3 };
+
+            //client.PlaceOrder(contract, order);
+            client.PlaceOrders(contract, l);
 
             Console.ReadKey();
             client.Disconnect();
