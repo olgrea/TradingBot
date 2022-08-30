@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Broker
@@ -15,5 +13,6 @@ namespace TradingBot.Broker
         void RequestBars(Contract contract, BarLength barLength, Action<Contract, Bar> callback);
         void CancelBarsRequest(Contract contract, BarLength barLength, Action<Contract, Bar> callback);
         void CancelAllBarsRequest(Contract contract);
+        void PlaceOrder(Contract contract, Order order);
     }
 }

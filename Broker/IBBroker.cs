@@ -205,10 +205,5 @@ namespace TradingBot.Broker
         {
             _client.PlaceOrder(contract, order);
         }
-
-        public void PlaceOrders(Contract contract, IList<Order> orders)
-        {
-            _client.PlaceOrders(contract, orders);
-        }
     }
 }

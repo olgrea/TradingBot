@@ -29,23 +29,32 @@ namespace TradingBot
                 TotalQuantity = 100,
             };
 
-            var o2 = new MarketOrder()
+            var o2 = new MarketIfTouchedOrder()
             {
                 Action = OrderAction.SELL,
-                TotalQuantity = 125,
+                TotalQuantity = 50,
+                TouchPrice = 100
             };
 
-            var o3 = new MarketOrder()
+            var o3 = new StopOrder()
             {
-                Action = OrderAction.BUY,
-                TotalQuantity = 25,
-                Transmit = false;
+                Action = OrderAction.SELL,
+                TotalQuantity = 50,
+                StopPrice = 95
             };
 
-            var l = new List<Order>() { o1, o2, o3 };
+            var o4 = new StopOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = 100,
+                StopPrice = 10
+            };
 
-            //client.PlaceOrder(contract, order);
-            client.PlaceOrders(contract, l);
+            o1.AttachedOrders.Add(o2);
+            o2.AttachedOrders.Add(o3);
+            o1.AttachedOrders.Add(o4);
+
+            client.PlaceOrder(contract, o1);
 
             Console.ReadKey();
             client.Disconnect();
