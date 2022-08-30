@@ -14,6 +14,7 @@ namespace TradingBot.Broker
     {
         public int Id { get; set; } = -1;
         public string Symbol { get; set; }
+        public string SecType { get; set; }
         public string Exchange { get; set; }
         public string Currency { get; set; }
 
@@ -22,11 +23,12 @@ namespace TradingBot.Broker
 
     public class Cash : Contract
     {
-
+        public Cash() => SecType = "CASH";
     }
 
     public class Stock : Contract
     {
+        public Stock() => SecType = "STK";
         public string LastTradeDate { get; set; }
 
         public override string ToString()
@@ -37,6 +39,7 @@ namespace TradingBot.Broker
 
     public class Option : Contract
     {
+        public Option() => SecType = "OPT";
         public Decimal Strike { get; set; }
         public Decimal Multiplier { get; set; }
         public string ContractMonth { get; set; }

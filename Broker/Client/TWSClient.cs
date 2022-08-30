@@ -215,17 +215,15 @@ namespace TradingBot.Broker.Client
             if (_fiveSecSubscriptions.ContainsKey(contract))
                 return;
 
-            // TODO : enough??
             var ibc = new IBApi.Contract()
             {
                 ConId = contract.Id,
                 Currency = contract.Currency,
-                SecType = contract is Stock ? "STK" : "OPT",
+                SecType = contract.SecType,
                 Symbol = contract.Symbol,
                 Exchange = contract.Exchange,
             };
 
-            // TODO : Or contract id ???
             int reqId = NextRequestId;
             _fiveSecSubscriptions[contract] = reqId;
 
@@ -264,17 +262,15 @@ namespace TradingBot.Broker.Client
             if (_bidAskSubscriptions.ContainsKey(contract))
                 return;
 
-            // TODO : enough??
             var ibc = new IBApi.Contract()
             {
                 ConId = contract.Id,
                 Currency = contract.Currency,
-                SecType = contract is Stock ? "STK" : "OPT",
+                SecType = contract.SecType,
                 Symbol = contract.Symbol,
                 Exchange = contract.Exchange,
             };
 
-            // TODO : Or contract id ???
             int reqId = NextRequestId;
             _bidAskSubscriptions[contract] = reqId;
 
