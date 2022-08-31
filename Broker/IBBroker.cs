@@ -15,6 +15,7 @@ namespace TradingBot.Broker
 
         TWSClient _client;
         ILogger _logger;
+        TWSOrderManager _orderManager;  
 
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
@@ -25,6 +26,8 @@ namespace TradingBot.Broker
             _client = new TWSClient(logger);
             _client.FiveSecBarReceived += OnFiveSecondsBarReceived;
             _client.BidAskReceived += OnBidAskReceived;
+
+            _orderManager = new TWSOrderManager(_client, _logger);
         }
 
         Dictionary<Contract, Dictionary<BarLength, Action<Contract, MarketData.Bar>>> _barReceived = new Dictionary<Contract, Dictionary<BarLength, Action<Contract, MarketData.Bar>>>();
@@ -204,7 +207,7 @@ namespace TradingBot.Broker
 
         public void PlaceOrder(Contract contract, Order order)
         {
-            _client.PlaceOrder(contract, order);
+            _orderManager.PlaceOrder(contract, order);
         }
     }
 }

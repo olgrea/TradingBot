@@ -12,10 +12,11 @@ using TradingBot.Broker.Orders;
 
 using TBOrder = TradingBot.Broker.Orders.Order;
 using TBOrderState = TradingBot.Broker.Orders.OrderState;
+using System.Diagnostics.Contracts;
 
 namespace TradingBot.Broker.Client
 {
-    internal partial class TWSClient : EWrapper
+    public partial class TWSClient : EWrapper
     {
         int _nextValidOrderId = -1;
         int _reqId = 0;
@@ -41,7 +42,9 @@ namespace TradingBot.Broker.Client
         AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
         Contract _contract;
 
-        public Action<Contract, List<TBOrder>, TBOrderState> OrdersOpened;
+        public Action<Contract, TBOrder, TBOrderState> OrderOpened;
+        public Action<Contract, TBOrder, TBOrderState> OrderStatusChanged;
+        public Action<Contract, TBOrder, TBOrderState> OrderExecuted;
 
         public TWSClient(ILogger logger)
         {
@@ -295,49 +298,20 @@ namespace TradingBot.Broker.Client
             _autoResetEvent.Set();
         }
 
-        List<TBOrder> AssignOrderIdsAndFlatten(TBOrder order, List<TBOrder> list = null)
+        public void RequestOpenOrders()
         {
-            if (order == null) 
-                return null;
+            _clientSocket.reqOpenOrders();
+        }
 
-            list ??= new List<TBOrder>();
-
-            order.Request.OrderId = GetNextValidOrderId();
-            order.Request.Transmit = false;
-            list.Add(order);
-
-            if(order.Request.AttachedOrders.Any())
-            {
-                int parentId = order.Request.OrderId;
-                
-                int count = order.Request.AttachedOrders.Count;
-                for (int i = 0; i < count; i++)
-                {
-                    var child = order.Request.AttachedOrders[i];
-                    child.Request.ParentId = parentId;
-                    AssignOrderIdsAndFlatten(child, list);
-                }
-            }
-
-            return list;
+        public void openOrderEnd()
+        {
+            _logger.LogDebug($"openOrderEnd");
         }
 
         public void PlaceOrder(Contract contract, TBOrder order)
         {
-            if (contract == null || order == null)
-                return;
-
-            var list = AssignOrderIdsAndFlatten(order);
-
-            // only the last child must be set to true
-            list.Last().Request.Transmit = true;
-
-            foreach(var o in list)
-            {
-                var ibo = o.ToIBApiOrder();
-                Debug.Assert(ibo.OrderId > 0);
-                _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
-            }
+            var ibo = order.ToIBApiOrder();
+            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
         }
 
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
@@ -346,21 +320,17 @@ namespace TradingBot.Broker.Client
 
             // TODO test multiple sent order
             _logger.LogDebug($"openOrder {orderId} : {orderState.Status}");
-        }
 
-        public void openOrderEnd()
-        {
-            _logger.LogDebug($"openOrderEnd");
-        }
-
-        public void orderBound(long orderId, int apiClientId, int apiOrderId)
-        {
-            _logger.LogDebug($"orderBound : orderId={orderId} apiClientId={apiClientId} apiOrderId={apiOrderId}");
+            OrderOpened?.Invoke(contract.ToTBContract(), order.ToTBOrder(), orderState.ToTBOrderState());
         }
 
         public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
             _logger.LogDebug($"orderStatus {orderId} : status={status} filled={filled} remaining={remaining} avgFillprice={avgFillPrice} avgFillPrice={lastFillPrice}");
+
+
+
+            //OrderStatusChanged?.Invoke();
         }
 
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
@@ -422,7 +392,7 @@ namespace TradingBot.Broker.Client
         }
     }
 
-    internal partial class TWSClient : EWrapper
+    public partial class TWSClient : EWrapper
     {
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
@@ -550,6 +520,10 @@ namespace TradingBot.Broker.Client
         }
 
         public void newsProviders(NewsProvider[] newsProviders)
+        {
+            throw new NotImplementedException();
+        }
+        public void orderBound(long orderId, int apiClientId, int apiOrderId)
         {
             throw new NotImplementedException();
         }
