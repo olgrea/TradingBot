@@ -1,5 +1,6 @@
 ﻿using System;
 using TradingBot.Broker.MarketData;
+using TradingBot.Broker.Orders;
 
 namespace TradingBot.Broker
 {

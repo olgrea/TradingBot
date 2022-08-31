@@ -8,6 +8,10 @@ using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
 using System.Threading;
 using System.Diagnostics;
+using TradingBot.Broker.Orders;
+
+using TBOrder = TradingBot.Broker.Orders.Order;
+using TBOrderState = TradingBot.Broker.Orders.OrderState;
 
 namespace TradingBot.Broker.Client
 {
@@ -37,7 +41,7 @@ namespace TradingBot.Broker.Client
         AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
         Contract _contract;
 
-        public Action<Contract, List<Order>, OrderState> OrdersOpened;
+        public Action<Contract, List<TBOrder>, TBOrderState> OrdersOpened;
 
         public TWSClient(ILogger logger)
         {
@@ -291,12 +295,12 @@ namespace TradingBot.Broker.Client
             _autoResetEvent.Set();
         }
 
-        List<Order> AssignOrderIdsAndFlatten(Order order, List<Order> list = null)
+        List<TBOrder> AssignOrderIdsAndFlatten(TBOrder order, List<TBOrder> list = null)
         {
             if (order == null) 
                 return null;
 
-            list ??= new List<Order>();
+            list ??= new List<TBOrder>();
 
             order.OrderRequest.OrderId = GetNextValidOrderId();
             order.OrderRequest.Transmit = false;
@@ -337,7 +341,7 @@ namespace TradingBot.Broker.Client
         //    return list;
         //}
 
-        public void PlaceOrder(Contract contract, Order order)
+        public void PlaceOrder(Contract contract, TBOrder order)
         {
             if (contract == null || order == null)
                 return;

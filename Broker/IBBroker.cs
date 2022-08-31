@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
+using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
 namespace TradingBot.Broker
