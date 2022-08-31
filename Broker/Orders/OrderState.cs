@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace TradingBot.Broker
+namespace TradingBot.Broker.Orders
 {
     public enum OrderStatus
     {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
+using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 using Bar = TradingBot.Broker.MarketData.Bar;
 

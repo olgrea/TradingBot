@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace TradingBot.Broker
+namespace TradingBot.Broker.Orders
 {
     public enum OrderAction
     {
@@ -22,7 +22,7 @@ namespace TradingBot.Broker
         public int OrderId { get; set; }
         public int ClientId { get; set; }
         // if false, order will be created but not transmitted
-        public bool Transmit { get; set; } 
+        public bool Transmit { get; set; }
         public int ParentId { get; set; }
         public int PermId { get; set; }
     }
@@ -43,7 +43,7 @@ namespace TradingBot.Broker
         public OrderRequest OrderRequest { get; set; } = new OrderRequest();
     }
 
-    public class MarketOrder : Order 
+    public class MarketOrder : Order
     {
         public MarketOrder() : base("MKT") { }
     }
@@ -51,25 +51,25 @@ namespace TradingBot.Broker
     public class MarketIfTouchedOrder : Order
     {
         public MarketIfTouchedOrder() : base("MIT") { }
-        public Decimal TouchPrice { get; set; }
+        public decimal TouchPrice { get; set; }
     }
-    
-    public class LimitOrder : Order 
+
+    public class LimitOrder : Order
     {
         public LimitOrder() : base("LMT") { }
-        public Decimal LmtPrice { get; set; }
+        public decimal LmtPrice { get; set; }
     }
 
     public class StopOrder : Order
     {
         public StopOrder() : base("STP") { }
-        public Decimal StopPrice { get; set; }
+        public decimal StopPrice { get; set; }
     }
 
     public class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        public Decimal StopPrice { get; set; }
+        public decimal StopPrice { get; set; }
 
         // Ignored if StopPrice is set
         public double TrailingPercent { get; set; }

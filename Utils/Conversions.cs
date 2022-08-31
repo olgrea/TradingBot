@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using TradingBot.Broker;
+using TradingBot.Broker.Orders;
 
 namespace TradingBot.Utils
 {
