@@ -153,18 +153,14 @@ namespace TradingBot.Utils
             return tbo;
         }
 
-        public static OrderState ToTBOrderStatus(this IBApi.OrderState ibo)
+        public static OrderState ToTBOrderState(this IBApi.OrderState ibo)
         {
             return new OrderState()
             {
-                Status = Enum.Parse<OrderStatus>(ibo.Status),
-                Commission = Convert.ToDecimal(ibo.Commission),
-                MinCommission = Convert.ToDecimal(ibo.MinCommission),
-                MaxCommission = Convert.ToDecimal(ibo.MaxCommission),
-                CommissionCurrency = ibo.CommissionCurrency,
+                Status = Enum.Parse<Status>(ibo.Status),
                 WarningText = ibo.WarningText,
                 CompletedStatus = ibo.CompletedStatus,
-                CompletedTime = DateTime.Parse(ibo.CompletedTime),
+                CompletedTime = ibo.CompletedTime != null ? DateTime.Parse(ibo.CompletedTime) : DateTime.MinValue,
             };
         }
     }

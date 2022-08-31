@@ -24,10 +24,11 @@ namespace TradingBot
             //client.RequestBars(contract, BarLength._30Sec, OnBarReceived);
             //client.RequestBidAsk(contract, OnBidAskReceived);
 
-            var o1 = new MarketOrder()
+            var o1 = new LimitOrder()
             {
                 Action = OrderAction.BUY,
-                TotalQuantity = 100,
+                TotalQuantity = 200,
+                LmtPrice = 15M,
             };
 
             var o2 = new MarketIfTouchedOrder()
@@ -40,7 +41,7 @@ namespace TradingBot
             var o3 = new StopOrder()
             {
                 Action = OrderAction.SELL,
-                TotalQuantity = 50,
+                TotalQuantity = 25,
                 StopPrice = 95
             };
 
