@@ -65,20 +65,18 @@ namespace TradingBot.Utils
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
                 TotalQuantity = order.TotalQuantity,
-                OcaGroup = order.OcaGroup, 
-                OcaType = (int)order.OcaType,
+
+                OrderId = order.Request.OrderId,
+                ClientId = order.Request.ClientId,
+                ParentId = order.Request.ParentId,
+                PermId = order.Request.PermId,
+                Transmit = order.Request.Transmit,
+                OcaGroup = order.Request.OcaGroup, 
+                OcaType = (int)order.Request.OcaType,
+
                 OutsideRth = true,
                 Tif = "DAY"
             };
-
-            if(order.OrderRequest != null)
-            {
-                ibo.OrderId = order.OrderRequest.OrderId;
-                ibo.ClientId = order.OrderRequest.ClientId;
-                ibo.ParentId = order.OrderRequest.ParentId;
-                ibo.PermId = order.OrderRequest.PermId;
-                ibo.Transmit = order.OrderRequest.Transmit;
-            }
 
             switch(order.OrderType)
             {
@@ -141,19 +139,16 @@ namespace TradingBot.Utils
                     throw new NotImplementedException($"{ibo.OrderType}");
             }
 
-            tbo.OrderRequest = new OrderRequest()
-            {
-                OrderId = ibo.OrderId,
-                ClientId = ibo.ClientId,
-                Transmit = ibo.Transmit,
-                ParentId = ibo.ParentId,
-                PermId = ibo.PermId,
-            };
-            
             tbo.Action = Enum.Parse<OrderAction>(ibo.Action);
             tbo.TotalQuantity = ibo.TotalQuantity;
-            tbo.OcaGroup = ibo.OcaGroup;
-            tbo.OcaType = (OcaType)ibo.OcaType;
+
+            tbo.Request.OrderId = ibo.OrderId;
+            tbo.Request.ClientId = ibo.ClientId;
+            tbo.Request.Transmit = ibo.Transmit;
+            tbo.Request.ParentId = ibo.ParentId;
+            tbo.Request.PermId = ibo.PermId;
+            tbo.Request.OcaGroup = ibo.OcaGroup;
+            tbo.Request.OcaType = (OcaType)ibo.OcaType;
 
             return tbo;
         }
