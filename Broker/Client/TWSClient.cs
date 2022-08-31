@@ -302,44 +302,25 @@ namespace TradingBot.Broker.Client
 
             list ??= new List<TBOrder>();
 
-            order.OrderRequest.OrderId = GetNextValidOrderId();
-            order.OrderRequest.Transmit = false;
+            order.Request.OrderId = GetNextValidOrderId();
+            order.Request.Transmit = false;
             list.Add(order);
 
-            if(order.AttachedOrders.Any())
+            if(order.Request.AttachedOrders.Any())
             {
-
-                int parentId = order.OrderRequest.OrderId;
+                int parentId = order.Request.OrderId;
                 
-                int count = order.AttachedOrders.Count;
+                int count = order.Request.AttachedOrders.Count;
                 for (int i = 0; i < count; i++)
                 {
-                    var child = order.AttachedOrders[i];
-
-                    child.OrderRequest.ParentId = parentId;
-
-                    //// only the last child must be set to true
-                    //child.OrderRequest.Transmit = i == count - 1;
-
+                    var child = order.Request.AttachedOrders[i];
+                    child.Request.ParentId = parentId;
                     AssignOrderIdsAndFlatten(child, list);
                 }
             }
 
             return list;
         }
-
-        //List<Order> Flatten(Order order)
-        //{
-        //    var list = new List<Order>();
-        //    list.Add(order);
-        //    if(order.AttachedOrders.Any())
-        //    {
-        //        foreach(var child in order.AttachedOrders)
-        //            list.AddRange(Flatten(child));
-        //    }
-
-        //    return list;
-        //}
 
         public void PlaceOrder(Contract contract, TBOrder order)
         {
@@ -349,7 +330,7 @@ namespace TradingBot.Broker.Client
             var list = AssignOrderIdsAndFlatten(order);
 
             // only the last child must be set to true
-            list.Last().OrderRequest.Transmit = true;
+            list.Last().Request.Transmit = true;
 
             foreach(var o in list)
             {

@@ -51,9 +51,9 @@ namespace TradingBot
                 StopPrice = 10
             };
 
-            o1.AttachedOrders.Add(o2);
-            o2.AttachedOrders.Add(o3);
-            o1.AttachedOrders.Add(o4);
+            o1.Request.AttachedOrders.Add(o2);
+            o2.Request.AttachedOrders.Add(o3);
+            o1.Request.AttachedOrders.Add(o4);
 
             client.PlaceOrder(contract, o1);
 
