@@ -32,11 +32,11 @@ namespace TradingBot.Broker.Client
             if (contract == null || order == null)
                 return;
 
-            order.Request.OrderId = _client.GetNextValidOrderId();
+            order.OrderId = _client.GetNextValidOrderId();
 
-            Trace.Assert(!_ordersRequested.ContainsKey(order.Request.OrderId));
+            Trace.Assert(!_ordersRequested.ContainsKey(order.OrderId));
 
-            _ordersRequested[order.Request.OrderId] = order;
+            _ordersRequested[order.OrderId] = order;
             _client.PlaceOrder(contract, order);
         }
 
@@ -52,7 +52,7 @@ namespace TradingBot.Broker.Client
             }
 
             PlaceOrder(contract, chain.Order);
-            _chainOrdersRequested[chain.Order.Request.OrderId] = chain;
+            _chainOrdersRequested[chain.Order.OrderId] = chain;
         }
 
         // For some reasons in TWS, when an order becomes active, the quantity of all its child orders gets set to the
@@ -67,11 +67,11 @@ namespace TradingBot.Broker.Client
 
                 // only the last child must be set to true to prevent parent orders from being
                 // submitted (and possibly filled) before all orders are submitted.
-                o.Request.Transmit = i == list.Count - 1;
+                o.Info.Transmit = i == list.Count - 1;
 
-                Trace.Assert(o.Request.OrderId > 0 && !_ordersRequested.ContainsKey(o.Request.OrderId));
+                Trace.Assert(o.OrderId > 0 && !_ordersRequested.ContainsKey(o.OrderId));
 
-                _ordersRequested[o.Request.OrderId] = o;
+                _ordersRequested[o.OrderId] = o;
                 _client.PlaceOrder(contract, o);
             }
         }
@@ -80,15 +80,15 @@ namespace TradingBot.Broker.Client
         {
             if (state.Status == Status.Submitted)
             {
-                _ordersSubmitted[order.Request.OrderId] = order;
+                _ordersSubmitted[order.OrderId] = order;
             }
 
             // TODO : check wether it should be in OnExecDetails instead
             if (state.Status == Status.Filled)
             {
-                if(_chainOrdersRequested.ContainsKey(order.Request.OrderId))
+                if(_chainOrdersRequested.ContainsKey(order.OrderId))
                 {
-                    PlaceNextOrdersInChain(contract, _chainOrdersRequested[order.Request.OrderId]);
+                    PlaceNextOrdersInChain(contract, _chainOrdersRequested[order.OrderId]);
                 }
             }
         }
@@ -98,15 +98,15 @@ namespace TradingBot.Broker.Client
             var executedOrder = chain.Order;
 
             // First cancel all siblings, if any
-            if(chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.Request.OrderId))
+            if(chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.OrderId))
             {
-                var parent = _chainOrdersRequested[chain.Parent.Request.OrderId];
+                var parent = _chainOrdersRequested[chain.Parent.OrderId];
                 foreach(OrderChain child in parent.AttachedOrders)
                 {
-                    if (child.Order.Request.OrderId == executedOrder.Request.OrderId)
+                    if (child.Order.OrderId == executedOrder.OrderId)
                         continue;
                     CancelOrder(child.Order);
-                    _chainOrdersRequested.Remove(child.Order.Request.OrderId);
+                    _chainOrdersRequested.Remove(child.Order.OrderId);
                 }
             }
 
@@ -119,14 +119,14 @@ namespace TradingBot.Broker.Client
 
         public void ModifyOrder(Contract contract, Order order)
         {
-            Trace.Assert(order.Request.OrderId > 0);
+            Trace.Assert(order.OrderId > 0);
             _client.PlaceOrder(contract, order);
         }
 
         public void CancelOrder(Order order)
         {
-            Trace.Assert(order.Request.OrderId > 0);
-            _client.CancelOrder(order.Request.OrderId);
+            Trace.Assert(order.OrderId > 0);
+            _client.CancelOrder(order.OrderId);
         }
 
         List<Order> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)
@@ -136,18 +136,18 @@ namespace TradingBot.Broker.Client
 
             list ??= new List<Order>();
 
-            chain.Order.Request.OrderId = _client.GetNextValidOrderId();
+            chain.Order.OrderId = _client.GetNextValidOrderId();
             list.Add(chain.Order);
 
             if (chain.AttachedOrders.Any())
             {
-                int parentId = chain.Order.Request.OrderId;
+                int parentId = chain.Order.OrderId;
 
                 int count = chain.AttachedOrders.Count;
                 for (int i = 0; i < count; i++)
                 {
                     var child = chain.AttachedOrders[i].Order;
-                    child.Request.ParentId = parentId;
+                    child.Info.ParentId = parentId;
                     AssignOrderIdsAndFlatten(chain.AttachedOrders[i], list);
                 }
             }
