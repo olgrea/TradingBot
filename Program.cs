@@ -52,11 +52,10 @@ namespace TradingBot
                 StopPrice = 10
             };
 
-            o1.Request.AttachedOrders.Add(o2);
-            o2.Request.AttachedOrders.Add(o3);
-            o1.Request.AttachedOrders.Add(o4);
+            var o2chain = new OrderChain(o2, new List<OrderChain>() { o3 });
+            var o1chain = new OrderChain(o1, new List<OrderChain>() { o2chain, o4 });
 
-            client.PlaceOrder(contract, o1);
+            client.PlaceOrder(contract, o1chain);
 
             Console.ReadKey();
             client.Disconnect();

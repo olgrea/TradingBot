@@ -209,5 +209,10 @@ namespace TradingBot.Broker
         {
             _orderManager.PlaceOrder(contract, order);
         }
+
+        public void PlaceOrder(Contract contract, OrderChain chain)
+        {
+            _orderManager.PlaceOrder(contract, chain);
+        }
     }
 }
