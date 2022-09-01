@@ -31,5 +31,10 @@ namespace TradingBot.Broker.MarketData
                 return false;
             return Time.Equals(bar.Time);
         }
+
+        public override int GetHashCode()
+        {
+            return Time.GetHashCode();
+        }
     }
 }

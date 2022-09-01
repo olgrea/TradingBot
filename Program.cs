@@ -52,6 +52,8 @@ namespace TradingBot
                 StopPrice = 10
             };
 
+            o1.RequestInfo.Transmit = o2.RequestInfo.Transmit = o3.RequestInfo.Transmit = o4.RequestInfo.Transmit = true;
+
             var o2chain = new OrderChain(o2, new List<OrderChain>() { o3 });
             var o1chain = new OrderChain(o1, new List<OrderChain>() { o2chain, o4 });
 

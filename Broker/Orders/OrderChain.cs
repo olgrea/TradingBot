@@ -9,7 +9,7 @@ namespace TradingBot.Broker.Orders
             Order = order;
             AttachedOrders = attachedOrders ?? new List<OrderChain>();
 
-            foreach (OrderChain attachedOrder in attachedOrders)
+            foreach (OrderChain attachedOrder in AttachedOrders)
             {
                 attachedOrder.Parent = order;
             }
