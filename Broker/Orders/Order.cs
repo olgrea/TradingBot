@@ -16,7 +16,7 @@ namespace TradingBot.Broker.Orders
         REDUCE_NON_BLOCK = 3,
     }
 
-    public class OrderRequest
+    public class RequestInfo
     {
         public int OrderId { get; set; }
         public int ClientId { get; set; }
@@ -29,11 +29,17 @@ namespace TradingBot.Broker.Orders
 
     public abstract class Order
     {
+        public RequestInfo RequestInfo { get; } = new RequestInfo();
+        public int Id
+        {
+            get => RequestInfo.OrderId;
+            set => RequestInfo.OrderId = value;
+        }
+
         public readonly string OrderType;
         protected Order(string orderType) => OrderType = orderType;
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
-        public OrderRequest Request { get; } = new OrderRequest();
     }
 
     public class MarketOrder : Order
