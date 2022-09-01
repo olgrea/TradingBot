@@ -13,6 +13,7 @@ namespace TradingBot.Broker.Client
         TWSClient _client;
 
         Dictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
+        Dictionary<int, OrderChain> _chainOrdersRequested = new Dictionary<int, OrderChain>();
         Dictionary<int, Order> _ordersSubmitted = new Dictionary<int, Order>();
 
         public TWSOrderManager(TWSClient client, ILogger logger)
@@ -31,16 +32,44 @@ namespace TradingBot.Broker.Client
             if (contract == null || order == null)
                 return;
 
-            var list = AssignOrderIdsAndFlatten(order);
+            order.Request.OrderId = _client.GetNextValidOrderId();
+
+            Trace.Assert(!_ordersRequested.ContainsKey(order.Request.OrderId));
+
+            _ordersRequested[order.Request.OrderId] = order;
+            _client.PlaceOrder(contract, order);
+        }
+
+        public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
+        {
+            if (contract == null || chain == null || chain.Order == null)
+                return;
+
+            if(useTWSAttachedOrderFeature)
+            {
+                PlaceTWSOrderChain(contract, chain);
+                return;
+            }
+
+            PlaceOrder(contract, chain.Order);
+            _chainOrdersRequested[chain.Order.Request.OrderId] = chain;
+        }
+
+        // For some reasons in TWS, when an order becomes active, the quantity of all its child orders gets set to the
+        // quantity of the parent order regardless of what was set as quantity in children.
+        void PlaceTWSOrderChain(Contract contract, OrderChain chain)
+        {
+            var list = AssignOrderIdsAndFlatten(chain);
 
             for (int i = 0; i < list.Count; i++)
             {
                 Order o = list[i];
 
-                // only the last child must be set to true.
+                // only the last child must be set to true to prevent parent orders from being
+                // submitted (and possibly filled) before all orders are submitted.
                 o.Request.Transmit = i == list.Count - 1;
 
-                Debug.Assert(o.Request.OrderId > 0 && !_ordersRequested.ContainsKey(o.Request.OrderId));
+                Trace.Assert(o.Request.OrderId > 0 && !_ordersRequested.ContainsKey(o.Request.OrderId));
 
                 _ordersRequested[o.Request.OrderId] = o;
                 _client.PlaceOrder(contract, o);
@@ -49,77 +78,77 @@ namespace TradingBot.Broker.Client
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
         {
-            //if(state.Status == Status.PreSubmitted)
-            //{
-            //    _ordersSubmitted[order.Request.OrderId] = order;
-            //}
+            if (state.Status == Status.Submitted)
+            {
+                _ordersSubmitted[order.Request.OrderId] = order;
+            }
 
-            //if (state.Status == Status.Filled)
-            //{
-            //    FixChildrenOrderQuantity(contract, order, state);
-            //}
-
-
+            // TODO : check wether it should be in OnExecDetails instead
+            if (state.Status == Status.Filled)
+            {
+                if(_chainOrdersRequested.ContainsKey(order.Request.OrderId))
+                {
+                    PlaceNextOrdersInChain(contract, _chainOrdersRequested[order.Request.OrderId]);
+                }
+            }
         }
 
-        void FixChildrenOrderQuantity(Contract contract, Order order, OrderState state)
+        void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
         {
-            if(!_ordersRequested.ContainsKey(order.Request.OrderId))
-                return;
+            var executedOrder = chain.Order;
 
-            // For some reasons in TWS, when an order becomes active, the quantity of all its child orders gets set to the
-            // quantity of the parent regardless of what was set as quantity in children.
-            // This is undesirable. Example : I may not want to put a stop loss for all the shares I just bought. Just half.
-            var requestedOrder = _ordersRequested[order.Request.OrderId];
-
-            if(requestedOrder.Request.AttachedOrders.Any())
+            // First cancel all siblings, if any
+            if(chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.Request.OrderId))
             {
-                foreach (var child in requestedOrder.Request.AttachedOrders)
+                var parent = _chainOrdersRequested[chain.Parent.Request.OrderId];
+                foreach(OrderChain child in parent.AttachedOrders)
                 {
-                    if(_ordersSubmitted.ContainsKey(child.Request.OrderId))
-                    {
-                        var os = _ordersSubmitted[child.Request.OrderId];
-                        if (child.TotalQuantity != os.TotalQuantity)
-                        {
-                            os.TotalQuantity = child.TotalQuantity;
-                            
-                            // Re-Submit order
-                            _client.PlaceOrder(contract, child);
-                        }
-                    }
+                    if (child.Order.Request.OrderId == executedOrder.Request.OrderId)
+                        continue;
+                    CancelOrder(child.Order);
+                    _chainOrdersRequested.Remove(child.Order.Request.OrderId);
                 }
+            }
+
+            // Then place all child of the executed order
+            foreach(OrderChain child in chain.AttachedOrders)
+            {
+                PlaceOrder(contract, child);
             }
         }
 
         public void ModifyOrder(Contract contract, Order order)
         {
-            Debug.Assert(order.Request.OrderId > 0);
+            Trace.Assert(order.Request.OrderId > 0);
+            _client.PlaceOrder(contract, order);
         }
 
         public void CancelOrder(Order order)
         {
-            Debug.Assert(order.Request.OrderId > 0);
+            Trace.Assert(order.Request.OrderId > 0);
+            _client.CancelOrder(order.Request.OrderId);
         }
 
-        List<Order> AssignOrderIdsAndFlatten(Order order, List<Order> list = null)
+        List<Order> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)
         {
-            if (order == null)
+            if (chain == null || chain.Order == null)
                 return null;
+
             list ??= new List<Order>();
 
-            order.Request.OrderId = _client.GetNextValidOrderId();
-            list.Add(order);
+            chain.Order.Request.OrderId = _client.GetNextValidOrderId();
+            list.Add(chain.Order);
 
-            if (order.Request.AttachedOrders.Any())
+            if (chain.AttachedOrders.Any())
             {
-                int parentId = order.Request.OrderId;
+                int parentId = chain.Order.Request.OrderId;
 
-                int count = order.Request.AttachedOrders.Count;
+                int count = chain.AttachedOrders.Count;
                 for (int i = 0; i < count; i++)
                 {
-                    var child = order.Request.AttachedOrders[i];
+                    var child = chain.AttachedOrders[i].Order;
                     child.Request.ParentId = parentId;
-                    AssignOrderIdsAndFlatten(child, list);
+                    AssignOrderIdsAndFlatten(chain.AttachedOrders[i], list);
                 }
             }
 

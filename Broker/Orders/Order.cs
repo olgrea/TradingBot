@@ -25,7 +25,6 @@ namespace TradingBot.Broker.Orders
         public bool Transmit { get; set; } // if false, order will be created but not transmitted
         public string OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
-        public List<Order> AttachedOrders { get; set; } = new List<Order>();
     }
 
     public abstract class Order
