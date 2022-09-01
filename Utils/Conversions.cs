@@ -66,13 +66,13 @@ namespace TradingBot.Utils
                 Action = order.Action.ToString(),
                 TotalQuantity = order.TotalQuantity,
 
-                OrderId = order.Request.OrderId,
-                ClientId = order.Request.ClientId,
-                ParentId = order.Request.ParentId,
-                PermId = order.Request.PermId,
-                Transmit = order.Request.Transmit,
-                OcaGroup = order.Request.OcaGroup, 
-                OcaType = (int)order.Request.OcaType,
+                OrderId = order.OrderId,
+                ClientId = order.Info.ClientId,
+                ParentId = order.Info.ParentId,
+                PermId = order.Info.PermId,
+                Transmit = order.Info.Transmit,
+                OcaGroup = order.Info.OcaGroup, 
+                OcaType = (int)order.Info.OcaType,
 
                 OutsideRth = true,
                 Tif = "DAY"
@@ -142,13 +142,13 @@ namespace TradingBot.Utils
             tbo.Action = Enum.Parse<OrderAction>(ibo.Action);
             tbo.TotalQuantity = ibo.TotalQuantity;
 
-            tbo.Request.OrderId = ibo.OrderId;
-            tbo.Request.ClientId = ibo.ClientId;
-            tbo.Request.Transmit = ibo.Transmit;
-            tbo.Request.ParentId = ibo.ParentId;
-            tbo.Request.PermId = ibo.PermId;
-            tbo.Request.OcaGroup = ibo.OcaGroup;
-            tbo.Request.OcaType = (OcaType)ibo.OcaType;
+            tbo.OrderId = ibo.OrderId;
+            tbo.Info.ClientId = ibo.ClientId;
+            tbo.Info.Transmit = ibo.Transmit;
+            tbo.Info.ParentId = ibo.ParentId;
+            tbo.Info.PermId = ibo.PermId;
+            tbo.Info.OcaGroup = ibo.OcaGroup;
+            tbo.Info.OcaType = (OcaType)ibo.OcaType;
 
             return tbo;
         }
