@@ -20,8 +20,13 @@ namespace TradingBot.Broker.Client
         {
             _logger = logger;
             _client = client;
+            
             _client.OrderOpened += OnOrderOpened;
-        }
+
+            _client.OrderStatusChanged += OnOrderStatusChanged;
+            _client.OrderExecuted += OnOrderExecuted;
+            _client.CommissionInfoReceived += OnCommissionInfoReceived;
+    }
 
         public Action<Contract, Order, OrderState> OrderOpened;
         public Action<Contract, Order, OrderState> OrderStatusChanged;
@@ -45,11 +50,15 @@ namespace TradingBot.Broker.Client
 
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
-            //TODO : add a bajillion logs
+            //TODO : add a bajillion logs everywhere
             
             if (contract == null || chain == null || chain.Order == null)
                 return;
 
+            // For some reasons in TWS, when an order becomes active, the quantity of all its attached orders gets set to the
+            // quantity of the parent order regardless of what was set as quantity in children. This is undesirable in
+            // some situations (ex : buy 100 shares but only put a stop loss on 50 shares).
+            // I've kept the TWS mechanism but I implemented my own attached order mechanism to circumvent this limitation.
             if(useTWSAttachedOrderFeature)
             {
                 PlaceTWSOrderChain(contract, chain);
@@ -60,8 +69,6 @@ namespace TradingBot.Broker.Client
             _chainOrdersRequested[chain.Order.Id] = chain;
         }
 
-        // For some reasons in TWS, when an order becomes active, the quantity of all its child orders gets set to the
-        // quantity of the parent order regardless of what was set as quantity in children.
         void PlaceTWSOrderChain(Contract contract, OrderChain chain)
         {
             var list = AssignOrderIdsAndFlatten(chain);
@@ -83,19 +90,28 @@ namespace TradingBot.Broker.Client
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
         {
-            if (state.Status == Status.Submitted)
+            if (state.Status == Status.Submitted || state.Status == Status.PreSubmitted /*for paper trading accounts*/)
             {
                 _ordersSubmitted[order.Id] = order;
             }
+        }
 
-            // TODO : check wether it should be in OnExecDetails instead
-            if (state.Status == Status.Filled)
+        void OnOrderStatusChanged(OrderStatus orderStatus)
+        {
+
+        }
+
+        void OnOrderExecuted(Contract contract, OrderExecution execution)
+        {
+            if (_chainOrdersRequested.ContainsKey(execution.OrderId))
             {
-                if(_chainOrdersRequested.ContainsKey(order.Id))
-                {
-                    PlaceNextOrdersInChain(contract, _chainOrdersRequested[order.Id]);
-                }
+                PlaceNextOrdersInChain(contract, _chainOrdersRequested[execution.OrderId]);
             }
+        }
+
+        void OnCommissionInfoReceived(CommissionInfo commissionInfo)
+        {
+
         }
 
         void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
