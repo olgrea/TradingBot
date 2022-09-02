@@ -147,6 +147,10 @@ namespace TradingBot.Broker.Client
         public void updateAccountTime(string timestamp)
         {
             _logger.LogDebug($"Getting account time : {timestamp}");
+
+            // Inconsistent date formats are received from TWS...
+            // try this is fail : 
+            // DateTime.ParseExact(exec.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
             _account.Time = DateTime.Parse(timestamp);
         }
 
