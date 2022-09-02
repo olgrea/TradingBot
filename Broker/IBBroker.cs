@@ -142,7 +142,7 @@ namespace TradingBot.Broker
 
         MarketData.Bar MakeBar(LinkedList<MarketData.Bar> list, int seconds)
         {
-            MarketData.Bar bar = new MarketData.Bar() { High = Decimal.MinValue, Low = Decimal.MaxValue};
+            MarketData.Bar bar = new MarketData.Bar() { High = double.MinValue, Low = double.MaxValue};
             var e = list.GetEnumerator();
             e.MoveNext();
 

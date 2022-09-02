@@ -16,13 +16,13 @@ namespace TradingBot.Broker
 
     public class CashBalance
     {
-        public CashBalance(decimal amount, string currency)
+        public CashBalance(double amount, string currency)
         {
             Amount = amount;
             Currency = currency;
         }
 
-        public Decimal Amount { get; set; }
+        public double Amount { get; set; }
         public string Currency { get; set; }
 
         public override string ToString()

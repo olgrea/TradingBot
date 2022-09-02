@@ -24,8 +24,8 @@ namespace TradingBot.Broker.Client
                     contract = new Option()
                     {
                         ContractMonth = ibc.LastTradeDateOrContractMonth,
-                        Strike = Convert.ToDecimal(ibc.Strike),
-                        Multiplier = decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
+                        Strike = ibc.Strike,
+                        Multiplier = double.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
                         OptionType = ibc.Right == "C" || ibc.Right == "CALL" ? OptionType.Call : OptionType.Put,
                     };
                     break;
@@ -116,23 +116,23 @@ namespace TradingBot.Broker.Client
                     break;
 
                 case "LMT":
-                    tbo = new LimitOrder() { LmtPrice = Convert.ToDecimal(ibo.LmtPrice) };
+                    tbo = new LimitOrder() { LmtPrice = ibo.LmtPrice };
                     break;
 
                 case "STP":
-                    tbo = new StopOrder() { StopPrice = Convert.ToDecimal(ibo.AuxPrice) };
+                    tbo = new StopOrder() { StopPrice = ibo.AuxPrice };
                     break;
 
                 case "TRAIL":
                     tbo = new TrailingStopOrder()
                     {
-                        StopPrice = Convert.ToDecimal(ibo.AuxPrice),
+                        StopPrice = ibo.AuxPrice,
                         TrailingPercent = ibo.TrailingPercent,
                     };
                     break;
 
                 case "MIT":
-                    tbo = new MarketIfTouchedOrder() { TouchPrice = Convert.ToDecimal(ibo.AuxPrice) };
+                    tbo = new MarketIfTouchedOrder() { TouchPrice = ibo.AuxPrice };
                     break;
 
                 default:

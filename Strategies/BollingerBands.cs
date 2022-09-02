@@ -12,9 +12,9 @@ namespace TradingBot.Strategies
     {
         const int nbPeriods = 20;
 
-        public Decimal MovingAverage { get; private set; }
-        public Decimal UpperBB { get; private set; }
-        public Decimal LowerBB { get; private set; }
+        public double MovingAverage { get; private set; }
+        public double UpperBB { get; private set; }
+        public double LowerBB { get; private set; }
 
         LinkedList<Bar> _bars = new LinkedList<Bar>();
 
@@ -33,10 +33,10 @@ namespace TradingBot.Strategies
 
         void Compute()
         {
-            var barsTypicalPrice = _bars.Select(b => Convert.ToDouble( (b.Close + b.High + b.Low)/3  ));
+            var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low)/3 );
             
-            MovingAverage = Convert.ToDecimal(Statistics.Mean(barsTypicalPrice));
-            var sdev = Convert.ToDecimal(Statistics.StandardDeviation(barsTypicalPrice));
+            MovingAverage = Statistics.Mean(barsTypicalPrice);
+            var sdev = Statistics.StandardDeviation(barsTypicalPrice);
 
             UpperBB = MovingAverage + 2 * sdev;
             LowerBB = MovingAverage - 2 * sdev;

@@ -40,8 +40,8 @@ namespace TradingBot.Broker
     public class Option : Contract
     {
         public Option() => SecType = "OPT";
-        public Decimal Strike { get; set; }
-        public Decimal Multiplier { get; set; }
+        public double Strike { get; set; }
+        public double Multiplier { get; set; }
         public string ContractMonth { get; set; }
         public OptionType OptionType { get; set; }
 
