@@ -13,6 +13,7 @@ using TradingBot.Broker.Orders;
 using TBOrder = TradingBot.Broker.Orders.Order;
 using TBOrderState = TradingBot.Broker.Orders.OrderState;
 using System.Diagnostics.Contracts;
+using TradingBot.Broker.Accounts;
 
 namespace TradingBot.Broker.Client
 {
@@ -30,7 +31,7 @@ namespace TradingBot.Broker.Client
         Task _processMsgTask;
 
         string _accountCode = null;
-        Account _account = new Account();
+        Accounts.Account _account = new Accounts.Account();
 
         public Action<Contract, BidAsk> BidAskReceived;
         Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
@@ -136,9 +137,9 @@ namespace TradingBot.Broker.Client
             _autoResetEvent.Set();
         }
         
-        public Account GetAccount()
+        public Accounts.Account GetAccount(bool receiveUpdates = true)
         {
-            _clientSocket.reqAccountUpdates(true, _accountCode);
+            _clientSocket.reqAccountUpdates(receiveUpdates, _accountCode);
             _account.Code = _accountCode;
             _autoResetEvent.WaitOne();
             return _account;
@@ -166,24 +167,23 @@ namespace TradingBot.Broker.Client
                     break;
 
                 case "CashBalance":
-                    _account.CashBalances.Add(new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency));
+                    _account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
                     break;
 
                 case "RealizedPnL":
-                    if (currency == "USD")
-                        _account.RealizedPnL = new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency);
+                    _account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
                     break;
 
                 case "UnrealizedPnL":
-                    if(currency == "USD")
-                        _account.UnrealizedPnL = new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency);
+                    _account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
                     break;
             }
-
         }
         
         public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
+            //TODO : garbage cleanup
+
             var pos = new Position()
             {
                 Contract = contract.ToTBContract(),
@@ -197,7 +197,7 @@ namespace TradingBot.Broker.Client
 
             _logger.LogDebug($"Getting portfolio : \n{pos}");
 
-            _account.Positions.Add(pos);
+            _account.Positions[pos.Contract] = pos;
         }
 
         public void accountDownloadEnd(string account)

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using TradingBot.Broker;
+using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
 using TradingBot.Utils;
@@ -10,21 +11,27 @@ namespace TradingBot
 {
     public class Trader
     {
+
+
         ILogger _logger;
         IBroker _broker;
         List<IStrategy> _strategies = new List<IStrategy>();
-        Dictionary<Contract, MarketData> MarketData = new Dictionary<Contract, MarketData>();
+        Dictionary<Contract, MarketData> _marketData = new Dictionary<Contract, MarketData>();
+        Account _account;
 
-
-        public Trader(ILogger logger)
+        public Trader(int clientId, List<IStrategy> strategies, ILogger logger)
         {
             _logger = logger;
-            _broker = new IBBroker(logger);
-            _broker.Connect();
+            _broker = new IBBroker(clientId, logger);
+            _strategies = strategies;
         }
 
         public void Start()
         {
+            _broker.Connect();
+            _account = _broker.GetAccount();
+
+
             Contract contract = _broker.GetContract("GME");
             _broker.RequestBars(contract, BarLength._5Sec, OnBarsReceived);
             _broker.RequestBidAsk(contract, OnBidAskReceived);
@@ -32,45 +39,24 @@ namespace TradingBot
 
         void OnBidAskReceived(Contract contract, BidAsk bidAsk)
         {
-            if (!MarketData.ContainsKey(contract))
-                MarketData.Add(contract, new MarketData());
+            if (!_marketData.ContainsKey(contract))
+                _marketData.Add(contract, new MarketData());
 
-            MarketData[contract].BidAsk= bidAsk;
+            _marketData[contract].BidAsk = bidAsk;
         }
 
         void OnBarsReceived(Contract contract, Bar bar)
         {
-            if (!MarketData.ContainsKey(contract))
-                MarketData.Add(contract, new MarketData());
+            if (!_marketData.ContainsKey(contract))
+                _marketData.Add(contract, new MarketData());
 
-            MarketData[contract].Bar = bar;
+            _marketData[contract].Bar = bar;
         }
-
-        //void Trade()
-        //{
-        //    try
-        //    {
-        //        while(true)
-        //        {
-        //            foreach(IStrategy strategy in _strategies)
-        //            {
-        //                var data = MarketData[strategy.Contract];
-        //                if(strategy.Evaluate(data.Bar, data.BidAsk, out Order order))
-        //                {
-        //                    //_broker.PlaceOrder(order);
-        //                }
-        //            }
-        //        }
-        //    }
-        //    catch(Exception e)
-        //    {
-        //        //_broker.SellEverything();
-        //        _logger.LogError(e.Message);
-        //    }
-        //}
 
         public void Stop()
         {
+            // TODO : error handling? try/catch all? Separate process that monitors the main one?
+
             // Kill task
             //_broker.SellEverything();
 

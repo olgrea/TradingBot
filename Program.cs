@@ -14,10 +14,10 @@ namespace TradingBot
         static void Main(string[] args)
         {
 
-            var client = new IBBroker(new ConsoleLogger());
+            var client = new IBBroker(1337, new ConsoleLogger());
             client.Connect();
 
-            //var account = client.GetAccount();
+            var account = client.GetAccount();
 
             var contract = client.GetContract("GME");
 
@@ -57,8 +57,9 @@ namespace TradingBot
             var o2chain = new OrderChain(o2, new List<OrderChain>() { o3 });
             var o1chain = new OrderChain(o1, new List<OrderChain>() { o2chain, o4 });
 
-            client.PlaceOrder(contract, o1chain);
+            //client.PlaceOrder(contract, o1chain);
 
+            Console.ReadKey();
             Console.ReadKey();
             client.Disconnect();
         }
