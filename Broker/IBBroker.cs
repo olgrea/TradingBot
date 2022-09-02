@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
@@ -9,6 +10,8 @@ namespace TradingBot.Broker
 {
     public class IBBroker : IBroker
     {
+        static HashSet<int> _clientIds = new HashSet<int>();
+
         const int DefaultPort = 7496;
         const string DefaultIP = "127.0.0.1";
         int _clientId = 1337;
@@ -19,8 +22,14 @@ namespace TradingBot.Broker
 
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
-        public IBBroker(ILogger logger)
+        public IBBroker(int clientId, ILogger logger)
         {
+            if (_clientIds.Contains(clientId))
+                throw new ArgumentException($"The client id {clientId} is already assigned.");
+
+            _clientId = clientId;
+            _clientIds.Add(clientId);
+
             _logger = logger;
             
             _client = new TWSClient(logger);
@@ -45,7 +54,7 @@ namespace TradingBot.Broker
             _client.Disconnect();
         }
 
-        public Account GetAccount()
+        public Accounts.Account GetAccount()
         {
             return _client.GetAccount();
         }
@@ -213,6 +222,16 @@ namespace TradingBot.Broker
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
             _orderManager.PlaceOrder(contract, chain, useTWSAttachedOrderFeature);
+        }
+
+        public void ModifyOrder(Contract contract, Order order)
+        {
+            _orderManager.ModifyOrder(contract, order);
+        }
+
+        public void CancelOrder(Order order)
+        {
+            _orderManager.CancelOrder(order);
         }
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace TradingBot.Broker
+﻿namespace TradingBot.Broker.Accounts
 {
     public class Position
     {
