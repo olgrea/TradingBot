@@ -28,7 +28,7 @@ namespace TradingBot
             {
                 Action = OrderAction.BUY,
                 TotalQuantity = 200,
-                LmtPrice = 15M,
+                LmtPrice = 15,
             };
 
             var o2 = new MarketIfTouchedOrder()

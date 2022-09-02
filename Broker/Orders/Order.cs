@@ -50,25 +50,25 @@ namespace TradingBot.Broker.Orders
     public class MarketIfTouchedOrder : Order
     {
         public MarketIfTouchedOrder() : base("MIT") { }
-        public decimal TouchPrice { get; set; }
+        public double TouchPrice { get; set; }
     }
 
     public class LimitOrder : Order
     {
         public LimitOrder() : base("LMT") { }
-        public decimal LmtPrice { get; set; }
+        public double LmtPrice { get; set; }
     }
 
     public class StopOrder : Order
     {
         public StopOrder() : base("STP") { }
-        public decimal StopPrice { get; set; }
+        public double StopPrice { get; set; }
     }
 
     public class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        public decimal StopPrice { get; set; }
+        public double StopPrice { get; set; }
 
         // Ignored if StopPrice is set
         public double TrailingPercent { get; set; }

@@ -6,9 +6,9 @@ namespace TradingBot.Broker.MarketData
 {
     public class BidAsk
     {
-        public Decimal Bid { get; set; }
+        public double Bid { get; set; }
         public int BidSize { get; set; }
-        public Decimal Ask { get; set; }
+        public double Ask { get; set; }
         public int AskSize { get; set; }
         public DateTime Time { get; set; }
     }

@@ -162,17 +162,17 @@ namespace TradingBot.Broker.Client
                     break;
 
                 case "CashBalance":
-                    _account.CashBalances.Add(new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency));
+                    _account.CashBalances.Add(new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency));
                     break;
 
                 case "RealizedPnL":
                     if (currency == "USD")
-                        _account.RealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                        _account.RealizedPnL = new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency);
                     break;
 
                 case "UnrealizedPnL":
                     if(currency == "USD")
-                        _account.UnrealizedPnL = new CashBalance(decimal.Parse(value, CultureInfo.InvariantCulture), currency);
+                        _account.UnrealizedPnL = new CashBalance(double.Parse(value, CultureInfo.InvariantCulture), currency);
                     break;
             }
 
@@ -183,12 +183,12 @@ namespace TradingBot.Broker.Client
             var pos = new Position()
             {
                 Contract = contract.ToTBContract(),
-                PositionAmount = Convert.ToDecimal(position),
-                MarketPrice = Convert.ToDecimal(marketPrice),
-                MarketValue = Convert.ToDecimal(marketValue),
-                AverageCost = Convert.ToDecimal(averageCost),
-                UnrealizedPNL = Convert.ToDecimal(unrealizedPNL),
-                RealizedPNL = Convert.ToDecimal(realizedPNL),
+                PositionAmount = position,
+                MarketPrice = marketPrice,
+                MarketValue = marketValue,
+                AverageCost = averageCost,
+                UnrealizedPNL = unrealizedPNL,
+                RealizedPNL = realizedPNL,
             };
 
             _logger.LogDebug($"Getting portfolio : \n{pos}");
@@ -221,10 +221,10 @@ namespace TradingBot.Broker.Client
 
             FiveSecBarReceived?.Invoke(contract, new MarketData.Bar()
             {
-                Open = Convert.ToDecimal(open),
-                Close = Convert.ToDecimal(close),
-                High = Convert.ToDecimal(high),
-                Low = Convert.ToDecimal(low),
+                Open = open,
+                Close = close,
+                High = high,
+                Low = low,
                 Volume = volume,
                 TradeAmount = count,
                 Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime.ToLocalTime(),
@@ -257,9 +257,9 @@ namespace TradingBot.Broker.Client
         {
             var contract = _bidAskSubscriptions.First(c => c.Value == reqId).Key;
 
-            _bidAsk.Bid = Convert.ToDecimal(bidPrice);
+            _bidAsk.Bid = bidPrice;
             _bidAsk.BidSize = bidSize;
-            _bidAsk.Ask = Convert.ToDecimal(askPrice);
+            _bidAsk.Ask = askPrice;
             _bidAsk.AskSize = askSize;
             _bidAsk.Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime();
 
@@ -337,11 +337,11 @@ namespace TradingBot.Broker.Client
                      PermId = permId,
                  },
                   Status = !string.IsNullOrEmpty(status) ? (Status)Enum.Parse(typeof(Status), status) : Status.Unknown,
-                  Filled = Convert.ToDecimal(filled),
-                  Remaining = Convert.ToDecimal(remaining),
-                  AvgFillPrice = Convert.ToDecimal(avgFillPrice),
-                  LastFillPrice = Convert.ToDecimal(lastFillPrice),
-                  MktCapPrice = Convert.ToDecimal(mktCapPrice),
+                  Filled = filled,
+                  Remaining = remaining,
+                  AvgFillPrice = avgFillPrice,
+                  LastFillPrice = lastFillPrice,
+                  MktCapPrice = mktCapPrice,
             };
 
             OrderStatusChanged?.Invoke(os);

@@ -15,10 +15,10 @@ namespace TradingBot.Broker.MarketData
 
     public class Bar
     {
-        public Decimal Open { get; set; }
-        public Decimal Close { get; set; }
-        public Decimal High { get; set; }
-        public Decimal Low { get; set; }
+        public double Open { get; set; }
+        public double Close { get; set; }
+        public double High { get; set; }
+        public double Low { get; set; }
         public long Volume { get; set; }
         public int TradeAmount { get; set; }
         public DateTime Time { get; set; }

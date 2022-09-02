@@ -6,10 +6,10 @@ namespace TradingBot.Broker.Orders
     {
         public RequestInfo Info { get; set; }
         public Status Status { get; set; }
-        public Decimal Filled { get; set; }
-        public Decimal Remaining { get; set; }
-        public Decimal AvgFillPrice { get; set; }
-        public Decimal LastFillPrice { get; set; }
-        public Decimal MktCapPrice { get; set; }
+        public double Filled { get; set; }
+        public double Remaining { get; set; }
+        public double AvgFillPrice { get; set; }
+        public double LastFillPrice { get; set; }
+        public double MktCapPrice { get; set; }
     }
 }
