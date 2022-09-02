@@ -16,7 +16,7 @@ using System.Diagnostics.Contracts;
 
 namespace TradingBot.Broker.Client
 {
-    public partial class TWSClient : EWrapper
+    public class TWSClient : EWrapper
     {
         int _nextValidOrderId = -1;
         int _reqId = 0;
@@ -43,8 +43,10 @@ namespace TradingBot.Broker.Client
         Contract _contract;
 
         public Action<Contract, TBOrder, TBOrderState> OrderOpened;
-        public Action<Contract, TBOrder, TBOrderState> OrderStatusChanged;
-        public Action<Contract, TBOrder, TBOrderState> OrderExecuted;
+        public Action<OrderStatus> OrderStatusChanged;
+        public Action<Contract, OrderExecution> OrderExecuted;
+        public Action<CommissionInfo> CommissionInfoReceived;
+        public Action<ClientMessage> ClientMessageReceived;
 
         public TWSClient(ILogger logger)
         {
@@ -317,10 +319,7 @@ namespace TradingBot.Broker.Client
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
             // orderState only used then IBApi.Order.WhatIf = true ?? 
-
-            // TODO test multiple sent order
             _logger.LogDebug($"openOrder {orderId} : {orderState.Status}");
-
             OrderOpened?.Invoke(contract.ToTBContract(), order.ToTBOrder(), orderState.ToTBOrderState());
         }
 
@@ -328,14 +327,30 @@ namespace TradingBot.Broker.Client
         {
             _logger.LogDebug($"orderStatus {orderId} : status={status} filled={filled} remaining={remaining} avgFillprice={avgFillPrice} avgFillPrice={lastFillPrice}");
 
+            var os = new OrderStatus()
+            {
+                 Info = new RequestInfo()
+                 {
+                     OrderId = orderId,
+                     ParentId = parentId,
+                     ClientId = clientId,
+                     PermId = permId,
+                 },
+                  Status = !string.IsNullOrEmpty(status) ? (Status)Enum.Parse(typeof(Status), status) : Status.Unknown,
+                  Filled = Convert.ToDecimal(filled),
+                  Remaining = Convert.ToDecimal(remaining),
+                  AvgFillPrice = Convert.ToDecimal(avgFillPrice),
+                  LastFillPrice = Convert.ToDecimal(lastFillPrice),
+                  MktCapPrice = Convert.ToDecimal(mktCapPrice),
+            };
 
-
-            //OrderStatusChanged?.Invoke();
+            OrderStatusChanged?.Invoke(os);
         }
 
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
             _logger.LogDebug($"execDetails : reqId={reqId}");
+            OrderExecuted?.Invoke(contract.ToTBContract(), execution.ToTBExecution());
         }
 
         public void execDetailsEnd(int reqId)
@@ -346,6 +361,7 @@ namespace TradingBot.Broker.Client
         public void commissionReport(CommissionReport commissionReport)
         {
             _logger.LogDebug($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+            CommissionInfoReceived?.Invoke(commissionReport.ToTBCommission());
         }
 
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
@@ -371,12 +387,13 @@ namespace TradingBot.Broker.Client
         public void error(Exception e)
         {
             _logger.LogError(e.Message);
-            throw e;
+            ClientMessageReceived?.Invoke(new ClientException(e));
         }
 
         public void error(string str)
         {
             _logger.LogError(str);
+            ClientMessageReceived?.Invoke(new ClientNotification(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
@@ -385,15 +402,25 @@ namespace TradingBot.Broker.Client
             if (errorCode == 502)
                 str += $"\nMake sure the API is enabled in Trader Workstation";
 
-            if (errorCode < 0)
-                _logger.LogDebug(str);
-            else
-                _logger.LogError(str);
-        }
-    }
 
-    public partial class TWSClient : EWrapper
-    {
+            // Note: id == -1 indicates a notification and not true error condition...
+            ClientMessage msg;
+            if (errorCode < 0)
+            {
+                _logger.LogDebug(str);
+                msg = new ClientNotification(errorMsg);
+            }
+            else
+            {
+                _logger.LogError(str);
+                msg = new ClientError(id, errorCode, errorMsg);
+            }
+
+            ClientMessageReceived?.Invoke(msg);
+        }
+
+        #region Not implemented
+
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
             throw new NotImplementedException();
@@ -708,5 +735,6 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
+        #endregion Not implemented
     }
 }

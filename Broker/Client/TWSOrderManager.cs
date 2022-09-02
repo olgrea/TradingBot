@@ -45,6 +45,8 @@ namespace TradingBot.Broker.Client
 
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
+            //TODO : add a bajillion logs
+            
             if (contract == null || chain == null || chain.Order == null)
                 return;
 
