@@ -3,7 +3,7 @@ using System.Globalization;
 using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 
-namespace TradingBot.Utils
+namespace TradingBot.Broker.Client
 {
     public static class Conversions
     {
@@ -25,8 +25,8 @@ namespace TradingBot.Utils
                     {
                         ContractMonth = ibc.LastTradeDateOrContractMonth,
                         Strike = Convert.ToDecimal(ibc.Strike),
-                        Multiplier = Decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
-                        OptionType = (ibc.Right == "C" || ibc.Right == "CALL") ? OptionType.Call : OptionType.Put,
+                        Multiplier = decimal.Parse(ibc.Multiplier, CultureInfo.InvariantCulture),
+                        OptionType = ibc.Right == "C" || ibc.Right == "CALL" ? OptionType.Call : OptionType.Put,
                     };
                     break;
 
@@ -71,47 +71,47 @@ namespace TradingBot.Utils
                 ParentId = order.RequestInfo.ParentId,
                 PermId = order.RequestInfo.PermId,
                 Transmit = order.RequestInfo.Transmit,
-                OcaGroup = order.RequestInfo.OcaGroup, 
+                OcaGroup = order.RequestInfo.OcaGroup,
                 OcaType = (int)order.RequestInfo.OcaType,
 
                 OutsideRth = true,
                 Tif = "DAY"
             };
 
-            switch(order.OrderType)
+            switch (order.OrderType)
             {
                 case "MKT": break;
                 case "LMT":
                     ibo.LmtPrice = Convert.ToDouble((order as LimitOrder).LmtPrice);
                     break;
 
-                case "STP": 
+                case "STP":
                     ibo.AuxPrice = Convert.ToDouble((order as StopOrder).StopPrice);
                     break;
 
-                case "TRAIL": 
+                case "TRAIL":
                     ibo.AuxPrice = Convert.ToDouble((order as TrailingStopOrder).StopPrice);
                     ibo.TrailingPercent = (order as TrailingStopOrder).TrailingPercent;
                     break;
 
-                case "MIT": 
+                case "MIT":
                     ibo.AuxPrice = Convert.ToDouble((order as MarketIfTouchedOrder).TouchPrice);
                     break;
-                
+
                 default:
                     throw new NotImplementedException($"{order.OrderType}");
             }
 
             return ibo;
         }
-        
+
         public static Order ToTBOrder(this IBApi.Order ibo)
         {
             Order tbo;
 
             switch (ibo.OrderType)
             {
-                case "MKT": 
+                case "MKT":
                     tbo = new MarketOrder();
                     break;
 
@@ -124,9 +124,9 @@ namespace TradingBot.Utils
                     break;
 
                 case "TRAIL":
-                    tbo = new TrailingStopOrder() 
+                    tbo = new TrailingStopOrder()
                     {
-                        StopPrice = Convert.ToDecimal(ibo.AuxPrice) ,
+                        StopPrice = Convert.ToDecimal(ibo.AuxPrice),
                         TrailingPercent = ibo.TrailingPercent,
                     };
                     break;
@@ -161,6 +161,32 @@ namespace TradingBot.Utils
                 WarningText = ibo.WarningText,
                 CompletedStatus = ibo.CompletedStatus,
                 CompletedTime = ibo.CompletedTime != null ? DateTime.Parse(ibo.CompletedTime) : DateTime.MinValue,
+            };
+        }
+
+        public static OrderExecution ToTBExecution(this IBApi.Execution exec)
+        {
+            return new OrderExecution()
+            {
+                OrderId = exec.OrderId,
+                Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
+                Shares = exec.Shares,
+                Price = exec.Price,
+                AvgPrice = exec.AvgPrice,
+                Time = DateTime.Parse(exec.Time)
+            };
+        }
+
+        public static CommissionInfo ToTBCommission(this IBApi.CommissionReport report)
+        {
+            return new CommissionInfo()
+            {
+                 Commission = report.Commission,
+                 ExecId = report.ExecId,   
+                 Currency = report.Currency,
+                 RealizedPNL = report.RealizedPNL,
+                 Yield = report.Yield,
+                 YieldRedemptionDate = report.YieldRedemptionDate
             };
         }
     }

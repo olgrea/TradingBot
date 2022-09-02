@@ -210,9 +210,9 @@ namespace TradingBot.Broker
             _orderManager.PlaceOrder(contract, order);
         }
 
-        public void PlaceOrder(Contract contract, OrderChain chain)
+        public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
-            _orderManager.PlaceOrder(contract, chain);
+            _orderManager.PlaceOrder(contract, chain, useTWSAttachedOrderFeature);
         }
     }
 }

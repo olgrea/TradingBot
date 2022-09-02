@@ -4,7 +4,7 @@ namespace TradingBot.Broker.Orders
 {
     public enum Status
     {
-        ApiPending, PendingSubmit, PendingCancel, PreSubmitted, Submitted, ApiCancelled, Cancelled, Filled, Inactive
+        Unknown, ApiPending, PendingSubmit, PendingCancel, PreSubmitted, Submitted, ApiCancelled, Cancelled, Filled, Inactive
     }
 
     public class OrderState
