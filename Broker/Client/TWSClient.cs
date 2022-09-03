@@ -7,12 +7,10 @@ using IBApi;
 using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
 using System.Threading;
-using System.Diagnostics;
 using TradingBot.Broker.Orders;
 
 using TBOrder = TradingBot.Broker.Orders.Order;
 using TBOrderState = TradingBot.Broker.Orders.OrderState;
-using System.Diagnostics.Contracts;
 using TradingBot.Broker.Accounts;
 
 namespace TradingBot.Broker.Client
@@ -141,7 +139,11 @@ namespace TradingBot.Broker.Client
         {
             _clientSocket.reqAccountUpdates(receiveUpdates, _accountCode);
             _account.Code = _accountCode;
+
+            // TODO : make sure that errors don't cause blocking... 
+            // Maybe it's better to just keep this async and use callbacks
             _autoResetEvent.WaitOne();
+
             return _account;
         }
 
@@ -290,7 +292,11 @@ namespace TradingBot.Broker.Client
             };
 
             _clientSocket.reqContractDetails(NextRequestId, sampleContract);
+
+            // TODO : make sure that errors don't cause blocking... 
+            // Maybe it's better to just keep this async and use callbacks
             _autoResetEvent.WaitOne();
+
             return _contract;
         }
 

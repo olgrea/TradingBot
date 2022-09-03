@@ -8,6 +8,6 @@ namespace TradingBot.Strategies
         void Stop();
 
         Contract Contract { get; }
-        IBroker Broker { get; }
+        Trader Trader { get; }
     }
 }

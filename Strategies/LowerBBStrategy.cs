@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 
@@ -10,10 +8,10 @@ namespace TradingBot.Strategies
     {
         IState _currentState = null;
 
-        public LowerBBStrategy(Contract contract, IBroker broker)
+        public LowerBBStrategy(Contract contract, Trader trader)
         {
             Contract = contract;
-            Broker = broker;
+            Trader = trader;
 
             States = new Dictionary<string, IState>()
             {
@@ -27,21 +25,21 @@ namespace TradingBot.Strategies
         }
 
         public Contract Contract { get; private set; }
-        public IBroker Broker { get; private set; }
+        public Trader Trader { get; private set; }
 
         void IStrategy.Start()
         {
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
-                Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
+                Trader.Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
             }
         }
 
         void IStrategy.Stop()
         {
             CurrentState = null;
-            Broker.CancelBarsRequest(Contract, BarLength._5Sec, OnBarReceived);
+            Trader.Broker.CancelBarsRequest(Contract, BarLength._5Sec, OnBarReceived);
         } 
 
         void OnBarReceived(Contract contract, Bar bar)
@@ -90,12 +88,12 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
+                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
+                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
         }
 
@@ -122,12 +120,12 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBars(_strat.Contract, BarLength._1Min, OnBarReceived);
+                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._1Min, OnBarReceived);
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._1Min, OnBarReceived);
+                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._1Min, OnBarReceived);
             }
         }
 
@@ -154,12 +152,12 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
             }
         }
 
@@ -192,13 +190,13 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
                 _counter = 0;
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
+                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
                 _counter = 0;
             }
         }
@@ -227,12 +225,12 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBidAsk(_strat.Contract, OnBidAskReceived);
+                _strat.Trader.Broker.RequestBidAsk(_strat.Contract, OnBidAskReceived);
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBidAskRequest(_strat.Contract, OnBidAskReceived);
+                _strat.Trader.Broker.CancelBidAskRequest(_strat.Contract, OnBidAskReceived);
             }
         }
 
@@ -259,12 +257,12 @@ namespace TradingBot.Strategies
 
             public void SubscribeToMarketData()
             {
-                _strat.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
+                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
 
             public void UnsubscribeToMarketData()
             {
-                _strat.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
+                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
         }
     }
