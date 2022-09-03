@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Text;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
@@ -11,30 +14,59 @@ namespace TradingBot
 {
     public class Trader
     {
-
-
         ILogger _logger;
         IBroker _broker;
-        List<IStrategy> _strategies = new List<IStrategy>();
-        Dictionary<Contract, MarketData> _marketData = new Dictionary<Contract, MarketData>();
-        Account _account;
+        HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
 
-        public Trader(int clientId, List<IStrategy> strategies, ILogger logger)
+        string _ticker;
+        HashSet<Type> _desiredStrategies = new HashSet<Type>();
+
+        Dictionary<Contract, MarketData> _marketData = new Dictionary<Contract, MarketData>();
+
+        public Trader(string ticker, int clientId, ILogger logger)
         {
+            Trace.Assert(!string.IsNullOrEmpty(ticker));
+
+            _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
-            _strategies = strategies;
+        }
+
+        public IBroker Broker => _broker;
+
+        public void AddStrategyForTicker<TStrategy>(string ticker) where TStrategy : IStrategy, new()
+        {
+            _desiredStrategies.Add(typeof(TStrategy));
         }
 
         public void Start()
         {
             _broker.Connect();
-            _account = _broker.GetAccount();
+            
+            if (!_desiredStrategies.Any())
+                _logger.LogError("No strategies set for this trader");
 
+            InitStrategies();
 
-            Contract contract = _broker.GetContract("GME");
-            _broker.RequestBars(contract, BarLength._5Sec, OnBarsReceived);
-            _broker.RequestBidAsk(contract, OnBidAskReceived);
+            //_account = _broker.GetAccount();
+            // TODO : get available funds, registration to PnL by contract
+
+            foreach(var strat in _strategies)
+                strat.Start();
+
+            //_broker.RequestBars(contract, BarLength._5Sec, OnBarsReceived);
+            //_broker.RequestBidAsk(contract, OnBidAskReceived);
+        }
+
+        void InitStrategies()
+        {
+            Contract contract = _broker.GetContract(_ticker);
+            // TODO : error if contract not received...
+
+            foreach(var type in _desiredStrategies)
+            {
+                _strategies.Add((IStrategy)Activator.CreateInstance(type, contract, this));
+            }
         }
 
         void OnBidAskReceived(Contract contract, BidAsk bidAsk)
