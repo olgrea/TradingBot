@@ -28,19 +28,21 @@ namespace TradingBot.Broker.Client
         ILogger _logger;
         Task _processMsgTask;
 
+        Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
+        Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
+        Dictionary<Contract, int> _pnlSubscriptions = new Dictionary<Contract, int>();
+        
         string _accountCode = null;
         Accounts.Account _account = new Accounts.Account();
-
-        public Action<Contract, BidAsk> BidAskReceived;
-        Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
         MarketData.BidAsk _bidAsk = new BidAsk();
-
-        public Action<Contract, MarketData.Bar> FiveSecBarReceived;
-        Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
-
         AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
         Contract _contract;
 
+        public Action<PnL> PnLReceived;
+        public Action<Position> PositionReceived;
+
+        public Action<Contract, MarketData.Bar> FiveSecBarReceived;
+        public Action<Contract, BidAsk> BidAskReceived;
         public Action<Contract, TBOrder, TBOrderState> OrderOpened;
         public Action<OrderStatus> OrderStatusChanged;
         public Action<Contract, OrderExecution> OrderExecuted;
@@ -150,11 +152,7 @@ namespace TradingBot.Broker.Client
         public void updateAccountTime(string timestamp)
         {
             _logger.LogDebug($"Getting account time : {timestamp}");
-
-            // Inconsistent date formats are received from TWS...
-            // try this is fail : 
-            // DateTime.ParseExact(exec.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
-            _account.Time = DateTime.Parse(timestamp);
+            _account.Time = DateTime.Parse(timestamp, CultureInfo.InvariantCulture);
         }
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
@@ -205,6 +203,78 @@ namespace TradingBot.Broker.Client
         public void accountDownloadEnd(string account)
         {
             _autoResetEvent.Set();
+        }
+
+        public void RequestPositions()
+        {
+            _logger.LogDebug($"Requesting positions for all accounts");
+            _clientSocket.reqPositions();
+        }
+
+        public void position(string account, IBApi.Contract contract, double pos, double avgCost)
+        {
+            if(account == _accountCode)
+            {
+                var p = new Position()
+                {
+                    Contract = contract.ToTBContract(),
+                    PositionAmount = pos,
+                    AverageCost = avgCost,
+                };
+                
+                _logger.LogDebug($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
+                PositionReceived?.Invoke(p);
+            }
+            else
+                _logger.LogDebug($"position ignored for account {account}");
+        }
+
+        public void positionEnd()
+        {
+            _logger.LogDebug($"positionEnd");
+        }
+
+        public void CancelPositionsSubscription()
+        {
+            _clientSocket.cancelPositions();
+            _logger.LogDebug($"cancelPositions");
+        }
+
+        public void RequestPnL(Contract contract)
+        {
+            if (_pnlSubscriptions.ContainsKey(contract))
+                return;
+
+            _logger.LogDebug($"Requesting PnL for {contract}");
+            int reqId = NextRequestId;
+            _pnlSubscriptions[contract] = reqId;
+            _clientSocket.reqPnLSingle(reqId, _accountCode, "", contract.Id);
+        }
+
+        public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
+        {
+            var pnl = new PnL()
+            {
+                Contract = _pnlSubscriptions.First(s => s.Value == reqId).Key,
+                PositionAmount = pos,
+                MarketValue = value,  
+                DailyPnL = dailyPnL,
+                UnrealizedPnL = unrealizedPnL,
+                RealizedPnL = realizedPnL
+            };
+
+            _logger.LogDebug($"PnL : {pnl}");
+            PnLReceived?.Invoke(pnl);
+        }
+
+        public void CancelPnLRequest(Contract contract)
+        {
+            if(_pnlSubscriptions.ContainsKey(contract))
+            {
+                _clientSocket.cancelPnL(_pnlSubscriptions[contract]);
+                _pnlSubscriptions.Remove(contract);
+                _logger.LogDebug($"CancelPnLRequest for {contract}");
+            }
         }
 
         public void RequestFiveSecondsBars(Contract contract)
@@ -566,21 +636,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void pnl(int reqId, double dailyPnL, double unrealizedPnL, double realizedPnL)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void position(string account, IBApi.Contract contract, double pos, double avgCost)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void positionEnd()
         {
             throw new NotImplementedException();
         }
