@@ -35,6 +35,8 @@ namespace TradingBot.Broker
             _client = new TWSClient(logger);
             _client.FiveSecBarReceived += OnFiveSecondsBarReceived;
             _client.BidAskReceived += OnBidAskReceived;
+            _client.PositionReceived += OnPositionReceived;
+            _client.PnLReceived += OnPnLReceived;
 
             _orderManager = new TWSOrderManager(_client, _logger);
         }
@@ -43,6 +45,13 @@ namespace TradingBot.Broker
         
         Dictionary<Contract, Action<Contract, MarketData.Bar>> _oneMinuteBarReceived = new Dictionary<Contract, Action<Contract, MarketData.Bar>>();
         Dictionary<Contract, Action<Contract, BidAsk>> _bidAskReceived = new Dictionary<Contract, Action<Contract, BidAsk>>();
+
+        Action<Position> _positionReceived;
+        Dictionary<Contract, Action<PnL>> _pnlReceived = new Dictionary<Contract, Action<PnL>>();
+
+
+        
+
 
         public void Connect()
         {
@@ -64,6 +73,10 @@ namespace TradingBot.Broker
             return _client.GetContract(ticker);
         }
 
+        // TODO : refactor subscription implementation.
+        // I could just redirect the TWSClient callbacks to other callbacks in this class since
+        // each Trader can have their own client. TWSClient doesn't have to be a singleton..
+
         public void RequestBidAsk(Contract contract, Action<Contract, BidAsk> callback)
         {
             if (!_bidAskReceived.ContainsKey(contract))
@@ -76,7 +89,10 @@ namespace TradingBot.Broker
 
         void OnBidAskReceived(Contract contract, BidAsk bidAsk)
         {
-            _bidAskReceived[contract]?.Invoke(contract, bidAsk);
+            if (_bidAskReceived.ContainsKey(contract))
+            {
+                _bidAskReceived[contract]?.Invoke(contract, bidAsk);
+            }
         }
 
         public void CancelBidAskRequest(Contract contract, Action<Contract, BidAsk> callback)
@@ -232,6 +248,57 @@ namespace TradingBot.Broker
         public void CancelOrder(Order order)
         {
             _orderManager.CancelOrder(order);
+        }
+
+        public void RequestPositions(Action<Position> callback)
+        {
+            _positionReceived += callback;
+            if (_positionReceived != null)
+                _client.RequestPositions();
+        }
+
+        void OnPositionReceived(Position position)
+        {
+            _positionReceived?.Invoke(position);
+        }
+
+        public void CancelPositionsSubscription(Action<Position> callback)
+        {
+            _positionReceived -= callback;
+            if (_positionReceived == null)
+                _client.CancelPositionsSubscription();
+        }
+
+        public void RequestPnL(Contract contract, Action<PnL> callback)
+        {
+            if (!_pnlReceived.ContainsKey(contract))
+            {
+                _client.RequestPnL(contract);
+            }
+
+            _pnlReceived[contract] += callback;
+        }
+
+        void OnPnLReceived(PnL pnl)
+        {
+            if (_pnlReceived.ContainsKey(pnl.Contract))
+            {
+                _pnlReceived[pnl.Contract]?.Invoke(pnl);
+            }
+        }
+
+        public void CancelPnLSubscription(Contract contract, Action<PnL> callback)
+        {
+            if (_pnlReceived.ContainsKey(contract))
+            {
+                _pnlReceived[contract] -= callback;
+            }
+
+            if (_pnlReceived[contract] == null)
+            {
+                _client.CancelPnLRequest(contract);
+                _pnlReceived.Remove(contract);
+            }
         }
     }
 }
