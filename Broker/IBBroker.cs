@@ -18,7 +18,7 @@ namespace TradingBot.Broker
 
         TWSClient _client;
         ILogger _logger;
-        TWSOrderManager _orderManager;  
+        TWSOrderManager _orderManager;
 
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
@@ -31,27 +31,32 @@ namespace TradingBot.Broker
             _clientIds.Add(clientId);
 
             _logger = logger;
-            
+
             _client = new TWSClient(logger);
             _client.FiveSecBarReceived += OnFiveSecondsBarReceived;
-            _client.BidAskReceived += OnBidAskReceived;
-            _client.PositionReceived += OnPositionReceived;
-            _client.PnLReceived += OnPnLReceived;
 
             _orderManager = new TWSOrderManager(_client, _logger);
         }
 
-        Dictionary<Contract, Dictionary<BarLength, Action<Contract, MarketData.Bar>>> _barReceived = new Dictionary<Contract, Dictionary<BarLength, Action<Contract, MarketData.Bar>>>();
-        
-        Dictionary<Contract, Action<Contract, MarketData.Bar>> _oneMinuteBarReceived = new Dictionary<Contract, Action<Contract, MarketData.Bar>>();
-        Dictionary<Contract, Action<Contract, BidAsk>> _bidAskReceived = new Dictionary<Contract, Action<Contract, BidAsk>>();
+        public Dictionary<BarLength, Action<Contract, MarketData.Bar>> BarReceived { get; set; } = new Dictionary<BarLength, Action<Contract, Bar>>();
 
-        Action<Position> _positionReceived;
-        Dictionary<Contract, Action<PnL>> _pnlReceived = new Dictionary<Contract, Action<PnL>>();
+        public Action<Contract, BidAsk> BidAskReceived
+        {
+            get => _client.BidAskReceived;
+            set => _client.BidAskReceived = value;
+        }
 
+        public Action<Position> PositionReceived
+        {
+            get => _client.PositionReceived;
+            set => _client.PositionReceived = value;
+        }
 
-        
-
+        public Action<PnL> PnLReceived
+        {
+            get => _client.PnLReceived;
+            set => _client.PnLReceived = value;
+        }
 
         public void Connect()
         {
@@ -73,52 +78,23 @@ namespace TradingBot.Broker
             return _client.GetContract(ticker);
         }
 
-        // TODO : refactor subscription implementation.
-        // I could just redirect the TWSClient callbacks to other callbacks in this class since
-        // each Trader can have their own client. TWSClient doesn't have to be a singleton..
-
-        public void RequestBidAsk(Contract contract, Action<Contract, BidAsk> callback)
+        public void RequestBidAsk(Contract contract)
         {
-            if (!_bidAskReceived.ContainsKey(contract))
-            {
-                _client.RequestBidAsk(contract);
-            }
-
-            _bidAskReceived[contract] += callback;
+            _client.RequestBidAsk(contract);
         }
 
-        void OnBidAskReceived(Contract contract, BidAsk bidAsk)
+        public void CancelBidAskRequest(Contract contract)
         {
-            if (_bidAskReceived.ContainsKey(contract))
-            {
-                _bidAskReceived[contract]?.Invoke(contract, bidAsk);
-            }
-        }
-
-        public void CancelBidAskRequest(Contract contract, Action<Contract, BidAsk> callback)
-        {
-            if (_bidAskReceived.ContainsKey(contract))
-            {
-                _bidAskReceived[contract] -= callback;
-            }
-
-            if (_bidAskReceived[contract] == null)
-            {
-                _client.CancelBidAskRequest(contract);
-                _bidAskReceived.Remove(contract);
-            }
+            _client.CancelBidAskRequest(contract);
         }
 
         // TODO : test multiple contract subscriptions
-        public void RequestBars(Contract contract, BarLength barLength, Action<Contract, MarketData.Bar> callback)
+        public void RequestBars(Contract contract, BarLength barLength)
         {
-            if (!_barReceived.ContainsKey(contract))
-                _barReceived[contract] = new Dictionary<BarLength, Action<Contract, MarketData.Bar>>();
+            if (!BarReceived.ContainsKey(barLength))
+                BarReceived[barLength] = null;
 
-            if (!_barReceived[contract].ContainsKey(barLength))
-                _barReceived[contract][barLength] += callback;
-
-            if(_barReceived.Count == 1)
+            if(BarReceived.Count == 1)
                 _client.RequestFiveSecondsBars(contract);
         }
 
@@ -145,23 +121,23 @@ namespace TradingBot.Broker
 
         void InvokeCallbacks(Contract contract, MarketData.Bar bar, BarLength barLength)
         {
-            if (!_barReceived.ContainsKey(contract))
+            if (!BarReceived.ContainsKey(barLength))
                 return;
 
-            if(barLength == BarLength._5Sec && _barReceived[contract].ContainsKey(barLength))
+            if(barLength == BarLength._5Sec)
             {
-                _barReceived[contract][BarLength._5Sec]?.Invoke(contract, bar);
+                BarReceived[BarLength._5Sec]?.Invoke(contract, bar);
                 return;
             }
 
             var list = _fiveSecBars[contract];
             int sec = (int)barLength;
 
-            if (_barReceived[contract].ContainsKey(barLength) && list.Count > (sec / 5) + 1 && (bar.Time.Second % sec) == 0)
+            if (list.Count > (sec / 5) + 1 && (bar.Time.Second % sec) == 0)
             {
                 var newBar = MakeBar(list, sec);
                 newBar.BarLength = barLength;
-                _barReceived[contract][barLength]?.Invoke(contract, newBar);
+                BarReceived[barLength]?.Invoke(contract, newBar);
             }
         }
 
@@ -200,31 +176,23 @@ namespace TradingBot.Broker
 
         public void CancelAllBarsRequest(Contract contract)
         {
-            if(!_barReceived.ContainsKey(contract))
+            if(BarReceived.Count == 0)
                 return;
 
-            _barReceived[contract].Clear();
-            _barReceived.Remove(contract);
+            BarReceived.Clear();
             _client.CancelFiveSecondsBarsRequest(contract);
             _fiveSecBars.Remove(contract);
         }
 
-        public void CancelBarsRequest(Contract contract, BarLength barLength, Action<Contract, MarketData.Bar> callback)
+        public void CancelBarsRequest(Contract contract, BarLength barLength)
         {
-            if (!_barReceived.ContainsKey(contract))
+            if (!BarReceived.ContainsKey(barLength))
                 return;
 
-            if (_barReceived[contract].ContainsKey(barLength))
-            {
-                _barReceived[contract][barLength] -= callback;
+            BarReceived.Remove(barLength);
 
-                if(_barReceived[contract][barLength] == null)
-                    _barReceived[contract].Remove(barLength);
-            }
-
-            if(_barReceived[contract].Count == 0)
+            if(BarReceived.Count == 0)
             {
-                _barReceived.Remove(contract);
                 _client.CancelFiveSecondsBarsRequest(contract);
                 _fiveSecBars.Remove(contract);
             }
@@ -250,55 +218,24 @@ namespace TradingBot.Broker
             _orderManager.CancelOrder(order);
         }
 
-        public void RequestPositions(Action<Position> callback)
+        public void RequestPositions()
         {
-            _positionReceived += callback;
-            if (_positionReceived != null)
-                _client.RequestPositions();
+            _client.RequestPositions();
         }
 
-        void OnPositionReceived(Position position)
+        public void CancelPositionsSubscription()
         {
-            _positionReceived?.Invoke(position);
+            _client.CancelPositionsSubscription();
         }
 
-        public void CancelPositionsSubscription(Action<Position> callback)
+        public void RequestPnL(Contract contract)
         {
-            _positionReceived -= callback;
-            if (_positionReceived == null)
-                _client.CancelPositionsSubscription();
+            _client.RequestPnL(contract);
         }
 
-        public void RequestPnL(Contract contract, Action<PnL> callback)
+        public void CancelPnLSubscription(Contract contract)
         {
-            if (!_pnlReceived.ContainsKey(contract))
-            {
-                _client.RequestPnL(contract);
-            }
-
-            _pnlReceived[contract] += callback;
-        }
-
-        void OnPnLReceived(PnL pnl)
-        {
-            if (_pnlReceived.ContainsKey(pnl.Contract))
-            {
-                _pnlReceived[pnl.Contract]?.Invoke(pnl);
-            }
-        }
-
-        public void CancelPnLSubscription(Contract contract, Action<PnL> callback)
-        {
-            if (_pnlReceived.ContainsKey(contract))
-            {
-                _pnlReceived[contract] -= callback;
-            }
-
-            if (_pnlReceived[contract] == null)
-            {
-                _client.CancelPnLRequest(contract);
-                _pnlReceived.Remove(contract);
-            }
+            _client.CancelPnLRequest(contract);
         }
     }
 }
