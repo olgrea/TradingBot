@@ -40,7 +40,7 @@ namespace TradingBot
         public IBroker Broker => _broker;
         public Contract Contract => _contract;
 
-        public void AddStrategyForTicker<TStrategy>(string ticker) where TStrategy : IStrategy, new()
+        public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy, new()
         {
             _desiredStrategies.Add(typeof(TStrategy));
         }
@@ -50,10 +50,14 @@ namespace TradingBot
             _broker.Connect();
             
             if (!_desiredStrategies.Any())
+            {
                 _logger.LogError("No strategies set for this trader");
+                return;
+            }
 
+            //TODO : refactor to async/await model and remove AutoResetEvent
             _contract = _broker.GetContract(_ticker);
-
+            
             SubscribeToData();
 
             foreach (var type in _desiredStrategies)
@@ -67,7 +71,7 @@ namespace TradingBot
         {
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
-            _broker.BarReceived[BarLength._5Sec] += OnBarsReceived;
+            _broker.Bar5SecReceived += OnBarsReceived;
             _broker.BidAskReceived += OnBidAskReceived;
             
             _broker.OrderOpened += OnOrderOpened;
@@ -87,7 +91,7 @@ namespace TradingBot
         {
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
-            _broker.BarReceived[BarLength._5Sec] -= OnBarsReceived;
+            _broker.Bar5SecReceived -= OnBarsReceived;
             _broker.BidAskReceived -= OnBidAskReceived;
 
             _broker.OrderOpened -= OnOrderOpened;
@@ -105,7 +109,7 @@ namespace TradingBot
 
         void OnClientMessageReceived(ClientMessage message)
         {
-
+            _logger.LogInfo($"OnClientMessageReceived : {message.Message}");
         }
 
         void OnPositionReceived(Position position)
@@ -114,45 +118,47 @@ namespace TradingBot
             {
                 _USDCash = position;
             }
-            else if(position.Contract == _contractPosition.Contract)
+            else if(position.Contract.Symbol == _ticker)
             {
                 _contractPosition = position;
             }
+
+            _logger.LogInfo($"OnPositionReceived : {position}");
         }
 
         void OnPnLReceived(PnL pnl)
         {
-
+            _logger.LogInfo($"OnPnLReceived : {pnl}");
         }
 
         void OnBidAskReceived(Contract contract, BidAsk bidAsk)
         {
-            
+            //_logger.LogInfo($"OnBidAskReceived {DateTime.Now} : bid={bidAsk.Bid} ask={bidAsk.Ask}");
         }
 
         void OnBarsReceived(Contract contract, Bar bar)
         {
-
+            //_logger.LogInfo($"OnBarsReceived {DateTime.Now} : time={bar.Time} open={bar.Open} high={bar.High} low={bar.Low} close={bar.Close}");
         }
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
         {
-         
+            _logger.LogInfo($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
         }
 
         void OnOrderStatusChanged(OrderStatus status)
         {
-
+            _logger.LogInfo($"OnOrderStatusChanged : {status.Status}");
         }
 
         void OnOrderExecuted(Contract contract, OrderExecution execution)
         {
-            
+            _logger.LogInfo($"OnOrderOpened : {contract} {execution}");
         }
 
         void OnCommissionInfoReceived(CommissionInfo commissionInfo)
         {
-
+            _logger.LogInfo($"OnCommissionInfoReceived : {commissionInfo}");
         }
 
         public void Stop()
@@ -163,6 +169,7 @@ namespace TradingBot
             //_broker.SellEverything();
 
             UnsubscribeToData();
+            _broker.Disconnect();
         }
     }
 }

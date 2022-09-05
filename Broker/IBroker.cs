@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
@@ -14,12 +13,21 @@ namespace TradingBot.Broker
         Accounts.Account GetAccount();
         Contract GetContract(string ticker);
 
+        event Action<Contract, BidAsk> BidAskReceived;
+        event Action<Contract, MarketData.Bar> Bar5SecReceived;
+        event Action<Contract, MarketData.Bar> Bar1MinReceived;
+        event Action<Contract, Order, OrderState> OrderOpened;
+        event Action<OrderStatus> OrderStatusChanged;
+        event Action<Contract, OrderExecution> OrderExecuted;
+        event Action<CommissionInfo> CommissionInfoReceived;
+        event Action<Position> PositionReceived;
+        event Action<PnL> PnLReceived;
+        event Action<ClientMessage> ClientMessageReceived;
+
         void RequestBidAsk(Contract contract);
-        Action<Contract, BidAsk> BidAskReceived { get; set; }
         void CancelBidAskRequest(Contract contract);
 
         void RequestBars(Contract contract, BarLength barLength);
-        Dictionary<BarLength, Action<Contract, MarketData.Bar>> BarReceived { get; set; }
         void CancelBarsRequest(Contract contract, BarLength barLength);
         void CancelAllBarsRequest(Contract contract);
 
@@ -27,20 +35,12 @@ namespace TradingBot.Broker
         // TODO : remove TWS specific stuff
         void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false);
         void ModifyOrder(Contract contract, Order order);
-        Action<Contract, Order, OrderState> OrderOpened { get; set; }
-        Action<CommissionInfo> CommissionInfoReceived { get; set; }
-        Action<Contract, OrderExecution> OrderExecuted { get; set; }
-        Action<OrderStatus> OrderStatusChanged { get; set; }
         void CancelOrder(Order order);
 
         void RequestPnL(Contract contract);
-        Action<PnL> PnLReceived { get; set; }
         void CancelPnLSubscription(Contract contract);
 
-        void CancelPositionsSubscription();
-        Action<Position> PositionReceived { get; set; }
         void RequestPositions();
-
-        Action<ClientMessage> ClientMessageReceived { get; set; }
+        void CancelPositionsSubscription();
     }
 }
