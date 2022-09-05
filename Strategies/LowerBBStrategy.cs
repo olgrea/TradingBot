@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
+using TradingBot.Strategies.Indicators;
 
 namespace TradingBot.Strategies
 {

@@ -6,9 +6,9 @@ using TradingBot.Broker.MarketData;
 using MathNet.Numerics.Statistics;
 using System.Linq;
 
-namespace TradingBot.Strategies
+namespace TradingBot.Strategies.Indicators
 {
-    public class BollingerBands
+    public class BollingerBands : IIndicator
     {
         const int nbPeriods = 20;
 
@@ -25,18 +25,18 @@ namespace TradingBot.Strategies
             // TODO : make sure that metrics are still valid when/if bars are not of the same length
 
             _bars.AddLast(bar);
-            if(_bars.Count > nbPeriods)
+            if (_bars.Count > nbPeriods)
                 _bars.RemoveFirst();
 
             Compute();
         }
 
-        void Compute()
+        public void Compute()
         {
-            var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low)/3 );
-            
-            MovingAverage = Statistics.Mean(barsTypicalPrice);
-            var sdev = Statistics.StandardDeviation(barsTypicalPrice);
+            var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low) / 3);
+
+            MovingAverage = barsTypicalPrice.Mean();
+            var sdev = barsTypicalPrice.StandardDeviation();
 
             UpperBB = MovingAverage + 2 * sdev;
             LowerBB = MovingAverage - 2 * sdev;
