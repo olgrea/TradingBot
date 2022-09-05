@@ -58,6 +58,37 @@ namespace TradingBot.Broker
             set => _client.PnLReceived = value;
         }
 
+        public Action<ClientMessage> ClientMessageReceived
+        {
+            get => _client.ClientMessageReceived;
+            set => _client.ClientMessageReceived = value;
+        }
+
+        //TODO : make sure no callbacks are lost...
+        public Action<Contract, Order, OrderState> OrderOpened
+        {
+            get => _client.OrderOpened;
+            set => _client.OrderOpened = value;
+        }
+
+        public Action<OrderStatus> OrderStatusChanged
+        {
+            get => _client.OrderStatusChanged;
+            set => _client.OrderStatusChanged = value;
+        }
+
+        public Action<Contract, OrderExecution> OrderExecuted
+        {
+            get => _client.OrderExecuted;
+            set => _client.OrderExecuted = value;
+        }
+
+        public Action<CommissionInfo> CommissionInfoReceived
+        {
+            get => _client.CommissionInfoReceived;
+            set => _client.CommissionInfoReceived = value;
+        }
+
         public void Connect()
         {
             _client.Connect(DefaultIP, DefaultPort, _clientId);

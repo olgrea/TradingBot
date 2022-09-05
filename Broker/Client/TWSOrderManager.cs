@@ -22,15 +22,8 @@ namespace TradingBot.Broker.Client
             _client = client;
             
             _client.OrderOpened += OnOrderOpened;
-
-            _client.OrderStatusChanged += OnOrderStatusChanged;
             _client.OrderExecuted += OnOrderExecuted;
-            _client.CommissionInfoReceived += OnCommissionInfoReceived;
-    }
-
-        public Action<Contract, Order, OrderState> OrderOpened;
-        public Action<Contract, Order, OrderState> OrderStatusChanged;
-        public Action<Contract, Order, OrderState> OrderExecuted;
+        }
 
         public void PlaceOrder(Contract contract, Order order)
         {
@@ -96,22 +89,12 @@ namespace TradingBot.Broker.Client
             }
         }
 
-        void OnOrderStatusChanged(OrderStatus orderStatus)
-        {
-
-        }
-
         void OnOrderExecuted(Contract contract, OrderExecution execution)
         {
             if (_chainOrdersRequested.ContainsKey(execution.OrderId))
             {
                 PlaceNextOrdersInChain(contract, _chainOrdersRequested[execution.OrderId]);
             }
-        }
-
-        void OnCommissionInfoReceived(CommissionInfo commissionInfo)
-        {
-
         }
 
         void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
