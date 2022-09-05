@@ -6,7 +6,9 @@ using System.Linq;
 using System.Text;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
+using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
+using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
 using TradingBot.Utils;
 
@@ -16,12 +18,15 @@ namespace TradingBot
     {
         ILogger _logger;
         IBroker _broker;
-        HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
 
         string _ticker;
-        HashSet<Type> _desiredStrategies = new HashSet<Type>();
+        Contract _contract;
+        
+        Position _contractPosition;
+        Position _USDCash;
 
-        Dictionary<Contract, MarketData> _marketData = new Dictionary<Contract, MarketData>();
+        HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+        HashSet<Type> _desiredStrategies = new HashSet<Type>();
 
         public Trader(string ticker, int clientId, ILogger logger)
         {
@@ -33,6 +38,7 @@ namespace TradingBot
         }
 
         public IBroker Broker => _broker;
+        public Contract Contract => _contract;
 
         public void AddStrategyForTicker<TStrategy>(string ticker) where TStrategy : IStrategy, new()
         {
@@ -46,43 +52,107 @@ namespace TradingBot
             if (!_desiredStrategies.Any())
                 _logger.LogError("No strategies set for this trader");
 
-            InitStrategies();
+            _contract = _broker.GetContract(_ticker);
 
-            //_account = _broker.GetAccount();
-            // TODO : get available funds, registration to PnL by contract
+            SubscribeToData();
 
-            foreach(var strat in _strategies)
+            foreach (var type in _desiredStrategies)
+                _strategies.Add((IStrategy)Activator.CreateInstance(type, _contract, this));
+
+            foreach (var strat in _strategies)
                 strat.Start();
-
-            //_broker.RequestBars(contract, BarLength._5Sec, OnBarsReceived);
-            //_broker.RequestBidAsk(contract, OnBidAskReceived);
         }
 
-        void InitStrategies()
+        void SubscribeToData()
         {
-            Contract contract = _broker.GetContract(_ticker);
-            // TODO : error if contract not received...
+            _broker.PositionReceived += OnPositionReceived;
+            _broker.PnLReceived += OnPnLReceived;
+            _broker.BarReceived[BarLength._5Sec] += OnBarsReceived;
+            _broker.BidAskReceived += OnBidAskReceived;
+            
+            _broker.OrderOpened += OnOrderOpened;
+            _broker.OrderStatusChanged += OnOrderStatusChanged;
+            _broker.OrderExecuted += OnOrderExecuted;
+            _broker.CommissionInfoReceived += OnCommissionInfoReceived;
 
-            foreach(var type in _desiredStrategies)
+            _broker.ClientMessageReceived += OnClientMessageReceived;
+
+            _broker.RequestPositions();
+            _broker.RequestPnL(_contract);
+            _broker.RequestBars(_contract, BarLength._5Sec);
+            _broker.RequestBidAsk(_contract);
+        }
+
+        void UnsubscribeToData()
+        {
+            _broker.PositionReceived -= OnPositionReceived;
+            _broker.PnLReceived -= OnPnLReceived;
+            _broker.BarReceived[BarLength._5Sec] -= OnBarsReceived;
+            _broker.BidAskReceived -= OnBidAskReceived;
+
+            _broker.OrderOpened -= OnOrderOpened;
+            _broker.OrderStatusChanged -= OnOrderStatusChanged;
+            _broker.OrderExecuted -= OnOrderExecuted;
+            _broker.CommissionInfoReceived -= OnCommissionInfoReceived;
+
+            _broker.ClientMessageReceived -= OnClientMessageReceived;
+
+            _broker.CancelPositionsSubscription();
+            _broker.CancelPnLSubscription(_contract);
+            _broker.CancelBidAskRequest(_contract);
+            _broker.CancelBarsRequest(_contract, BarLength._5Sec);
+        }
+
+        void OnClientMessageReceived(ClientMessage message)
+        {
+
+        }
+
+        void OnPositionReceived(Position position)
+        {
+            if(position.Contract is Cash cash && cash.Currency == "USD")
             {
-                _strategies.Add((IStrategy)Activator.CreateInstance(type, contract, this));
+                _USDCash = position;
             }
+            else if(position.Contract == _contractPosition.Contract)
+            {
+                _contractPosition = position;
+            }
+        }
+
+        void OnPnLReceived(PnL pnl)
+        {
+
         }
 
         void OnBidAskReceived(Contract contract, BidAsk bidAsk)
         {
-            if (!_marketData.ContainsKey(contract))
-                _marketData.Add(contract, new MarketData());
-
-            _marketData[contract].BidAsk = bidAsk;
+            
         }
 
         void OnBarsReceived(Contract contract, Bar bar)
         {
-            if (!_marketData.ContainsKey(contract))
-                _marketData.Add(contract, new MarketData());
 
-            _marketData[contract].Bar = bar;
+        }
+
+        void OnOrderOpened(Contract contract, Order order, OrderState state)
+        {
+         
+        }
+
+        void OnOrderStatusChanged(OrderStatus status)
+        {
+
+        }
+
+        void OnOrderExecuted(Contract contract, OrderExecution execution)
+        {
+            
+        }
+
+        void OnCommissionInfoReceived(CommissionInfo commissionInfo)
+        {
+
         }
 
         public void Stop()
@@ -92,8 +162,7 @@ namespace TradingBot
             // Kill task
             //_broker.SellEverything();
 
-            //_broker.CancelBarsRequest()
-            //_broker.CancelBidAskRequest();
+            UnsubscribeToData();
         }
     }
 }

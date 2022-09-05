@@ -7,7 +7,6 @@ namespace TradingBot.Strategies
         void Start();
         void Stop();
 
-        Contract Contract { get; }
         Trader Trader { get; }
     }
 }

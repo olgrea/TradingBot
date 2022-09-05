@@ -19,6 +19,11 @@ namespace TradingBot.Broker
         public string Currency { get; set; }
 
         public override int GetHashCode() => Id;
+        public override bool Equals(object obj)
+        {
+            var c = obj as Contract;
+            return Id.Equals(c);
+        }
     }
 
     public class Cash : Contract
