@@ -38,16 +38,18 @@ namespace TradingBot.Broker.Client
         AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
         Contract _contract;
 
-        public Action<PnL> PnLReceived;
-        public Action<Position> PositionReceived;
+        //TODO : refactor to async/await model and remove AutoResetEvent
 
-        public Action<Contract, MarketData.Bar> FiveSecBarReceived;
-        public Action<Contract, BidAsk> BidAskReceived;
-        public Action<Contract, TBOrder, TBOrderState> OrderOpened;
-        public Action<OrderStatus> OrderStatusChanged;
-        public Action<Contract, OrderExecution> OrderExecuted;
-        public Action<CommissionInfo> CommissionInfoReceived;
-        public Action<ClientMessage> ClientMessageReceived;
+        public event Action<PnL> PnLReceived;
+        public event Action<Position> PositionReceived;
+
+        public event Action<Contract, MarketData.Bar> FiveSecBarReceived;
+        public event Action<Contract, BidAsk> BidAskReceived;
+        public event Action<Contract, TBOrder, TBOrderState> OrderOpened;
+        public event Action<OrderStatus> OrderStatusChanged;
+        public event Action<Contract, OrderExecution> OrderExecuted;
+        public event Action<CommissionInfo> CommissionInfoReceived;
+        public event Action<ClientMessage> ClientMessageReceived;
 
         public TWSClient(ILogger logger)
         {

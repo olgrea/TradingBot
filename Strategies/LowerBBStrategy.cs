@@ -9,11 +9,14 @@ namespace TradingBot.Strategies
     {
         IState _currentState = null;
 
-        public LowerBBStrategy(Contract contract, Trader trader)
+        public LowerBBStrategy(Contract contract, Trader trader) : this()
         {
             Contract = contract;
             Trader = trader;
+        }
 
+        public LowerBBStrategy()
+        {
             States = new Dictionary<string, IState>()
             {
                 { nameof(InitState), new InitState(this)},
@@ -33,7 +36,7 @@ namespace TradingBot.Strategies
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
-                Trader.Broker.BarReceived[BarLength._5Sec] += OnBarReceived;
+                Trader.Broker.Bar5SecReceived += OnBarReceived;
                 Trader.Broker.RequestBars(Contract, BarLength._5Sec);
             }
         }
@@ -41,7 +44,7 @@ namespace TradingBot.Strategies
         void IStrategy.Stop()
         {
             CurrentState = null;
-            Trader.Broker.BarReceived[BarLength._5Sec] -= OnBarReceived;
+            Trader.Broker.Bar5SecReceived -= OnBarReceived;
             Trader.Broker.CancelBarsRequest(Contract, BarLength._5Sec);
         } 
 
