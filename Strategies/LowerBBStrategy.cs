@@ -33,14 +33,16 @@ namespace TradingBot.Strategies
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
-                Trader.Broker.RequestBars(Contract, BarLength._5Sec, OnBarReceived);
+                Trader.Broker.BarReceived[BarLength._5Sec] += OnBarReceived;
+                Trader.Broker.RequestBars(Contract, BarLength._5Sec);
             }
         }
 
         void IStrategy.Stop()
         {
             CurrentState = null;
-            Trader.Broker.CancelBarsRequest(Contract, BarLength._5Sec, OnBarReceived);
+            Trader.Broker.BarReceived[BarLength._5Sec] -= OnBarReceived;
+            Trader.Broker.CancelBarsRequest(Contract, BarLength._5Sec);
         } 
 
         void OnBarReceived(Contract contract, Bar bar)
@@ -59,8 +61,6 @@ namespace TradingBot.Strategies
             {
                 if(value != _currentState)
                 {
-                    value?.SubscribeToMarketData();
-                    _currentState?.UnsubscribeToMarketData();
                     _currentState = value;
                 }
             }
@@ -86,16 +86,6 @@ namespace TradingBot.Strategies
             {
                 Evaluate(bar, null);
             }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
-            }
         }
 
         class MonitoringState : IState
@@ -118,16 +108,6 @@ namespace TradingBot.Strategies
             {
                 Evaluate(bar, null);
             }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._1Min, OnBarReceived);
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._1Min, OnBarReceived);
-            }
         }
 
         class OversoldState : IState
@@ -149,16 +129,6 @@ namespace TradingBot.Strategies
             void OnBarReceived(Contract contract, Bar bar)
             {
                 Evaluate(bar, null);
-            }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
             }
         }
 
@@ -188,18 +158,6 @@ namespace TradingBot.Strategies
             {
                 Evaluate(bar, null);
             }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._10Sec, OnBarReceived);
-                _counter = 0;
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._10Sec, OnBarReceived);
-                _counter = 0;
-            }
         }
 
         class SubmitBuyOrderState : IState
@@ -223,16 +181,6 @@ namespace TradingBot.Strategies
             {
                 Evaluate(null, bidAsk);
             }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBidAsk(_strat.Contract, OnBidAskReceived);
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBidAskRequest(_strat.Contract, OnBidAskReceived);
-            }
         }
 
         class BoughtState : IState
@@ -254,16 +202,6 @@ namespace TradingBot.Strategies
             void OnBarReceived(Contract contract, Bar bar)
             {
                 Evaluate(bar, null);
-            }
-
-            public void SubscribeToMarketData()
-            {
-                _strat.Trader.Broker.RequestBars(_strat.Contract, BarLength._5Sec, OnBarReceived);
-            }
-
-            public void UnsubscribeToMarketData()
-            {
-                _strat.Trader.Broker.CancelBarsRequest(_strat.Contract, BarLength._5Sec, OnBarReceived);
             }
         }
     }
