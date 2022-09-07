@@ -172,7 +172,9 @@ namespace TradingBot.Broker.Client
         {
             return new OrderExecution()
             {
+                ExecId = exec.ExecId,
                 OrderId = exec.OrderId,
+                Exchange = exec.Exchange,
                 Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
                 Shares = exec.Shares,
                 Price = exec.Price,

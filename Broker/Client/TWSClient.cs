@@ -366,7 +366,7 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqContractDetails(NextRequestId, sampleContract);
 
             // TODO : make sure that errors don't cause blocking... 
-            // Maybe it's better to just keep this async and use callbacks
+            // make that properly async using async/await
             _autoResetEvent.WaitOne();
 
             return _contract;

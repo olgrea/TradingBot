@@ -22,7 +22,7 @@ namespace TradingBot.Broker
         public override bool Equals(object obj)
         {
             var c = obj as Contract;
-            return Id.Equals(c);
+            return Id.Equals(c?.Id);
         }
     }
 
