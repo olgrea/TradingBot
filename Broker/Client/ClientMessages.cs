@@ -16,15 +16,19 @@ namespace TradingBot.Broker.Client
             Message = message;
         }
 
+        public ClientError(string message)
+        {
+            Message = message;
+        }
+
         public int ReqId { get; set; } 
         public int ErrorCode { get; set; }
     }
 
-    public class ClientException : ClientMessage
+    public class ClientException : ClientError
     {
-        public ClientException(Exception e) => Exception = e;
+        public ClientException(Exception e) : base(e.Message) => Exception = e;
         public Exception Exception { get; set; }
-        public new string Message => Exception.Message;
     }
 
     public class ClientNotification : ClientMessage

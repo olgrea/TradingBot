@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -92,7 +93,6 @@ namespace TradingBot.Broker
             remove => _client.ClientMessageReceived -= value;
         }
 
-        //TODO : make sure no callbacks are lost...
         public event Action<Contract, Order, OrderState> OrderOpened
         {
             add => _client.OrderOpened += value;
@@ -119,7 +119,7 @@ namespace TradingBot.Broker
 
         public void Connect()
         {
-            _client.Connect(DefaultIP, DefaultPort, _clientId);
+            _client.ConnectAsync(DefaultIP, DefaultPort, _clientId).Wait();
         }
 
         public void Disconnect()
@@ -129,12 +129,12 @@ namespace TradingBot.Broker
 
         public Accounts.Account GetAccount()
         {
-            return _client.GetAccount();
+            return _client.GetAccountAsync().Result;
         }
 
         public Contract GetContract(string ticker)
         {
-            return _client.GetContract(ticker);
+            return _client.GetContractsAsync(ticker).Result?.FirstOrDefault();
         }
 
         public void RequestBidAsk(Contract contract)

@@ -55,7 +55,6 @@ namespace TradingBot
                 return;
             }
 
-            //TODO : refactor to async/await model and remove AutoResetEvent
             _contract = _broker.GetContract(_ticker);
 
             var acc = _broker.GetAccount();
