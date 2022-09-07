@@ -10,5 +10,10 @@
         // TODO : useful?
         public double Yield { get; set; }
         public int YieldRedemptionDate { get; set; }
+
+        public override string ToString()
+        {
+            return $"execId={ExecId} commission={Commission} {Currency} : realizedPnL={RealizedPNL}";
+        }
     }
 }
