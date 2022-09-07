@@ -23,7 +23,7 @@ namespace TradingBot
         Contract _contract;
         
         Position _contractPosition;
-        Position _USDCash;
+        double _USDCashBalance;
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<Type> _desiredStrategies = new HashSet<Type>();
@@ -57,7 +57,16 @@ namespace TradingBot
 
             //TODO : refactor to async/await model and remove AutoResetEvent
             _contract = _broker.GetContract(_ticker);
-            
+
+            var acc = _broker.GetAccount();
+            if(!acc.CashBalances.ContainsKey("USD"))
+            {
+                _logger.LogError("No USD cash funds in this account. This trader only trades in USD.");
+                return;
+            }
+            _USDCashBalance = acc.CashBalances["USD"];
+
+
             SubscribeToData();
 
             foreach (var type in _desiredStrategies)
@@ -114,11 +123,7 @@ namespace TradingBot
 
         void OnPositionReceived(Position position)
         {
-            if(position.Contract is Cash cash && cash.Currency == "USD")
-            {
-                _USDCash = position;
-            }
-            else if(position.Contract.Symbol == _ticker)
+            if(position.Contract.Symbol == _ticker)
             {
                 _contractPosition = position;
             }
