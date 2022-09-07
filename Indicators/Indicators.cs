@@ -2,6 +2,6 @@
 {
     public class Indicators
     {
-        public BollingerBands BollingerBands { get; set; }
+        public BollingerBands BB1Min { get; set; }
     }
 }

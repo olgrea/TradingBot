@@ -1,4 +1,6 @@
-﻿using TradingBot.Broker;
+﻿using System.Collections.Generic;
+using TradingBot.Broker;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Strategies
 {
@@ -7,6 +9,6 @@ namespace TradingBot.Strategies
         void Start();
         void Stop();
 
-        Trader Trader { get; }
+        public Dictionary<string, IState> States { get; }
     }
 }
