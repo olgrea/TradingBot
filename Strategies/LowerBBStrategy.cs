@@ -1,21 +1,13 @@
 ﻿using System.Collections.Generic;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
-using TradingBot.Strategies.Indicators;
+using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public class LowerBBStrategy : IStrategy
+    public class LowerBBStrategy : StrategyBase
     {
-        IState _currentState = null;
-
-        public LowerBBStrategy(Contract contract, Trader trader) : this()
-        {
-            Contract = contract;
-            Trader = trader;
-        }
-
-        public LowerBBStrategy()
+        public LowerBBStrategy(Trader trader) : base(trader)
         {
             States = new Dictionary<string, IState>()
             {
@@ -28,45 +20,17 @@ namespace TradingBot.Strategies
             };
         }
 
-        public Contract Contract { get; private set; }
-        public Trader Trader { get; private set; }
-
-        void IStrategy.Start()
+        public override void Start()
         {
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
-                Trader.Broker.Bar5SecReceived += OnBarReceived;
-                Trader.Broker.RequestBars(Contract, BarLength._5Sec);
             }
         }
 
-        void IStrategy.Stop()
+        public override void Stop()
         {
             CurrentState = null;
-            Trader.Broker.Bar5SecReceived -= OnBarReceived;
-            Trader.Broker.CancelBarsRequest(Contract, BarLength._5Sec);
-        } 
-
-        void OnBarReceived(Contract contract, Bar bar)
-        {
-            BB.Update(bar);
-        }
-
-        public BollingerBands BB = new BollingerBands();
-
-        public readonly Dictionary<string, IState> States;
-
-        public IState CurrentState
-        {
-            get => _currentState;
-            set
-            {
-                if(value != _currentState)
-                {
-                    _currentState = value;
-                }
-            }
         }
 
         class InitState : IState
@@ -79,7 +43,7 @@ namespace TradingBot.Strategies
 
             public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                if (!_strat.BB.IsReady)
+                if (!_strat.Trader.Indicators.BollingerBands.IsReady)
                     _strat.CurrentState = this;
                 else
                     _strat.CurrentState = _strat.States[nameof(MonitoringState)];
@@ -101,7 +65,7 @@ namespace TradingBot.Strategies
 
             public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                if(bar.Low <= _strat.BB.LowerBB)
+                if(bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
                     _strat.CurrentState = _strat.States[nameof(OversoldState)];
                 else
                     _strat.CurrentState = this;
@@ -123,7 +87,7 @@ namespace TradingBot.Strategies
 
             public void Evaluate(Bar bar, BidAsk bidAsk)
             {
-                if (bar.Low <= _strat.BB.LowerBB)
+                if (bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
                     _strat.CurrentState = this;
                 else
                     _strat.CurrentState = _strat.States[nameof(RisingState)];
@@ -149,7 +113,7 @@ namespace TradingBot.Strategies
             {
                 _counter++;
 
-                if (bar.Low <= _strat.BB.LowerBB)
+                if (bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
                     _strat.CurrentState = _strat.States[nameof(OversoldState)]; 
                 else if(_counter < 3)
                     _strat.CurrentState = this;

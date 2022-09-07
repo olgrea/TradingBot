@@ -21,10 +21,11 @@ namespace TradingBot
 
         string _ticker;
         Contract _contract;
-        
+        Indicators.Indicators _indicators;
+
         Position _contractPosition;
         double _USDCashBalance;
-
+                
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<Type> _desiredStrategies = new HashSet<Type>();
 
@@ -35,12 +36,14 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
+            _indicators = new Indicators.Indicators();
         }
 
         public IBroker Broker => _broker;
         public Contract Contract => _contract;
+        public Indicators.Indicators Indicators => _indicators;
 
-        public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy, new()
+        public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
             _desiredStrategies.Add(typeof(TStrategy));
         }

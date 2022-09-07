@@ -6,9 +6,9 @@ using TradingBot.Broker.MarketData;
 using MathNet.Numerics.Statistics;
 using System.Linq;
 
-namespace TradingBot.Strategies.Indicators
+namespace TradingBot.Indicators
 {
-    public class BollingerBands : IIndicator
+    public class BollingerBands
     {
         const int nbPeriods = 20;
 

@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Strategies.Indicators
+﻿namespace TradingBot.Indicators
 {
     public interface IIndicator
     {
