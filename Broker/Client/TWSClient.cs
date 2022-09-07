@@ -33,13 +33,10 @@ namespace TradingBot.Broker.Client
         Dictionary<Contract, int> _pnlSubscriptions = new Dictionary<Contract, int>();
         
         string _accountCode = null;
-        Accounts.Account _account = new Accounts.Account();
         MarketData.BidAsk _bidAsk = new BidAsk();
-        AutoResetEvent _autoResetEvent = new AutoResetEvent(false);
-        Contract _contract;
 
-        //TODO : refactor to async/await model and remove AutoResetEvent
-
+        public event Action ClientConnected;
+        public event Action ClientDisconnected;
         public event Action<PnL> PnLReceived;
         public event Action<Position> PositionReceived;
 
@@ -51,6 +48,16 @@ namespace TradingBot.Broker.Client
         public event Action<CommissionInfo> CommissionInfoReceived;
         public event Action<ClientMessage> ClientMessageReceived;
 
+        event Action<int> _nextValidId;
+        event Action<string> _managedAccounts;
+        event Action<DateTime> _updateAccountTimeEvent;
+        event Action<string, string, string> _updateAccountValueEvent;
+        event Action<Position> _updatePortfolioEvent;
+        event Action<string> _accountDownloadEndEvent;
+
+        event Action<int, Contract> _contractDetailsEvent;
+        event Action<int> _contractDetailsEndEvent;
+
         public TWSClient(ILogger logger)
         {
             _signal = new EReaderMonitorSignal();
@@ -61,21 +68,37 @@ namespace TradingBot.Broker.Client
         int NextRequestId => _reqId++;
         int NextValidOrderId => _nextValidOrderId++;
 
-        public void Connect(string host, int port, int clientId)
+        public Task<bool> ConnectAsync(string host, int port, int clientId)
         {
             //TODO: Handle IB server resets
 
-            if (_clientId >= 0)
-                throw new NotImplementedException("Implement Next Valid Identifier logic with IBApi.EClient.reqIds ");
-
             _clientId = clientId;
+
+            var resolveResult = new TaskCompletionSource<bool>();
+            var nextValidId = new Action<int>(id => resolveResult.SetResult(id > 0));
+            var managedAccounts = new Action<string>(acc => _accountCode = acc);
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+            _nextValidId += nextValidId;
+            ClientMessageReceived += error;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _nextValidId -= nextValidId;
+                ClientMessageReceived -= error;
+                if(_nextValidOrderId > 0)
+                    ClientConnected?.Invoke();
+            });
+            
             _clientSocket.eConnect(host, port, clientId);
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
             _processMsgTask = Task.Run(ProcessMsg);
             _logger.LogDebug($"Reader started and is listening to messages from TWS");
-            _autoResetEvent.WaitOne();
+
+            return resolveResult.Task;
         }
+
+
 
         public void Disconnect()
         {
@@ -88,6 +111,7 @@ namespace TradingBot.Broker.Client
 
             _clientSocket.eDisconnect();
             _clientId = -1;
+            ClientDisconnected?.Invoke();
         }
 
         public bool IsConnected => _clientSocket.IsConnected() && _nextValidOrderId > 0;
@@ -114,17 +138,35 @@ namespace TradingBot.Broker.Client
         public void managedAccounts(string accountsList)
         {
             _logger.LogDebug($"Account list : {accountsList}");
-            _accountCode = accountsList;
+            _managedAccounts?.Invoke(accountsList);
         }
 
         public int GetNextValidOrderId(bool fromTWS = false)
         {
             if(fromTWS)
             {
-                _clientSocket.reqIds(-1); // param is deprecated
-                _autoResetEvent.WaitOne();
+                return GetNextValidOrderIdAsync().Result;
             }
             return NextValidOrderId;   
+        }
+
+        Task<int> GetNextValidOrderIdAsync()
+        {
+            var resolveResult = new TaskCompletionSource<int>();
+            var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+            _nextValidId += nextValidId;
+            ClientMessageReceived += error;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _nextValidId -= nextValidId;
+                ClientMessageReceived -= error;
+            });
+
+            _clientSocket.reqIds(-1); // param is deprecated
+
+            return resolveResult.Task;
         }
 
         // The next valid identifier is persistent between TWS sessions
@@ -136,25 +178,62 @@ namespace TradingBot.Broker.Client
             }
 
             _nextValidOrderId = orderId;
-            _autoResetEvent.Set();
+            _nextValidId?.Invoke(orderId);
         }
         
-        public Accounts.Account GetAccount(bool receiveUpdates = true)
+        public Task<Account> GetAccountAsync()
         {
-            _clientSocket.reqAccountUpdates(receiveUpdates, _accountCode);
-            _account.Code = _accountCode;
+            var account = new Account() { Code = _accountCode };
 
-            // TODO : make sure that errors don't cause blocking... 
-            // Maybe it's better to just keep this async and use callbacks
-            _autoResetEvent.WaitOne();
+            var resolveResult = new TaskCompletionSource<Account>();
 
-            return _account;
+            var updateAccountTime = new Action<DateTime>(time => account.Time = time);
+            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
+            {
+                switch(key)
+                {
+                    case "CashBalance":
+                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "RealizedPnL":
+                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "UnrealizedPnL":
+                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+                }
+            });
+            var updatePortfolio = new Action<Position>(pos => account.Positions.Add(pos));
+            var accountDownloadEnd = new Action<string>(accountCode => resolveResult.SetResult(account));
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+            _updateAccountTimeEvent += updateAccountTime;
+            _updateAccountValueEvent += updateAccountValue;
+            _updatePortfolioEvent += updatePortfolio;
+            _accountDownloadEndEvent += accountDownloadEnd;
+            ClientMessageReceived += error;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _updateAccountTimeEvent -= updateAccountTime;
+                _updateAccountValueEvent -= updateAccountValue;
+                _updatePortfolioEvent -= updatePortfolio;
+                _accountDownloadEndEvent -= accountDownloadEnd;
+                ClientMessageReceived -= error;
+                _clientSocket.reqAccountUpdates(false, _accountCode);
+            });
+
+            _clientSocket.reqAccountUpdates(true, _accountCode);
+
+            return resolveResult.Task;
         }
 
         public void updateAccountTime(string timestamp)
         {
             _logger.LogDebug($"Getting account time : {timestamp}");
-            _account.Time = DateTime.Parse(timestamp, CultureInfo.InvariantCulture);
+            _updateAccountTimeEvent?.Invoke(DateTime.Parse(timestamp, CultureInfo.InvariantCulture));
         }
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
@@ -165,27 +244,20 @@ namespace TradingBot.Broker.Client
             {
                 case "AccountReady":
                     if (!bool.Parse(value))
-                        _logger.LogError("Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate. Try again later");
+                    {
+                        string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate. Try again later";
+                        error(msg);
+                    }
                     break;
 
-                case "CashBalance":
-                    _account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                    break;
-
-                case "RealizedPnL":
-                    _account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                    break;
-
-                case "UnrealizedPnL":
-                    _account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                default:
+                    _updateAccountValueEvent?.Invoke(key, value, currency);
                     break;
             }
         }
         
         public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
-            //TODO : garbage cleanup
-
             var pos = new Position()
             {
                 Contract = contract.ToTBContract(),
@@ -199,12 +271,12 @@ namespace TradingBot.Broker.Client
 
             _logger.LogDebug($"Getting portfolio : \n{pos}");
 
-            _account.Positions[pos.Contract] = pos;
+            _updatePortfolioEvent?.Invoke(pos);
         }
 
         public void accountDownloadEnd(string account)
         {
-            _autoResetEvent.Set();
+            _accountDownloadEndEvent?.Invoke(account);
         }
 
         public void RequestPositions()
@@ -353,7 +425,7 @@ namespace TradingBot.Broker.Client
             }
         }
 
-        public Contract GetContract(string ticker)
+        public Task<List<Contract>> GetContractsAsync(string ticker)
         {
             var sampleContract = new IBApi.Contract()
             {
@@ -362,24 +434,46 @@ namespace TradingBot.Broker.Client
                 Symbol = ticker,
                 SecType = "STK"
             };
+            var reqId = NextRequestId;
 
-            _clientSocket.reqContractDetails(NextRequestId, sampleContract);
+            var resolveResult = new TaskCompletionSource<List<Contract>>();
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var tmpContracts = new List<Contract>();
+            var contractDetails = new Action<int, Contract>((rId, c) => 
+            { 
+                if(rId == reqId)
+                    tmpContracts.Add(c);
+            });
+            var contractDetailsEnd = new Action<int>(rId => 
+            {
+                if(rId == reqId)
+                    resolveResult.SetResult(tmpContracts);
+            });
 
-            // TODO : make sure that errors don't cause blocking... 
-            // make that properly async using async/await
-            _autoResetEvent.WaitOne();
+            _contractDetailsEvent += contractDetails;
+            _contractDetailsEndEvent += contractDetailsEnd;
+            ClientMessageReceived += error;
 
-            return _contract;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _contractDetailsEvent -= contractDetails;
+                _contractDetailsEndEvent -= contractDetailsEnd;
+                ClientMessageReceived -= error;
+            });
+
+            _clientSocket.reqContractDetails(reqId, sampleContract);
+
+            return resolveResult.Task;
         }
 
         public void contractDetails(int reqId, ContractDetails contractDetails)
         {
-            _contract = contractDetails.Contract.ToTBContract();
+            _contractDetailsEvent?.Invoke(reqId, contractDetails.Contract.ToTBContract());
         }
 
         public void contractDetailsEnd(int reqId)
         {
-            _autoResetEvent.Set();
+            _contractDetailsEndEvent?.Invoke(reqId);    
         }
 
         public void RequestOpenOrders()
@@ -475,7 +569,7 @@ namespace TradingBot.Broker.Client
         public void error(string str)
         {
             _logger.LogError(str);
-            ClientMessageReceived?.Invoke(new ClientNotification(str));
+            ClientMessageReceived?.Invoke(new ClientError(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
@@ -499,6 +593,16 @@ namespace TradingBot.Broker.Client
             }
 
             ClientMessageReceived?.Invoke(msg);
+        }
+
+        void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
+        {
+            if (msg is ClientError)
+            {
+                if (msg is ClientException ex)
+                    resolveResult.SetException(ex.Exception);
+                resolveResult.SetResult(default(T));
+            }
         }
 
         #region Not implemented
