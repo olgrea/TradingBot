@@ -7,16 +7,16 @@ namespace TradingBot.Strategies
 {
     public class LowerBBStrategy : StrategyBase
     {
-        public LowerBBStrategy(Trader trader) : base(trader)
+        public LowerBBStrategy(Trader trader) : base()
         {
             States = new Dictionary<string, IState>()
             {
-                { nameof(InitState), new InitState(this)},
-                { nameof(MonitoringState), new MonitoringState(this)},
-                { nameof(OversoldState), new OversoldState(this)},
-                { nameof(RisingState), new RisingState(this)},
-                { nameof(SubmitBuyOrderState), new SubmitBuyOrderState(this)},
-                { nameof(BoughtState), new BoughtState(this)},
+                { nameof(InitState), new InitState(this, trader)},
+                { nameof(MonitoringState), new MonitoringState(this, trader)},
+                { nameof(OversoldState), new OversoldState(this, trader)},
+                { nameof(RisingState), new RisingState(this, trader)},
+                { nameof(SubmitBuyOrderState), new SubmitBuyOrderState(this, trader)},
+                { nameof(BoughtState), new BoughtState(this, trader)},
             };
         }
 
@@ -25,150 +25,138 @@ namespace TradingBot.Strategies
             if (CurrentState == null)
             {
                 CurrentState = States[nameof(InitState)];
+                base.Start();
             }
         }
 
-        public override void Stop()
+        class InitState : StateBase
         {
-            CurrentState = null;
-        }
+            public InitState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
 
-        class InitState : IState
-        {
-            LowerBBStrategy _strat;
-            public InitState(LowerBBStrategy strat)
+            public override IState Evaluate()
             {
-                _strat = strat;
-            }
-
-            public void Evaluate(Bar bar, BidAsk bidAsk)
-            {
-                if (!_strat.Trader.Indicators.BollingerBands.IsReady)
-                    _strat.CurrentState = this;
+                if (!Trader.Indicators.BollingerBands.IsReady)
+                    return this;
                 else
-                    _strat.CurrentState = _strat.States[nameof(MonitoringState)];
+                    return Strategy.States[nameof(MonitoringState)];
+            }
+        }
+
+        class MonitoringState : StateBase
+        {
+            public MonitoringState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
+
+            Bar _bar;
+
+            public override IState Evaluate()
+            {
+                if (_bar == null)
+                    return this;
+
+                if(_bar.Low <= Trader.Indicators.BollingerBands.LowerBB)
+                    return Strategy.States[nameof(OversoldState)];
+                else
+                    return this;
+            }
+
+            public override void SubscribeToData()
+            {
+                Trader.Broker.Bar5SecReceived += OnBarReceived;
+                Trader.Broker.RequestBars(Trader.Contract, BarLength._5Sec);
+                base.SubscribeToData();
             }
 
             void OnBarReceived(Contract contract, Bar bar)
             {
-                Evaluate(bar, null);
+                _bar = bar;
+            }
+
+            public override void UnsubscribeToData()
+            {
+                Trader.Broker.Bar5SecReceived -= OnBarReceived;
+                Trader.Broker.CancelBarsRequest(Trader.Contract, BarLength._5Sec);
+                base.UnsubscribeToData();
             }
         }
 
-        class MonitoringState : IState
+        class OversoldState : StateBase
         {
-            LowerBBStrategy _strat;
-            public MonitoringState(LowerBBStrategy strat)
+            public OversoldState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
+
+            Bar _bar;
+
+            public override IState Evaluate()
             {
-                _strat = strat;
+                if (_bar == null || _bar.Low <= Trader.Indicators.BollingerBands.LowerBB)
+                    return this;
+                else
+                    return Strategy.States[nameof(RisingState)];
             }
 
-            public void Evaluate(Bar bar, BidAsk bidAsk)
+            public override void SubscribeToData()
             {
-                if(bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
-                    _strat.CurrentState = _strat.States[nameof(OversoldState)];
-                else
-                    _strat.CurrentState = this;
+                Trader.Broker.Bar1MinReceived += OnBarReceived;
+                Trader.Broker.RequestBars(Trader.Contract, BarLength._1Min);
+                base.SubscribeToData();
             }
 
             void OnBarReceived(Contract contract, Bar bar)
             {
-                Evaluate(bar, null);
+                _bar = bar;
+            }
+
+            public override void UnsubscribeToData()
+            {
+                Trader.Broker.Bar1MinReceived -= OnBarReceived;
+                Trader.Broker.CancelBarsRequest(Trader.Contract, BarLength._1Min);
+                base.UnsubscribeToData();
             }
         }
 
-        class OversoldState : IState
+        class RisingState : StateBase
         {
-            LowerBBStrategy _strat;
-            public OversoldState(LowerBBStrategy strat)
-            {
-                _strat = strat;
-            }
+            public RisingState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
 
-            public void Evaluate(Bar bar, BidAsk bidAsk)
+            public override IState Evaluate()
             {
-                if (bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
-                    _strat.CurrentState = this;
-                else
-                    _strat.CurrentState = _strat.States[nameof(RisingState)];
-            }
+                //_counter++;
 
-            void OnBarReceived(Contract contract, Bar bar)
-            {
-                Evaluate(bar, null);
+                //if (bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
+                //    _strat.CurrentState = _strat.States[nameof(OversoldState)]; 
+                //else if(_counter < 3)
+                //    _strat.CurrentState = this;
+                //else
+                //    _strat.CurrentState = _strat.States[nameof(SubmitBuyOrderState)];
+
+                return null;
             }
         }
 
-        class RisingState : IState
+        class SubmitBuyOrderState : StateBase
         {
-            int _counter = 0;
-
-            LowerBBStrategy _strat;
-            public RisingState(LowerBBStrategy strat)
-            {
-                _strat = strat;
-            }
-
-            public void Evaluate(Bar bar, BidAsk bidAsk)
-            {
-                _counter++;
-
-                if (bar.Low <= _strat.Trader.Indicators.BollingerBands.LowerBB)
-                    _strat.CurrentState = _strat.States[nameof(OversoldState)]; 
-                else if(_counter < 3)
-                    _strat.CurrentState = this;
-                else
-                    _strat.CurrentState = _strat.States[nameof(SubmitBuyOrderState)];
-            }
-
-            void OnBarReceived(Contract contract, Bar bar)
-            {
-                Evaluate(bar, null);
-            }
-        }
-
-        class SubmitBuyOrderState : IState
-        {
-            LowerBBStrategy _strat;
-            public SubmitBuyOrderState(LowerBBStrategy strat)
-            {
-                _strat = strat;
-            }
-
-            public void Evaluate(Bar bar, BidAsk bidAsk)
+            public SubmitBuyOrderState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
+            
+            public override IState Evaluate()
             {
 
                 //if (/*order is filled*/)
                 //_strat.CurrentState = _strat.States[nameof(BoughtState)];
                 //else
                 //    return _strat.States[nameof(MonitoringState)];
-            }
-
-            void OnBidAskReceived(Contract contract, BidAsk bidAsk)
-            {
-                Evaluate(null, bidAsk);
+                return null;
             }
         }
 
-        class BoughtState : IState
+        class BoughtState : StateBase
         {
-            LowerBBStrategy _strat;
-            public BoughtState(LowerBBStrategy strat)
-            {
-                _strat = strat;
-            }
+            public BoughtState(LowerBBStrategy strat, Trader trader) : base(strat, trader) { }
 
-            public void Evaluate(Bar bar, BidAsk bidAsk)
+            public override IState Evaluate()
             {
                 //if (/*order is opened*/)
-                _strat.CurrentState = this;
+                return this;
                 //else
                 //    return _strat.States[nameof(MonitoringState)];
-            }
-
-            void OnBarReceived(Contract contract, Bar bar)
-            {
-                Evaluate(bar, null);
             }
         }
     }
