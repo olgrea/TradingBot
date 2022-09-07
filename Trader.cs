@@ -43,6 +43,9 @@ namespace TradingBot
         public Contract Contract => _contract;
         public Indicators.Indicators Indicators => _indicators;
 
+        public Bar Bar5Sec { get; private set; }
+        public Bar Bar1Min { get; private set; }
+
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
             _desiredStrategies.Add(typeof(TStrategy));
@@ -82,8 +85,10 @@ namespace TradingBot
         {
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
+
             _broker.Bar5SecReceived += OnBarsReceived;
-            _broker.BidAskReceived += OnBidAskReceived;
+            _broker.Bar1MinReceived += OnBarsReceived;
+            //_broker.BidAskReceived += OnBidAskReceived;
             
             _broker.OrderOpened += OnOrderOpened;
             _broker.OrderStatusChanged += OnOrderStatusChanged;
@@ -103,7 +108,8 @@ namespace TradingBot
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
             _broker.Bar5SecReceived -= OnBarsReceived;
-            _broker.BidAskReceived -= OnBidAskReceived;
+            _broker.Bar1MinReceived -= OnBarsReceived;
+            //_broker.BidAskReceived -= OnBidAskReceived;
 
             _broker.OrderOpened -= OnOrderOpened;
             _broker.OrderStatusChanged -= OnOrderStatusChanged;
@@ -138,14 +144,21 @@ namespace TradingBot
             _logger.LogInfo($"OnPnLReceived : {pnl}");
         }
 
-        void OnBidAskReceived(Contract contract, BidAsk bidAsk)
-        {
-            //_logger.LogInfo($"OnBidAskReceived {DateTime.Now} : bid={bidAsk.Bid} ask={bidAsk.Ask}");
-        }
-
         void OnBarsReceived(Contract contract, Bar bar)
         {
-            //_logger.LogInfo($"OnBarsReceived {DateTime.Now} : time={bar.Time} open={bar.Open} high={bar.High} low={bar.Low} close={bar.Close}");
+            if (bar.BarLength == BarLength._5Sec)
+            {
+                Bar5Sec = bar;
+            }
+            else if(bar.BarLength == BarLength._1Min)
+            {
+                if(!Indicators.BB1Min.IsReady)
+                {
+                    // TODO : fetch historical data
+                }
+                Indicators.BB1Min.Update(bar);
+                Bar1Min = bar;
+            }
         }
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)

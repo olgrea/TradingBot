@@ -7,6 +7,9 @@ namespace TradingBot.Strategies
 {
     public interface IState
     {
-        void Evaluate(Bar bar, BidAsk bidAsk);
+        Trader Trader { get; }
+        IState Evaluate();
+        void SubscribeToData();
+        void UnsubscribeToData();
     }
 }
