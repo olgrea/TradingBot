@@ -12,7 +12,12 @@ namespace TradingBot.Indicators
     {
         public const int NbPeriods = 20;
 
-        public double MovingAverage { get; private set; }
+        public BollingerBands()
+        {
+            MovingAverage = new MovingAverage(NbPeriods);
+        }
+
+        public MovingAverage MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
         public double LowerBB { get; private set; }
 
@@ -23,6 +28,7 @@ namespace TradingBot.Indicators
         public void Update(Bar bar)
         {
             // TODO : make sure that metrics are still valid when/if bars are not of the same length
+            MovingAverage.Update(bar);
 
             _bars.AddLast(bar);
             if (_bars.Count > NbPeriods)
@@ -35,7 +41,6 @@ namespace TradingBot.Indicators
         {
             var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low) / 3);
 
-            MovingAverage = barsTypicalPrice.Mean();
             var sdev = barsTypicalPrice.StandardDeviation();
 
             UpperBB = MovingAverage + 2 * sdev;
