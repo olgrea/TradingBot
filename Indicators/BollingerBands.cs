@@ -8,38 +8,29 @@ using System.Linq;
 
 namespace TradingBot.Indicators
 {
-    public class BollingerBands
+    public class BollingerBands : IIndicator
     {
-        public const int NbPeriods = 20;
-
-        public BollingerBands()
+        public BollingerBands(int nbPeriods = 20)
         {
-            MovingAverage = new MovingAverage(NbPeriods);
+            MovingAverage = new MovingAverage(nbPeriods);
         }
 
         public MovingAverage MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
         public double LowerBB { get; private set; }
-
-        LinkedList<Bar> _bars = new LinkedList<Bar>();
-
-        public bool IsReady => _bars.Count == NbPeriods;
+        LinkedList<Bar> Bars => MovingAverage.Bars;
+        public int NbPeriods => MovingAverage.NbPeriods;
+        public bool IsReady => MovingAverage.IsReady;
 
         public void Update(Bar bar)
         {
-            // TODO : make sure that metrics are still valid when/if bars are not of the same length
             MovingAverage.Update(bar);
-
-            _bars.AddLast(bar);
-            if (_bars.Count > NbPeriods)
-                _bars.RemoveFirst();
-
             Compute();
         }
 
         public void Compute()
         {
-            var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low) / 3);
+            var barsTypicalPrice = Bars.Select(b => (b.Close + b.High + b.Low) / 3);
 
             var sdev = barsTypicalPrice.StandardDeviation();
 

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Collections.Generic;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 
@@ -7,62 +6,72 @@ namespace TradingBot.Indicators
 {
     public class Indicators
     {
+        Dictionary<BarLength, List<Bar>> _pastBars = new Dictionary<BarLength, List<Bar>>();
+        BarLength _barLength;
+
         Trader _trader;
-        public Indicators(Trader trader)
+        public Indicators(BarLength barLength, Trader trader)
         {
+            _barLength = barLength;
             _trader = trader;
         }
 
-        public BollingerBands BB1Min { get; private set; }
-        public BollingerBands BB5Sec { get; private set; }
+        public BollingerBands BollingerBands { get; private set; }
+        public BBTrend BBTrend { get; private set; }
 
         public void Start()
         {
-            BB1Min = new BollingerBands();
-            BB5Sec = new BollingerBands();
+            BBTrend = new BBTrend();
+            BollingerBands = new BollingerBands();
 
             //testInitBollingerBands(_trader.Contract, BarLength._5Sec, BB5Sec);
-            //testInitBollingerBands(_trader.Contract, BarLength._1Min, BB1Min);
 
-            _trader.Broker.Bar5SecReceived += OnBarsReceived;
-            _trader.Broker.Bar1MinReceived += OnBarsReceived;
-            _trader.Broker.RequestBars(_trader.Contract, Broker.MarketData.BarLength._5Sec);
-            _trader.Broker.RequestBars(_trader.Contract, Broker.MarketData.BarLength._1Min);
+            _trader.Broker.BarReceived[_barLength] += OnBarsReceived;
+            _trader.Broker.RequestBars(_trader.Contract, _barLength);
         }
 
         public void Stop()
         {
-            _trader.Broker.Bar5SecReceived -= OnBarsReceived;
-            _trader.Broker.Bar1MinReceived -= OnBarsReceived;
-            _trader.Broker.CancelBarsRequest(_trader.Contract, Broker.MarketData.BarLength._5Sec);
-            _trader.Broker.CancelBarsRequest(_trader.Contract, Broker.MarketData.BarLength._1Min);
+            _trader.Broker.BarReceived[_barLength] -= OnBarsReceived;
+            _trader.Broker.CancelBarsRequest(_trader.Contract, _barLength);
 
-            BB1Min = null;
-            BB5Sec = null;
+            BollingerBands = null;
+            BBTrend = null;
         }
 
         void OnBarsReceived(Contract contract, Bar bar)
         {
-            if (bar.BarLength == BarLength._5Sec)
+            if (bar.BarLength == _barLength)
             {
-                UpdateBollingerBands(contract, bar, BB5Sec);
-            }
-            else if (bar.BarLength == BarLength._1Min)
-            {
-                UpdateBollingerBands(contract, bar, BB1Min);
+                UpdateIndicator(contract, bar, BollingerBands);
+                UpdateIndicator(contract, bar, BBTrend);
             }
         }
 
-        void UpdateBollingerBands(Contract contract, Bar bar, BollingerBands bb)
+        void UpdateIndicator(Contract contract, Bar bar, IIndicator indicator)
         {
-            if (!bb.IsReady)
+            if (!indicator.IsReady)
             {
-                var pastBars = _trader.Broker.GetPastBars(contract, bar.Time, bar.BarLength, BollingerBands.NbPeriods);
-                foreach(var pastBar in pastBars)
-                    bb.Update(pastBar);
+                var pastBars = GetPastBars(contract, bar, indicator.NbPeriods);
+                for(int i = pastBars.Count - indicator.NbPeriods; i < pastBars.Count; ++i)
+                    indicator.Update(pastBars[i]);
             }
 
-            bb.Update(bar);
+            indicator.Update(bar);
+        }
+
+        // To limit the number of historical data requests
+        List<Bar> GetPastBars(Contract contract, Bar bar, int nbPeriods)
+        {
+            if (!_pastBars.ContainsKey(bar.BarLength))
+                _pastBars.Add(bar.BarLength, new List<Bar>());
+
+            if (_pastBars[bar.BarLength].Count < nbPeriods)
+            {
+                _pastBars[bar.BarLength] = _trader.Broker.GetPastBars(contract, bar.Time, bar.BarLength, nbPeriods);
+            }
+
+            return _pastBars[bar.BarLength];
         }
 
         //void testInitBollingerBands(Contract contract, BarLength barLength, BollingerBands bb)
