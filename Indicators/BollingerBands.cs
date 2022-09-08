@@ -18,7 +18,7 @@ namespace TradingBot.Indicators
         public MovingAverage MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
         public double LowerBB { get; private set; }
-        LinkedList<Bar> Bars => MovingAverage.Bars;
+        public LinkedList<Bar> Bars => MovingAverage.Bars;
         public int NbPeriods => MovingAverage.NbPeriods;
         public bool IsReady => MovingAverage.IsReady;
 

@@ -231,7 +231,7 @@ namespace TradingBot.Broker.Client
                 _accountDownloadEndEvent -= accountDownloadEnd;
                 ClientMessageReceived -= error;
                 
-                //_clientSocket.reqAccountUpdates(false, _accountCode);
+                _clientSocket.reqAccountUpdates(false, _accountCode);
             });
 
             _clientSocket.reqAccountUpdates(true, _accountCode);
@@ -380,6 +380,7 @@ namespace TradingBot.Broker.Client
 
             FiveSecBarReceived?.Invoke(contract, new MarketData.Bar()
             {
+                BarLength = BarLength._5Sec,
                 Open = open,
                 Close = close,
                 High = high,
@@ -571,11 +572,6 @@ namespace TradingBot.Broker.Client
 
         public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, int count)
         {
-            return GetHistoricalDataAsync(contract, DateTime.Now, barLength, count);
-        }
-
-        public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, DateTime endDateTime, BarLength barLength, int count)
-        {
             var tmpList = new List<MarketData.Bar>();
             var reqId = NextRequestId;
 
@@ -609,20 +605,17 @@ namespace TradingBot.Broker.Client
                 ClientMessageReceived -= error;
             });
 
-            string timeFormat = "yyyyMMdd-HH:mm:ss";
-            string endDateTimeStr = null;
+            //string timeFormat = "yyyyMMdd-HH:mm:ss";
             string durationStr = null;
             string barSizeStr = null;
             switch(barLength)
             {
                 case BarLength._5Sec :
-                    endDateTimeStr = endDateTime.ToUniversalTime().ToString(timeFormat);
                     durationStr = $"{5*count} S";
                     barSizeStr = "5 secs";
                     break;
 
                 case BarLength._1Min:
-                    endDateTimeStr = endDateTime.ToUniversalTime().ToString(timeFormat);
                     durationStr = $"{60 * count} S";
                     barSizeStr = "1 min";
                     break;
@@ -638,7 +631,7 @@ namespace TradingBot.Broker.Client
             // - making more than 60 requests within any ten minute period.
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
             
-            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTimeStr, durationStr, barSizeStr, "TRADES", 1, 1, false, null);
+            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), string.Empty, durationStr, barSizeStr, "TRADES", 0, 1, false, null);
 
             return resolveResult.Task;
         }
