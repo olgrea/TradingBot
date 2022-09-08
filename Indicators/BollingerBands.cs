@@ -10,7 +10,7 @@ namespace TradingBot.Indicators
 {
     public class BollingerBands
     {
-        const int nbPeriods = 20;
+        public const int NbPeriods = 20;
 
         public double MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
@@ -18,14 +18,14 @@ namespace TradingBot.Indicators
 
         LinkedList<Bar> _bars = new LinkedList<Bar>();
 
-        public bool IsReady => _bars.Count == nbPeriods;
+        public bool IsReady => _bars.Count == NbPeriods;
 
         public void Update(Bar bar)
         {
             // TODO : make sure that metrics are still valid when/if bars are not of the same length
 
             _bars.AddLast(bar);
-            if (_bars.Count > nbPeriods)
+            if (_bars.Count > NbPeriods)
                 _bars.RemoveFirst();
 
             Compute();

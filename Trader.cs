@@ -10,6 +10,7 @@ using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
+using TradingBot.Indicators;
 using TradingBot.Utils;
 
 namespace TradingBot
@@ -36,7 +37,7 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
-            _indicators = new Indicators.Indicators();
+            _indicators = new Indicators.Indicators(this);
         }
 
         public IBroker Broker => _broker;
@@ -74,6 +75,8 @@ namespace TradingBot
 
             SubscribeToData();
 
+            _indicators.Start();
+
             foreach (var type in _desiredStrategies)
                 _strategies.Add((IStrategy)Activator.CreateInstance(type, this));
 
@@ -86,8 +89,8 @@ namespace TradingBot
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
 
-            _broker.Bar5SecReceived += OnBarsReceived;
-            _broker.Bar1MinReceived += OnBarsReceived;
+            //_broker.Bar5SecReceived += OnBarsReceived;
+            //_broker.Bar1MinReceived += OnBarsReceived;
             //_broker.BidAskReceived += OnBidAskReceived;
             
             _broker.OrderOpened += OnOrderOpened;
@@ -107,8 +110,8 @@ namespace TradingBot
         {
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
-            _broker.Bar5SecReceived -= OnBarsReceived;
-            _broker.Bar1MinReceived -= OnBarsReceived;
+            //_broker.Bar5SecReceived -= OnBarsReceived;
+            //_broker.Bar1MinReceived -= OnBarsReceived;
             //_broker.BidAskReceived -= OnBidAskReceived;
 
             _broker.OrderOpened -= OnOrderOpened;
@@ -144,23 +147,6 @@ namespace TradingBot
             _logger.LogInfo($"OnPnLReceived : {pnl}");
         }
 
-        void OnBarsReceived(Contract contract, Bar bar)
-        {
-            if (bar.BarLength == BarLength._5Sec)
-            {
-                Bar5Sec = bar;
-            }
-            else if(bar.BarLength == BarLength._1Min)
-            {
-                if(!Indicators.BB1Min.IsReady)
-                {
-                    // TODO : fetch historical data
-                }
-                Indicators.BB1Min.Update(bar);
-                Bar1Min = bar;
-            }
-        }
-
         void OnOrderOpened(Contract contract, Order order, OrderState state)
         {
             _logger.LogInfo($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
@@ -187,7 +173,8 @@ namespace TradingBot
 
             // Kill task
             //_broker.SellEverything();
-
+            
+            _indicators.Stop();
             UnsubscribeToData();
             _broker.Disconnect();
         }

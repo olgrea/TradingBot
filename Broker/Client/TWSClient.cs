@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using IBApi;
 using TradingBot.Utils;
 using TradingBot.Broker.MarketData;
-using System.Threading;
 using TradingBot.Broker.Orders;
 
 using TBOrder = TradingBot.Broker.Orders.Order;
@@ -56,6 +55,8 @@ namespace TradingBot.Broker.Client
         event Action<string> _accountDownloadEndEvent;
         event Action<int, Contract> _contractDetailsEvent;
         event Action<int> _contractDetailsEndEvent;
+        event Action<int, MarketData.Bar> _historicalDataEvent;
+        event Action<int, string, string> _historicalDataEndEvent;
 
         public TWSClient(ILogger logger)
         {
@@ -568,6 +569,101 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqGlobalCancel();
         }
 
+        public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, int count)
+        {
+            return GetHistoricalDataAsync(contract, DateTime.Now, barLength, count);
+        }
+
+        public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, DateTime endDateTime, BarLength barLength, int count)
+        {
+            var tmpList = new List<MarketData.Bar>();
+            var reqId = NextRequestId;
+
+            var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
+            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
+            {
+                if (rId == reqId)
+                {
+                    tmpList.Add(bar);
+                }
+            });
+
+            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
+            {
+                if(rId == reqId)
+                {
+                    resolveResult.SetResult(tmpList);
+                }
+            });
+
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+            _historicalDataEvent += historicalData;
+            _historicalDataEndEvent += historicalDataEnd;
+            ClientMessageReceived += error;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _historicalDataEvent -= historicalData;
+                _historicalDataEndEvent -= historicalDataEnd;
+                ClientMessageReceived -= error;
+            });
+
+            string timeFormat = "yyyyMMdd-HH:mm:ss";
+            string endDateTimeStr = null;
+            string durationStr = null;
+            string barSizeStr = null;
+            switch(barLength)
+            {
+                case BarLength._5Sec :
+                    endDateTimeStr = endDateTime.ToUniversalTime().ToString(timeFormat);
+                    durationStr = $"{5*count} S";
+                    barSizeStr = "5 secs";
+                    break;
+
+                case BarLength._1Min:
+                    endDateTimeStr = endDateTime.ToUniversalTime().ToString(timeFormat);
+                    durationStr = $"{60 * count} S";
+                    barSizeStr = "1 min";
+                    break;
+
+                default:
+                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
+            }
+
+            // Caution : Pacing Violations for Small Bars (30 secs or less)
+            // IB limits the nb of possible historical data requests. A violation occurs when : 
+            // - making identical historical data requests within 15 seconds.
+            // - making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
+            // - making more than 60 requests within any ten minute period.
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+            
+            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTimeStr, durationStr, barSizeStr, "TRADES", 1, 1, false, null);
+
+            return resolveResult.Task;
+        }
+
+        public void historicalData(int reqId, IBApi.Bar bar)
+        {
+            _historicalDataEvent?.Invoke(reqId, new MarketData.Bar()
+            {
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                TradeAmount = bar.Count,
+                
+                // non-standard date format...
+                Time = DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+            });
+        }
+
+        public void historicalDataEnd(int reqId, string start, string end)
+        {
+            _historicalDataEndEvent?.Invoke(reqId, start, end);
+        }
+
         public void error(Exception e)
         {
             _logger.LogError(e.Message);
@@ -676,16 +772,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void histogramData(int reqId, HistogramEntry[] data)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void historicalData(int reqId, IBApi.Bar bar)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void historicalDataEnd(int reqId, string start, string end)
         {
             throw new NotImplementedException();
         }
