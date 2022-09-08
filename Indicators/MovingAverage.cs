@@ -6,10 +6,11 @@ using MathNet.Numerics.Statistics;
 namespace TradingBot.Indicators
 {
     //TODO : make some stuff internal
-    public class MovingAverage
+    public class MovingAverage : IIndicator
     {
         double _lastMA = double.MinValue;
         double _lastDeltaMA = double.MinValue;
+        LinkedList<Bar> _bars = new LinkedList<Bar>();
 
         public MovingAverage(int nbPeriods)
         {
@@ -17,15 +18,13 @@ namespace TradingBot.Indicators
         }
 
         public int NbPeriods { get; private set; }
-        public double MovingAvg { get; private set;} = double.MinValue;
-        public double DeltaMA { get; private set; } = double.MinValue;
-        public double DeltaSpeed { get; private set; } = double.MinValue;
+        public double MovingAvg { get; private set;}
+        public double DeltaMA { get; private set; }
+        public double DeltaSpeed { get; private set; }
+        public LinkedList<Bar> Bars => _bars;
+        public bool IsReady => _bars.Count == NbPeriods;
 
         public static implicit operator double(MovingAverage ma) => ma.MovingAvg;
-
-        LinkedList<Bar> _bars = new LinkedList<Bar>();
-
-        public bool IsReady => _bars.Count == NbPeriods;
 
         public override string ToString()
         {

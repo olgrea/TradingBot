@@ -22,7 +22,7 @@ namespace TradingBot
 
         string _ticker;
         Contract _contract;
-        Indicators.Indicators _indicators;
+        Dictionary<BarLength, Indicators.Indicators> _indicators;
 
         Position _contractPosition;
         double _USDCashBalance;
@@ -37,12 +37,16 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
-            _indicators = new Indicators.Indicators(this);
+            _indicators = new Dictionary<BarLength, Indicators.Indicators>()
+            {
+                { BarLength._5Sec, new Indicators.Indicators(BarLength._5Sec, this) },
+                { BarLength._1Min, new Indicators.Indicators(BarLength._1Min, this) },
+            };
         }
 
         public IBroker Broker => _broker;
         public Contract Contract => _contract;
-        public Indicators.Indicators Indicators => _indicators;
+        public Dictionary<BarLength, Indicators.Indicators> Indicators => _indicators;
 
         public Bar Bar5Sec { get; private set; }
         public Bar Bar1Min { get; private set; }
@@ -75,7 +79,8 @@ namespace TradingBot
 
             SubscribeToData();
 
-            _indicators.Start();
+            foreach(var indicator in _indicators)
+                indicator.Value.Start();
 
             foreach (var type in _desiredStrategies)
                 _strategies.Add((IStrategy)Activator.CreateInstance(type, this));
@@ -89,10 +94,6 @@ namespace TradingBot
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
 
-            //_broker.Bar5SecReceived += OnBarsReceived;
-            //_broker.Bar1MinReceived += OnBarsReceived;
-            //_broker.BidAskReceived += OnBidAskReceived;
-            
             _broker.OrderOpened += OnOrderOpened;
             _broker.OrderStatusChanged += OnOrderStatusChanged;
             _broker.OrderExecuted += OnOrderExecuted;
@@ -110,9 +111,6 @@ namespace TradingBot
         {
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
-            //_broker.Bar5SecReceived -= OnBarsReceived;
-            //_broker.Bar1MinReceived -= OnBarsReceived;
-            //_broker.BidAskReceived -= OnBidAskReceived;
 
             _broker.OrderOpened -= OnOrderOpened;
             _broker.OrderStatusChanged -= OnOrderStatusChanged;
@@ -173,8 +171,9 @@ namespace TradingBot
 
             // Kill task
             //_broker.SellEverything();
-            
-            _indicators.Stop();
+
+            foreach (var indicator in _indicators)
+                indicator.Value.Stop();
             UnsubscribeToData();
             _broker.Disconnect();
         }

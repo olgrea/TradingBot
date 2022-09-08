@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
+using TradingBot.Utils;
 
 namespace TradingBot.Broker
 {
@@ -15,8 +17,8 @@ namespace TradingBot.Broker
         Contract GetContract(string ticker);
 
         event Action<Contract, BidAsk> BidAskReceived;
-        event Action<Contract, MarketData.Bar> Bar5SecReceived;
-        event Action<Contract, MarketData.Bar> Bar1MinReceived;
+
+        Dictionary<BarLength, EventElement<Contract, MarketData.Bar>> BarReceived { get;}
         event Action<Contract, Order, OrderState> OrderOpened;
         event Action<OrderStatus> OrderStatusChanged;
         event Action<Contract, OrderExecution> OrderExecuted;
