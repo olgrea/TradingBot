@@ -19,9 +19,9 @@ namespace TradingBot.Strategies
             {
                 if (value != _currentState)
                 {
-                    _currentState.UnsubscribeToData();
+                    _currentState?.UnsubscribeToData();
                     _currentState = value;
-                    _currentState.SubscribeToData();
+                    _currentState?.SubscribeToData();
                 }
             }
         }
@@ -31,7 +31,7 @@ namespace TradingBot.Strategies
 
         public virtual void Start()
         {
-            if (_evaluateTask == null && !_evaluateTask.IsCompleted)
+            if (_evaluateTask == null || !_evaluateTask.IsCompleted)
                 return;
 
             _cancellationTokenSource = new CancellationTokenSource();

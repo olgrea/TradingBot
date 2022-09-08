@@ -75,7 +75,7 @@ namespace TradingBot
             SubscribeToData();
 
             foreach (var type in _desiredStrategies)
-                _strategies.Add((IStrategy)Activator.CreateInstance(type, _contract, this));
+                _strategies.Add((IStrategy)Activator.CreateInstance(type, this));
 
             foreach (var strat in _strategies)
                 strat.Start();

@@ -48,13 +48,12 @@ namespace TradingBot.Broker.Client
         public event Action<CommissionInfo> CommissionInfoReceived;
         public event Action<ClientMessage> ClientMessageReceived;
 
-        event Action<int> _nextValidId;
-        event Action<string> _managedAccounts;
+        event Action<int> _nextValidIdEvent;
+        event Action<string> _managedAccountsEvent;
         event Action<DateTime> _updateAccountTimeEvent;
         event Action<string, string, string> _updateAccountValueEvent;
         event Action<Position> _updatePortfolioEvent;
         event Action<string> _accountDownloadEndEvent;
-
         event Action<int, Contract> _contractDetailsEvent;
         event Action<int> _contractDetailsEndEvent;
 
@@ -75,16 +74,32 @@ namespace TradingBot.Broker.Client
             _clientId = clientId;
 
             var resolveResult = new TaskCompletionSource<bool>();
-            var nextValidId = new Action<int>(id => resolveResult.SetResult(id > 0));
-            var managedAccounts = new Action<string>(acc => _accountCode = acc);
+            var nextValidId = new Action<int>(id => 
+            {
+                if (_nextValidOrderId < 0)
+                {
+                    _logger.LogInfo($"Client connected.");
+                }
+                _nextValidOrderId = id;
+            });
+
+            var managedAccounts = new Action<string>(acc => 
+            {
+                _accountCode = acc;
+                resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode)); 
+            });
+
             var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
 
-            _nextValidId += nextValidId;
+            _nextValidIdEvent += nextValidId;
+            _managedAccountsEvent += managedAccounts;
             ClientMessageReceived += error;
             resolveResult.Task.ContinueWith(t =>
             {
-                _nextValidId -= nextValidId;
+                _nextValidIdEvent -= nextValidId;
+                _managedAccountsEvent -= managedAccounts;
                 ClientMessageReceived -= error;
+                
                 if(_nextValidOrderId > 0)
                     ClientConnected?.Invoke();
             });
@@ -97,8 +112,6 @@ namespace TradingBot.Broker.Client
 
             return resolveResult.Task;
         }
-
-
 
         public void Disconnect()
         {
@@ -138,7 +151,7 @@ namespace TradingBot.Broker.Client
         public void managedAccounts(string accountsList)
         {
             _logger.LogDebug($"Account list : {accountsList}");
-            _managedAccounts?.Invoke(accountsList);
+            _managedAccountsEvent?.Invoke(accountsList);
         }
 
         public int GetNextValidOrderId(bool fromTWS = false)
@@ -156,11 +169,11 @@ namespace TradingBot.Broker.Client
             var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
             var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
 
-            _nextValidId += nextValidId;
+            _nextValidIdEvent += nextValidId;
             ClientMessageReceived += error;
             resolveResult.Task.ContinueWith(t =>
             {
-                _nextValidId -= nextValidId;
+                _nextValidIdEvent -= nextValidId;
                 ClientMessageReceived -= error;
             });
 
@@ -172,13 +185,7 @@ namespace TradingBot.Broker.Client
         // The next valid identifier is persistent between TWS sessions
         public void nextValidId(int orderId)
         {
-            if (_nextValidOrderId < 0)
-            {
-                _logger.LogInfo($"Client connected.");
-            }
-
-            _nextValidOrderId = orderId;
-            _nextValidId?.Invoke(orderId);
+            _nextValidIdEvent?.Invoke(orderId);
         }
         
         public Task<Account> GetAccountAsync()
@@ -222,7 +229,8 @@ namespace TradingBot.Broker.Client
                 _updatePortfolioEvent -= updatePortfolio;
                 _accountDownloadEndEvent -= accountDownloadEnd;
                 ClientMessageReceived -= error;
-                _clientSocket.reqAccountUpdates(false, _accountCode);
+                
+                //_clientSocket.reqAccountUpdates(false, _accountCode);
             });
 
             _clientSocket.reqAccountUpdates(true, _accountCode);
@@ -581,7 +589,7 @@ namespace TradingBot.Broker.Client
 
             // Note: id == -1 indicates a notification and not true error condition...
             ClientMessage msg;
-            if (errorCode < 0)
+            if (id < 0)
             {
                 _logger.LogDebug(str);
                 msg = new ClientNotification(errorMsg);
