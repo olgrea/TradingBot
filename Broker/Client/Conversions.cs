@@ -160,10 +160,7 @@ namespace TradingBot.Broker.Client
                 Status = Enum.Parse<Status>(ibo.Status),
                 WarningText = ibo.WarningText,
                 CompletedStatus = ibo.CompletedStatus,
-
-                // Inconsistent date formats are received from TWS...
-                // try this is fail : 
-                // DateTime.ParseExact(exec.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+                
                 CompletedTime = ibo.CompletedTime != null ? DateTime.Parse(ibo.CompletedTime) : DateTime.MinValue,
             };
         }
