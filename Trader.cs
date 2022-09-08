@@ -48,9 +48,6 @@ namespace TradingBot
         public Contract Contract => _contract;
         public Dictionary<BarLength, Indicators.Indicators> Indicators => _indicators;
 
-        public Bar Bar5Sec { get; private set; }
-        public Bar Bar1Min { get; private set; }
-
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
             _desiredStrategies.Add(typeof(TStrategy));

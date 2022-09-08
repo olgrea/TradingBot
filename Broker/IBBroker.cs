@@ -275,9 +275,9 @@ namespace TradingBot.Broker
             _client.CancelPnLRequest(contract);
         }
 
-        public List<Bar> GetPastBars(Contract contract, DateTime from, BarLength barLength, int count)
+        public List<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return _client.GetHistoricalDataAsync(contract, from, barLength, count).Result;   
+            return _client.GetHistoricalDataAsync(contract, barLength, count).Result;   
         }
     }
 }

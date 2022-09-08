@@ -46,10 +46,10 @@ namespace TradingBot.Strategies
 
             public override IState Evaluate()
             {
-                if (Trader.Bar5Sec == null)
+                if (Trader.Indicators[BarLength._5Sec].LatestBar == null)
                     return this;
 
-                if(Trader.Bar5Sec.Close < Trader.Indicators[BarLength._1Min].BollingerBands.LowerBB)
+                if(Trader.Indicators[BarLength._5Sec].LatestBar.Close < Trader.Indicators[BarLength._1Min].BollingerBands.LowerBB)
                     return Strategy.States[nameof(OversoldState)];
                 else
                     return this;

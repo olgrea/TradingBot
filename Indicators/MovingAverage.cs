@@ -33,6 +33,9 @@ namespace TradingBot.Indicators
 
         public void Update(Bar bar)
         {
+            if (_bars.Any() && _bars.Last() == bar)
+                return;
+
             _bars.AddLast(bar);
             if (_bars.Count > NbPeriods)
                 _bars.RemoveFirst();
