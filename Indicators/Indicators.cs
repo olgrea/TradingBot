@@ -20,13 +20,13 @@ namespace TradingBot.Indicators
         {
             BB1Min = new BollingerBands();
             BB5Sec = new BollingerBands();
-            
-            //UpdateBollingerBands(_trader.Contract, BarLength._5Sec, BB5Sec);
-            //UpdateBollingerBands(_trader.Contract, BarLength._1Min, BB1Min);
+
+            //testInitBollingerBands(_trader.Contract, BarLength._5Sec, BB5Sec);
+            //testInitBollingerBands(_trader.Contract, BarLength._1Min, BB1Min);
 
             _trader.Broker.Bar5SecReceived += OnBarsReceived;
             _trader.Broker.Bar1MinReceived += OnBarsReceived;
-            //_trader.Broker.RequestBars(_trader.Contract, Broker.MarketData.BarLength._5Sec);
+            _trader.Broker.RequestBars(_trader.Contract, Broker.MarketData.BarLength._5Sec);
             _trader.Broker.RequestBars(_trader.Contract, Broker.MarketData.BarLength._1Min);
         }
 
@@ -34,7 +34,7 @@ namespace TradingBot.Indicators
         {
             _trader.Broker.Bar5SecReceived -= OnBarsReceived;
             _trader.Broker.Bar1MinReceived -= OnBarsReceived;
-            //_trader.Broker.CancelBarsRequest(_trader.Contract, Broker.MarketData.BarLength._5Sec);
+            _trader.Broker.CancelBarsRequest(_trader.Contract, Broker.MarketData.BarLength._5Sec);
             _trader.Broker.CancelBarsRequest(_trader.Contract, Broker.MarketData.BarLength._1Min);
 
             BB1Min = null;
@@ -65,7 +65,7 @@ namespace TradingBot.Indicators
             bb.Update(bar);
         }
 
-        //void InitBollingerBands(Contract contract, BarLength barLength, BollingerBands bb)
+        //void testInitBollingerBands(Contract contract, BarLength barLength, BollingerBands bb)
         //{
         //    if (!bb.IsReady)
         //    {
