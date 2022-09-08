@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
@@ -42,5 +43,6 @@ namespace TradingBot.Broker
 
         void RequestPositions();
         void CancelPositionsSubscription();
+        List<Bar> GetPastBars(Contract contract, DateTime from, BarLength barLength, int count);
     }
 }

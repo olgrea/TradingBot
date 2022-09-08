@@ -293,5 +293,10 @@ namespace TradingBot.Broker
         {
             _client.CancelPnLRequest(contract);
         }
+
+        public List<Bar> GetPastBars(Contract contract, DateTime from, BarLength barLength, int count)
+        {
+            return _client.GetHistoricalDataAsync(contract, from, barLength, count).Result;   
+        }
     }
 }
