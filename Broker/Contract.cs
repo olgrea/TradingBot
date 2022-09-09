@@ -10,7 +10,7 @@ namespace TradingBot.Broker
         Call, Put
     }
 
-    public abstract class Contract
+    internal abstract class Contract
     {
         public int Id { get; set; } = -1;
         public string Symbol { get; set; }
