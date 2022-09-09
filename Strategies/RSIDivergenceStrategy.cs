@@ -92,7 +92,7 @@ namespace TradingBot.Strategies
 
             foreach (var indicator in indicators)
             {
-                for (int i = pastBars.Count - indicator.NbPeriods; i < pastBars.Count; ++i)
+                for (int i = pastBars.Count - indicator.NbPeriods + 1; i < pastBars.Count; ++i)
                     indicator.Update(pastBars[i]);
             }
         }
