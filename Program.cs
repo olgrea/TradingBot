@@ -15,7 +15,7 @@ namespace TradingBot
         static void Main(string[] args)
         {
             Trader trader = new Trader("GME", 1337, new ConsoleLogger());
-            trader.AddStrategyForTicker<LowerBBStrategy>();
+            trader.AddStrategyForTicker<RSIDivergenceStrategy>();
             
             trader.Start();
 
