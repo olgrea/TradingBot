@@ -5,18 +5,17 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    public class Indicators
+    public class IndicatorsManager
     {
         BarLength _barLength;
 
         Trader _trader;
-        public Indicators(BarLength barLength, Trader trader)
+        public IndicatorsManager(BarLength barLength, Trader trader)
         {
             _barLength = barLength;
             _trader = trader;
         }
 
-        public MovingAverage MovingAverage => BollingerBands.MovingAverage;
         public BollingerBands BollingerBands { get; private set; }
         public BBTrend BBTrend { get; private set; }
         public Bar LatestBar => BollingerBands.Bars.LastOrDefault();

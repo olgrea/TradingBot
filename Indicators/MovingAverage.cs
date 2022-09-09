@@ -1,58 +1,37 @@
 ﻿using System.Linq;
-using System.Collections.Generic;
-using TradingBot.Broker.MarketData;
 using MathNet.Numerics.Statistics;
 
 namespace TradingBot.Indicators
 {
     //TODO : make some stuff internal
-    public class MovingAverage : IIndicator
+    public class MovingAverage : IndicatorBase, IIndicator
     {
-        double _lastMA = double.MinValue;
-        double _lastDeltaMA = double.MinValue;
-        LinkedList<Bar> _bars = new LinkedList<Bar>();
+        protected double _last = double.MinValue;
+        protected double _lastDelta = double.MinValue;
 
-        public MovingAverage(int nbPeriods)
-        {
-            NbPeriods = nbPeriods;
-        }
+        public MovingAverage(int nbPeriods) : base(nbPeriods) { }
 
-        public int NbPeriods { get; private set; }
-        public double MovingAvg { get; private set;}
-        public double DeltaMA { get; private set; }
-        public double DeltaSpeed { get; private set; }
-        public LinkedList<Bar> Bars => _bars;
-        public bool IsReady => _bars.Count == NbPeriods;
+        public double Value { get; protected set;}
+        public double Delta { get; protected set; }
+        public double DeltaOfDelta { get; protected set; }
 
-        public static implicit operator double(MovingAverage ma) => ma.MovingAvg;
+        public static implicit operator double(MovingAverage ma) => ma.Value;
 
         public override string ToString()
         {
-            return MovingAvg.ToString();
+            return Value.ToString();
         }
 
-        public void Update(Bar bar)
+        public override void Compute()
         {
-            if (_bars.Any() && _bars.Last() == bar)
-                return;
+            _last = Value;
+            _lastDelta = Delta;
 
-            _bars.AddLast(bar);
-            if (_bars.Count > NbPeriods)
-                _bars.RemoveFirst();
+            var barsTypicalPrice = Bars.Select(b => (b.Close + b.High + b.Low) / 3);
+            Value = barsTypicalPrice.Mean();
 
-            Compute();
-        }
-
-        public void Compute()
-        {
-            _lastMA = MovingAvg;
-            _lastDeltaMA = DeltaMA;
-            
-            var barsTypicalPrice = _bars.Select(b => (b.Close + b.High + b.Low) / 3);
-            MovingAvg = barsTypicalPrice.Mean();
-
-            DeltaMA = _lastMA != double.MinValue ? MovingAvg - _lastMA : double.MinValue;
-            DeltaSpeed = (DeltaMA != double.MinValue && _lastDeltaMA != double.MinValue) ? DeltaMA - _lastDeltaMA : double.MinValue;
+            Delta = Value - _last;
+            DeltaOfDelta = Delta - _lastDelta;
         }
     }
 }
