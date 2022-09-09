@@ -7,7 +7,7 @@ using TradingBot.Broker.Orders;
 
 namespace TradingBot.Broker.Client
 {
-    public class TWSOrderManager
+    internal class TWSOrderManager
     {
         ILogger _logger;
         TWSClient _client;

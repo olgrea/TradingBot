@@ -2,7 +2,7 @@
 
 namespace TradingBot.Broker.Orders
 {
-    public class OrderExecution
+    internal class OrderExecution
     {
         public string ExecId { get; set; }
         public int OrderId { get; set; }

@@ -5,7 +5,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Strategies
 {
-    public interface IState
+    internal interface IState
     {
         Trader Trader { get; }
         IState Evaluate();

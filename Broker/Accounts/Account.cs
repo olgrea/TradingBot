@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker.Accounts
 {
-    public class Account
+    internal class Account
     {
         public string Code { get; set; }
         public DateTime Time { get; set; }

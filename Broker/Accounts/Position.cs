@@ -1,6 +1,6 @@
 ﻿namespace TradingBot.Broker.Accounts
 {
-    public class Position
+    internal class Position
     {
         public Contract Contract { get; set; }
         public double PositionAmount { get; set; }

@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Globalization;
-using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 
 namespace TradingBot.Broker.Client
 {
-    public static class Conversions
+    internal static class Conversions
     {
-        public static Contract ToTBContract(this IBApi.Contract ibc)
+        internal static Contract ToTBContract(this IBApi.Contract ibc)
         {
             Contract contract = null;
 
@@ -46,7 +45,7 @@ namespace TradingBot.Broker.Client
             return contract;
         }
 
-        public static IBApi.Contract ToIBApiContract(this Contract contract)
+        internal static IBApi.Contract ToIBApiContract(this Contract contract)
         {
             return new IBApi.Contract()
             {
@@ -58,7 +57,7 @@ namespace TradingBot.Broker.Client
             };
         }
 
-        public static IBApi.Order ToIBApiOrder(this Order order)
+        internal static IBApi.Order ToIBApiOrder(this Order order)
         {
             var ibo = new IBApi.Order()
             {
@@ -105,7 +104,7 @@ namespace TradingBot.Broker.Client
             return ibo;
         }
 
-        public static Order ToTBOrder(this IBApi.Order ibo)
+        internal static Order ToTBOrder(this IBApi.Order ibo)
         {
             Order tbo;
 
@@ -153,7 +152,7 @@ namespace TradingBot.Broker.Client
             return tbo;
         }
 
-        public static OrderState ToTBOrderState(this IBApi.OrderState ibo)
+        internal static OrderState ToTBOrderState(this IBApi.OrderState ibo)
         {
             return new OrderState()
             {
@@ -165,7 +164,7 @@ namespace TradingBot.Broker.Client
             };
         }
 
-        public static OrderExecution ToTBExecution(this IBApi.Execution exec)
+        internal static OrderExecution ToTBExecution(this IBApi.Execution exec)
         {
             return new OrderExecution()
             {
@@ -182,7 +181,7 @@ namespace TradingBot.Broker.Client
             };
         }
 
-        public static CommissionInfo ToTBCommission(this IBApi.CommissionReport report)
+        internal static CommissionInfo ToTBCommission(this IBApi.CommissionReport report)
         {
             return new CommissionInfo()
             {

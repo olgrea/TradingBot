@@ -2,7 +2,7 @@
 
 namespace TradingBot.Indicators
 {
-    public interface IIndicator
+    internal interface IIndicator
     {
         public bool IsReady { get; }
         public int NbPeriods { get; }

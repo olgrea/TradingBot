@@ -8,7 +8,7 @@ using TradingBot.Utils;
 
 namespace TradingBot.Broker
 {
-    public interface IBroker
+    internal interface IBroker
     {
         void Connect();
         void Disconnect();

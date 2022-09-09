@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace TradingBot.Indicators
 {
-    public class RSI : IndicatorBase
+    internal class RSI : IndicatorBase
     {
         const double _oversoldThreshold = 20.0;
         const double _overboughtThreshold = 80.0;

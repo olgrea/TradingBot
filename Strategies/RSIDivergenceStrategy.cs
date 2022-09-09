@@ -13,7 +13,7 @@ using System.Linq;
 
 namespace TradingBot.Strategies
 {
-    public class RSIDivergenceStrategy : StrategyBase
+    internal class RSIDivergenceStrategy : StrategyBase
     {
         Trader _trader;
 

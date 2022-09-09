@@ -1,10 +1,11 @@
 ﻿using System.Linq;
+
+// TODO : encapsulate this
 using MathNet.Numerics.Statistics;
 
 namespace TradingBot.Indicators
 {
-    //TODO : make some stuff internal
-    public class MovingAverage : IndicatorBase, IIndicator
+    internal class MovingAverage : IndicatorBase, IIndicator
     {
         protected double _last = double.MinValue;
         protected double _lastDelta = double.MinValue;

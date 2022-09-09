@@ -15,7 +15,7 @@ using TradingBot.Utils;
 
 namespace TradingBot
 {
-    public class Trader
+    internal class Trader
     {
         ILogger _logger;
         IBroker _broker;

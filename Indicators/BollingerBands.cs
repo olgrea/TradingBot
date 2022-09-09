@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace TradingBot.Indicators
 {
-    public class BollingerBands : IndicatorBase
+    internal class BollingerBands : IndicatorBase
     {
         public BollingerBands(int nbPeriods = 20) : base(nbPeriods) { }
 

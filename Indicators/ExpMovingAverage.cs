@@ -3,7 +3,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    public class ExpMovingAverage : MovingAverage
+    internal class ExpMovingAverage : MovingAverage
     {
         const int Smoothing = 2;
         double _ema = double.MinValue;

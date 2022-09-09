@@ -3,7 +3,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    public class BBTrend : IIndicator
+    internal class BBTrend : IIndicator
     {
         BollingerBands _bb20 = new BollingerBands(20);
         BollingerBands _bb50 = new BollingerBands(50);

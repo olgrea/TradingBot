@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Utils
 {
-    public interface ILogger
+    internal interface ILogger
     {
         void LogDebug(string message);
         void LogInfo(string message);

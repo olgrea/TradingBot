@@ -4,7 +4,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Strategies
 {
-    public interface IStrategy
+    internal interface IStrategy
     {
         void Start();
         void Stop();

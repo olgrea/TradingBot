@@ -10,7 +10,7 @@ using System.Collections.ObjectModel;
 
 namespace TradingBot.Broker
 {
-    public class IBBroker : IBroker
+    internal class IBBroker : IBroker
     {
         static HashSet<int> _clientIds = new HashSet<int>();
 
