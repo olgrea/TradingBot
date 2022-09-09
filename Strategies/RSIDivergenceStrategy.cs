@@ -9,13 +9,18 @@ using TradingBot.Indicators;
 using System.Threading.Tasks;
 using TradingBot.Broker.Client;
 using System.Diagnostics;
+using System.Linq;
 
 namespace TradingBot.Strategies
 {
     public class RSIDivergenceStrategy : StrategyBase
     {
+        Trader _trader;
+
         public RSIDivergenceStrategy(Trader trader)
         {
+            _trader = trader;
+
             States = new Dictionary<string, IState>()
             {
                 { nameof(InitState), new InitState(this, trader)},
@@ -27,9 +32,6 @@ namespace TradingBot.Strategies
             BollingerBands_1Min = new BollingerBands();
             RSIDivergence_1Min = new RSIDivergence();
             RSIDivergence_5Sec = new RSIDivergence();
-
-            trader.Broker.BarReceived[BarLength._1Min] += OnBarReceived;
-            trader.Broker.RequestBars(trader.Contract, BarLength._1Min);
         }
 
         public BollingerBands BollingerBands_1Min { get; private set; }
@@ -52,8 +54,47 @@ namespace TradingBot.Strategies
 
         public override void Start()
         {
+            InitIndicators(BarLength._1Min, RSIDivergence_1Min, BollingerBands_1Min);
+            InitIndicators(BarLength._5Sec, RSIDivergence_5Sec);
+
+            _trader.Broker.BarReceived[BarLength._1Min] += OnBarReceived;
+            _trader.Broker.BarReceived[BarLength._5Sec] += OnBarReceived;
+            _trader.Broker.RequestBars(_trader.Contract, BarLength._1Min);
+            _trader.Broker.RequestBars(_trader.Contract, BarLength._5Sec);
+
             CurrentState = States[nameof(InitState)];
             base.Start();
+        }
+
+        public override void Stop()
+        {
+            RSIDivergence_1Min.Reset();
+            RSIDivergence_5Sec.Reset();
+            BollingerBands_1Min.Reset();
+
+            _trader.Broker.BarReceived[BarLength._1Min] -= OnBarReceived;
+            _trader.Broker.BarReceived[BarLength._5Sec] -= OnBarReceived;
+            _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._1Min);
+            _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._5Sec);
+
+            base.Stop();
+        }
+
+        //TODO : move this elsewhere
+        void InitIndicators(BarLength barLength, params IIndicator[] indicators)
+        {
+            if (!indicators.Any())
+                return;
+
+            var longestPeriod = indicators.Max(i => i.NbPeriods);
+
+            var pastBars = _trader.Broker.GetPastBars(_trader.Contract, barLength, longestPeriod);
+
+            foreach (var indicator in indicators)
+            {
+                for (int i = pastBars.Count - indicator.NbPeriods; i < pastBars.Count; ++i)
+                    indicator.Update(pastBars[i]);
+            }
         }
 
         #region States
@@ -156,7 +197,7 @@ namespace TradingBot.Strategies
                 var orderPlaced = new Action<Contract, Order, OrderState>((c, o, os) =>
                 {
                     Debug.Assert(chain.Order.Id > 0);
-                    if(chain.Order.Id == o.Id && os.Status == Status.Submitted)
+                    if(chain.Order.Id == o.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
                     {
                         _strategy.Order = o;
                     }
