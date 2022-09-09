@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TradingBot.Strategies
 {
-    public abstract class StrategyBase : IStrategy
+    internal abstract class StrategyBase : IStrategy
     {
         IState _currentState;
 

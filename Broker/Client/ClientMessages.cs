@@ -2,12 +2,12 @@
 
 namespace TradingBot.Broker.Client
 {
-    public abstract class ClientMessage
+    internal abstract class ClientMessage
     {
         public string Message { get; set; }
     }
 
-    public class ClientError : ClientMessage
+    internal class ClientError : ClientMessage
     {
         public ClientError(int reqId, int errorCode, string message)
         {
@@ -25,13 +25,13 @@ namespace TradingBot.Broker.Client
         public int ErrorCode { get; set; }
     }
 
-    public class ClientException : ClientError
+    internal class ClientException : ClientError
     {
         public ClientException(Exception e) : base(e.Message) => Exception = e;
         public Exception Exception { get; set; }
     }
 
-    public class ClientNotification : ClientMessage
+    internal class ClientNotification : ClientMessage
     {
         public ClientNotification(string message) => Message = message;
     }

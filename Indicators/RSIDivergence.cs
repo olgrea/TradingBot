@@ -3,7 +3,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    public class RSIDivergence : IIndicator
+    internal class RSIDivergence : IIndicator
     {
         RSI _slowRsi;
         RSI _fastRsi;

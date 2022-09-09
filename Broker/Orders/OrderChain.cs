@@ -2,7 +2,7 @@
 
 namespace TradingBot.Broker.Orders
 {
-    public class OrderChain
+    internal class OrderChain
     {
         public OrderChain(Order order, List<OrderChain> attachedOrders = null)
         {

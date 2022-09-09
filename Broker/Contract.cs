@@ -5,7 +5,7 @@ using IBApi;
 
 namespace TradingBot.Broker
 {
-    public enum OptionType
+    internal enum OptionType
     {
         Call, Put
     }
@@ -26,12 +26,12 @@ namespace TradingBot.Broker
         }
     }
 
-    public class Cash : Contract
+    internal class Cash : Contract
     {
         public Cash() => SecType = "CASH";
     }
 
-    public class Stock : Contract
+    internal class Stock : Contract
     {
         public Stock() => SecType = "STK";
         public string LastTradeDate { get; set; }
@@ -42,7 +42,7 @@ namespace TradingBot.Broker
         }
     }
 
-    public class Option : Contract
+    internal class Option : Contract
     {
         public Option() => SecType = "OPT";
         public double Strike { get; set; }

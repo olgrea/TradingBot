@@ -2,7 +2,7 @@
 
 namespace TradingBot.Broker.Orders
 {
-    public class OrderStatus
+    internal class OrderStatus
     {
         public RequestInfo Info { get; set; }
         public Status Status { get; set; }

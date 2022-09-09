@@ -14,7 +14,7 @@ using TradingBot.Broker.Accounts;
 
 namespace TradingBot.Broker.Client
 {
-    public class TWSClient : EWrapper
+    internal class TWSClient : EWrapper
     {
         int _nextValidOrderId = -1;
         int _reqId = 0;

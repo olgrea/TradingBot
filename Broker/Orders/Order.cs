@@ -3,12 +3,12 @@ using System.Collections.Generic;
 
 namespace TradingBot.Broker.Orders
 {
-    public enum OrderAction
+    internal enum OrderAction
     {
         BUY, SELL
     }
 
-    public enum OcaType
+    internal enum OcaType
     {
         NONE = 0,
         CANCEL_WITH_BLOCK = 1,
@@ -16,7 +16,7 @@ namespace TradingBot.Broker.Orders
         REDUCE_NON_BLOCK = 3,
     }
 
-    public class RequestInfo
+    internal class RequestInfo
     {
         public int OrderId { get; set; }
         public int ClientId { get; set; }
@@ -27,7 +27,7 @@ namespace TradingBot.Broker.Orders
         public OcaType OcaType { get; set; }
     }
 
-    public abstract class Order
+    internal abstract class Order
     {
         public RequestInfo RequestInfo { get; } = new RequestInfo();
         public int Id
@@ -42,30 +42,30 @@ namespace TradingBot.Broker.Orders
         public double TotalQuantity { get; set; }
     }
 
-    public class MarketOrder : Order
+    internal class MarketOrder : Order
     {
         public MarketOrder() : base("MKT") { }
     }
 
-    public class MarketIfTouchedOrder : Order
+    internal class MarketIfTouchedOrder : Order
     {
         public MarketIfTouchedOrder() : base("MIT") { }
         public double TouchPrice { get; set; }
     }
 
-    public class LimitOrder : Order
+    internal class LimitOrder : Order
     {
         public LimitOrder() : base("LMT") { }
         public double LmtPrice { get; set; }
     }
 
-    public class StopOrder : Order
+    internal class StopOrder : Order
     {
         public StopOrder() : base("STP") { }
         public double StopPrice { get; set; }
     }
 
-    public class TrailingStopOrder : Order
+    internal class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
         public double StopPrice { get; set; }

@@ -4,7 +4,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    public abstract class IndicatorBase : IIndicator
+    internal abstract class IndicatorBase : IIndicator
     {
         LinkedList<Bar> _bars = new LinkedList<Bar>();
 

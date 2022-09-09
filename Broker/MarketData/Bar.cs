@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
-    public enum BarLength
+    internal enum BarLength
     {
         _5Sec = 5,
         _10Sec = 10,
@@ -13,7 +13,7 @@ namespace TradingBot.Broker.MarketData
         _1Min = 60
     }
 
-    public class Bar
+    internal class Bar
     {
         public double Open { get; set; }
         public double Close { get; set; }

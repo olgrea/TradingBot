@@ -2,7 +2,7 @@
 
 namespace TradingBot.Utils
 {
-    public class EventElement<T1, T2>
+    internal class EventElement<T1, T2>
     {
         event Action<T1, T2> _event;
 
