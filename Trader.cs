@@ -15,7 +15,7 @@ using TradingBot.Utils;
 
 namespace TradingBot
 {
-    internal class Trader
+    public class Trader
     {
         ILogger _logger;
         IBroker _broker;
@@ -38,8 +38,8 @@ namespace TradingBot
             _broker = new IBBroker(clientId, logger);
         }
 
-        public IBroker Broker => _broker;
-        public Contract Contract => _contract;
+        internal IBroker Broker => _broker;
+        internal Contract Contract => _contract;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {

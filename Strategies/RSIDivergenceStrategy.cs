@@ -13,11 +13,11 @@ using System.Linq;
 
 namespace TradingBot.Strategies
 {
-    internal class RSIDivergenceStrategy : StrategyBase
+    public class RSIDivergenceStrategy : StrategyBase
     {
         Trader _trader;
 
-        public RSIDivergenceStrategy(Trader trader)
+        internal RSIDivergenceStrategy(Trader trader)
         {
             _trader = trader;
 
@@ -34,10 +34,10 @@ namespace TradingBot.Strategies
             RSIDivergence_5Sec = new RSIDivergence();
         }
 
-        public BollingerBands BollingerBands_1Min { get; private set; }
-        public RSIDivergence RSIDivergence_1Min { get; private set; }
-        public RSIDivergence RSIDivergence_5Sec { get; private set; }
-        public OrderChain Order { get; set; }
+        internal BollingerBands BollingerBands_1Min { get; private set; }
+        internal RSIDivergence RSIDivergence_1Min { get; private set; }
+        internal RSIDivergence RSIDivergence_5Sec { get; private set; }
+        internal OrderChain Order { get; set; }
 
         void OnBarReceived(Contract contract, Bar bar)
         {
