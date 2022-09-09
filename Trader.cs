@@ -22,7 +22,7 @@ namespace TradingBot
 
         string _ticker;
         Contract _contract;
-        Dictionary<BarLength, Indicators.Indicators> _indicators;
+        Dictionary<BarLength, Indicators.IndicatorsManager> _indicators;
 
         Position _contractPosition;
         double _USDCashBalance;
@@ -37,16 +37,16 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
-            _indicators = new Dictionary<BarLength, Indicators.Indicators>()
+            _indicators = new Dictionary<BarLength, Indicators.IndicatorsManager>()
             {
-                { BarLength._5Sec, new Indicators.Indicators(BarLength._5Sec, this) },
-                { BarLength._1Min, new Indicators.Indicators(BarLength._1Min, this) },
+                { BarLength._5Sec, new Indicators.IndicatorsManager(BarLength._5Sec, this) },
+                { BarLength._1Min, new Indicators.IndicatorsManager(BarLength._1Min, this) },
             };
         }
 
         public IBroker Broker => _broker;
         public Contract Contract => _contract;
-        public Dictionary<BarLength, Indicators.Indicators> Indicators => _indicators;
+        public Dictionary<BarLength, Indicators.IndicatorsManager> Indicators => _indicators;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
