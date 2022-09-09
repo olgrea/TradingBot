@@ -31,5 +31,11 @@ namespace TradingBot.Indicators
             var upper = Math.Abs(_bb20.UpperBB - _bb50.UpperBB);
             Value = (lower - upper) / _bb20.MovingAverage;
         }
+
+        public void Reset()
+        {
+            _bb20.Reset();
+            _bb50.Reset();
+        }
     }
 }
