@@ -26,7 +26,7 @@ namespace TradingBot.Strategies
             if (CurrentState == null)
                 throw new InvalidOperationException("No starting state has been set");
 
-            if (_evaluateTask == null || !_evaluateTask.IsCompleted)
+            if (_evaluateTask != null && !_evaluateTask.IsCompleted)
                 return;
 
             _cancellationTokenSource = new CancellationTokenSource();

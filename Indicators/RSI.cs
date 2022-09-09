@@ -34,7 +34,7 @@ namespace TradingBot.Indicators
 
             Debug.Assert(_diffs.Count == NbPeriods - 1);
             var upMoves = _diffs.Select(d => Math.Max(d, 0));
-            var downMoves = _diffs.Select(d => -Math.Min(-d, 0));
+            var downMoves = _diffs.Select(d => -1 * Math.Min(d, 0));
             
             if (_lastAvgD == double.MinValue)
             {
@@ -43,11 +43,13 @@ namespace TradingBot.Indicators
             }
             else
             {
-                var a = 2 / (NbPeriods + 1);
+                //TODO : support multiple types of MA
+                // This is a running moving average (RMA)
+                var a = 1 / NbPeriods;
                 var avgU = a * _diffs.Last.Value + (1 - a) * _lastAvgU;
                 var avgD = a * _diffs.Last.Value + (1 - a) * _lastAvgD;
                 var RS = avgU / avgD;
-                Value = 100 - 100/(1+RS);
+                Value = 100 - (100/(1+RS));
 
                 _lastAvgD = avgD;
                 _lastAvgU = avgU;

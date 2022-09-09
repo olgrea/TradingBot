@@ -129,8 +129,7 @@ namespace TradingBot.Broker
         // TODO : test multiple contract subscriptions
         public void RequestBars(Contract contract, BarLength barLength)
         {
-            if(BarReceived.Count(c => c.Value.HasSubscribers) == 1)
-                _client.RequestFiveSecondsBars(contract);
+            _client.RequestFiveSecondsBars(contract);
         }
 
         void OnFiveSecondsBarReceived(Contract contract, MarketData.Bar bar)
