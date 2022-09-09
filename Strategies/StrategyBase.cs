@@ -10,20 +10,12 @@ namespace TradingBot.Strategies
     {
         IState _currentState;
 
-        public Dictionary<string, IState> States { get; protected set; }
+        public IReadOnlyDictionary<string, IState> States { get; protected set; }
 
         public IState CurrentState
         {
             get => _currentState;
-            set
-            {
-                if (value != _currentState)
-                {
-                    _currentState?.UnsubscribeToData();
-                    _currentState = value;
-                    _currentState?.SubscribeToData();
-                }
-            }
+            protected set => _currentState = value;
         }
 
         Task _evaluateTask;
@@ -31,6 +23,9 @@ namespace TradingBot.Strategies
 
         public virtual void Start()
         {
+            if (CurrentState == null)
+                throw new InvalidOperationException("No starting state has been set");
+
             if (_evaluateTask == null || !_evaluateTask.IsCompleted)
                 return;
 
