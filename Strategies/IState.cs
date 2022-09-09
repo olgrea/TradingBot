@@ -9,7 +9,5 @@ namespace TradingBot.Strategies
     {
         Trader Trader { get; }
         IState Evaluate();
-        void SubscribeToData();
-        void UnsubscribeToData();
     }
 }

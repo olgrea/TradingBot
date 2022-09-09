@@ -22,7 +22,6 @@ namespace TradingBot
 
         string _ticker;
         Contract _contract;
-        Dictionary<BarLength, Indicators.IndicatorsManager> _indicators;
 
         Position _contractPosition;
         double _USDCashBalance;
@@ -37,16 +36,10 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
-            _indicators = new Dictionary<BarLength, Indicators.IndicatorsManager>()
-            {
-                { BarLength._5Sec, new Indicators.IndicatorsManager(BarLength._5Sec, this) },
-                { BarLength._1Min, new Indicators.IndicatorsManager(BarLength._1Min, this) },
-            };
         }
 
         public IBroker Broker => _broker;
         public Contract Contract => _contract;
-        public Dictionary<BarLength, Indicators.IndicatorsManager> Indicators => _indicators;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
@@ -75,9 +68,6 @@ namespace TradingBot
 
 
             SubscribeToData();
-
-            foreach(var indicator in _indicators)
-                indicator.Value.Start();
 
             foreach (var type in _desiredStrategies)
                 _strategies.Add((IStrategy)Activator.CreateInstance(type, this));
@@ -124,7 +114,10 @@ namespace TradingBot
 
         void OnClientMessageReceived(ClientMessage message)
         {
-            _logger.LogInfo($"OnClientMessageReceived : {message.Message}");
+            if(message is ClientNotification)
+                _logger.LogInfo($"OnClientMessageReceived : {message.Message}");
+            else
+                _logger.LogError($"Error : {message.Message}");
         }
 
         void OnPositionReceived(Position position)
@@ -162,6 +155,12 @@ namespace TradingBot
             _logger.LogInfo($"OnCommissionInfoReceived : {commissionInfo}");
         }
 
+        public double GetAvailableFunds()
+        {
+            // TODO : manage this better
+            return 5000;
+        }
+
         public void Stop()
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
@@ -169,8 +168,6 @@ namespace TradingBot
             // Kill task
             //_broker.SellEverything();
 
-            foreach (var indicator in _indicators)
-                indicator.Value.Stop();
             UnsubscribeToData();
             _broker.Disconnect();
         }

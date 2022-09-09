@@ -9,6 +9,7 @@ namespace TradingBot.Strategies
         void Start();
         void Stop();
 
-        public Dictionary<string, IState> States { get; }
+        public IReadOnlyDictionary<string, IState> States { get; }
+        public IState CurrentState { get; }
     }
 }
