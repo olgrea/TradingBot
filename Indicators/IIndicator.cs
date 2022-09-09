@@ -7,5 +7,6 @@ namespace TradingBot.Indicators
         public bool IsReady { get; }
         public int NbPeriods { get; }
         void Update(Bar bar);
+        void Reset();
     }
 }

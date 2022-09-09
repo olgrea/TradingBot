@@ -30,5 +30,10 @@ namespace TradingBot.Indicators
         }
 
         public abstract void Compute();
+
+        public virtual void Reset()
+        {
+            _bars.Clear();
+        }
     }
 }
