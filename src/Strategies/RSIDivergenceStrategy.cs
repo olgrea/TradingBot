@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Text;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker;
 using TradingBot.Broker.Orders;
@@ -17,7 +15,7 @@ namespace TradingBot.Strategies
     {
         Trader _trader;
 
-        internal RSIDivergenceStrategy(Trader trader)
+        public RSIDivergenceStrategy(Trader trader)
         {
             _trader = trader;
 
