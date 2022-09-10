@@ -38,6 +38,15 @@ namespace TradingBot
             _broker = new IBBroker(clientId, logger);
         }
 
+        internal Trader(string ticker, IBroker broker, ILogger logger)
+        {
+            Trace.Assert(!string.IsNullOrEmpty(ticker));
+
+            _ticker = ticker;
+            _logger = logger;
+            _broker = broker;
+        }
+
         internal IBroker Broker => _broker;
         internal Contract Contract => _contract;
 

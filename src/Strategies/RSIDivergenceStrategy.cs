@@ -52,8 +52,10 @@ namespace TradingBot.Strategies
 
         public override void Start()
         {
-            InitIndicators(BarLength._1Min, RSIDivergence_1Min, BollingerBands_1Min);
-            InitIndicators(BarLength._5Sec, RSIDivergence_5Sec);
+            InitIndicators(_trader, BarLength._1Min, RSIDivergence_1Min, BollingerBands_1Min);
+#if !BACKTESTING
+            InitIndicators(_trader, BarLength._5Sec, RSIDivergence_5Sec);
+#endif
 
             _trader.Broker.BarReceived[BarLength._1Min] += OnBarReceived;
             _trader.Broker.BarReceived[BarLength._5Sec] += OnBarReceived;
@@ -79,14 +81,14 @@ namespace TradingBot.Strategies
         }
 
         //TODO : move this elsewhere
-        void InitIndicators(BarLength barLength, params IIndicator[] indicators)
+        internal static void InitIndicators(Trader trader, BarLength barLength, params IIndicator[] indicators)
         {
             if (!indicators.Any())
                 return;
 
             var longestPeriod = indicators.Max(i => i.NbPeriods);
 
-            var pastBars = _trader.Broker.GetPastBars(_trader.Contract, barLength, longestPeriod);
+            var pastBars = trader.Broker.GetPastBars(trader.Contract, barLength, longestPeriod);
 
             foreach (var indicator in indicators)
             {
@@ -112,7 +114,11 @@ namespace TradingBot.Strategies
             public IState Evaluate()
             {
                 // Initialization of indicators
+#if BACKTESTING
+                if (_strategy.BollingerBands_1Min.IsReady && _strategy.RSIDivergence_1Min.IsReady)
+#else
                 if (_strategy.BollingerBands_1Min.IsReady && _strategy.RSIDivergence_1Min.IsReady && _strategy.RSIDivergence_5Sec.IsReady)
+#endif
                     return _strategy.States[nameof(MonitoringState)];
                 else
                     return this;
@@ -158,6 +164,9 @@ namespace TradingBot.Strategies
 
             public IState Evaluate()
             {
+#if BACKTESTING
+                InitIndicators(Trader, BarLength._5Sec, _strategy.RSIDivergence_5Sec);
+#endif
                 // At this moment, we switch to a 5 secs resolution.
                 var RSIdiv5sec = _strategy.RSIDivergence_5Sec;
 
@@ -281,6 +290,6 @@ namespace TradingBot.Strategies
             }
         }
 
-        #endregion States
+#endregion States
     }
 }
