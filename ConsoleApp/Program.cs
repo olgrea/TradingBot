@@ -1,8 +1,9 @@
 ﻿using System;
+using TradingBot;
 using TradingBot.Strategies;
 using TradingBot.Utils;
 
-namespace TradingBot
+namespace ConsoleApp
 {
     internal class Program
     {
