@@ -12,6 +12,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\sou
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backtester", "Backtester\Backtester.csproj", "{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,6 +32,10 @@ Global
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
