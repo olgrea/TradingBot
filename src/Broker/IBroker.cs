@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
+[assembly: InternalsVisibleTo("Backtester")]
 namespace TradingBot.Broker
 {
     internal interface IBroker
@@ -31,8 +33,7 @@ namespace TradingBot.Broker
 
         void RequestBars(Contract contract, BarLength barLength);
         void CancelBarsRequest(Contract contract, BarLength barLength);
-        void CancelAllBarsRequest(Contract contract);
-
+        
         void PlaceOrder(Contract contract, Order order);
         // TODO : remove TWS specific stuff
         void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false);

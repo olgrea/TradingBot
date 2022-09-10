@@ -11,6 +11,7 @@ using TradingBot.Broker.Orders;
 using TBOrder = TradingBot.Broker.Orders.Order;
 using TBOrderState = TradingBot.Broker.Orders.OrderState;
 using TradingBot.Broker.Accounts;
+using System.Drawing;
 
 namespace TradingBot.Broker.Client
 {
@@ -569,13 +570,57 @@ namespace TradingBot.Broker.Client
         {
             _clientSocket.reqGlobalCancel();
         }
-
         public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, int count)
+        {
+            return GetHistoricalDataAsync(contract, barLength, string.Empty, count);
+        }
+
+        public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, string endDateTime, int count)
         {
             var tmpList = new List<MarketData.Bar>();
             var reqId = NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
+            SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
+
+            //string timeFormat = "yyyyMMdd-HH:mm:ss";
+            string durationStr = null;
+            string barSizeStr = null;
+            switch (barLength)
+            {
+                case BarLength._5Sec:
+                    durationStr = $"{5 * count} S";
+                    barSizeStr = "5 secs";
+                    break;
+
+                case BarLength._1Min:
+                    durationStr = $"{60 * count} S";
+                    barSizeStr = "1 min";
+                    break;
+
+                default:
+                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
+            }
+
+            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime, durationStr, barSizeStr, "TRADES", 0, 1, false, null);
+
+            return resolveResult.Task;
+        }
+
+#if BACKTESTING
+        public Task<List<MarketData.Bar>> GetHistoricalDataForDayAsync(Contract contract, DateTime endDateTime)
+        {
+            var tmpList = new List<MarketData.Bar>();
+            var reqId = NextRequestId;
+
+            var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
+            SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
+            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime.ToString("yyyyMMdd-HH:mm:ss"), "1 D", "1 min", "TRADES", 0, 1, false, null);
+            return resolveResult.Task;
+        }
+#endif
+        private void SetupHistoricalDataCallbacks(List<MarketData.Bar> tmpList, int reqId, TaskCompletionSource<List<MarketData.Bar>> resolveResult)
+        {
             var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
             {
                 if (rId == reqId)
@@ -586,7 +631,7 @@ namespace TradingBot.Broker.Client
 
             var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
             {
-                if(rId == reqId)
+                if (rId == reqId)
                 {
                     resolveResult.SetResult(tmpList);
                 }
@@ -604,36 +649,6 @@ namespace TradingBot.Broker.Client
                 _historicalDataEndEvent -= historicalDataEnd;
                 ClientMessageReceived -= error;
             });
-
-            //string timeFormat = "yyyyMMdd-HH:mm:ss";
-            string durationStr = null;
-            string barSizeStr = null;
-            switch(barLength)
-            {
-                case BarLength._5Sec :
-                    durationStr = $"{5*count} S";
-                    barSizeStr = "5 secs";
-                    break;
-
-                case BarLength._1Min:
-                    durationStr = $"{60 * count} S";
-                    barSizeStr = "1 min";
-                    break;
-
-                default:
-                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
-            }
-
-            // Caution : Pacing Violations for Small Bars (30 secs or less)
-            // IB limits the nb of possible historical data requests. A violation occurs when : 
-            // - making identical historical data requests within 15 seconds.
-            // - making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
-            // - making more than 60 requests within any ten minute period.
-            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
-            
-            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), string.Empty, durationStr, barSizeStr, "TRADES", 0, 1, false, null);
-
-            return resolveResult.Task;
         }
 
         public void historicalData(int reqId, IBApi.Bar bar)
@@ -702,7 +717,7 @@ namespace TradingBot.Broker.Client
             }
         }
 
-        #region Not implemented
+#region Not implemented
 
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
@@ -993,6 +1008,6 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        #endregion Not implemented
+#endregion Not implemented
     }
 }

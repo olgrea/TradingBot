@@ -39,6 +39,7 @@ namespace TradingBot.Broker
 
             _orderManager = new TWSOrderManager(_client, _logger);
 
+            // TODO : need to find a better way to have events in a collection
             BarReceived = new Dictionary<BarLength, EventElement<Contract, Bar>>();
             foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
             {
@@ -206,18 +207,6 @@ namespace TradingBot.Broker
             }
 
             return bar;
-        }
-
-        public void CancelAllBarsRequest(Contract contract)
-        {
-            if(BarReceived.All(c => !c.Value.HasSubscribers))
-                return;
-
-            foreach (var b in BarReceived)
-                b.Value.Clear();
-
-            _client.CancelFiveSecondsBarsRequest(contract);
-            _fiveSecBars.Remove(contract);
         }
 
         public void CancelBarsRequest(Contract contract, BarLength barLength)
