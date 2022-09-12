@@ -47,6 +47,12 @@ namespace TradingBot.Broker
             }
         }
 
+        public event Action<string, string, string> AccountValueUpdated
+        {
+            add => _client.AccountValueUpdated += value;
+            remove => _client.AccountValueUpdated -= value;
+        }
+
         public Dictionary<BarLength, EventElement<Contract, MarketData.Bar>> BarReceived { get; }
 
         public event Action<Contract, BidAsk> BidAskReceived

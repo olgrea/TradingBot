@@ -11,7 +11,6 @@ using TradingBot.Broker.Orders;
 using TBOrder = TradingBot.Broker.Orders.Order;
 using TBOrderState = TradingBot.Broker.Orders.OrderState;
 using TradingBot.Broker.Accounts;
-using System.Drawing;
 
 namespace TradingBot.Broker.Client
 {
@@ -39,6 +38,7 @@ namespace TradingBot.Broker.Client
         public event Action ClientDisconnected;
         public event Action<PnL> PnLReceived;
         public event Action<Position> PositionReceived;
+        public event Action<string, string, string> AccountValueUpdated;
 
         public event Action<Contract, MarketData.Bar> FiveSecBarReceived;
         public event Action<Contract, BidAsk> BidAskReceived;
@@ -51,7 +51,6 @@ namespace TradingBot.Broker.Client
         event Action<int> _nextValidIdEvent;
         event Action<string> _managedAccountsEvent;
         event Action<DateTime> _updateAccountTimeEvent;
-        event Action<string, string, string> _updateAccountValueEvent;
         event Action<Position> _updatePortfolioEvent;
         event Action<string> _accountDownloadEndEvent;
         event Action<int, Contract> _contractDetailsEvent;
@@ -124,6 +123,9 @@ namespace TradingBot.Broker.Client
             foreach (var kvp in _fiveSecSubscriptions)
                 _clientSocket.cancelRealTimeBars(kvp.Value);
 
+            foreach (var kvp in _pnlSubscriptions)
+                _clientSocket.cancelPnL(kvp.Value);
+
             _clientSocket.eDisconnect();
             _clientId = -1;
             ClientDisconnected?.Invoke();
@@ -190,7 +192,7 @@ namespace TradingBot.Broker.Client
             _nextValidIdEvent?.Invoke(orderId);
         }
         
-        public Task<Account> GetAccountAsync()
+        public Task<Account> GetAccountAsync(bool receiveUpdates = true)
         {
             var account = new Account() { Code = _accountCode };
 
@@ -219,7 +221,7 @@ namespace TradingBot.Broker.Client
             var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
 
             _updateAccountTimeEvent += updateAccountTime;
-            _updateAccountValueEvent += updateAccountValue;
+            AccountValueUpdated += updateAccountValue;
             _updatePortfolioEvent += updatePortfolio;
             _accountDownloadEndEvent += accountDownloadEnd;
             ClientMessageReceived += error;
@@ -227,12 +229,13 @@ namespace TradingBot.Broker.Client
             resolveResult.Task.ContinueWith(t =>
             {
                 _updateAccountTimeEvent -= updateAccountTime;
-                _updateAccountValueEvent -= updateAccountValue;
+                AccountValueUpdated -= updateAccountValue;
                 _updatePortfolioEvent -= updatePortfolio;
                 _accountDownloadEndEvent -= accountDownloadEnd;
                 ClientMessageReceived -= error;
-                
-                _clientSocket.reqAccountUpdates(false, _accountCode);
+
+                if(!receiveUpdates)
+                    _clientSocket.reqAccountUpdates(false, _accountCode);
             });
 
             _clientSocket.reqAccountUpdates(true, _accountCode);
@@ -261,7 +264,7 @@ namespace TradingBot.Broker.Client
                     break;
 
                 default:
-                    _updateAccountValueEvent?.Invoke(key, value, currency);
+                    AccountValueUpdated?.Invoke(key, value, currency);
                     break;
             }
         }

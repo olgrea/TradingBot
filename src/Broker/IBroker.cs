@@ -18,7 +18,7 @@ namespace TradingBot.Broker
         Contract GetContract(string ticker);
 
         event Action<Contract, BidAsk> BidAskReceived;
-
+        event Action<string, string, string> AccountValueUpdated;
         Dictionary<BarLength, EventElement<Contract, MarketData.Bar>> BarReceived { get;}
         event Action<Contract, Order, OrderState> OrderOpened;
         event Action<OrderStatus> OrderStatusChanged;

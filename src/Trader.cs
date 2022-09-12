@@ -12,6 +12,7 @@ using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
 using TradingBot.Indicators;
 using TradingBot.Utils;
+using System.Globalization;
 
 namespace TradingBot
 {
@@ -22,10 +23,10 @@ namespace TradingBot
 
         string _ticker;
         Contract _contract;
-
-        Position _contractPosition;
         double _USDCashBalance;
-                
+        Position _contractPosition;
+        PnL _PnL;
+
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<Type> _desiredStrategies = new HashSet<Type>();
 
@@ -75,7 +76,6 @@ namespace TradingBot
             }
             _USDCashBalance = acc.CashBalances["USD"];
 
-
             SubscribeToData();
 
             foreach (var type in _desiredStrategies)
@@ -87,6 +87,7 @@ namespace TradingBot
 
         void SubscribeToData()
         {
+            _broker.AccountValueUpdated += OnAccountValueUpdated;
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
 
@@ -105,6 +106,7 @@ namespace TradingBot
 
         void UnsubscribeToData()
         {
+            _broker.AccountValueUpdated -= OnAccountValueUpdated;
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
 
@@ -121,6 +123,17 @@ namespace TradingBot
             _broker.CancelBarsRequest(_contract, BarLength._5Sec);
         }
 
+        void OnAccountValueUpdated(string key, string value, string currency)
+        {
+            switch (key)
+            {
+                case "CashBalance":
+                    if(currency == "USD")
+                        _USDCashBalance = double.Parse(value, CultureInfo.InvariantCulture);
+                    break;
+            }
+        }
+
         void OnClientMessageReceived(ClientMessage message)
         {
             if(message is ClientNotification)
@@ -131,17 +144,20 @@ namespace TradingBot
 
         void OnPositionReceived(Position position)
         {
-            if(position.Contract.Symbol == _ticker)
+            if (position.Contract.Symbol == _ticker)
             {
                 _contractPosition = position;
+                _logger.LogInfo($"OnPositionReceived : {position}");
             }
-
-            _logger.LogInfo($"OnPositionReceived : {position}");
         }
 
         void OnPnLReceived(PnL pnl)
         {
-            _logger.LogInfo($"OnPnLReceived : {pnl}");
+            if(pnl.Contract.Symbol == _ticker)
+            {
+                _PnL = pnl;
+                _logger.LogInfo($"OnPnLReceived : {pnl}");
+            }
         }
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
@@ -167,7 +183,8 @@ namespace TradingBot
         public double GetAvailableFunds()
         {
             // TODO : manage this better
-            return 5000;
+            //return 5000;
+            return _USDCashBalance;
         }
 
         public void Stop()
