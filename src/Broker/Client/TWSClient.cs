@@ -16,26 +16,212 @@ namespace TradingBot.Broker.Client
 {
     internal class TWSClient : EWrapper
     {
-        int _nextValidOrderId = -1;
-        int _reqId = 0;
+        internal class Connector
+        {
+            int _nextValidOrderId = -1;
+            int _reqId = 0;
 
-        int _clientId = -1;
-        EClientSocket _clientSocket;
-        EReaderSignal _signal;
-        EReader _reader;
+            int _clientId = -1;
+            EReaderSignal _signal;
+            EReader _reader;
 
+            ILogger _logger;
+            Task _processMsgTask;
+            string _accountCode = null;
+
+            public Connector(EWrapper eWrapper, ILogger logger)
+            {
+                _signal = new EReaderMonitorSignal();
+                ClientSocket = new EClientSocket(eWrapper, _signal);
+                _logger = logger;
+            }
+
+            public EClientSocket ClientSocket { get; private set; }
+            public int NextRequestId => _reqId++;
+            public int NextValidOrderId => _nextValidOrderId++;
+            public string AccountCode => _accountCode;
+            public Dictionary<Contract, int> BidAskSubscriptions { get; private set; } = new Dictionary<Contract, int>();
+            public Dictionary<Contract, int> FiveSecSubscriptions { get; private set; } = new Dictionary<Contract, int>();
+            public Dictionary<Contract, int> PnlSubscriptions { get; private set; } = new Dictionary<Contract, int>();
+
+
+            public event Action ClientConnected;
+            public event Action ClientDisconnected;
+            public event Action<ClientMessage> ClientMessageReceived;
+            event Action<int> _nextValidIdEvent;
+            event Action<string> _managedAccountsEvent;
+
+            public Task<bool> ConnectAsync(string host, int port, int clientId)
+            {
+                //TODO: Handle IB server resets
+
+                _clientId = clientId;
+
+                var resolveResult = new TaskCompletionSource<bool>();
+                var nextValidId = new Action<int>(id =>
+                {
+                    if (_nextValidOrderId < 0)
+                    {
+                        _logger.LogInfo($"Client connected.");
+                    }
+                    _nextValidOrderId = id;
+                });
+
+                var managedAccounts = new Action<string>(acc =>
+                {
+                    _accountCode = acc;
+                    resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
+                });
+
+                var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+                _nextValidIdEvent += nextValidId;
+                _managedAccountsEvent += managedAccounts;
+                ClientMessageReceived += error;
+                resolveResult.Task.ContinueWith(t =>
+                {
+                    _nextValidIdEvent -= nextValidId;
+                    _managedAccountsEvent -= managedAccounts;
+                    ClientMessageReceived -= error;
+
+                    if (_nextValidOrderId > 0)
+                        ClientConnected?.Invoke();
+                });
+
+                ClientSocket.eConnect(host, port, clientId);
+                _reader = new EReader(ClientSocket, _signal);
+                _reader.Start();
+                _processMsgTask = Task.Run(ProcessMsg);
+                _logger.LogDebug($"Reader started and is listening to messages from TWS");
+
+                return resolveResult.Task;
+            }
+
+            public void Disconnect()
+            {
+                ClientSocket.reqAccountUpdates(false, _accountCode);
+                foreach (var kvp in BidAskSubscriptions)
+                    ClientSocket.cancelTickByTickData(kvp.Value);
+
+                foreach (var kvp in FiveSecSubscriptions)
+                    ClientSocket.cancelRealTimeBars(kvp.Value);
+
+                foreach (var kvp in PnlSubscriptions)
+                    ClientSocket.cancelPnL(kvp.Value);
+
+                ClientSocket.eDisconnect();
+                _clientId = -1;
+                ClientDisconnected?.Invoke();
+            }
+
+            public bool IsConnected => ClientSocket.IsConnected() && _nextValidOrderId > 0;
+
+            void ProcessMsg()
+            {
+                while (ClientSocket.IsConnected())
+                {
+                    _signal.waitForSignal();
+                    _reader.processMsgs();
+                }
+            }
+
+            public void connectAck()
+            => _logger.LogDebug($"Connecting client to TWS...");
+
+            public void connectionClosed()
+            => _logger.LogDebug($"Connection closed");
+
+            public void managedAccounts(string accountsList)
+            {
+                _logger.LogDebug($"Account list : {accountsList}");
+                _managedAccountsEvent?.Invoke(accountsList);
+            }
+
+            public int GetNextValidOrderId(bool fromTWS = false)
+            {
+                if (fromTWS)
+                {
+                    return GetNextValidOrderIdAsync().Result;
+                }
+                return NextValidOrderId;
+            }
+
+            Task<int> GetNextValidOrderIdAsync()
+            {
+                var resolveResult = new TaskCompletionSource<int>();
+                var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
+                var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+                _nextValidIdEvent += nextValidId;
+                ClientMessageReceived += error;
+                resolveResult.Task.ContinueWith(t =>
+                {
+                    _nextValidIdEvent -= nextValidId;
+                    ClientMessageReceived -= error;
+                });
+
+                ClientSocket.reqIds(-1); // param is deprecated
+
+                return resolveResult.Task;
+            }
+
+            // The next valid identifier is persistent between TWS sessions
+            public void nextValidId(int orderId)
+            {
+                _nextValidIdEvent?.Invoke(orderId);
+            }
+
+            public void error(Exception e)
+            {
+                _logger.LogError(e.Message);
+                ClientMessageReceived?.Invoke(new ClientException(e));
+            }
+
+            public void error(string str)
+            {
+                _logger.LogError(str);
+                ClientMessageReceived?.Invoke(new ClientError(str));
+            }
+
+            public void error(int id, int errorCode, string errorMsg)
+            {
+                var str = $"{id} {errorCode} {errorMsg}";
+                if (errorCode == 502)
+                    str += $"\nMake sure the API is enabled in Trader Workstation";
+
+
+                // Note: id == -1 indicates a notification and not true error condition...
+                ClientMessage msg;
+                if (id < 0)
+                {
+                    _logger.LogDebug(str);
+                    msg = new ClientNotification(errorMsg);
+                }
+                else
+                {
+                    _logger.LogError(str);
+                    msg = new ClientError(id, errorCode, errorMsg);
+                }
+
+                ClientMessageReceived?.Invoke(msg);
+            }
+
+            public void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
+            {
+                if (msg is ClientError)
+                {
+                    if (msg is ClientException ex)
+                        resolveResult.SetException(ex.Exception);
+                    resolveResult.SetResult(default(T));
+                }
+            }
+        }
+
+        Connector _connector;
         ILogger _logger;
-        Task _processMsgTask;
-
-        Dictionary<Contract, int> _bidAskSubscriptions = new Dictionary<Contract, int>();
-        Dictionary<Contract, int> _fiveSecSubscriptions = new Dictionary<Contract, int>();
-        Dictionary<Contract, int> _pnlSubscriptions = new Dictionary<Contract, int>();
         
-        string _accountCode = null;
         MarketData.BidAsk _bidAsk = new BidAsk();
 
-        public event Action ClientConnected;
-        public event Action ClientDisconnected;
         public event Action<PnL> PnLReceived;
         public event Action<Position> PositionReceived;
         public event Action<string, string, string> AccountValueUpdated;
@@ -46,10 +232,7 @@ namespace TradingBot.Broker.Client
         public event Action<OrderStatus> OrderStatusChanged;
         public event Action<Contract, OrderExecution> OrderExecuted;
         public event Action<CommissionInfo> CommissionInfoReceived;
-        public event Action<ClientMessage> ClientMessageReceived;
 
-        event Action<int> _nextValidIdEvent;
-        event Action<string> _managedAccountsEvent;
         event Action<DateTime> _updateAccountTimeEvent;
         event Action<Position> _updatePortfolioEvent;
         event Action<string> _accountDownloadEndEvent;
@@ -58,143 +241,47 @@ namespace TradingBot.Broker.Client
         event Action<int, MarketData.Bar> _historicalDataEvent;
         event Action<int, string, string> _historicalDataEndEvent;
 
+        public event Action ClientConnected
+        {
+            add => _connector.ClientConnected += value;
+            remove => _connector.ClientConnected -= value;
+        }
+
+        public event Action ClientDisconnected
+        {
+            add => _connector.ClientDisconnected += value;
+            remove => _connector.ClientDisconnected -= value;
+        }
+
+        public event Action<ClientMessage> ClientMessageReceived
+        {
+            add => _connector.ClientMessageReceived += value;
+            remove => _connector.ClientMessageReceived -= value;
+        }
+
+        // TODO : move this to a data subscription manager?
+        Dictionary<Contract, int> BidAskSubscriptions => _connector.BidAskSubscriptions;
+        Dictionary<Contract, int> FiveSecSubscriptions => _connector.FiveSecSubscriptions;
+        Dictionary<Contract, int> PnlSubscriptions => _connector.PnlSubscriptions;
+
         public TWSClient(ILogger logger)
         {
-            _signal = new EReaderMonitorSignal();
-            _clientSocket = new EClientSocket(this, _signal);
+            _connector = new Connector(this, logger);
             _logger = logger;
         }
 
-        int NextRequestId => _reqId++;
-        int NextValidOrderId => _nextValidOrderId++;
-
-        public Task<bool> ConnectAsync(string host, int port, int clientId)
-        {
-            //TODO: Handle IB server resets
-
-            _clientId = clientId;
-
-            var resolveResult = new TaskCompletionSource<bool>();
-            var nextValidId = new Action<int>(id => 
-            {
-                if (_nextValidOrderId < 0)
-                {
-                    _logger.LogInfo($"Client connected.");
-                }
-                _nextValidOrderId = id;
-            });
-
-            var managedAccounts = new Action<string>(acc => 
-            {
-                _accountCode = acc;
-                resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode)); 
-            });
-
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
-
-            _nextValidIdEvent += nextValidId;
-            _managedAccountsEvent += managedAccounts;
-            ClientMessageReceived += error;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _nextValidIdEvent -= nextValidId;
-                _managedAccountsEvent -= managedAccounts;
-                ClientMessageReceived -= error;
-                
-                if(_nextValidOrderId > 0)
-                    ClientConnected?.Invoke();
-            });
-            
-            _clientSocket.eConnect(host, port, clientId);
-            _reader = new EReader(_clientSocket, _signal);
-            _reader.Start();
-            _processMsgTask = Task.Run(ProcessMsg);
-            _logger.LogDebug($"Reader started and is listening to messages from TWS");
-
-            return resolveResult.Task;
-        }
-
-        public void Disconnect()
-        {
-            _clientSocket.reqAccountUpdates(false, _accountCode);
-            foreach (var kvp in _bidAskSubscriptions)
-                _clientSocket.cancelTickByTickData(kvp.Value);
-
-            foreach (var kvp in _fiveSecSubscriptions)
-                _clientSocket.cancelRealTimeBars(kvp.Value);
-
-            foreach (var kvp in _pnlSubscriptions)
-                _clientSocket.cancelPnL(kvp.Value);
-
-            _clientSocket.eDisconnect();
-            _clientId = -1;
-            ClientDisconnected?.Invoke();
-        }
-
-        public bool IsConnected => _clientSocket.IsConnected() && _nextValidOrderId > 0;
-
-        void ProcessMsg()
-        {
-            while (_clientSocket.IsConnected())
-            {
-                _signal.waitForSignal();
-                _reader.processMsgs();
-            }
-        }
-
-        public void connectAck()
-        {
-            _logger.LogDebug($"Connecting client to TWS...");
-        }
-
-        public void connectionClosed()
-        {
-            _logger.LogDebug($"Connection closed");
-        }
-
-        public void managedAccounts(string accountsList)
-        {
-            _logger.LogDebug($"Account list : {accountsList}");
-            _managedAccountsEvent?.Invoke(accountsList);
-        }
-
-        public int GetNextValidOrderId(bool fromTWS = false)
-        {
-            if(fromTWS)
-            {
-                return GetNextValidOrderIdAsync().Result;
-            }
-            return NextValidOrderId;   
-        }
-
-        Task<int> GetNextValidOrderIdAsync()
-        {
-            var resolveResult = new TaskCompletionSource<int>();
-            var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
-
-            _nextValidIdEvent += nextValidId;
-            ClientMessageReceived += error;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _nextValidIdEvent -= nextValidId;
-                ClientMessageReceived -= error;
-            });
-
-            _clientSocket.reqIds(-1); // param is deprecated
-
-            return resolveResult.Task;
-        }
-
-        // The next valid identifier is persistent between TWS sessions
-        public void nextValidId(int orderId)
-        {
-            _nextValidIdEvent?.Invoke(orderId);
-        }
+        public Task<bool> ConnectAsync(string host, int port, int clientId) => _connector.ConnectAsync(host, port, clientId);
+        public void Disconnect() => _connector.Disconnect();
+        public bool IsConnected => _connector.IsConnected;
+        public void connectAck() => _connector.connectAck();
+        public void connectionClosed() => _connector.connectionClosed();
+        public void managedAccounts(string accountsList) => _connector.managedAccounts(accountsList);
+        public void nextValidId(int orderId) => _connector.nextValidId(orderId);
+        public int GetNextValidOrderId(bool fromTWS = false) => _connector.GetNextValidOrderId(fromTWS);
         
         public Task<Account> GetAccountAsync(bool receiveUpdates = true)
         {
-            var account = new Account() { Code = _accountCode };
+            var account = new Account() { Code = _connector.AccountCode};
 
             var resolveResult = new TaskCompletionSource<Account>();
 
@@ -235,13 +322,15 @@ namespace TradingBot.Broker.Client
                 ClientMessageReceived -= error;
 
                 if(!receiveUpdates)
-                    _clientSocket.reqAccountUpdates(false, _accountCode);
+                    _connector.ClientSocket.reqAccountUpdates(false, _connector.AccountCode);
             });
 
-            _clientSocket.reqAccountUpdates(true, _accountCode);
+            _connector.ClientSocket.reqAccountUpdates(true, _connector.AccountCode);
 
             return resolveResult.Task;
         }
+
+        public void CancelAccountUpdates() => _connector.ClientSocket.reqAccountUpdates(false, _connector.AccountCode);
 
         public void updateAccountTime(string timestamp)
         {
@@ -295,12 +384,12 @@ namespace TradingBot.Broker.Client
         public void RequestPositions()
         {
             _logger.LogDebug($"Requesting positions for all accounts");
-            _clientSocket.reqPositions();
+            _connector.ClientSocket.reqPositions();
         }
 
         public void position(string account, IBApi.Contract contract, double pos, double avgCost)
         {
-            if(account == _accountCode)
+            if(account == _connector.AccountCode)
             {
                 var p = new Position()
                 {
@@ -316,33 +405,30 @@ namespace TradingBot.Broker.Client
                 _logger.LogDebug($"position ignored for account {account}");
         }
 
-        public void positionEnd()
-        {
-            _logger.LogDebug($"positionEnd");
-        }
+        public void positionEnd() => _logger.LogDebug($"positionEnd");
 
         public void CancelPositionsSubscription()
         {
-            _clientSocket.cancelPositions();
+            _connector.ClientSocket.cancelPositions();
             _logger.LogDebug($"cancelPositions");
         }
 
         public void RequestPnL(Contract contract)
         {
-            if (_pnlSubscriptions.ContainsKey(contract))
+            if (PnlSubscriptions.ContainsKey(contract))
                 return;
 
             _logger.LogDebug($"Requesting PnL for {contract}");
-            int reqId = NextRequestId;
-            _pnlSubscriptions[contract] = reqId;
-            _clientSocket.reqPnLSingle(reqId, _accountCode, "", contract.Id);
+            int reqId = _connector.NextRequestId;
+            PnlSubscriptions[contract] = reqId;
+            _connector.ClientSocket.reqPnLSingle(reqId, _connector.AccountCode, "", contract.Id);
         }
 
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             var pnl = new PnL()
             {
-                Contract = _pnlSubscriptions.First(s => s.Value == reqId).Key,
+                Contract = PnlSubscriptions.First(s => s.Value == reqId).Key,
                 PositionAmount = pos,
                 MarketValue = value,  
                 DailyPnL = dailyPnL,
@@ -356,31 +442,31 @@ namespace TradingBot.Broker.Client
 
         public void CancelPnLRequest(Contract contract)
         {
-            if(_pnlSubscriptions.ContainsKey(contract))
+            if(PnlSubscriptions.ContainsKey(contract))
             {
-                _clientSocket.cancelPnL(_pnlSubscriptions[contract]);
-                _pnlSubscriptions.Remove(contract);
+                _connector.ClientSocket.cancelPnL(PnlSubscriptions[contract]);
+                PnlSubscriptions.Remove(contract);
                 _logger.LogDebug($"CancelPnLRequest for {contract}");
             }
         }
 
         public void RequestFiveSecondsBars(Contract contract)
         {
-            if (_fiveSecSubscriptions.ContainsKey(contract))
+            if (FiveSecSubscriptions.ContainsKey(contract))
                 return;
 
             var ibc = contract.ToIBApiContract();
-            int reqId = NextRequestId;
-            _fiveSecSubscriptions[contract] = reqId;
+            int reqId = _connector.NextRequestId;
+            FiveSecSubscriptions[contract] = reqId;
 
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-            _clientSocket.reqRealTimeBars(reqId, ibc, 5, "TRADES", true, null);
+            _connector.ClientSocket.reqRealTimeBars(reqId, ibc, 5, "TRADES", true, null);
         }
 
         // called at 5 sec intervals
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
-            var contract = _fiveSecSubscriptions.First(c => c.Value == reqId).Key;
+            var contract = FiveSecSubscriptions.First(c => c.Value == reqId).Key;
 
             FiveSecBarReceived?.Invoke(contract, new MarketData.Bar()
             {
@@ -397,29 +483,29 @@ namespace TradingBot.Broker.Client
 
         public void CancelFiveSecondsBarsRequest(Contract contract)
         {
-            if(_fiveSecSubscriptions.ContainsKey(contract))
+            if(FiveSecSubscriptions.ContainsKey(contract))
             {
-                _clientSocket.cancelRealTimeBars(_fiveSecSubscriptions[contract]);
-                _fiveSecSubscriptions.Remove(contract);
+                _connector.ClientSocket.cancelRealTimeBars(FiveSecSubscriptions[contract]);
+                FiveSecSubscriptions.Remove(contract);
             }
         }
 
         public void RequestBidAsk(Contract contract)
         {
-            if (_bidAskSubscriptions.ContainsKey(contract))
+            if (BidAskSubscriptions.ContainsKey(contract))
                 return;
 
             var ibc = contract.ToIBApiContract();
-            int reqId = NextRequestId;
-            _bidAskSubscriptions[contract] = reqId;
+            int reqId = _connector.NextRequestId;
+            BidAskSubscriptions[contract] = reqId;
 
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-            _clientSocket.reqTickByTickData(reqId, ibc, "BidAsk", 0, false);
+            _connector.ClientSocket.reqTickByTickData(reqId, ibc, "BidAsk", 0, false);
         }
 
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            var contract = _bidAskSubscriptions.First(c => c.Value == reqId).Key;
+            var contract = BidAskSubscriptions.First(c => c.Value == reqId).Key;
 
             _bidAsk.Bid = bidPrice;
             _bidAsk.BidSize = bidSize;
@@ -432,10 +518,10 @@ namespace TradingBot.Broker.Client
 
         public void CancelBidAskRequest(Contract contract)
         {
-            if (_bidAskSubscriptions.ContainsKey(contract))
+            if (BidAskSubscriptions.ContainsKey(contract))
             {
-                _clientSocket.cancelTickByTickData(_bidAskSubscriptions[contract]);
-                _bidAskSubscriptions.Remove(contract);
+                _connector.ClientSocket.cancelTickByTickData(BidAskSubscriptions[contract]);
+                BidAskSubscriptions.Remove(contract);
             }
         }
 
@@ -448,7 +534,7 @@ namespace TradingBot.Broker.Client
                 Symbol = ticker,
                 SecType = "STK"
             };
-            var reqId = NextRequestId;
+            var reqId = _connector.NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<Contract>>();
             var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
@@ -475,7 +561,7 @@ namespace TradingBot.Broker.Client
                 ClientMessageReceived -= error;
             });
 
-            _clientSocket.reqContractDetails(reqId, sampleContract);
+            _connector.ClientSocket.reqContractDetails(reqId, sampleContract);
 
             return resolveResult.Task;
         }
@@ -490,20 +576,14 @@ namespace TradingBot.Broker.Client
             _contractDetailsEndEvent?.Invoke(reqId);    
         }
 
-        public void RequestOpenOrders()
-        {
-            _clientSocket.reqOpenOrders();
-        }
+        public void RequestOpenOrders() => _connector.ClientSocket.reqOpenOrders();
 
-        public void openOrderEnd()
-        {
-            _logger.LogDebug($"openOrderEnd");
-        }
+        public void openOrderEnd() => _logger.LogDebug($"openOrderEnd");
 
         public void PlaceOrder(Contract contract, TBOrder order)
         {
             var ibo = order.ToIBApiOrder();
-            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+            _connector.ClientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
         }
 
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
@@ -537,6 +617,9 @@ namespace TradingBot.Broker.Client
             OrderStatusChanged?.Invoke(os);
         }
 
+        public void CancelOrder(int orderId) => _connector.ClientSocket.cancelOrder(orderId);
+        public void CancelAllOrders() => _connector.ClientSocket.reqGlobalCancel();
+
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
             _logger.LogDebug($"execDetails : reqId={reqId}");
@@ -544,9 +627,7 @@ namespace TradingBot.Broker.Client
         }
 
         public void execDetailsEnd(int reqId)
-        {
-            _logger.LogDebug($"execDetailsEnd : reqId={reqId}");
-        }
+        => _logger.LogDebug($"execDetailsEnd : reqId={reqId}");
 
         public void commissionReport(CommissionReport commissionReport)
         {
@@ -555,24 +636,11 @@ namespace TradingBot.Broker.Client
         }
 
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
-        {
-            _logger.LogDebug($"completedOrder {order.OrderId} : {orderState.Status}");
-        }
+        => _logger.LogDebug($"completedOrder {order.OrderId} : {orderState.Status}");
 
         public void completedOrdersEnd()
-        {
-            _logger.LogDebug($"completedOrdersEnd");
-        }
+        => _logger.LogDebug($"completedOrdersEnd");
 
-        public void CancelOrder(int orderId)
-        {
-            _clientSocket.cancelOrder(orderId);
-        }
-
-        public void CancelAllOrders()
-        {
-            _clientSocket.reqGlobalCancel();
-        }
         public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, int count)
         {
             return GetHistoricalDataAsync(contract, barLength, string.Empty, count);
@@ -581,7 +649,7 @@ namespace TradingBot.Broker.Client
         public Task<List<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, string endDateTime, int count)
         {
             var tmpList = new List<MarketData.Bar>();
-            var reqId = NextRequestId;
+            var reqId = _connector.NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
             SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
@@ -605,7 +673,7 @@ namespace TradingBot.Broker.Client
                     throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
             }
 
-            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime, durationStr, barSizeStr, "TRADES", 0, 1, false, null);
+            _connector.ClientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime, durationStr, barSizeStr, "TRADES", 0, 1, false, null);
 
             return resolveResult.Task;
         }
@@ -675,52 +743,12 @@ namespace TradingBot.Broker.Client
             _historicalDataEndEvent?.Invoke(reqId, start, end);
         }
 
-        public void error(Exception e)
-        {
-            _logger.LogError(e.Message);
-            ClientMessageReceived?.Invoke(new ClientException(e));
-        }
+        public void error(Exception e) => _connector.error(e);
+        public void error(string str) => _connector.error(str);
+        public void error(int id, int errorCode, string errorMsg) => _connector.error(id, errorCode, errorMsg);
+        void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult) => _connector.TaskError(msg, resolveResult);
 
-        public void error(string str)
-        {
-            _logger.LogError(str);
-            ClientMessageReceived?.Invoke(new ClientError(str));
-        }
-
-        public void error(int id, int errorCode, string errorMsg)
-        {
-            var str = $"{id} {errorCode} {errorMsg}";
-            if (errorCode == 502)
-                str += $"\nMake sure the API is enabled in Trader Workstation";
-
-
-            // Note: id == -1 indicates a notification and not true error condition...
-            ClientMessage msg;
-            if (id < 0)
-            {
-                _logger.LogDebug(str);
-                msg = new ClientNotification(errorMsg);
-            }
-            else
-            {
-                _logger.LogError(str);
-                msg = new ClientError(id, errorCode, errorMsg);
-            }
-
-            ClientMessageReceived?.Invoke(msg);
-        }
-
-        void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
-        {
-            if (msg is ClientError)
-            {
-                if (msg is ClientException ex)
-                    resolveResult.SetException(ex.Exception);
-                resolveResult.SetResult(default(T));
-            }
-        }
-
-#region Not implemented
+        #region Not implemented
 
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
