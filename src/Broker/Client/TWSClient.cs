@@ -678,18 +678,6 @@ namespace TradingBot.Broker.Client
             return resolveResult.Task;
         }
 
-#if BACKTESTING
-        public Task<List<MarketData.Bar>> GetHistoricalDataForDayAsync(Contract contract, DateTime endDateTime)
-        {
-            var tmpList = new List<MarketData.Bar>();
-            var reqId = NextRequestId;
-
-            var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
-            SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
-            _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime.ToString("yyyyMMdd-HH:mm:ss"), "1 D", "1 min", "TRADES", 0, 1, false, null);
-            return resolveResult.Task;
-        }
-#endif
         private void SetupHistoricalDataCallbacks(List<MarketData.Bar> tmpList, int reqId, TaskCompletionSource<List<MarketData.Bar>> resolveResult)
         {
             var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
