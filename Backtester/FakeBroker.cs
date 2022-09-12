@@ -28,6 +28,7 @@ namespace Backtester
         public event Action<Position> PositionReceived;
         public event Action<PnL> PnLReceived;
         public event Action<ClientMessage> ClientMessageReceived;
+        public event Action<string, string, string> AccountValueUpdated;
 
         public FakeBroker(ILogger logger)
         {
