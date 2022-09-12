@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Backtester.Client;
-using MathNet.Numerics.LinearAlgebra.Factorization;
+using System.Threading.Tasks;
+using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
+using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
 
 namespace Backtester
@@ -16,24 +15,39 @@ namespace Backtester
     {
         const int TimeScale = 1;
 
+        const int DefaultPort = 7496;
+        const string DefaultIP = "127.0.0.1";
+        int _clientId = 9000;
+
+        string _ticker;
         DateTime _start;
         DateTime _end;
 
-        TWSClientSlim _client;
+        TWSClient _client;
         ILogger _logger;
+        Contract _contract;
 
+        Dictionary<DateTime, LinkedList<Bar>> _historicalData = new Dictionary<DateTime, LinkedList<Bar>>();
         Dictionary<int, PnL> PnLs = new Dictionary<int, PnL>();
 
-        public Backtester(DateTime from, DateTime to, ILogger logger)
+        public Backtester(string ticker, DateTime from, DateTime to, ILogger logger)
         {
+            _ticker = ticker;
             _start = from;
             _end = to;
             _logger = logger;
-            _client = new TWSClientSlim(logger);
+            _client = new TWSClient(logger);
+            var _trader = new Trader(ticker, new FakeBroker(logger), logger);
         }
 
         public void Start()
         {
+            _client.ConnectAsync(DefaultIP, DefaultPort, _clientId).Wait();
+            
+            var contractList = _client.GetContractsAsync(_ticker).Result;
+            _contract = contractList.First();
+
+            FetchHistoricalData();
 
         }
 
@@ -84,39 +98,13 @@ namespace Backtester
         
         public void FetchHistoricalData()
         {
-            var marketDays = GetMarketDays(_start, _end).ToList();
+            var marketDays = GetMarketDays(_start, _end);
+            foreach (var day in marketDays)
+            {
+                var barList = _client.GetHistoricalDataForDayAsync(_contract, day.Item2).Result;
+
+                _historicalData.Add(day.Item1, barList);
+            }
         }
-
-        //public void GetMarketDays()
-        //{
-        //    var ranges = SplitByDay(_start, _end).Where(r => r.Item1.DayOfWeek != DayOfWeek.Sunday && r.Item1.DayOfWeek != DayOfWeek.Saturday).ToList();
-
-        //    if (ranges[0].Item1.Hour >= 16)
-        //        ranges.RemoveAt(0);
-
-        //    if (ranges[ranges.Count-1].Item2.Hour < 9 && ranges[ranges.Count - 1].Item2.Minute < 30)
-        //        ranges.RemoveAt(ranges.Count - 1);
-
-        //    for (int i = 0; i < ranges.Count-1 ; ++i)
-        //    {
-        //        ranges[i] = (ranges[i].Item1, new DateTime(ranges[i].Item1.Year, ranges[i].Item1.Month, ranges[i].Item1.Day, 16, 0, 0));
-        //    }
-
-        //    for (int i = 1; i < ranges.Count; ++i)
-        //    {
-        //        ranges[i] = (new DateTime(ranges[i].Item2.Year, ranges[i].Item2.Month, ranges[i].Item2.Day, 9, 30, 0), ranges[i].Item2);
-        //    }
-        //}
-
-        //IEnumerable<(DateTime, DateTime)> SplitByDay(DateTime start, DateTime end)
-        //{
-        //    DateTime chunkEnd;
-        //    while ((chunkEnd = start.AddDays(1)) < end)
-        //    {
-        //        yield return (start, chunkEnd);
-        //        start = chunkEnd;
-        //    }
-        //    yield return (start, end);
-        //}
     }
 }

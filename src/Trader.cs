@@ -100,7 +100,7 @@ namespace TradingBot
 
             _broker.RequestPositions();
             _broker.RequestPnL(_contract);
-            _broker.RequestBars(_contract, BarLength._5Sec);
+            //_broker.RequestBars(_contract, BarLength._5Sec);
             _broker.RequestBidAsk(_contract);
         }
 
@@ -120,7 +120,8 @@ namespace TradingBot
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
             _broker.CancelBidAskRequest(_contract);
-            _broker.CancelBarsRequest(_contract, BarLength._5Sec);
+            
+            //_broker.CancelBarsRequest(_contract, BarLength._5Sec);
         }
 
         void OnAccountValueUpdated(string key, string value, string currency)
