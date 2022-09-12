@@ -32,27 +32,11 @@ namespace Backtester
 
         public FakeBroker(ILogger logger)
         {
-            _fakeAccount = MakeFakeAccount();
-
             BarReceived = new Dictionary<BarLength, EventElement<Contract, Bar>>();
             foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
             {
                 BarReceived.Add(barLength, new EventElement<Contract, Bar>());
             }
-        }
-
-        Account _fakeAccount;
-
-        Account MakeFakeAccount()
-        {
-            return new Account()
-            {
-                 Code = "FAKEACCOUNT123",
-                 CashBalances = new Dictionary<string, double>()
-                 {
-                     {"USD", 10000 }
-                 }
-            };
         }
 
         public void CancelBarsRequest(Contract contract, BarLength barLength)
@@ -73,7 +57,17 @@ namespace Backtester
 
         public void Connect() {}
         public void Disconnect() {}
-        public Account GetAccount() => _fakeAccount;
+        public Account GetAccount()
+        {
+            return new Account()
+            {
+                Code = "FAKEACCOUNT123",
+                CashBalances = new Dictionary<string, double>()
+                 {
+                     {"USD", 10000 }
+                 }
+            };
+        }
 
         public Contract GetContract(string ticker)
         {
