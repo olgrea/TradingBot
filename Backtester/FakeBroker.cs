@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using IBApi;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -38,22 +37,6 @@ namespace Backtester
                 BarReceived.Add(barLength, new EventElement<Contract, Bar>());
             }
         }
-
-        public void CancelBarsRequest(Contract contract, BarLength barLength)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelBidAskRequest(Contract contract){}
-
-        public void CancelOrder(Order order)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelPnLSubscription(Contract contract){}
-
-        public void CancelPositionsSubscription(){}
 
         public void Connect() {}
         public void Disconnect() {}
@@ -94,13 +77,26 @@ namespace Backtester
             throw new NotImplementedException();
         }
 
+        public void CancelOrder(Order order)
+        {
+            throw new NotImplementedException();
+        }
+
         public void RequestBars(Contract contract, BarLength barLength)
         {
             throw new NotImplementedException();
         }
 
+        public void CancelBarsRequest(Contract contract, BarLength barLength)
+        {
+            throw new NotImplementedException();
+        }
+
         public void RequestBidAsk(Contract contract) {}
+        public void CancelBidAskRequest(Contract contract) { }
         public void RequestPnL(Contract contract) {}
+        public void CancelPnLSubscription(Contract contract) { }
         public void RequestPositions(){}
+        public void CancelPositionsSubscription() { }
     }
 }

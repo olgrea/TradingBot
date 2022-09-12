@@ -12,9 +12,11 @@ namespace Backtester
         {
             DateTime start = new DateTime(2022, 9, 1, 15, 5, 5);
             DateTime end = new DateTime(2022, 9, 9, 10, 5, 5);
-            var bt = new Backtester(start, end, new ConsoleLogger());
+            var bt = new Backtester("GME", start, end, new ConsoleLogger());
 
-            bt.FetchHistoricalData();
+            bt.Start();
+
+            Console.ReadKey();
         }
     }
 

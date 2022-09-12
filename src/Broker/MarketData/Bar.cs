@@ -13,6 +13,7 @@ namespace TradingBot.Broker.MarketData
         _1Min = 60
     }
 
+    //TODO : make serializable
     internal class Bar
     {
         public double Open { get; set; }

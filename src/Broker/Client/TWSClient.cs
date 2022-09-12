@@ -652,7 +652,19 @@ namespace TradingBot.Broker.Client
             var reqId = _connector.NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<MarketData.Bar>>();
-            SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
+            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
+            {
+                if (rId == reqId)
+                    tmpList.Add(bar);
+            });
+
+            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
+            {
+                if (rId == reqId)
+                    resolveResult.SetResult(tmpList);
+            });
+
+            SetupHistoricalDataCallbacks(historicalData, historicalDataEnd, resolveResult);
 
             //string timeFormat = "yyyyMMdd-HH:mm:ss";
             string durationStr = null;
@@ -678,24 +690,42 @@ namespace TradingBot.Broker.Client
             return resolveResult.Task;
         }
 
-        private void SetupHistoricalDataCallbacks(List<MarketData.Bar> tmpList, int reqId, TaskCompletionSource<List<MarketData.Bar>> resolveResult)
+#if BACKTESTING
+        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataForDayAsync(Contract contract, DateTime endDateTime, bool onlyRTH = true)
         {
+            var tmpList = new LinkedList<MarketData.Bar>();
+            var reqId = _connector.NextRequestId;
+
+            var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
             var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
             {
                 if (rId == reqId)
-                {
-                    tmpList.Add(bar);
-                }
+                    tmpList.AddLast(bar);
             });
 
             var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
             {
                 if (rId == reqId)
-                {
                     resolveResult.SetResult(tmpList);
-                }
             });
+            SetupHistoricalDataCallbacks(historicalData, historicalDataEnd, resolveResult);
 
+            string edt;
+            if(endDateTime.Kind == DateTimeKind.Local || endDateTime.Kind == DateTimeKind.Unspecified)
+            {
+                edt = endDateTime.ToUniversalTime().ToString("yyyyMMdd-HH:mm:ss");
+            }
+            else
+            {
+                edt = endDateTime.ToString("yyyyMMdd-HH:mm:ss");
+            }
+
+            _connector.ClientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), edt, "1 D", "1 min", "TRADES", Convert.ToInt32(onlyRTH), 1, false, null);
+            return resolveResult.Task;
+        }
+#endif
+        private void SetupHistoricalDataCallbacks<TResult>(Action<int, MarketData.Bar> historicalData, Action<int, string, string> historicalDataEnd, TaskCompletionSource<TResult> resolveResult)
+        {
             var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
 
             _historicalDataEvent += historicalData;
