@@ -15,7 +15,7 @@ namespace Backtester
 
         DateTime _start;
         DateTime _end;
-        TWSClient _client;
+        IBClient _client;
         ILogger _logger;
         Contract _contract;
 
@@ -27,7 +27,7 @@ namespace Backtester
             _start = from;
             _end = to;
             _logger = logger;
-            _client = new TWSClient(logger);
+            _client = new IBClient(logger);
         }
 
         public void FetchHistoricalData()
