@@ -3,26 +3,28 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
 using TradingBot.Utils;
-using TradingBot.Broker.Orders;
+using TradingBot.Broker.Client;
 
-namespace TradingBot.Broker.Client
+namespace TradingBot.Broker.Orders
 {
-    internal class TWSOrderManager
+    internal class OrderManager
     {
         ILogger _logger;
-        TWSClient _client;
+        IBBroker _broker;
+        IIBClient _client;
 
         Dictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
         Dictionary<int, OrderChain> _chainOrdersRequested = new Dictionary<int, OrderChain>();
         Dictionary<int, Order> _ordersSubmitted = new Dictionary<int, Order>();
 
-        public TWSOrderManager(TWSClient client, ILogger logger)
+        public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
         {
             _logger = logger;
+            _broker = broker;
             _client = client;
-            
-            _client.OrderOpened += OnOrderOpened;
-            _client.OrderExecuted += OnOrderExecuted;
+
+            _client.Callbacks.OpenOrder += OnOrderOpened;
+            _client.Callbacks.ExecDetails += OnOrderExecuted;
         }
 
         public void PlaceOrder(Contract contract, Order order)
@@ -30,7 +32,7 @@ namespace TradingBot.Broker.Client
             if (contract == null || order == null)
                 return;
 
-            order.Id = _client.GetNextValidOrderId();
+            order.Id = _broker.GetNextValidOrderId();
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
@@ -44,7 +46,7 @@ namespace TradingBot.Broker.Client
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
             //TODO : add a bajillion logs everywhere
-            
+
             if (contract == null || chain == null || chain.Order == null)
                 return;
 
@@ -52,7 +54,7 @@ namespace TradingBot.Broker.Client
             // quantity of the parent order regardless of what was set as quantity in children. This is undesirable in
             // some situations (ex : buy 100 shares but only put a stop loss on 50 shares).
             // I've kept the TWS mechanism but I implemented my own attached order mechanism to circumvent this limitation.
-            if(useTWSAttachedOrderFeature)
+            if (useTWSAttachedOrderFeature)
             {
                 PlaceTWSOrderChain(contract, chain);
                 return;
@@ -102,10 +104,10 @@ namespace TradingBot.Broker.Client
             var executedOrder = chain.Order;
 
             // First cancel all siblings, if any
-            if(chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.Id))
+            if (chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.Id))
             {
                 var parent = _chainOrdersRequested[chain.Parent.Id];
-                foreach(OrderChain child in parent.AttachedOrders)
+                foreach (OrderChain child in parent.AttachedOrders)
                 {
                     if (child.Order.Id == executedOrder.Id)
                         continue;
@@ -115,7 +117,7 @@ namespace TradingBot.Broker.Client
             }
 
             // Then place all child of the executed order
-            foreach(OrderChain child in chain.AttachedOrders)
+            foreach (OrderChain child in chain.AttachedOrders)
             {
                 PlaceOrder(contract, child);
             }
@@ -140,7 +142,7 @@ namespace TradingBot.Broker.Client
 
             list ??= new List<Order>();
 
-            chain.Order.Id = _client.GetNextValidOrderId();
+            chain.Order.Id = _broker.GetNextValidOrderId();
             list.Add(chain.Order);
 
             if (chain.AttachedOrders.Any())

@@ -4,6 +4,7 @@ namespace TradingBot.Broker.Client
 {
     internal interface IIBClient
     {
+        IBCallbacks Callbacks { get; }
         void Connect(string host, int port, int clientId);
         void Disconnect();
         void RequestValidOrderIds();

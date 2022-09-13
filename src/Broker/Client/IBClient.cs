@@ -31,6 +31,8 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"Reader started and is listening to messages from TWS");
         }
 
+        public IBCallbacks Callbacks => _callbacks;
+
         void ProcessMsg()
         {
             while (_clientSocket.IsConnected())

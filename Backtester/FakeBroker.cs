@@ -18,8 +18,6 @@ namespace Backtester
 {
     internal class FakeBroker : IBroker
     {
-        public Dictionary<BarLength, EventElement<Contract, Bar>> BarReceived { get; }
-
         public event Action<Contract, BidAsk> BidAskReceived;
         public event Action<Contract, Order, OrderState> OrderOpened;
         public event Action<OrderStatus> OrderStatusChanged;
@@ -29,16 +27,12 @@ namespace Backtester
         public event Action<PnL> PnLReceived;
         public event Action<ClientMessage> ClientMessageReceived;
         public event Action<string, string, string> AccountValueUpdated;
+        public event Action<Contract, Bar> Bar5SecReceived;
+        public event Action<Contract, Bar> Bar1MinReceived;
 
         public FakeBroker(ILogger logger)
         {
             _fakeAccount = MakeFakeAccount();
-
-            BarReceived = new Dictionary<BarLength, EventElement<Contract, Bar>>();
-            foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
-            {
-                BarReceived.Add(barLength, new EventElement<Contract, Bar>());
-            }
         }
 
         Account _fakeAccount;
