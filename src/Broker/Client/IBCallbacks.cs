@@ -10,14 +10,12 @@ using TradingBot.Utils;
 
 namespace TradingBot.Broker.Client
 {
-    internal class TWSCallbacks : EWrapper
+    internal class IBCallbacks : EWrapper
     {
         ILogger _logger;
-        DataSubscriptions _subscriptions;
 
-        public TWSCallbacks(DataSubscriptions subscriptions, ILogger logger)
+        public IBCallbacks(ILogger logger)
         {
-            _subscriptions = subscriptions;
             _logger = logger;
         }
 
@@ -116,12 +114,13 @@ namespace TradingBot.Broker.Client
             PositionEnd?.Invoke();
         }
 
-        public event Action<PnL> PnlSingle;
+        public event Action<int, PnL> PnlSingle;
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             var pnl = new PnL()
             {
-                Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key,
+                //TODO : add contract
+                //Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key,
                 PositionAmount = pos,
                 MarketValue = value,
                 DailyPnL = dailyPnL,
@@ -130,16 +129,17 @@ namespace TradingBot.Broker.Client
             };
 
             _logger.LogDebug($"PnL : {pnl}");
-            PnlSingle?.Invoke(pnl);
+            PnlSingle?.Invoke(reqId, pnl);
         }
 
         // called at 5 sec intervals
-        public event Action<Contract, MarketData.Bar> RealtimeBar;
+        public event Action<int, MarketData.Bar> RealtimeBar;
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
-            var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
+            //TODO : add contract
+            //var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
 
-            RealtimeBar?.Invoke(contract, new MarketData.Bar()
+            RealtimeBar?.Invoke(reqId, new MarketData.Bar()
             {
                 BarLength = BarLength._5Sec,
                 Open = open,
@@ -152,10 +152,11 @@ namespace TradingBot.Broker.Client
             });
         }
 
-        public event Action<Contract, BidAsk> TickByTickBidAsk;
+        public event Action<int, BidAsk> TickByTickBidAsk;
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            var contract = _subscriptions.BidAsk.First(c => c.Value == reqId).Key;
+            //TODO : add contract
+            //var contract = _subscriptions.BidAsk.First(c => c.Value == reqId).Key;
 
             var bidAsk = new BidAsk()
             {
@@ -166,7 +167,7 @@ namespace TradingBot.Broker.Client
                 Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
             };
 
-            TickByTickBidAsk?.Invoke(contract, bidAsk);
+            TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
         public event Action<int, Contract> ContractDetails;
