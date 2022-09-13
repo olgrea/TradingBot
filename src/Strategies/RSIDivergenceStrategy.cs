@@ -57,8 +57,8 @@ namespace TradingBot.Strategies
             InitIndicators(_trader, BarLength._5Sec, RSIDivergence_5Sec);
 #endif
 
-            _trader.Broker.BarReceived[BarLength._1Min] += OnBarReceived;
-            _trader.Broker.BarReceived[BarLength._5Sec] += OnBarReceived;
+            _trader.Broker.Bar1MinReceived += OnBarReceived;
+            _trader.Broker.Bar5SecReceived += OnBarReceived;
             _trader.Broker.RequestBars(_trader.Contract, BarLength._1Min);
             _trader.Broker.RequestBars(_trader.Contract, BarLength._5Sec);
 
@@ -72,8 +72,8 @@ namespace TradingBot.Strategies
             RSIDivergence_5Sec.Reset();
             BollingerBands_1Min.Reset();
 
-            _trader.Broker.BarReceived[BarLength._1Min] -= OnBarReceived;
-            _trader.Broker.BarReceived[BarLength._5Sec] -= OnBarReceived;
+            _trader.Broker.Bar1MinReceived -= OnBarReceived;
+            _trader.Broker.Bar5SecReceived -= OnBarReceived;
             _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._1Min);
             _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._5Sec);
 

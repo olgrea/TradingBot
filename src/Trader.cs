@@ -183,8 +183,6 @@ namespace TradingBot
 
         public double GetAvailableFunds()
         {
-            // TODO : manage this better
-            //return 5000;
             return _USDCashBalance;
         }
 

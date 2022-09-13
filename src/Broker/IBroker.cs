@@ -19,7 +19,8 @@ namespace TradingBot.Broker
 
         event Action<Contract, BidAsk> BidAskReceived;
         event Action<string, string, string> AccountValueUpdated;
-        Dictionary<BarLength, EventElement<Contract, MarketData.Bar>> BarReceived { get;}
+        event Action<Contract, Bar> Bar5SecReceived;
+        event Action<Contract, Bar> Bar1MinReceived;
         event Action<Contract, Order, OrderState> OrderOpened;
         event Action<OrderStatus> OrderStatusChanged;
         event Action<Contract, OrderExecution> OrderExecuted;
