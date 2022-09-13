@@ -68,6 +68,115 @@ namespace Backtester
             StartPassingTimeTask();
         }
 
+        public void Stop()
+        {
+            StopPassingTimeTask();
+            StopAccountUpdateTask();
+        }
+
+        public void Connect(string host, int port, int clientId)
+        {
+            _client.Connect(host, port, clientId);
+        }
+
+        public void Disconnect()
+        {
+            _client.Disconnect();
+        }
+
+        public void PlaceOrder(Contract contract, Order order)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelOrder(int orderId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelAllOrders() { }
+
+        public void RequestAccount(string accountCode, bool receiveUpdates = true)
+        {
+            SendAccountUpdate(accountCode);
+            if (receiveUpdates)
+            {
+                StartAccountUpdateTask(accountCode);
+            }
+            else
+            {
+                StopAccountUpdateTask();
+            }
+        }
+
+        public void RequestContract(int reqId, Contract contract)
+        {
+            if (contract != _contract)
+                throw new InvalidOperationException();
+
+            var cd = new IBApi.ContractDetails();
+            cd.Contract = _contract.ToIBApiContract();
+            Callbacks.contractDetails(reqId, cd);
+            Callbacks.contractDetailsEnd(reqId);
+        }
+
+        public void RequestFiveSecondsBars(int reqId, Contract contract)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelFiveSecondsBarsRequest(int reqId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RequestOpenOrders()
+        {
+            foreach (var o in _openOrders)
+                Callbacks.openOrder(o.Id, _contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
+            Callbacks.openOrderEnd();
+        }
+
+        public void RequestPnL(int reqId, string accountCode, int contractId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelPnL(int contractId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RequestPositions()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelPositions()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RequestTickByTickData(int reqId, Contract contract, string tickType)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelTickByTickData(int reqId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RequestValidOrderIds()
+        {
+            throw new NotImplementedException();
+        }
+
         void StartPassingTimeTask()
         {
             _passingTimeCancellation = new CancellationTokenSource();
@@ -96,13 +205,6 @@ namespace Backtester
                 }
 
             }, mainToken);
-
-        }
-
-        public void Stop()
-        {
-            StopPassingTimeTask();
-            StopAccountUpdateTask();
         }
 
         void StopPassingTimeTask()
@@ -116,61 +218,6 @@ namespace Backtester
         void ClockTick(DateTime newTime)
         {
             _currentFakeTime = newTime;
-        }
-
-        public void CancelAllOrders() { }
-
-        public void CancelFiveSecondsBarsRequest(int reqId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelOrder(int orderId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelPnL(int contractId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelPositions()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelTickByTickData(int reqId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void Connect(string host, int port, int clientId)
-        {
-            _client.Connect(host, port, clientId);
-        }
-
-        public void Disconnect()
-        {
-            _client.Disconnect();
-        }
-
-        public void PlaceOrder(Contract contract, Order order)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestAccount(string accountCode, bool receiveUpdates = true)
-        {
-            SendAccountUpdate(accountCode);
-            if (receiveUpdates)
-            {
-                StartAccountUpdateTask(accountCode);
-            }
-            else
-            {
-                StopAccountUpdateTask();
-            }
         }
 
         void StopAccountUpdateTask()
@@ -224,54 +271,6 @@ namespace Backtester
             Callbacks.updateAccountTime(_currentFakeTime.ToString()); //TODO : make sure format is correct
             Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(), "USD", _fakeAccount.Code);
             Callbacks.accountDownloadEnd(accountCode);
-        }
-
-        public void RequestContract(int reqId, Contract contract)
-        {
-            if (contract != _contract)
-                throw new InvalidOperationException();
-
-            var cd = new IBApi.ContractDetails();
-            cd.Contract = _contract.ToIBApiContract();
-            Callbacks.contractDetails(reqId, cd);
-            Callbacks.contractDetailsEnd(reqId);
-        }
-
-        public void RequestFiveSecondsBars(int reqId, Contract contract)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestOpenOrders()
-        {
-            foreach (var o in _openOrders)
-                Callbacks.openOrder(o.Id, _contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
-            Callbacks.openOrderEnd();
-        }
-
-        public void RequestPnL(int reqId, string accountCode, int contractId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestPositions()
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestTickByTickData(int reqId, Contract contract, string tickType)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void RequestValidOrderIds()
-        {
-            throw new NotImplementedException();
         }
     }
 }
