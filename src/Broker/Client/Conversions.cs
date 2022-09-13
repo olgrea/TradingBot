@@ -189,8 +189,6 @@ namespace TradingBot.Broker.Client
                  ExecId = report.ExecId,   
                  Currency = report.Currency,
                  RealizedPNL = report.RealizedPNL,
-                 Yield = report.Yield,
-                 YieldRedemptionDate = report.YieldRedemptionDate
             };
         }
     }

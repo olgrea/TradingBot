@@ -178,7 +178,6 @@ namespace TradingBot.Broker
 
         public void Disconnect()
         {
-            // TODO : cancel subscription
             _client.Disconnect();
             ClientDisconnected?.Invoke();
         }
