@@ -19,9 +19,13 @@ namespace Backtester
         // Times are in ms
         static class TimeDelays
         {
-            public static double TimeFactor = 1;
-            public static int AccountUpdateInterval => (int)(3 * 60 * 1000 * TimeFactor);
+            public static double TimeScale = 1;
+            public static int OneSecond = (int)Math.Round(1 * 1000 * TimeScale);
+            public static int AccountUpdateInterval => (int)Math.Round(3 * 60 * 1000 * TimeScale);
         }
+
+        Task _passingTimeTask;
+        CancellationTokenSource _passingTimeCancellation;
 
         Account _fakeAccount;
         Task _accountUpdateTask;
@@ -57,12 +61,62 @@ namespace Backtester
             };
         }
 
+        public IBCallbacks Callbacks { get; }
+
         public void Start()
         {
+            StartPassingTimeTask();
+        }
+
+        void StartPassingTimeTask()
+        {
+            _passingTimeCancellation = new CancellationTokenSource();
+            var mainToken = _passingTimeCancellation.Token;
+            _passingTimeTask = Task.Factory.StartNew(() =>
+            {
+                var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
+                var delayToken = delayCancellation.Token;
+
+                while (!mainToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        Task.Delay(TimeDelays.OneSecond, delayToken);
+                        ClockTick(_currentFakeTime.AddSeconds(1));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        delayCancellation.Dispose();
+                        if(!mainToken.IsCancellationRequested)
+                        {
+                            delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
+                            delayToken = delayCancellation.Token;
+                        }
+                    }
+                }
+
+            }, mainToken);
 
         }
 
-        public IBCallbacks Callbacks { get; }
+        public void Stop()
+        {
+            StopPassingTimeTask();
+            StopAccountUpdateTask();
+        }
+
+        void StopPassingTimeTask()
+        {
+            _passingTimeCancellation.Cancel();
+            _passingTimeCancellation.Dispose();
+            _passingTimeCancellation = null;
+            _passingTimeTask = null;
+        }
+
+        void ClockTick(DateTime newTime)
+        {
+            _currentFakeTime = newTime;
+        }
 
         public void CancelAllOrders() { }
 
@@ -148,10 +202,15 @@ namespace Backtester
                     catch (OperationCanceledException)
                     {
                         _accountUpdateDelayCancellation.Dispose();
-                        _accountUpdateDelayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
-                        delayToken = _accountUpdateDelayCancellation.Token;
+                        if(!mainToken.IsCancellationRequested)
+                        {
+                            _accountUpdateDelayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
+                            delayToken = _accountUpdateDelayCancellation.Token;
+                        }
                     }
-                    SendAccountUpdate(accountCode);
+
+                    if(!mainToken.IsCancellationRequested)
+                        SendAccountUpdate(accountCode);
                 }
 
             }, mainToken);
