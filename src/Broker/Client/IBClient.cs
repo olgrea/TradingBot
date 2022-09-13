@@ -22,6 +22,16 @@ namespace TradingBot.Broker.Client
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
 
+#if BACKTESTING
+        public IBClient(IBCallbacks callbacks, ILogger logger)
+        {
+            _logger = logger;
+            _callbacks = callbacks;
+            _signal = new EReaderMonitorSignal();
+            _clientSocket = new EClientSocket(_callbacks, _signal);
+        }
+#endif
+
         public void Connect(string host, int port, int clientId)
         {
             _clientSocket.eConnect(host, port, clientId);

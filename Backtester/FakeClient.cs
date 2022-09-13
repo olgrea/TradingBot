@@ -16,32 +16,37 @@ namespace Backtester
 {
     internal class FakeClient : IIBClient
     {
+        // Times are in ms
         static class TimeDelays
         {
             public static double TimeFactor = 1;
-            // All in ms
             public static int AccountUpdateInterval => (int)(3 * 60 * 1000 * TimeFactor);
         }
-        DateTime _currentTime;
-
 
         Account _fakeAccount;
         Task _accountUpdateTask;
         CancellationTokenSource _accountUpdateCancellation;
         CancellationTokenSource _accountUpdateDelayCancellation;
 
+        //TODO : use IBApi classes?
         HashSet<Order> _openOrders;
         HashSet<Order> _executedOrders;
         Bar _latestBar;
 
+        DateTime _currentFakeTime;
+        Contract _contract;
         ILogger _logger;
+        IBClient _client;
 
-        public FakeClient(DateTime startTime, ILogger logger)
+        public FakeClient(DateTime startTime, Contract contract, ILogger logger)
         {
-            _currentTime = startTime;
+            _currentFakeTime = startTime;
+            _contract = contract;
+            _logger = logger;
 
             Callbacks = new IBCallbacks(logger);
-            _logger = logger;
+            _client = new IBClient(Callbacks, logger);
+
             _fakeAccount = new Account()
             {
                 Code = "FAKEACCOUNT123",
@@ -52,17 +57,14 @@ namespace Backtester
             };
         }
 
+        public void Start()
+        {
+
+        }
+
         public IBCallbacks Callbacks { get; }
 
-        public void FeedHistoricalData(Bar bar)
-        {
-            _latestBar = bar;
-        }
-
-        public void CancelAllOrders()
-        {
-            throw new NotImplementedException();
-        }
+        public void CancelAllOrders() { }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
         {
@@ -91,12 +93,12 @@ namespace Backtester
 
         public void Connect(string host, int port, int clientId)
         {
-            throw new NotImplementedException();
+            _client.Connect(host, port, clientId);
         }
 
         public void Disconnect()
         {
-            throw new NotImplementedException();
+            _client.Disconnect();
         }
 
         public void PlaceOrder(Contract contract, Order order)
@@ -113,14 +115,19 @@ namespace Backtester
             }
             else
             {
-                _accountUpdateCancellation.Cancel();
-                _accountUpdateCancellation.Dispose();
-                _accountUpdateDelayCancellation.Cancel();
-                _accountUpdateDelayCancellation.Dispose();
-                _accountUpdateCancellation = null;
-                _accountUpdateDelayCancellation = null;
-                _accountUpdateTask = null;
+                StopAccountUpdateTask();
             }
+        }
+
+        void StopAccountUpdateTask()
+        {
+            _accountUpdateCancellation.Cancel();
+            _accountUpdateCancellation.Dispose();
+            _accountUpdateDelayCancellation.Cancel();
+            _accountUpdateDelayCancellation.Dispose();
+            _accountUpdateCancellation = null;
+            _accountUpdateDelayCancellation = null;
+            _accountUpdateTask = null;
         }
 
         void StartAccountUpdateTask(string accountCode)
@@ -154,14 +161,21 @@ namespace Backtester
 
         void SendAccountUpdate(string accountCode)
         {
-            Callbacks.updateAccountTime(_currentTime.ToString()); //TODO : make sure format is correct
+            //TODO : insert delay between calls?
+            Callbacks.updateAccountTime(_currentFakeTime.ToString()); //TODO : make sure format is correct
             Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(), "USD", _fakeAccount.Code);
             Callbacks.accountDownloadEnd(accountCode);
         }
 
         public void RequestContract(int reqId, Contract contract)
         {
-            throw new NotImplementedException();
+            if (contract != _contract)
+                throw new InvalidOperationException();
+
+            var cd = new IBApi.ContractDetails();
+            cd.Contract = _contract.ToIBApiContract();
+            Callbacks.contractDetails(reqId, cd);
+            Callbacks.contractDetailsEnd(reqId);
         }
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)
@@ -176,7 +190,9 @@ namespace Backtester
 
         public void RequestOpenOrders()
         {
-            throw new NotImplementedException();
+            foreach (var o in _openOrders)
+                Callbacks.openOrder(o.Id, _contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
+            Callbacks.openOrderEnd();
         }
 
         public void RequestPnL(int reqId, string accountCode, int contractId)
