@@ -485,7 +485,7 @@ namespace TradingBot.Broker
             var reqId = NextRequestId;
 
             var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
-            SetupHistoricalDataCallbacks(tmpList, reqId, resolveResult);
+            SetupHistoricalDataCallbacks(tmpList, reqId, barLength, resolveResult);
 
             //string timeFormat = "yyyyMMdd-HH:mm:ss";
             string durationStr = null;
@@ -511,12 +511,13 @@ namespace TradingBot.Broker
             return resolveResult.Task;
         }
 
-        private void SetupHistoricalDataCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
+        private void SetupHistoricalDataCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
         {
             var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
             {
                 if (rId == reqId)
                 {
+                    bar.BarLength = barLength;
                     tmpList.AddLast(bar);
                 }
             });
