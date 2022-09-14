@@ -59,7 +59,7 @@ namespace HistoricalDataFetcher
                     }
                     nbRequest = 0;
                 }
-                else if (nbRequest % 5 == 0)
+                else if (nbRequest != 0 && nbRequest % 5 == 0)
                 {
                     logger.LogInfo($"{nbRequest} requests made : waiting 2 seconds...");
                     Task.Delay(2000);

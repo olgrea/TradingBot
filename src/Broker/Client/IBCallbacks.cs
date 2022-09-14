@@ -262,7 +262,7 @@ namespace TradingBot.Broker.Client
                 TradeAmount = bar.Count,
 
                 // non-standard date format...
-                Time = DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
             HistoricalData?.Invoke(reqId, b);
             _logger.LogDebug($"historicalData for : {bar.Time}");
