@@ -32,6 +32,8 @@ namespace TradingBot.Broker.Client
         }
 #endif
 
+        // TODO : really need to handle market data connection losses. It seems to happen everyday at around 8pm
+
         public void Connect(string host, int port, int clientId)
         {
             _clientSocket.eConnect(host, port, clientId);

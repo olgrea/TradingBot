@@ -12,29 +12,48 @@ namespace Backtester
 {
     internal class Backtester
     {
-        const int TimeScale = 1;
-
         DateTime _start;
         DateTime _end;
+
+        List<(DateTime, DateTime)> _marketDays;
+
+        FakeClient _fakeClient;
         IBClient _client;
         ILogger _logger;
+        string _ticker;
         Contract _contract;
 
         Dictionary<int, PnL> PnLs = new Dictionary<int, PnL>();
         Dictionary<DateTime, LinkedList<Bar>> _historicalData = new Dictionary<DateTime, LinkedList<Bar>>();
 
-        public Backtester(Contract contract, DateTime from, DateTime to, ILogger logger)
+        public Backtester(string ticker, DateTime from, DateTime to, ILogger logger)
         {
-            _contract = contract;
-            _start = from;
-            _end = to;
+            _ticker = ticker;
             _logger = logger;
-            _client = new IBClient(logger);
+            
+            _marketDays = GetMarketDays(from, to).ToList();
+
+            var callbacks = new IBCallbacks(logger);
+            _client = new IBClient(callbacks, logger);
+            _fakeClient = new FakeClient(_marketDays[0].Item1, _marketDays[0].Item2, _client, logger);
+        }
+
+        public void Start()
+        {
+            foreach(var day in _marketDays)
+            {
+
+            }
+        }
+
+        public void Stop()
+        {
+
         }
 
         bool IsWeekend(DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
-        public IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
+        IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
         {
             if (end <= start)
                 yield break;
@@ -80,16 +99,6 @@ namespace Backtester
                 //var barList = _client.GetHistoricalDataForDayAsync(_contract, day.Item2).Result;
                 //_historicalData.Add(day.Item1, barList);
             }
-        }
-
-        public void Start()
-        {
-
-        }
-
-        public void Stop()
-        {
-
         }
     }
 }
