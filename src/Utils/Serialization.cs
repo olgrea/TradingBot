@@ -7,13 +7,13 @@ namespace TradingBot.Utils
 {
     internal class Serialization
     {
-        public static LinkedList<Bar> DeserializeBars(string path)
+        public static IEnumerable<Bar> DeserializeBars(string path)
         {
             var json = File.ReadAllText(path);
-            return (LinkedList<Bar>)JsonSerializer.Deserialize(json, typeof(LinkedList<Bar>));
+            return (IEnumerable<Bar>)JsonSerializer.Deserialize(json, typeof(IEnumerable<Bar>));
         }
 
-        public static void SerializeBars(string path, LinkedList<Bar> bars)
+        public static void SerializeBars(string path, IEnumerable<Bar> bars)
         {
             var json = JsonSerializer.Serialize(bars);
             File.WriteAllText(path, json);

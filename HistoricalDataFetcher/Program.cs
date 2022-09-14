@@ -14,23 +14,28 @@ namespace HistoricalDataFetcher
     {
         public const string root = "historical";
         public static int nbRequest = 0;
+        public static IBBroker broker;
+        public static ConsoleLogger logger;
+
+        public static TimeSpan MarketStart = DateTimeUtils.MarketStartTime;
+        public static TimeSpan MarketEnd = DateTimeUtils.MarketEndTime;
 
         static void Main(string[] args)
         {
             string ticker = args[0];
             DateTime startDate = DateTime.Parse(args[1]);
-            DateTime endDate;
+            DateTime endDate = startDate;
             if (args.Length == 3)
                 endDate = DateTime.Parse(args[2]);
-                        
+
             // TWS API limitations. Pacing violation occurs when : 
             // - Making identical historical data requests within 15 seconds.
             // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
             // - Making more than 60 requests within any ten minute period.
             // Step sizes for 5 secs bars : 3600 S
 
-            var logger = new ConsoleLogger();
-            var broker = new IBBroker(321, new NoLogger());
+            logger = new ConsoleLogger();
+            broker = new IBBroker(321, new NoLogger());
             broker.Connect();
 
             var contract = broker.GetContract(ticker);
@@ -40,12 +45,33 @@ namespace HistoricalDataFetcher
             string tickerDir = Path.Combine(root, ticker);
             if (!Directory.Exists(tickerDir))
                 Directory.CreateDirectory(tickerDir);
+            
 
-            DateTime morning = new DateTime(startDate.Year, startDate.Month, startDate.Day, 7, 0, 0, DateTimeKind.Local);
-            DateTime current = new DateTime(startDate.Year, startDate.Month, startDate.Day, 16, 0, 0, DateTimeKind.Local);
+            if(startDate < endDate)
+            {
+                foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(startDate, endDate))
+                {
+                    GetDataForDay(pair.Item1, contract, tickerDir);
+                }
+            }
+            else
+            {
+                GetDataForDay(startDate, contract, tickerDir);
+            }
+        }
 
-            string tmpDir = Path.Combine(tickerDir, $"{startDate.ToString("yyyy-MM-dd")}");
+        private static void GetDataForDay(DateTime date, Contract contract, string tickerDir)
+        {
+            var marketStart = DateTimeUtils.MarketStartTime;
+            var marketEnd = DateTimeUtils.MarketEndTime;
+
+            DateTime morning = new DateTime(date.Year, date.Month, date.Day, marketStart.Hours, marketStart.Minutes, marketStart.Seconds, DateTimeKind.Local);
+            DateTime current = new DateTime(date.Year, date.Month, date.Day, marketEnd.Hours, marketEnd.Minutes, marketEnd.Seconds, DateTimeKind.Local);
+
+            string outDir = Path.Combine(tickerDir, $"{date.ToString("yyyy-MM-dd")}");
             IEnumerable<Bar> dailyBars = new LinkedList<Bar>();
+
+            logger.LogInfo($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             while (current >= morning)
             {
@@ -68,24 +94,30 @@ namespace HistoricalDataFetcher
                     Task.Delay(2000);
                 }
 
-                LinkedList<Bar> bars = GetHistoricalData(broker, contract, current, tmpDir);
+                LinkedList<Bar> bars = FetchHistoricalData(contract, current, outDir);
                 dailyBars = bars.Concat(dailyBars);
 
                 current = current.AddHours(-1);
                 nbRequest++;
             }
+
+            string filename = Path.Combine(outDir, $"full.json");
+            if (!File.Exists(filename))
+            {
+                Serialization.SerializeBars(filename, dailyBars);
+            }
         }
 
-        private static LinkedList<Bar> GetHistoricalData(IBBroker broker, Contract contract, DateTime current, string tmpDir)
+        private static LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current, string outDir)
         {
-            if (!Directory.Exists(tmpDir))
-                Directory.CreateDirectory(tmpDir);
+            if (!Directory.Exists(outDir))
+                Directory.CreateDirectory(outDir);
 
-            string filename = Path.Combine(tmpDir, $"{current.ToString("yyyy-MM-dd HH-mm-ss")}.json");
+            string filename = Path.Combine(outDir, $"{current.ToString("yyyy-MM-dd HH-mm-ss")}.json");
             LinkedList<Bar> bars;
             if (File.Exists(filename))
             {
-                bars = Serialization.DeserializeBars(filename);
+                bars = new LinkedList<Bar>(Serialization.DeserializeBars(filename));
             }
             else
             {

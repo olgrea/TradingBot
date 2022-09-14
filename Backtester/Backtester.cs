@@ -31,7 +31,7 @@ namespace Backtester
             _ticker = ticker;
             _logger = logger;
             
-            _marketDays = GetMarketDays(from, to).ToList();
+            _marketDays = DateTimeUtils.GetMarketDays(from, to).ToList();
 
             var callbacks = new IBCallbacks(logger);
             _client = new IBClient(callbacks, logger);
@@ -51,49 +51,11 @@ namespace Backtester
 
         }
 
-        bool IsWeekend(DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
-
-        IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
-        {
-            if (end <= start)
-                yield break;
-
-            DateTime marketStartTime = new DateTime(start.Year, start.Month, start.Day, 9, 30, 0);
-            DateTime marketEndTime = new DateTime(start.Year, start.Month, start.Day, 16, 0, 0);
-
-            if (start < marketStartTime)
-                start = marketStartTime;
-
-            int i = 0;
-            DateTime current = start;
-            while (current < end)
-            {
-                if (!IsWeekend(current))
-                {
-                    if (i == 0 && start < marketEndTime)
-                        yield return (start, marketEndTime);
-                    else if (i > 0)
-                        yield return (marketStartTime, marketEndTime);
-                }
-
-                current = current.AddDays(1);
-                marketStartTime = marketStartTime.AddDays(1);
-                marketEndTime = marketEndTime.AddDays(1);
-                i++;
-            }
-
-            if (!IsWeekend(end) && end > marketStartTime)
-            {
-                if (end > marketEndTime)
-                    end = marketEndTime;
-
-                yield return (marketStartTime, end);
-            }
-        }
+        
 
         public void FetchHistoricalData()
         {
-            var marketDays = GetMarketDays(_start, _end);
+            var marketDays = DateTimeUtils.GetMarketDays(_start, _end);
             foreach (var day in marketDays)
             {
                 //var barList = _client.GetHistoricalDataForDayAsync(_contract, day.Item2).Result;
