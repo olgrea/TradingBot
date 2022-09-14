@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using IBApi;
-
-namespace TradingBot.Broker
+﻿namespace TradingBot.Broker
 {
     internal enum OptionType
     {
@@ -12,7 +7,7 @@ namespace TradingBot.Broker
 
     internal abstract class Contract
     {
-        public int Id { get; set; } = -1;
+        public int Id { get; set; }
         public string Symbol { get; set; }
         public string SecType { get; set; }
         public string Exchange { get; set; }
