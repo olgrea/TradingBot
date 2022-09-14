@@ -88,7 +88,7 @@ namespace TradingBot.Strategies
 
             var longestPeriod = indicators.Max(i => i.NbPeriods);
 
-            var pastBars = trader.Broker.GetPastBars(trader.Contract, barLength, longestPeriod);
+            var pastBars = trader.Broker.GetPastBars(trader.Contract, barLength, longestPeriod).ToList();
 
             foreach (var indicator in indicators)
             {
