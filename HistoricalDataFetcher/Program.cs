@@ -28,12 +28,6 @@ namespace HistoricalDataFetcher
             if (args.Length == 3)
                 endDate = DateTime.Parse(args[2]);
 
-            // TWS API limitations. Pacing violation occurs when : 
-            // - Making identical historical data requests within 15 seconds.
-            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
-            // - Making more than 60 requests within any ten minute period.
-            // Step sizes for 5 secs bars : 3600 S
-
             logger = new ConsoleLogger();
             broker = new IBBroker(321, new NoLogger());
             broker.Connect();
@@ -58,6 +52,8 @@ namespace HistoricalDataFetcher
             {
                 GetDataForDay(startDate, contract, tickerDir);
             }
+
+            logger.LogInfo($"\nComplete!\n");
         }
 
         private static void GetDataForDay(DateTime date, Contract contract, string tickerDir)
@@ -72,6 +68,12 @@ namespace HistoricalDataFetcher
             IEnumerable<Bar> dailyBars = new LinkedList<Bar>();
 
             logger.LogInfo($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+
+            // TWS API limitations. Pacing violation occurs when : 
+            // - Making identical historical data requests within 15 seconds.
+            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
+            // - Making more than 60 requests within any ten minute period.
+            // Step sizes for 5 secs bars : 3600 S
 
             while (current >= morning)
             {
@@ -117,10 +119,12 @@ namespace HistoricalDataFetcher
             LinkedList<Bar> bars;
             if (File.Exists(filename))
             {
+                logger.LogInfo($"File '{filename}' exists. Restoring from dicks.");
                 bars = new LinkedList<Bar>(Serialization.DeserializeBars(filename));
             }
             else
             {
+                logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
                 bars = broker.GetHistoricalDataAsync(contract, BarLength._5Sec, $"{current.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 3600 / 5).Result;
             }
 
