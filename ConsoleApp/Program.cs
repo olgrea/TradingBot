@@ -18,13 +18,4 @@ namespace ConsoleApp
             trader.Stop();
         }
     }
-
-
-    internal class ConsoleLogger : ILogger
-    {
-        public void LogDebug(string message) => Console.WriteLine(message);
-        public void LogInfo(string message) => Console.WriteLine(message);
-        public void LogWarning(string message) => Console.Error.WriteLine(message);
-        public void LogError(string message) => Console.Error.WriteLine(message);
-    }
 }
