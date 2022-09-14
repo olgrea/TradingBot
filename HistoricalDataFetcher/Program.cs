@@ -13,16 +13,16 @@ namespace HistoricalDataFetcher
     internal class Program
     {
         public const string root = "historical";
+        public static int nbRequest = 0;
 
         static void Main(string[] args)
         {
             string ticker = args[0];
             DateTime startDate = DateTime.Parse(args[1]);
-
-            
-            if (!Directory.Exists(root))
-                Directory.CreateDirectory(root);
-
+            DateTime endDate;
+            if (args.Length == 3)
+                endDate = DateTime.Parse(args[2]);
+                        
             // TWS API limitations. Pacing violation occurs when : 
             // - Making identical historical data requests within 15 seconds.
             // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
@@ -30,18 +30,21 @@ namespace HistoricalDataFetcher
             // Step sizes for 5 secs bars : 3600 S
 
             var logger = new ConsoleLogger();
-            var broker = new IBBroker(321, logger);
+            var broker = new IBBroker(321, new NoLogger());
             broker.Connect();
 
             var contract = broker.GetContract(ticker);
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
-            int nbRequest = 0;
+            string tickerDir = Path.Combine(root, ticker);
+            if (!Directory.Exists(tickerDir))
+                Directory.CreateDirectory(tickerDir);
+
             DateTime morning = new DateTime(startDate.Year, startDate.Month, startDate.Day, 7, 0, 0, DateTimeKind.Local);
             DateTime current = new DateTime(startDate.Year, startDate.Month, startDate.Day, 16, 0, 0, DateTimeKind.Local);
 
-            string tmpDir = Path.Combine(root, $"{startDate.ToString("yyyy-MM-dd")}");
+            string tmpDir = Path.Combine(tickerDir, $"{startDate.ToString("yyyy-MM-dd")}");
             IEnumerable<Bar> dailyBars = new LinkedList<Bar>();
 
             while (current >= morning)
@@ -86,7 +89,7 @@ namespace HistoricalDataFetcher
             }
             else
             {
-                bars = broker.GetHistoricalDataAsync(contract, BarLength._5Sec, current.ToUniversalTime().ToString("yyyyMMdd-HH:mm:ss"), 3600 / 5).Result;
+                bars = broker.GetHistoricalDataAsync(contract, BarLength._5Sec, $"{current.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 3600 / 5).Result;
             }
 
             if (!File.Exists(filename))
