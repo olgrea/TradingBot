@@ -313,432 +313,292 @@ namespace TradingBot.Broker.Client
 
         #region Not Implemented
 
-        void EWrapper.accountDownloadEnd(string account)
+        public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.accountSummary(int reqId, string account, string tag, string value, string currency)
+        public void accountSummaryEnd(int reqId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.accountSummaryEnd(int reqId)
+        public void accountUpdateMulti(int requestId, string account, string modelCode, string key, string value, string currency)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.accountUpdateMulti(int requestId, string account, string modelCode, string key, string value, string currency)
+        public void accountUpdateMultiEnd(int requestId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.accountUpdateMultiEnd(int requestId)
+        public void bondContractDetails(int reqId, ContractDetails contract)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.bondContractDetails(int reqId, ContractDetails contract)
+        public void currentTime(long time)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.commissionReport(CommissionReport commissionReport)
+        public void deltaNeutralValidation(int reqId, DeltaNeutralContract deltaNeutralContract)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        public void displayGroupList(int reqId, string groups)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.completedOrdersEnd()
+        public void displayGroupUpdated(int reqId, string contractInfo)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.connectAck()
+        public void familyCodes(FamilyCode[] familyCodes)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.connectionClosed()
+        public void fundamentalData(int reqId, string data)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.contractDetails(int reqId, ContractDetails contractDetails)
+        public void headTimestamp(int reqId, string headTimestamp)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.contractDetailsEnd(int reqId)
+        public void histogramData(int reqId, HistogramEntry[] data)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.currentTime(long time)
+        public void historicalDataUpdate(int reqId, IBApi.Bar bar)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.deltaNeutralValidation(int reqId, DeltaNeutralContract deltaNeutralContract)
+        public void historicalNews(int requestId, string time, string providerCode, string articleId, string headline)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.displayGroupList(int reqId, string groups)
+        public void historicalNewsEnd(int requestId, bool hasMore)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.displayGroupUpdated(int reqId, string contractInfo)
+        public void historicalTicks(int reqId, HistoricalTick[] ticks, bool done)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.error(Exception e)
+        public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.error(string str)
+        public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.error(int id, int errorCode, string errorMsg)
+        public void marketDataType(int reqId, int marketDataType)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.execDetails(int reqId, IBApi.Contract contract, Execution execution)
+        public void marketRule(int marketRuleId, PriceIncrement[] priceIncrements)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.execDetailsEnd(int reqId)
+        public void mktDepthExchanges(DepthMktDataDescription[] depthMktDataDescriptions)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.familyCodes(FamilyCode[] familyCodes)
+        public void newsArticle(int requestId, int articleType, string articleText)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.fundamentalData(int reqId, string data)
+        public void newsProviders(NewsProvider[] newsProviders)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.headTimestamp(int reqId, string headTimestamp)
+        public void orderBound(long orderId, int apiClientId, int apiOrderId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.histogramData(int reqId, HistogramEntry[] data)
+        public void pnl(int reqId, double dailyPnL, double unrealizedPnL, double realizedPnL)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalData(int reqId, IBApi.Bar bar)
+        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, double pos, double avgCost)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalDataEnd(int reqId, string start, string end)
+        public void positionMultiEnd(int requestId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalDataUpdate(int reqId, IBApi.Bar bar)
+        public void receiveFA(int faDataType, string faXmlData)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalNews(int requestId, string time, string providerCode, string articleId, string headline)
+        public void replaceFAEnd(int reqId, string text)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalNewsEnd(int requestId, bool hasMore)
+        public void rerouteMktDataReq(int reqId, int conId, string exchange)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalTicks(int reqId, HistoricalTick[] ticks, bool done)
+        public void rerouteMktDepthReq(int reqId, int conId, string exchange)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
+        public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
+        public void scannerDataEnd(int reqId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.managedAccounts(string accountsList)
+        public void scannerParameters(string xml)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.marketDataType(int reqId, int marketDataType)
+        public void securityDefinitionOptionParameter(int reqId, string exchange, int underlyingConId, string tradingClass, string multiplier, HashSet<string> expirations, HashSet<double> strikes)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.marketRule(int marketRuleId, PriceIncrement[] priceIncrements)
+        public void securityDefinitionOptionParameterEnd(int reqId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.mktDepthExchanges(DepthMktDataDescription[] depthMktDataDescriptions)
+        public void smartComponents(int reqId, Dictionary<int, KeyValuePair<string, char>> theMap)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.newsArticle(int requestId, int articleType, string articleText)
+        public void softDollarTiers(int reqId, SoftDollarTier[] tiers)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.newsProviders(NewsProvider[] newsProviders)
+        public void symbolSamples(int reqId, ContractDescription[] contractDescriptions)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.nextValidId(int orderId)
+        public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        public void tickByTickMidPoint(int reqId, long time, double midPoint)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.openOrderEnd()
+        public void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.orderBound(long orderId, int apiClientId, int apiOrderId)
+        public void tickGeneric(int tickerId, int field, double value)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
+        public void tickNews(int tickerId, long timeStamp, string providerCode, string articleId, string headline, string extraData)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.pnl(int reqId, double dailyPnL, double unrealizedPnL, double realizedPnL)
+        public void tickOptionComputation(int tickerId, int field, int tickAttrib, double impliedVolatility, double delta, double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
+        public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.position(string account, IBApi.Contract contract, double pos, double avgCost)
+        public void tickReqParams(int tickerId, double minTick, string bboExchange, int snapshotPermissions)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.positionEnd()
+        public void tickSize(int tickerId, int field, int size)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, double pos, double avgCost)
+        public void tickSnapshotEnd(int tickerId)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.positionMultiEnd(int requestId)
+        public void tickString(int tickerId, int field, string value)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
+        public void updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.receiveFA(int faDataType, string faXmlData)
+        public void updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, int size, bool isSmartDepth)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.replaceFAEnd(int reqId, string text)
+        public void updateNewsBulletin(int msgId, int msgType, string message, string origExchange)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.rerouteMktDataReq(int reqId, int conId, string exchange)
+        public void verifyAndAuthCompleted(bool isSuccessful, string errorText)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.rerouteMktDepthReq(int reqId, int conId, string exchange)
+        public void verifyAndAuthMessageAPI(string apiData, string xyzChallenge)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
+        public void verifyCompleted(bool isSuccessful, string errorText)
         {
             throw new NotImplementedException();
         }
 
-        void EWrapper.scannerDataEnd(int reqId)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.scannerParameters(string xml)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.securityDefinitionOptionParameter(int reqId, string exchange, int underlyingConId, string tradingClass, string multiplier, HashSet<string> expirations, HashSet<double> strikes)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.securityDefinitionOptionParameterEnd(int reqId)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.smartComponents(int reqId, Dictionary<int, KeyValuePair<string, char>> theMap)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.softDollarTiers(int reqId, SoftDollarTier[] tiers)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.symbolSamples(int reqId, ContractDescription[] contractDescriptions)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickByTickMidPoint(int reqId, long time, double midPoint)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickGeneric(int tickerId, int field, double value)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickNews(int tickerId, long timeStamp, string providerCode, string articleId, string headline, string extraData)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickOptionComputation(int tickerId, int field, int tickAttrib, double impliedVolatility, double delta, double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickPrice(int tickerId, int field, double price, TickAttrib attribs)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickReqParams(int tickerId, double minTick, string bboExchange, int snapshotPermissions)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickSize(int tickerId, int field, int size)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickSnapshotEnd(int tickerId)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.tickString(int tickerId, int field, string value)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updateAccountTime(string timestamp)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updateAccountValue(string key, string value, string currency, string accountName)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, int size, bool isSmartDepth)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updateNewsBulletin(int msgId, int msgType, string message, string origExchange)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.verifyAndAuthCompleted(bool isSuccessful, string errorText)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.verifyAndAuthMessageAPI(string apiData, string xyzChallenge)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.verifyCompleted(bool isSuccessful, string errorText)
-        {
-            throw new NotImplementedException();
-        }
-
-        void EWrapper.verifyMessageAPI(string apiData)
+        public void verifyMessageAPI(string apiData)
         {
             throw new NotImplementedException();
         }
