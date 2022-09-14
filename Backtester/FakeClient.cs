@@ -37,19 +37,22 @@ namespace Backtester
         HashSet<Order> _executedOrders;
         Bar _latestBar;
 
+        DateTime _start;
+        DateTime _end;
         DateTime _currentFakeTime;
         Contract _contract;
         ILogger _logger;
         IBClient _client;
 
-        public FakeClient(DateTime startTime, Contract contract, ILogger logger)
+        public FakeClient(DateTime start, DateTime end, IBClient client, ILogger logger)
         {
-            _currentFakeTime = startTime;
-            _contract = contract;
+            _currentFakeTime = start;
+            _start = start;
+            _end = end; 
+
             _logger = logger;
 
-            Callbacks = new IBCallbacks(logger);
-            _client = new IBClient(Callbacks, logger);
+            _client = client;
 
             _fakeAccount = new Account()
             {
@@ -61,7 +64,7 @@ namespace Backtester
             };
         }
 
-        public IBCallbacks Callbacks { get; }
+        public IBCallbacks Callbacks => _client.Callbacks;
 
         public void Start()
         {
@@ -86,7 +89,18 @@ namespace Backtester
 
         public void PlaceOrder(Contract contract, Order order)
         {
-            throw new NotImplementedException();
+            if (contract != _contract)
+                throw new InvalidOperationException();
+
+            //TODO : make sure correct callbacks are called
+
+
+            // get price at current time
+
+            
+            // get actual commission using what if
+
+
         }
 
         public void CancelOrder(int orderId)
@@ -157,6 +171,7 @@ namespace Backtester
             throw new NotImplementedException();
         }
 
+        // TODO : I would really need 5 secs bars because of my architecture... Create a separate fetcher program?
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
             throw new NotImplementedException();
