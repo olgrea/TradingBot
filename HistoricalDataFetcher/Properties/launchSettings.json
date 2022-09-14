@@ -2,7 +2,7 @@
   "profiles": {
     "HistoricalDataFetcher": {
       "commandName": "Project",
-      "commandLineArgs": "GME 2020-09-12"
+      "commandLineArgs": "GME 2020-09-09"
     }
   }
 }
