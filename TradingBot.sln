@@ -10,9 +10,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "src\TradingBo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backtester", "Backtester\Backtester.csproj", "{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester", "Backtester\Backtester.csproj", "{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HistoricalDataFetcher", "HistoricalDataFetcher\HistoricalDataFetcher.csproj", "{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +47,12 @@ Global
 		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Backtesting|Any CPU.ActiveCfg = Debug|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Backtesting|Any CPU.Build.0 = Debug|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30880D34-8E8B-4D39-A6A1-C2C4D931DD29}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
