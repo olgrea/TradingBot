@@ -116,15 +116,23 @@ namespace HistoricalDataFetcher
                 }
                 else if (_nbRequest5 == 5)
                 {
-                    _logger.LogInfo($"{_nbRequest60} requests made : waiting 2 seconds...");
+                    _logger.LogInfo($"{_nbRequest5} requests made : waiting 2 seconds...");
                     Task.Delay(2000).Wait();
                     _nbRequest5 = 0;
                 }
 
                 LinkedList<Bar> bars = FetchHistoricalData(contract, current);
-                dailyBars = bars.Concat(dailyBars);
+
+                // TODO : better way to know if the market was opened?
+                // On market holidays, TWS seems to return the bars of the previous trading day.
+                if (bars != null && bars.Count > 0 && current.Date != bars.First.Value.Time.Date)
+                {
+                    _logger.LogInfo($"Possible market holiday on {date} (returned bars date mismatch). Skipping.");
+                    break;
+                }
 
                 current = current.AddHours(-1);
+                dailyBars = bars.Concat(dailyBars);
             }
 
             string filename = Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, date));
@@ -147,7 +155,8 @@ namespace HistoricalDataFetcher
                 _nbRequest60++;
                 _nbRequest5++;
 
-                BarsUtils.SerializeBars(filename, bars);
+                if (bars != null && bars.Count > 0 && current.Date == bars.First.Value.Time.Date)
+                    BarsUtils.SerializeBars(filename, bars);
             }
 
             return bars;

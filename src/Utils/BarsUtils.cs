@@ -20,7 +20,7 @@ namespace TradingBot.Utils
 
         public static void SerializeBars(string path, IEnumerable<Bar> bars)
         {
-            if(bars == null || !bars.Any())
+            if(bars == null)
                 throw new ArgumentNullException(nameof(bars));
 
             var dirPath = Path.GetDirectoryName(path);
