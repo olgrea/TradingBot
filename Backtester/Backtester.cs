@@ -10,6 +10,7 @@ using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
+using TradingBot.Strategies;
 using TradingBot.Utils;
 
 namespace Backtester
@@ -46,26 +47,29 @@ namespace Backtester
 
         public void Start()
         {
-            // TEST : time scaling
-            var day = _historicalData.First();
-            var fakeClient = new FakeClient(day.Key.Item1, day.Key.Item2, day.Value, _client, _logger);
-            var broker = new IBBroker(123, fakeClient, _logger);
-            broker.Connect();
-            var contract = broker.GetContract(_ticker);
-            broker.RequestBars(contract, BarLength._5Sec);
 
-            Console.ReadKey();
+            var fakeClient = new FakeClient(_client, _logger);
+            var broker = new IBBroker(1337, fakeClient, _logger);
+            Trader trader = new Trader("GME", broker, _logger);
+            trader.AddStrategyForTicker<RSIDivergenceStrategy>();
+            
+            foreach (var day in _historicalData)
+            {
+                // For backtesting, we need to have enough past bars to be able to initialize all indicators.
+                // So we will set the start time a couple seconds later, corresponding to the highest NbPeriods * BarLength;
+                var secondsToAdd = trader.Strategies.Max(s => s.Indicators.Max(i => i.NbPeriods * (int)i.BarLength));
+                fakeClient.Init(day.Key.Item1.AddSeconds(secondsToAdd), day.Key.Item2, day.Value);
+                
+                try
+                {
+                    trader.Start();
+                    fakeClient.WaitUntilDayIsOver();
+                }
+                catch (OperationCanceledException)
+                {
 
-            //foreach(var day in _historicalData)
-            //{
-
-            //    //var trader = new Trader(_ticker, broker, _logger);
-            //}
-        }
-
-        public void Stop()
-        {
-
+                }
+            }
         }
 
         public void LoadHistoricalData()
