@@ -1,5 +1,6 @@
 ﻿namespace TradingBot.Broker.Accounts
 {
+    //TODO : is this class really necessary?
     internal class PnL
     {
         public Contract Contract { get; set; }
