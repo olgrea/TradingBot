@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
+using MathNet.Numerics.LinearAlgebra.Factorization;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -12,8 +15,10 @@ namespace Backtester
 {
     internal class Backtester
     {
-        DateTime _start;
-        DateTime _end;
+        const string RootDir = @"D:\dev\repos\TradingBot\HistoricalDataFetcher\bin\Debug\netcoreapp3.1\historical";
+
+        DateTime _startTime;
+        DateTime _endTime;
 
         List<(DateTime, DateTime)> _marketDays;
 
@@ -26,16 +31,22 @@ namespace Backtester
         Dictionary<int, PnL> PnLs = new Dictionary<int, PnL>();
         Dictionary<DateTime, LinkedList<Bar>> _historicalData = new Dictionary<DateTime, LinkedList<Bar>>();
 
-        public Backtester(string ticker, DateTime start, DateTime end, ILogger logger)
+        public Backtester(string ticker, DateTime startDate, DateTime endDate, ILogger logger)
         {
             _ticker = ticker;
-            _logger = logger;
+
+            var marketStartTime = DateTimeUtils.MarketStartTime;
+            var marketEndTime = DateTimeUtils.MarketEndTime;
+            _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
+            _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
             
-            _marketDays = DateTimeUtils.GetMarketDays(start, end).ToList();
+            _logger = logger;
+            LoadHistoricalData();
 
             var callbacks = new IBCallbacks(logger);
             _client = new IBClient(callbacks, logger);
-            _fakeClient = new FakeClient(_marketDays[0].Item1, _marketDays[0].Item2, _client, logger);
+
+            //_fakeClient = new FakeClient(_marketDays[0].Item1, _marketDays[0].Item2, _client, logger);
         }
 
         public void Start()
@@ -50,15 +61,14 @@ namespace Backtester
         {
 
         }
-        
 
-        public void FetchHistoricalData()
+        public void LoadHistoricalData()
         {
-            var marketDays = DateTimeUtils.GetMarketDays(_start, _end);
-            foreach (var day in marketDays)
+            _marketDays = DateTimeUtils.GetMarketDays(_startTime, _endTime).ToList();
+            foreach (var day in _marketDays)
             {
-                //var barList = _client.GetHistoricalDataForDayAsync(_contract, day.Item2).Result;
-                //_historicalData.Add(day.Item1, barList);
+                var barList = BarsUtils.DeserializeBars(Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, day.Item1)));
+                _historicalData.Add(day.Item1, new LinkedList<Bar>(barList));
             }
         }
     }

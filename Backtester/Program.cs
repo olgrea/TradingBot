@@ -10,13 +10,14 @@ namespace Backtester
 
         static void Main(string[] args)
         {
-            DateTime start = new DateTime(2022, 9, 1, 15, 5, 5);
-            DateTime end = new DateTime(2022, 9, 9, 10, 5, 5);
-            var bt = new Backtester("GME", start, end, new ConsoleLogger());
+            string ticker = args[0];
+            DateTime startDate = DateTime.Parse(args[1]);
+            DateTime endDate = startDate;
+            if (args.Length == 3)
+                endDate = DateTime.Parse(args[2]);
 
+            var bt = new Backtester(ticker, startDate, endDate, new ConsoleLogger());
             bt.Start();
-
-            Console.ReadKey();
         }
     }
 }
