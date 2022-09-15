@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Backtester": {
+      "commandName": "Project",
+      "commandLineArgs": "GME 2022-08-29 2022-09-02"
+    }
+  }
+}
