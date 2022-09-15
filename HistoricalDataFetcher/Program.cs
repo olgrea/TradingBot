@@ -27,9 +27,18 @@ namespace HistoricalDataFetcher
     internal class HistoricalDataFetcher
     {
         public const string RootDir = "historical";
-        
-        public int _nbRequest60 = 0;
-        public int _nbRequest5 = 0;
+
+        public int _nbRequest = 0;
+
+        public int NbRequest
+        {
+            get => _nbRequest;
+            set
+            {
+                _nbRequest = value;
+                CheckForPacingViolations();
+            }
+        }
 
         public IBBroker _broker;
         public ConsoleLogger _logger;
@@ -70,18 +79,20 @@ namespace HistoricalDataFetcher
             {
                 foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
                 {
-                    GetDataForDay(pair.Item1, contract);
+                    GetDataForDay<Bar>(pair.Item1, contract);
+                    GetDataForDay<BidAsk>(pair.Item1, contract);
                 }
             }
             else
             {
-                GetDataForDay(_startDate, contract);
+                GetDataForDay<Bar>(_startDate, contract);
+                GetDataForDay<BidAsk>(_startDate, contract);
             }
 
             _logger.LogInfo($"\nComplete!\n");
         }
 
-        void GetDataForDay(DateTime date, Contract contract)
+        void GetDataForDay<TData>(DateTime date, Contract contract) where TData : IMarketData, new()
         {
             var marketStart = DateTimeUtils.MarketStartTime;
             var marketEnd = DateTimeUtils.MarketEndTime;
@@ -89,79 +100,107 @@ namespace HistoricalDataFetcher
             DateTime morning = new DateTime(date.Year, date.Month, date.Day, marketStart.Hours, marketStart.Minutes, marketStart.Seconds, DateTimeKind.Local);
             DateTime current = new DateTime(date.Year, date.Month, date.Day, marketEnd.Hours, marketEnd.Minutes, marketEnd.Seconds, DateTimeKind.Local);
             
-            IEnumerable<Bar> dailyBars = new LinkedList<Bar>();
+            IEnumerable<TData> dailyData = new LinkedList<TData>();
             _logger.LogInfo($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
-
-            // TWS API limitations. Pacing violation occurs when : 
-            // - Making identical historical data requests within 15 seconds.
-            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
-            // - Making more than 60 requests within any ten minute period.
-            // Step sizes for 5 secs bars : 3600 S
 
             while (current >= morning)
             {
-                if (_nbRequest60 == 60)
-                {
-                    _logger.LogInfo($"60 requests made : waiting 10 minutes...");
-                    for (int i = 0; i < 10; ++i)
-                    {
-                        Task.Delay(60 * 1000).Wait();
-                        if (i < 9)
-                            _logger.LogInfo($"{9 - i} minutes left...");
-                        else
-                            _logger.LogInfo($"Resuming historical data fetching");
-                    }
-                    _nbRequest60 = 0;
-                    _nbRequest5 = 0;
-                }
-                else if (_nbRequest5 == 5)
-                {
-                    _logger.LogInfo($"{_nbRequest5} requests made : waiting 2 seconds...");
-                    Task.Delay(2000).Wait();
-                    _nbRequest5 = 0;
-                }
+                CheckForPacingViolations();
 
-                LinkedList<Bar> bars = FetchHistoricalData(contract, current);
+                LinkedList<TData> data = FetchHistoricalData<TData>(contract, current);
 
                 // TODO : better way to know if the market was opened?
                 // On market holidays, TWS seems to return the bars of the previous trading day.
-                var bar = bars.FirstOrDefault();
-                if (bar != null && current.Date != bar.Time.Date)
+                var d = data.FirstOrDefault();
+                if (d != null && current.Date != d.Time.Date)
                 {
-                    _logger.LogInfo($"Possible market holiday on {date} (returned bars date mismatch). Skipping.");
+                    _logger.LogInfo($"Possible market holiday on {date} (returned data time mismatch). Skipping.");
                     break;
                 }
 
                 current = current.AddHours(-1);
-                dailyBars = bars.Concat(dailyBars);
+                dailyData = data.Concat(dailyData);
             }
 
-            string filename = Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, date));
-            BarsUtils.SerializeBars(filename, dailyBars);
+            string filename = Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<TData>(_ticker, date));
+            MarketDataUtils.SerializeData(filename, dailyData);
         }
 
-        LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current)
+        private void CheckForPacingViolations()
         {
-            string filename = Path.Combine(RootDir, BarsUtils.MakeHourlyBarsPath(contract.Symbol, current));
-            LinkedList<Bar> bars;
+            // TWS API limitations. Pacing violation occurs when : 
+            // - Making identical historical data requests within 15 seconds.
+            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
+            // - Making more than 60 requests within any ten minute period.
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+
+            if (NbRequest == 60)
+            {
+                _logger.LogInfo($"60 requests made : waiting 10 minutes...");
+                for (int i = 0; i < 10; ++i)
+                {
+                    Task.Delay(60 * 1000).Wait();
+                    if (i < 9)
+                        _logger.LogInfo($"{9 - i} minutes left...");
+                    else
+                        _logger.LogInfo($"Resuming historical data fetching");
+                }
+                NbRequest = 0;
+            }
+            else if (NbRequest != 0 && NbRequest % 5 == 0)
+            {
+                _logger.LogInfo($"{NbRequest} requests made : waiting 2 seconds...");
+                Task.Delay(2000).Wait();
+            }
+        }
+
+        LinkedList<TData> FetchHistoricalData<TData>(Contract contract, DateTime current) where TData : IMarketData, new()
+        {
+            string filename = Path.Combine(RootDir, MarketDataUtils.MakeHourlyDataPath<TData>(contract.Symbol, current));
+            LinkedList<TData> data;
             if (File.Exists(filename))
             {
                 _logger.LogInfo($"File '{filename}' exists. Restoring from dicks.");
-                bars = new LinkedList<Bar>(BarsUtils.DeserializeBars(filename));
+                data = new LinkedList<TData>(MarketDataUtils.DeserializeData<TData>(filename));
             }
             else
             {
-                _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
-                bars = _broker.GetHistoricalDataAsync(contract, BarLength._5Sec, $"{current.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 3600 / 5).Result;
-                _nbRequest60++;
-                _nbRequest5++;
+                data = Fetch<TData>(filename, contract, current);
 
-                var bar = bars.FirstOrDefault();
-                if (bar != null && current.Date == bar.Time.Date)
-                    BarsUtils.SerializeBars(filename, bars);
+                var d = data.FirstOrDefault();
+                if (d != null && current.Date == d.Time.Date)
+                    MarketDataUtils.SerializeData(filename, data);
             }
 
-            return bars;
+            return data;
+        }
+
+        LinkedList<TData> Fetch<TData>(string filename, Contract contract, DateTime current) where TData : IMarketData, new()
+        {
+            if (typeof(TData) == typeof(Bar))
+            {
+                _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
+                var bars = _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, current, 1800).Result;
+                
+                NbRequest++;
+                return new LinkedList<TData>(bars.Cast<TData>());
+            }
+            else if (typeof(TData) == typeof(BidAsk))
+            {
+
+                _logger.LogInfo($"Retrieving bid ask from TWS for '{filename}'.");
+                //var bidask = _broker.GetPastBidAsks(contract, current);
+
+                // Note that when BID_ASK historical data is requested, each request is counted twice
+                NbRequest++;
+                NbRequest++;
+
+                return new LinkedList<TData>(bidask.Cast<TData>());
+            }
+
+            return new LinkedList<TData>();
         }
     }
 }
+
+

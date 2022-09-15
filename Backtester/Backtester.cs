@@ -76,7 +76,7 @@ namespace Backtester
         {
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
-                var barList = BarsUtils.DeserializeBars(Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, day.Item1)));
+                var barList = MarketDataUtils.DeserializeData<Bar>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<Bar>(_ticker, day.Item1)));
                 _historicalData.Add(day, new LinkedList<Bar>(barList));
             }
         }
