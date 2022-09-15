@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -17,12 +18,17 @@ namespace Backtester
 {
     internal class FakeClient : IIBClient
     {
-        // Times are in ms
+        /// <summary>
+        /// For supposed market hours 7:00 to 16:00 : 9 hours = 32400s
+        /// - To have 1 day pass in 1 hour => TimeScale = 3600.0d/32400 ~ 111 ms/sec
+        /// - To have 1 week (5 days) pass in 1 hour => TimeScale = 3600.0d/162000 ~ 22 ms/sec
+        /// </summary>
         static class TimeDelays
         {
-            public static double TimeScale = 1;
+            public static double TimeScale = 3600.0d / 32400;
             public static int OneSecond = (int)Math.Round(1 * 1000 * TimeScale);
         }
+        Stopwatch _st = new Stopwatch();
 
         ConcurrentQueue<Action> _messageQueue;
         Task _consumerTask;
@@ -39,17 +45,16 @@ namespace Backtester
         Account _fakeAccount;
 
         //TODO : use IBApi classes?
-        HashSet<Order> _openOrders;
-        HashSet<Order> _executedOrders;
+        Dictionary<Contract, Order> _openOrders;
+        Dictionary<Contract, Order> _executedOrders;
 
         LinkedList<Bar> _dailyBars;
         LinkedListNode<Bar> _currentBarNode;
 
-        Contract _contract;
         ILogger _logger;
         IBClient _client;
 
-        int _reqId5SecBar = -1;
+        int _reqId5SecBar = -1;      
 
         public FakeClient(DateTime start, DateTime end, IEnumerable<Bar> dailyBars, IBClient client, ILogger logger)
         {
@@ -74,13 +79,25 @@ namespace Backtester
 
         public IBCallbacks Callbacks => _client.Callbacks;
 
-        public void Start()
+        public void Connect(string host, int port, int clientId)
+        {
+            _client.Connect(host, port, clientId);
+            Start();
+        }
+
+        public void Disconnect()
+        {
+            Stop();
+            _client.Disconnect();
+        }
+
+        void Start()
         {
             StartConsumerTask();
             StartPassingTimeTask();
         }
 
-        public void Stop()
+        void Stop()
         {
             CancelSubscriptions();
             StopPassingTimeTask();
@@ -125,6 +142,7 @@ namespace Backtester
                 var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
                 var delayToken = delayCancellation.Token;
 
+                _st.Start();
                 while (!mainToken.IsCancellationRequested)
                 {
                     try
@@ -152,26 +170,15 @@ namespace Backtester
 
         void StopPassingTimeTask()
         {
+            _st.Stop();
             _passingTimeCancellation.Cancel();
             _passingTimeCancellation.Dispose();
             _passingTimeCancellation = null;
             _passingTimeTask = null;
         }
 
-        public void Connect(string host, int port, int clientId)
-        {
-            _client.Connect(host, port, clientId);
-        }
-
-        public void Disconnect()
-        {
-            _client.Disconnect();
-        }
-
         public void PlaceOrder(Contract contract, Order order)
         {
-            if (contract != _contract)
-                throw new InvalidOperationException();
 
             //TODO : make sure correct callbacks are called
 
@@ -234,11 +241,8 @@ namespace Backtester
 
         public void RequestContract(int reqId, Contract contract)
         {
-            if (contract != _contract)
-                throw new InvalidOperationException();
-
             var cd = new IBApi.ContractDetails();
-            cd.Contract = _contract.ToIBApiContract();
+            cd.Contract = contract.ToIBApiContract();
 
             _messageQueue.Enqueue(() => 
             { 
@@ -249,15 +253,15 @@ namespace Backtester
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)
         {
-            if (contract != _contract)
-                throw new InvalidOperationException();
-
             _reqId5SecBar = reqId;
             ClockTick += OnClockTick_FiveSecondBar;
         }
 
         void OnClockTick_FiveSecondBar(DateTime newTime)
         {
+            var elapsed = _st.ElapsedMilliseconds;
+            //_logger.LogDebug($"newTime={newTime}\t{elapsed}");
+
             var b = _currentBarNode.Value;
             _messageQueue.Enqueue(() => 
             {
@@ -278,7 +282,7 @@ namespace Backtester
             _messageQueue.Enqueue(() =>
             {
                 foreach (var o in openOrders)
-                    Callbacks.openOrder(o.Id, _contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
+                    Callbacks.openOrder(o.Value.Id, o.Key.ToIBApiContract(), o.Value.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
                 Callbacks.openOrderEnd();
             });
         }

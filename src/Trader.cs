@@ -42,6 +42,7 @@ namespace TradingBot
         internal Trader(string ticker, IBroker broker, ILogger logger)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
+            Trace.Assert(broker != null);
 
             _ticker = ticker;
             _logger = logger;

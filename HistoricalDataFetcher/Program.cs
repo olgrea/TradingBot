@@ -125,7 +125,8 @@ namespace HistoricalDataFetcher
 
                 // TODO : better way to know if the market was opened?
                 // On market holidays, TWS seems to return the bars of the previous trading day.
-                if (bars != null && bars.Count > 0 && current.Date != bars.First.Value.Time.Date)
+                var bar = bars.FirstOrDefault();
+                if (bar != null && current.Date != bar.Time.Date)
                 {
                     _logger.LogInfo($"Possible market holiday on {date} (returned bars date mismatch). Skipping.");
                     break;
@@ -155,7 +156,8 @@ namespace HistoricalDataFetcher
                 _nbRequest60++;
                 _nbRequest5++;
 
-                if (bars != null && bars.Count > 0 && current.Date == bars.First.Value.Time.Date)
+                var bar = bars.FirstOrDefault();
+                if (bar != null && current.Date == bar.Time.Date)
                     BarsUtils.SerializeBars(filename, bars);
             }
 

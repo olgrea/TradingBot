@@ -24,10 +24,10 @@ namespace TradingBot.Broker
 
     internal class IBBroker : IBroker
     {
-        static HashSet<int> _clientIds = new HashSet<int>();
+        public const int DefaultPort = 7496;
+        public const string DefaultIP = "127.0.0.1";
 
-        const int DefaultPort = 7496;
-        const string DefaultIP = "127.0.0.1";
+        static HashSet<int> _clientIds = new HashSet<int>();
         
         int _clientId = 1337;
         int _nextValidOrderId = -1;
@@ -43,7 +43,11 @@ namespace TradingBot.Broker
         int NextRequestId => _reqId++;
         int NextValidOrderId => _nextValidOrderId++;
 
-        public IBBroker(int clientId, ILogger logger)
+        public IBBroker(int clientId, ILogger logger) : this(clientId, new IBClient(logger), logger)
+        {
+        }
+
+        internal IBBroker(int clientId, IIBClient client, ILogger logger)
         {
             if (_clientIds.Contains(clientId))
                 throw new ArgumentException($"The client id {clientId} is already assigned.");
@@ -52,7 +56,8 @@ namespace TradingBot.Broker
             _clientIds.Add(clientId);
             
             _subscriptions = new DataSubscriptions();
-            _client = new IBClient(logger);
+
+            _client = client;
             _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
             _client.Callbacks.PnlSingle += PnlSingle;
             _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
