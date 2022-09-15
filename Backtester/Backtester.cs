@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using MathNet.Numerics.LinearAlgebra.Factorization;
+using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -20,16 +21,12 @@ namespace Backtester
         DateTime _startTime;
         DateTime _endTime;
 
-        List<(DateTime, DateTime)> _marketDays;
-
-        FakeClient _fakeClient;
         IBClient _client;
         ILogger _logger;
         string _ticker;
-        Contract _contract;
 
-        Dictionary<int, PnL> PnLs = new Dictionary<int, PnL>();
-        Dictionary<DateTime, LinkedList<Bar>> _historicalData = new Dictionary<DateTime, LinkedList<Bar>>();
+        Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
+        Dictionary<(DateTime, DateTime), LinkedList<Bar>> _historicalData = new Dictionary<(DateTime, DateTime), LinkedList<Bar>>();
 
         public Backtester(string ticker, DateTime startDate, DateTime endDate, ILogger logger)
         {
@@ -45,16 +42,25 @@ namespace Backtester
 
             var callbacks = new IBCallbacks(logger);
             _client = new IBClient(callbacks, logger);
-
-            //_fakeClient = new FakeClient(_marketDays[0].Item1, _marketDays[0].Item2, _client, logger);
         }
 
         public void Start()
         {
-            foreach(var day in _marketDays)
-            {
+            // TEST : time scaling
+            var day = _historicalData.First();
+            var fakeClient = new FakeClient(day.Key.Item1, day.Key.Item2, day.Value, _client, _logger);
+            var broker = new IBBroker(123, fakeClient, _logger);
+            broker.Connect();
+            var contract = broker.GetContract(_ticker);
+            broker.RequestBars(contract, BarLength._5Sec);
 
-            }
+            Console.ReadKey();
+
+            //foreach(var day in _historicalData)
+            //{
+
+            //    //var trader = new Trader(_ticker, broker, _logger);
+            //}
         }
 
         public void Stop()
@@ -64,11 +70,10 @@ namespace Backtester
 
         public void LoadHistoricalData()
         {
-            _marketDays = DateTimeUtils.GetMarketDays(_startTime, _endTime).ToList();
-            foreach (var day in _marketDays)
+            foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
                 var barList = BarsUtils.DeserializeBars(Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, day.Item1)));
-                _historicalData.Add(day.Item1, new LinkedList<Bar>(barList));
+                _historicalData.Add(day, new LinkedList<Bar>(barList));
             }
         }
     }
