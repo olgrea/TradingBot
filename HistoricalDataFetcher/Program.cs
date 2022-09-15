@@ -27,7 +27,10 @@ namespace HistoricalDataFetcher
     internal class HistoricalDataFetcher
     {
         public const string RootDir = "historical";
-        public int _nbRequest = 0;
+        
+        public int _nbRequest60 = 0;
+        public int _nbRequest5 = 0;
+
         public IBBroker _broker;
         public ConsoleLogger _logger;
 
@@ -41,8 +44,12 @@ namespace HistoricalDataFetcher
         public HistoricalDataFetcher(string ticker, DateTime start, DateTime end)
         {
             _ticker = ticker;
-            _startDate = start;
-            _endDate = end;
+
+            var marketStartTime = DateTimeUtils.MarketStartTime;
+            var marketEndTime = DateTimeUtils.MarketEndTime;
+            _startDate = new DateTime(start.Year, start.Month, start.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
+            _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
+
             _logger = new ConsoleLogger();
             _broker = new IBBroker(321, new NoLogger());
         }
@@ -93,7 +100,7 @@ namespace HistoricalDataFetcher
 
             while (current >= morning)
             {
-                if (_nbRequest == 60)
+                if (_nbRequest60 == 60)
                 {
                     _logger.LogInfo($"60 requests made : waiting 10 minutes...");
                     for (int i = 0; i < 10; ++i)
@@ -104,12 +111,14 @@ namespace HistoricalDataFetcher
                         else
                             _logger.LogInfo($"Resuming historical data fetching");
                     }
-                    _nbRequest = 0;
+                    _nbRequest60 = 0;
+                    _nbRequest5 = 0;
                 }
-                else if (_nbRequest != 0 && _nbRequest % 5 == 0)
+                else if (_nbRequest5 == 5)
                 {
-                    _logger.LogInfo($"{_nbRequest} requests made : waiting 2 seconds...");
-                    Task.Delay(2000).Wait(); 
+                    _logger.LogInfo($"{_nbRequest60} requests made : waiting 2 seconds...");
+                    Task.Delay(2000).Wait();
+                    _nbRequest5 = 0;
                 }
 
                 LinkedList<Bar> bars = FetchHistoricalData(contract, current);
@@ -135,7 +144,8 @@ namespace HistoricalDataFetcher
             {
                 _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
                 bars = _broker.GetHistoricalDataAsync(contract, BarLength._5Sec, $"{current.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 3600 / 5).Result;
-                _nbRequest++;
+                _nbRequest60++;
+                _nbRequest5++;
 
                 BarsUtils.SerializeBars(filename, bars);
             }
