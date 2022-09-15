@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
@@ -27,7 +26,7 @@ namespace HistoricalDataFetcher
 
     internal class HistoricalDataFetcher
     {
-        public const string root = "historical";
+        public const string RootDir = "historical";
         public int _nbRequest = 0;
         public IBBroker _broker;
         public ConsoleLogger _logger;
@@ -56,37 +55,34 @@ namespace HistoricalDataFetcher
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {_ticker}");
 
-            string tickerDir = Path.Combine(root, _ticker);
+            string tickerDir = Path.Combine(RootDir, _ticker);
             if (!Directory.Exists(tickerDir))
                 Directory.CreateDirectory(tickerDir);
-            
 
             if(_startDate < _endDate)
             {
                 foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
                 {
-                    GetDataForDay(pair.Item1, contract, tickerDir);
+                    GetDataForDay(pair.Item1, contract);
                 }
             }
             else
             {
-                GetDataForDay(_startDate, contract, tickerDir);
+                GetDataForDay(_startDate, contract);
             }
 
             _logger.LogInfo($"\nComplete!\n");
         }
 
-        void GetDataForDay(DateTime date, Contract contract, string tickerDir)
+        void GetDataForDay(DateTime date, Contract contract)
         {
             var marketStart = DateTimeUtils.MarketStartTime;
             var marketEnd = DateTimeUtils.MarketEndTime;
 
             DateTime morning = new DateTime(date.Year, date.Month, date.Day, marketStart.Hours, marketStart.Minutes, marketStart.Seconds, DateTimeKind.Local);
             DateTime current = new DateTime(date.Year, date.Month, date.Day, marketEnd.Hours, marketEnd.Minutes, marketEnd.Seconds, DateTimeKind.Local);
-
-            string outDir = Path.Combine(tickerDir, $"{date.ToString("yyyy-MM-dd")}");
+            
             IEnumerable<Bar> dailyBars = new LinkedList<Bar>();
-
             _logger.LogInfo($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             // TWS API limitations. Pacing violation occurs when : 
@@ -116,25 +112,19 @@ namespace HistoricalDataFetcher
                     Task.Delay(2000).Wait(); 
                 }
 
-                LinkedList<Bar> bars = FetchHistoricalData(contract, current, outDir);
+                LinkedList<Bar> bars = FetchHistoricalData(contract, current);
                 dailyBars = bars.Concat(dailyBars);
 
                 current = current.AddHours(-1);
             }
 
-            string filename = Path.Combine(outDir, $"full.json");
-            if (!File.Exists(filename))
-            {
-                BarsUtils.SerializeBars(filename, dailyBars);
-            }
+            string filename = Path.Combine(RootDir, BarsUtils.MakeDailyBarsPath(_ticker, date));
+            BarsUtils.SerializeBars(filename, dailyBars);
         }
 
-        LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current, string outDir)
+        LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current)
         {
-            if (!Directory.Exists(outDir))
-                Directory.CreateDirectory(outDir);
-
-            string filename = Path.Combine(outDir, $"{current.ToString("yyyy-MM-dd HH-mm-ss")}.json");
+            string filename = Path.Combine(RootDir, BarsUtils.MakeHourlyBarsPath(contract.Symbol, current));
             LinkedList<Bar> bars;
             if (File.Exists(filename))
             {
@@ -146,10 +136,7 @@ namespace HistoricalDataFetcher
                 _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
                 bars = _broker.GetHistoricalDataAsync(contract, BarLength._5Sec, $"{current.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 3600 / 5).Result;
                 _nbRequest++;
-            }
 
-            if (!File.Exists(filename))
-            {
                 BarsUtils.SerializeBars(filename, bars);
             }
 

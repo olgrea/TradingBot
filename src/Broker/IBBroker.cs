@@ -350,8 +350,7 @@ namespace TradingBot.Broker
                 int sec = (int)barLength;
                 if (list.Count > (sec / 5) + 1 && (bar.Time.Second % sec) == 0)
                 {
-                    var newBar = MakeBar(list, sec);
-                    newBar.BarLength = barLength;
+                    var newBar = BarsUtils.MakeBar(list, barLength);
                     InvokeCallbacks(contract, newBar);
                 }
             }
@@ -376,38 +375,38 @@ namespace TradingBot.Broker
             }
         }
 
-        MarketData.Bar MakeBar(LinkedList<MarketData.Bar> list, int seconds)
-        {
-            MarketData.Bar bar = new MarketData.Bar() { High = double.MinValue, Low = double.MaxValue};
-            var e = list.GetEnumerator();
-            e.MoveNext();
+        //MarketData.Bar MakeBar(LinkedList<MarketData.Bar> list, int seconds)
+        //{
+        //    MarketData.Bar bar = new MarketData.Bar() { High = double.MinValue, Low = double.MaxValue};
+        //    var e = list.GetEnumerator();
+        //    e.MoveNext();
 
-            // The 1st bar shouldn't be included.
-            e.MoveNext();
+        //    // The 1st bar shouldn't be included.
+        //    e.MoveNext();
 
-            int nbBars = seconds / 5;
-            for (int i = 0; i < nbBars; i++, e.MoveNext())
-            {
-                MarketData.Bar current = e.Current;
-                if(i == 0)
-                {
-                    bar.Close = current.Close;
-                }
+        //    int nbBars = seconds / 5;
+        //    for (int i = 0; i < nbBars; i++, e.MoveNext())
+        //    {
+        //        MarketData.Bar current = e.Current;
+        //        if(i == 0)
+        //        {
+        //            bar.Close = current.Close;
+        //        }
 
-                bar.High = Math.Max(bar.High, current.High);
-                bar.Low = Math.Min(bar.Low, current.Low);
-                bar.Volume += current.Volume;
-                bar.TradeAmount += current.TradeAmount;
+        //        bar.High = Math.Max(bar.High, current.High);
+        //        bar.Low = Math.Min(bar.Low, current.Low);
+        //        bar.Volume += current.Volume;
+        //        bar.TradeAmount += current.TradeAmount;
 
-                if (i == nbBars - 1)
-                {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
-                }
-            }
+        //        if (i == nbBars - 1)
+        //        {
+        //            bar.Open = current.Open;
+        //            bar.Time = current.Time;
+        //        }
+        //    }
 
-            return bar;
-        }
+        //    return bar;
+        //}
 
         public void CancelBarsRequest(Contract contract, BarLength barLength)
         {
