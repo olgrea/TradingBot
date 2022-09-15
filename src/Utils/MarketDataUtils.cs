@@ -14,7 +14,7 @@ namespace TradingBot.Utils
             return Path.Combine(ticker, typeof(TData).Name, date.ToString("yyyy-MM-dd"), "full.json");
         }
 
-        public static string MakeHourlyDataPath<TData>(string ticker, DateTime date) where TData : IMarketData, new()
+        public static string MakeDataPath<TData>(string ticker, DateTime date) where TData : IMarketData, new()
         {
             return Path.Combine(ticker, typeof(TData).Name, date.ToString("yyyy-MM-dd"), $"{date.ToString("yyyy-MM-dd HH-mm-ss")}.json");
         }

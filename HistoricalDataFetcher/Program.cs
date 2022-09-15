@@ -60,7 +60,8 @@ namespace HistoricalDataFetcher
             _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
 
             _logger = new ConsoleLogger();
-            _broker = new IBBroker(321, new NoLogger());
+            //_broker = new IBBroker(321, new NoLogger());
+            _broker = new IBBroker(321, _logger);
         }
 
         public void Start()
@@ -80,13 +81,13 @@ namespace HistoricalDataFetcher
                 foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
                 {
                     GetDataForDay<Bar>(pair.Item1, contract);
-                    GetDataForDay<BidAsk>(pair.Item1, contract);
+                    //GetDataForDay<BidAsk>(pair.Item1, contract);
                 }
             }
             else
             {
                 GetDataForDay<Bar>(_startDate, contract);
-                GetDataForDay<BidAsk>(_startDate, contract);
+                //GetDataForDay<BidAsk>(_startDate, contract);
             }
 
             _logger.LogInfo($"\nComplete!\n");
@@ -105,20 +106,11 @@ namespace HistoricalDataFetcher
 
             while (current >= morning)
             {
-                CheckForPacingViolations();
-
                 LinkedList<TData> data = FetchHistoricalData<TData>(contract, current);
-
-                // TODO : better way to know if the market was opened?
-                // On market holidays, TWS seems to return the bars of the previous trading day.
-                var d = data.FirstOrDefault();
-                if (d != null && current.Date != d.Time.Date)
-                {
-                    _logger.LogInfo($"Possible market holiday on {date} (returned data time mismatch). Skipping.");
+                if (data == null || data.Count == 0)
                     break;
-                }
 
-                current = current.AddHours(-1);
+                current = current.AddMinutes(-30);
                 dailyData = data.Concat(dailyData);
             }
 
@@ -154,51 +146,92 @@ namespace HistoricalDataFetcher
             }
         }
 
-        LinkedList<TData> FetchHistoricalData<TData>(Contract contract, DateTime current) where TData : IMarketData, new()
+        LinkedList<TData> FetchHistoricalData<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
         {
-            string filename = Path.Combine(RootDir, MarketDataUtils.MakeHourlyDataPath<TData>(contract.Symbol, current));
+            string filename = Path.Combine(RootDir, MarketDataUtils.MakeDataPath<TData>(contract.Symbol, time));
             LinkedList<TData> data;
             if (File.Exists(filename))
             {
-                _logger.LogInfo($"File '{filename}' exists. Restoring from dicks.");
+                _logger.LogInfo($"File '{filename}' exists. Restoring from disk.");
                 data = new LinkedList<TData>(MarketDataUtils.DeserializeData<TData>(filename));
             }
             else
             {
-                data = Fetch<TData>(filename, contract, current);
+                data = Fetch<TData>(filename, contract, time);
+                if (PossibleMarketHoliday(time, data))
+                {
+                    _logger.LogInfo($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
+                    return new LinkedList<TData>();
+                }
 
-                var d = data.FirstOrDefault();
-                if (d != null && current.Date == d.Time.Date)
-                    MarketDataUtils.SerializeData(filename, data);
+                MarketDataUtils.SerializeData(filename, data);
             }
 
             return data;
         }
 
-        LinkedList<TData> Fetch<TData>(string filename, Contract contract, DateTime current) where TData : IMarketData, new()
+        bool PossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData, new()
+        {
+            // TODO : better way to know if the market was opened or not?
+            // On market holidays, TWS seems to return the bars of the previous trading day.
+            var d = data.FirstOrDefault();
+            return d != null && time.Date != d.Time.Date;
+        }
+
+        LinkedList<TData> Fetch<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
         {
             if (typeof(TData) == typeof(Bar))
             {
-                _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
-                var bars = _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, current, 1800).Result;
-                
-                NbRequest++;
-                return new LinkedList<TData>(bars.Cast<TData>());
+                return FetchBars<TData>(filename, contract, time);
             }
             else if (typeof(TData) == typeof(BidAsk))
             {
-
-                _logger.LogInfo($"Retrieving bid ask from TWS for '{filename}'.");
-                var bidask = _broker.GetPastBidAsks(contract, current);
-
-                // Note that when BID_ASK historical data is requested, each request is counted twice
-                NbRequest++;
-                NbRequest++;
-
-                return new LinkedList<TData>(bidask.Cast<TData>());
+                return FetchBidAsk<TData>(filename, contract, time);
             }
 
             return new LinkedList<TData>();
+        }
+
+        private LinkedList<TData> FetchBidAsk<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
+        {
+            _logger.LogInfo($"Retrieving bid ask from TWS for '{filename}'.");
+
+            // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
+            // There doesn't seem to be a way to convert ticks to seconds... 1 tick != 1 seconds apparently. 
+            // So we just do multiple requests as long as we don't have 30 minutes.
+            IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
+            DateTime current = time;
+            while (time - current <= TimeSpan.FromMinutes(30))
+            {
+                int tickCount = 1000;
+
+                // Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
+                if(time - current > TimeSpan.FromMinutes(25))
+                    tickCount = 100;
+
+                var ticks = _broker.RequestHistoricalTicks(contract, current, tickCount).Result;
+
+                // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
+                NbRequest++;
+                NbRequest++;
+
+                if (PossibleMarketHoliday(current, ticks))
+                    return new LinkedList<TData>();
+
+                bidask = ticks.Concat(bidask);
+
+                current = ticks.First().Time;
+            }
+
+            return new LinkedList<TData>(bidask.Where(b => time - b.Time <= TimeSpan.FromMinutes(30)).Cast<TData>());
+        }
+
+        private LinkedList<TData> FetchBars<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
+        {
+            _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
+            var bars = _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800).Result;
+            NbRequest++;
+            return new LinkedList<TData>(bars.Cast<TData>());
         }
     }
 }

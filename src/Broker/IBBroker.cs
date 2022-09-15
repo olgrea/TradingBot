@@ -446,12 +446,12 @@ namespace TradingBot.Broker
             }
         }
 
-        public LinkedList<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
+        public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
             return GetHistoricalDataAsync(contract, barLength, DateTime.MinValue, count).Result;   
         }
 
-        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        internal Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var tmpList = new LinkedList<MarketData.Bar>();
             var reqId = NextRequestId;
@@ -559,12 +559,12 @@ namespace TradingBot.Broker
             PnLReceived?.Invoke(pnl);
         }
 
-        public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time)
+        public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count)
         {
-            return RequestHistoricalTicks(contract, time).Result;
+            return RequestHistoricalTicks(contract, time, count).Result;
         }
 
-        Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time)
+        internal Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count)
         {
             var tmpList = new LinkedList<BidAsk>();
             var reqId = NextRequestId;
@@ -593,7 +593,7 @@ namespace TradingBot.Broker
                 _client.Callbacks.Message -= error;
             });
 
-            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 1000, "BidAsk", false, true);
+            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
 
             return resolveResult.Task;
         }
