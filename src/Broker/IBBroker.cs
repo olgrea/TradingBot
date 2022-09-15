@@ -380,39 +380,6 @@ namespace TradingBot.Broker
             }
         }
 
-        //MarketData.Bar MakeBar(LinkedList<MarketData.Bar> list, int seconds)
-        //{
-        //    MarketData.Bar bar = new MarketData.Bar() { High = double.MinValue, Low = double.MaxValue};
-        //    var e = list.GetEnumerator();
-        //    e.MoveNext();
-
-        //    // The 1st bar shouldn't be included.
-        //    e.MoveNext();
-
-        //    int nbBars = seconds / 5;
-        //    for (int i = 0; i < nbBars; i++, e.MoveNext())
-        //    {
-        //        MarketData.Bar current = e.Current;
-        //        if(i == 0)
-        //        {
-        //            bar.Close = current.Close;
-        //        }
-
-        //        bar.High = Math.Max(bar.High, current.High);
-        //        bar.Low = Math.Min(bar.Low, current.Low);
-        //        bar.Volume += current.Volume;
-        //        bar.TradeAmount += current.TradeAmount;
-
-        //        if (i == nbBars - 1)
-        //        {
-        //            bar.Open = current.Open;
-        //            bar.Time = current.Time;
-        //        }
-        //    }
-
-        //    return bar;
-        //}
-
         public void CancelBarsRequest(Contract contract, BarLength barLength)
         {
             if (!HasSubscribers(barLength))

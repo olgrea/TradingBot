@@ -2,6 +2,19 @@
 {
     internal class Position
     {
+        public Position() { }
+
+        public Position(Position pos)
+        {
+            Contract = pos.Contract;
+            PositionAmount = pos.PositionAmount;
+            MarketPrice = pos.MarketPrice;
+            MarketValue = pos.MarketValue;
+            AverageCost = pos.AverageCost;
+            UnrealizedPNL = pos.UnrealizedPNL;
+            RealizedPNL = pos.RealizedPNL;
+        }
+
         public Contract Contract { get; set; }
         public double PositionAmount { get; set; }
         public double MarketPrice { get; set; }

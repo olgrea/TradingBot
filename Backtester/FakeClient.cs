@@ -47,8 +47,9 @@ namespace Backtester
         Account _fakeAccount;
 
         //TODO : use IBApi classes?
-        Dictionary<Contract, Order> _openOrders;
-        Dictionary<Contract, Order> _executedOrders;
+        Dictionary<Contract, Order> _openOrders = new Dictionary<Contract, Order>();
+        Position _position = new Position();
+        Dictionary<Contract, Order> _executedOrders = new Dictionary<Contract, Order>();
 
         LinkedList<Bar> _dailyBars;
         LinkedListNode<Bar> _currentBarNode;
@@ -56,7 +57,12 @@ namespace Backtester
         ILogger _logger;
         IBClient _client;
 
-        int _reqId5SecBar = -1;      
+        bool _positionRequested = false;
+        int _reqId5SecBar = -1;
+        int _reqIdPnL = -1;
+
+        int _nextValidOrderId = 0;
+        int NextValidOrderId => _nextValidOrderId++;
 
         public FakeClient(IBClient client, ILogger logger)
         {
@@ -105,21 +111,20 @@ namespace Backtester
             if (!_initialized)
                 throw new InvalidOperationException("Fake client has not been initialized.");
 
+            ClockTick += OnClockTick_UpdateUnrealizedPNL;
+
             StartConsumerTask();
             StartPassingTimeTask();
         }
 
         void Stop()
         {
-            CancelSubscriptions();
-            StopPassingTimeTask();
-            StopConsumerTask();
-        }
-
-        void CancelSubscriptions()
-        {
             ClockTick -= OnClockTick_AccountSubscription;
             ClockTick -= OnClockTick_FiveSecondBar;
+            ClockTick -= OnClockTick_PnL;
+
+            StopPassingTimeTask();
+            StopConsumerTask();
         }
 
         void StartConsumerTask()
@@ -163,8 +168,7 @@ namespace Backtester
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
                         
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                        if (_currentFakeTime.Second % 5 == 0)
-                            _currentBarNode = _currentBarNode.Next;
+                        _currentBarNode = _currentBarNode.Next;
                     }
                     catch (OperationCanceledException)
                     {
@@ -274,12 +278,15 @@ namespace Backtester
             var elapsed = _st.ElapsedMilliseconds;
             //_logger.LogDebug($"newTime={newTime}\t{elapsed}");
 
-            var b = _currentBarNode.Value;
-            _messageQueue.Enqueue(() => 
+            if(newTime.Second % 5 == 0)
             {
-                DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
-                Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
-            });
+                var b = _currentBarNode.Value;
+                _messageQueue.Enqueue(() => 
+                {
+                    DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
+                    Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
+                });
+            }
         }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
@@ -299,24 +306,62 @@ namespace Backtester
             });
         }
 
-        public void RequestPnL(int reqId, string accountCode, int contractId)
+        void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
-            throw new NotImplementedException();
-        }
+            var newBar = _currentBarNode.Value;
+            var currentPrice = (newBar.Close + newBar.High + newBar.Low) / 3;
 
-        public void CancelPnL(int contractId)
-        {
-            throw new NotImplementedException();
+            var oldPos = new Position(_position);
+            _position.MarketPrice = currentPrice;
+            _position.MarketValue = currentPrice * _position.PositionAmount;
+            _position.UnrealizedPNL = _position.PositionAmount * (_position.MarketValue - _position.AverageCost);
+
+            if(_positionRequested && oldPos != _position)
+                SendPosition();
         }
 
         public void RequestPositions()
         {
-            throw new NotImplementedException();
+            _positionRequested = true;
+            SendPosition();
+            _messageQueue.Enqueue(() =>
+            {
+                Callbacks.positionEnd();
+            });
+        }
+
+        void SendPosition()
+        {
+            _messageQueue.Enqueue(() =>
+            {
+                Callbacks.position(_fakeAccount.Code, _position.Contract.ToIBApiContract(), _position.PositionAmount, _position.AverageCost);
+            });
         }
 
         public void CancelPositions()
         {
-            throw new NotImplementedException();
+            _positionRequested = false;
+        }
+
+        public void RequestPnL(int reqId, string accountCode, int contractId)
+        {
+            //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
+            _reqIdPnL = reqId;
+            ClockTick += OnClockTick_PnL;
+        }
+
+        void OnClockTick_PnL(DateTime newTime)
+        {
+            _messageQueue.Enqueue(() => 
+            {
+                Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(_position.PositionAmount), _position.RealizedPNL, _position.UnrealizedPNL, _position.RealizedPNL, _position.MarketValue);
+            });
+        }
+
+        public void CancelPnL(int contractId)
+        {
+            ClockTick -= OnClockTick_PnL;
+            _reqIdPnL = -1;
         }
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
@@ -336,7 +381,8 @@ namespace Backtester
 
         public void RequestValidOrderIds()
         {
-            throw new NotImplementedException();
+            int next = NextValidOrderId;
+            _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
     }
 }
