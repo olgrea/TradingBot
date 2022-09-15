@@ -22,8 +22,6 @@ namespace TradingBot.Broker.Client
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
 
-        //TODO : fix build config
-//#if BACKTESTING
         internal IBClient(IBCallbacks callbacks, ILogger logger)
         {
             _logger = logger;
@@ -31,7 +29,6 @@ namespace TradingBot.Broker.Client
             _signal = new EReaderMonitorSignal();
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
-//#endif
 
         // TODO : really need to handle market data connection losses. It seems to happen everyday at around 8pm
 
