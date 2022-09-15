@@ -53,9 +53,7 @@ namespace TradingBot.Strategies
         public override void Start()
         {
             InitIndicators(_trader, BarLength._1Min, RSIDivergence_1Min, BollingerBands_1Min);
-#if !BACKTESTING
             InitIndicators(_trader, BarLength._5Sec, RSIDivergence_5Sec);
-#endif
 
             _trader.Broker.Bar1MinReceived += OnBarReceived;
             _trader.Broker.Bar5SecReceived += OnBarReceived;
@@ -114,11 +112,7 @@ namespace TradingBot.Strategies
             public IState Evaluate()
             {
                 // Initialization of indicators
-#if BACKTESTING
-                if (_strategy.BollingerBands_1Min.IsReady && _strategy.RSIDivergence_1Min.IsReady)
-#else
                 if (_strategy.BollingerBands_1Min.IsReady && _strategy.RSIDivergence_1Min.IsReady && _strategy.RSIDivergence_5Sec.IsReady)
-#endif
                     return _strategy.States[nameof(MonitoringState)];
                 else
                     return this;
@@ -164,9 +158,6 @@ namespace TradingBot.Strategies
 
             public IState Evaluate()
             {
-#if BACKTESTING
-                InitIndicators(Trader, BarLength._5Sec, _strategy.RSIDivergence_5Sec);
-#endif
                 // At this moment, we switch to a 5 secs resolution.
                 var RSIdiv5sec = _strategy.RSIDivergence_5Sec;
 

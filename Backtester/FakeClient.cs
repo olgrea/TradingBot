@@ -35,24 +35,29 @@ namespace Backtester
         //TODO : use IBApi classes?
         HashSet<Order> _openOrders;
         HashSet<Order> _executedOrders;
-        Bar _latestBar;
-
+        
         DateTime _start;
         DateTime _end;
         DateTime _currentFakeTime;
+        LinkedList<Bar> _dailyBars;
+        LinkedListNode<Bar> _currentBarNode;
+
         Contract _contract;
         ILogger _logger;
         IBClient _client;
 
-        public FakeClient(DateTime start, DateTime end, IBClient client, ILogger logger)
+        int _reqId5SecBar = -1;
+        bool _enable5SecBar = false;
+
+        public FakeClient(DateTime start, DateTime end, IEnumerable<Bar> dailyBars, IBClient client, ILogger logger)
         {
             _currentFakeTime = start;
             _start = start;
             _end = end; 
-
-            _logger = logger;
-
+            _dailyBars = new LinkedList<Bar>(dailyBars);
+            _currentBarNode = _dailyBars.First;
             _client = client;
+            _logger = logger;
 
             _fakeAccount = new Account()
             {
@@ -136,12 +141,17 @@ namespace Backtester
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)
         {
-            throw new NotImplementedException();
+            if (contract != _contract)
+                throw new InvalidOperationException();
+
+            _reqId5SecBar = reqId;
+            _enable5SecBar = true;
         }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
         {
-            throw new NotImplementedException();
+            _reqId5SecBar = -1;
+            _enable5SecBar = false;
         }
 
         public void RequestOpenOrders()
@@ -171,7 +181,6 @@ namespace Backtester
             throw new NotImplementedException();
         }
 
-        // TODO : I would really need 5 secs bars because of my architecture... Create a separate fetcher program?
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
             throw new NotImplementedException();
@@ -205,8 +214,9 @@ namespace Backtester
                 {
                     try
                     {
-                        Task.Delay(TimeDelays.OneSecond, delayToken);
-                        ClockTick(_currentFakeTime.AddSeconds(1));
+                        ClockTick(_currentFakeTime);
+                        Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
+                        _currentFakeTime = _currentFakeTime.AddSeconds(1);
                     }
                     catch (OperationCanceledException)
                     {
@@ -232,7 +242,16 @@ namespace Backtester
 
         void ClockTick(DateTime newTime)
         {
-            _currentFakeTime = newTime;
+            if(newTime.Second % 5 == 0)
+            {
+                _currentBarNode = _currentBarNode.Next;
+                if(_enable5SecBar)
+                {
+                    var b = _currentBarNode.Value;
+                    DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
+                    Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
+                }
+            }
         }
 
         void StopAccountUpdateTask()
@@ -259,7 +278,7 @@ namespace Backtester
                 {
                     try
                     {
-                        Task.Delay(TimeDelays.AccountUpdateInterval, delayToken);
+                        Task.Delay(TimeDelays.AccountUpdateInterval, delayToken).Wait();
                     }
                     catch (OperationCanceledException)
                     {
