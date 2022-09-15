@@ -2,6 +2,7 @@
 
 // TODO : encapsulate this
 using MathNet.Numerics.Statistics;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
@@ -10,7 +11,7 @@ namespace TradingBot.Indicators
         protected double _last = double.MinValue;
         protected double _lastDelta = double.MinValue;
 
-        public MovingAverage(int nbPeriods) : base(nbPeriods) { }
+        public MovingAverage(BarLength barLength, int nbPeriods) : base(barLength, nbPeriods) { }
 
         public double Value { get; protected set;}
         public double Delta { get; protected set; }

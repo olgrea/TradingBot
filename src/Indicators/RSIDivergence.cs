@@ -8,14 +8,15 @@ namespace TradingBot.Indicators
         RSI _slowRsi;
         RSI _fastRsi;
 
-        public RSIDivergence(int slowPeriod=14, int fastPeriod=5)
+        public RSIDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5)
         {
-            _slowRsi = new RSI(slowPeriod);
-            _fastRsi = new RSI(fastPeriod);
+            _slowRsi = new RSI(barLength, slowPeriod);
+            _fastRsi = new RSI(barLength, fastPeriod);
         }
 
         public double Value => _fastRsi.Value - _slowRsi.Value;
         public bool IsReady => _slowRsi.IsReady && _fastRsi.IsReady;
+        public BarLength BarLength => _slowRsi.BarLength;
         public int NbPeriods => _slowRsi.NbPeriods;
         public Bar LatestBar => _fastRsi.Bars.Last.Value;
 

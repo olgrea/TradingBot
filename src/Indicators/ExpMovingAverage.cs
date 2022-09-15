@@ -8,7 +8,7 @@ namespace TradingBot.Indicators
         const int Smoothing = 2;
         double _ema = double.MinValue;
 
-        public ExpMovingAverage(int nbPeriods = 14) : base(nbPeriods) {}
+        public ExpMovingAverage(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods) {}
         public override bool IsReady => _ema != double.MinValue && base.IsReady;
 
         public override void Compute()

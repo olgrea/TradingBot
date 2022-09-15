@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
-    internal enum BarLength
+    public enum BarLength
     {
         _5Sec = 5,
         _10Sec = 10,
@@ -14,7 +14,7 @@ namespace TradingBot.Broker.MarketData
     }
 
     //TODO : make serializable
-    internal class Bar
+    public class Bar
     {
         public double Open { get; set; }
         public double Close { get; set; }

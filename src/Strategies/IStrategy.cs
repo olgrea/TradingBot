@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
+using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
@@ -9,7 +10,8 @@ namespace TradingBot.Strategies
         void Start();
         void Stop();
 
-        public IReadOnlyDictionary<string, IState> States { get; }
-        public IState CurrentState { get; }
+        IEnumerable<IIndicator> Indicators { get; }
+        IReadOnlyDictionary<string, IState> States { get; }
+        IState CurrentState { get; }
     }
 }

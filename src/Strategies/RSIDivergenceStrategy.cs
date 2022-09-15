@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Collections.Generic;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker;
@@ -7,7 +8,6 @@ using TradingBot.Indicators;
 using System.Threading.Tasks;
 using TradingBot.Broker.Client;
 using System.Diagnostics;
-using System.Linq;
 
 namespace TradingBot.Strategies
 {
@@ -27,33 +27,37 @@ namespace TradingBot.Strategies
                 { nameof(BoughtState), new BoughtState(this, trader)},
             };
 
-            BollingerBands_1Min = new BollingerBands();
-            RSIDivergence_1Min = new RSIDivergence();
-            RSIDivergence_5Sec = new RSIDivergence();
+            BollingerBands_1Min = new BollingerBands(BarLength._1Min);
+            RSIDivergence_1Min = new RSIDivergence(BarLength._1Min);
+            RSIDivergence_5Sec = new RSIDivergence(BarLength._5Sec);
+
+            Indicators = new List<IIndicator>()
+            {
+                BollingerBands_1Min,
+                RSIDivergence_1Min,
+                RSIDivergence_5Sec
+            };
         }
 
         internal BollingerBands BollingerBands_1Min { get; private set; }
         internal RSIDivergence RSIDivergence_1Min { get; private set; }
         internal RSIDivergence RSIDivergence_5Sec { get; private set; }
+
         internal OrderChain Order { get; set; }
 
         void OnBarReceived(Contract contract, Bar bar)
         {
-            if(bar.BarLength == BarLength._1Min)
+            foreach(var indicator in Indicators.Where(i => i.BarLength == bar.BarLength))
             {
-                BollingerBands_1Min.Update(bar);
-                RSIDivergence_1Min.Update(bar);
-            }
-            else if(bar.BarLength == BarLength._5Sec)
-            {
-                RSIDivergence_5Sec.Update(bar);
+                indicator.Update(bar);
             }
         }
 
         public override void Start()
         {
-            InitIndicators(_trader, BarLength._1Min, RSIDivergence_1Min, BollingerBands_1Min);
-            InitIndicators(_trader, BarLength._5Sec, RSIDivergence_5Sec);
+            var lookup = Indicators.ToLookup(i => i.BarLength);
+            foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>().Where(v => lookup.Contains(v)))
+                InitIndicators(_trader, barLength, lookup[barLength]);
 
             _trader.Broker.Bar1MinReceived += OnBarReceived;
             _trader.Broker.Bar5SecReceived += OnBarReceived;
@@ -66,9 +70,8 @@ namespace TradingBot.Strategies
 
         public override void Stop()
         {
-            RSIDivergence_1Min.Reset();
-            RSIDivergence_5Sec.Reset();
-            BollingerBands_1Min.Reset();
+            foreach (var indicator in Indicators)
+                indicator.Reset();
 
             _trader.Broker.Bar1MinReceived -= OnBarReceived;
             _trader.Broker.Bar5SecReceived -= OnBarReceived;
@@ -79,7 +82,7 @@ namespace TradingBot.Strategies
         }
 
         //TODO : move this elsewhere
-        internal static void InitIndicators(Trader trader, BarLength barLength, params IIndicator[] indicators)
+        internal static void InitIndicators(Trader trader, BarLength barLength, IEnumerable<IIndicator> indicators)
         {
             if (!indicators.Any())
                 return;
@@ -111,8 +114,7 @@ namespace TradingBot.Strategies
 
             public IState Evaluate()
             {
-                // Initialization of indicators
-                if (_strategy.BollingerBands_1Min.IsReady && _strategy.RSIDivergence_1Min.IsReady && _strategy.RSIDivergence_5Sec.IsReady)
+                if (_strategy.Indicators.All(i => i.IsReady))
                     return _strategy.States[nameof(MonitoringState)];
                 else
                     return this;
@@ -122,6 +124,7 @@ namespace TradingBot.Strategies
         class MonitoringState : IState
         {
             RSIDivergenceStrategy _strategy;
+
             public MonitoringState(RSIDivergenceStrategy strategy, Trader trader)
             {
                 _strategy = strategy;

@@ -1,11 +1,12 @@
 ﻿using MathNet.Numerics.Statistics;
 using System.Linq;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
     internal class BollingerBands : IndicatorBase
     {
-        public BollingerBands(int nbPeriods = 20) : base(nbPeriods) { }
+        public BollingerBands(BarLength barLength, int nbPeriods = 20) : base(barLength, nbPeriods) { }
 
         public double MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
