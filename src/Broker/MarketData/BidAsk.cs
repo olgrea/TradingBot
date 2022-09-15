@@ -4,7 +4,7 @@ using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
-    internal class BidAsk
+    internal class BidAsk : IMarketData
     {
         public double Bid { get; set; }
         public int BidSize { get; set; }

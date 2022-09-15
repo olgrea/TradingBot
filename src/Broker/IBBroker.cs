@@ -355,7 +355,7 @@ namespace TradingBot.Broker
                 int sec = (int)barLength;
                 if (list.Count > (sec / 5) + 1 && (bar.Time.Second % sec) == 0)
                 {
-                    var newBar = BarsUtils.MakeBar(list, barLength);
+                    var newBar = MarketDataUtils.MakeBar(list, barLength);
                     InvokeCallbacks(contract, newBar);
                 }
             }
