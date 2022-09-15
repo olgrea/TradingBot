@@ -480,7 +480,7 @@ namespace TradingBot.Broker
             {
                 case BarLength._1Sec :
                     durationStr = $"{count} S";
-                    barSizeStr = "1 sec";
+                    barSizeStr = "1 secs";
                     break;
 
                 case BarLength._5Sec:
