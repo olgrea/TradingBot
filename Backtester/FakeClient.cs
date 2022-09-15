@@ -34,9 +34,11 @@ namespace Backtester
         Task _consumerTask;
         CancellationTokenSource _consumerTaskCancellation;
 
+        bool _initialized = false;
         DateTime _start;
         DateTime _end;
         DateTime _currentFakeTime;
+
         event Action<DateTime> ClockTick;
         Task _passingTimeTask;
         CancellationTokenSource _passingTimeCancellation;
@@ -56,13 +58,8 @@ namespace Backtester
 
         int _reqId5SecBar = -1;      
 
-        public FakeClient(DateTime start, DateTime end, IEnumerable<Bar> dailyBars, IBClient client, ILogger logger)
+        public FakeClient(IBClient client, ILogger logger)
         {
-            _currentFakeTime = start;
-            _start = start;
-            _end = end; 
-            _dailyBars = new LinkedList<Bar>(dailyBars);
-            _currentBarNode = _dailyBars.First;
             _client = client;
             _logger = logger;
             _messageQueue = new ConcurrentQueue<Action>();
@@ -79,6 +76,18 @@ namespace Backtester
 
         public IBCallbacks Callbacks => _client.Callbacks;
 
+        public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
+
+        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars)
+        {
+            _currentFakeTime = startTime;
+            _start = startTime;
+            _end = endTime;
+            _dailyBars = new LinkedList<Bar>(dailyBars);
+            _currentBarNode = _dailyBars.First;
+            _initialized = true;
+        }
+
         public void Connect(string host, int port, int clientId)
         {
             _client.Connect(host, port, clientId);
@@ -93,6 +102,9 @@ namespace Backtester
 
         void Start()
         {
+            if (!_initialized)
+                throw new InvalidOperationException("Fake client has not been initialized.");
+
             StartConsumerTask();
             StartPassingTimeTask();
         }
@@ -143,7 +155,7 @@ namespace Backtester
                 var delayToken = delayCancellation.Token;
 
                 _st.Start();
-                while (!mainToken.IsCancellationRequested)
+                while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
                 {
                     try
                     {

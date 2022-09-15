@@ -28,7 +28,6 @@ namespace TradingBot
         PnL _PnL;
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
-        HashSet<Type> _desiredStrategies = new HashSet<Type>();
 
         public Trader(string ticker, int clientId, ILogger logger)
         {
@@ -51,17 +50,18 @@ namespace TradingBot
 
         internal IBroker Broker => _broker;
         internal Contract Contract => _contract;
+        internal HashSet<IStrategy> Strategies => _strategies;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
-            _desiredStrategies.Add(typeof(TStrategy));
+            _strategies.Add((IStrategy)Activator.CreateInstance(typeof(TStrategy), this));
         }
 
         public void Start()
         {
             _broker.Connect();
             
-            if (!_desiredStrategies.Any())
+            if (!_strategies.Any())
             {
                 _logger.LogError("No strategies set for this trader");
                 return;
@@ -78,9 +78,6 @@ namespace TradingBot
             _USDCashBalance = acc.CashBalances["USD"];
 
             SubscribeToData();
-
-            foreach (var type in _desiredStrategies)
-                _strategies.Add((IStrategy)Activator.CreateInstance(type, this));
 
             foreach (var strat in _strategies)
                 strat.Start();
