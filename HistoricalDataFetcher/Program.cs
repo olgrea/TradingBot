@@ -60,8 +60,8 @@ namespace HistoricalDataFetcher
             _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
 
             _logger = new ConsoleLogger();
-            //_broker = new IBBroker(321, new NoLogger());
-            _broker = new IBBroker(321, _logger);
+            _broker = new IBBroker(321, new NoLogger());
+            //_broker = new IBBroker(321, _logger);
         }
 
         public void Start()
@@ -81,13 +81,13 @@ namespace HistoricalDataFetcher
                 foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
                 {
                     GetDataForDay<Bar>(pair.Item1, contract);
-                    //GetDataForDay<BidAsk>(pair.Item1, contract);
+                    GetDataForDay<BidAsk>(pair.Item1, contract);
                 }
             }
             else
             {
                 GetDataForDay<Bar>(_startDate, contract);
-                //GetDataForDay<BidAsk>(_startDate, contract);
+                GetDataForDay<BidAsk>(_startDate, contract);
             }
 
             _logger.LogInfo($"\nComplete!\n");
