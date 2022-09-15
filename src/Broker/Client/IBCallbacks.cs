@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using IBApi;
+using MathNet.Numerics.LinearAlgebra.Factorization;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
@@ -275,6 +277,22 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"historicalDataEnd");
         }
 
+        public event Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
+        public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
+        {
+            IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk() 
+            {
+                 Bid = t.PriceBid,
+                 BidSize = Convert.ToInt32(t.SizeBid),
+                 Ask = t.PriceAsk,
+                 AskSize = Convert.ToInt32(t.SizeAsk),
+
+            });
+
+            HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
+            _logger.LogDebug($"historicalTicksBidAsk");
+        }
+
         public event Action<ClientMessage> Message;
         public void error(Exception e)
         {
@@ -394,11 +412,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void historicalTicks(int reqId, HistoricalTick[] ticks, bool done)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
             throw new NotImplementedException();
         }

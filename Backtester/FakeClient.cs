@@ -384,5 +384,10 @@ namespace Backtester
             int next = NextValidOrderId;
             _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
+
+        public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
