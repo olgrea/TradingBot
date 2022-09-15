@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
@@ -15,7 +16,7 @@ namespace TradingBot.Indicators
 
         LinkedList<double> _diffs = new LinkedList<double>();
 
-        public RSI(int nbPeriods) : base(nbPeriods) { }
+        public RSI(BarLength barLength, int nbPeriods) : base(barLength, nbPeriods) { }
 
         public double Value { get; protected set; } = double.MinValue;
         public bool IsOverbought => Value > _overboughtThreshold;
