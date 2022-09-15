@@ -26,12 +26,12 @@ namespace Backtester
         Dictionary<int, PnL> PnLs = new Dictionary<int, PnL>();
         Dictionary<DateTime, LinkedList<Bar>> _historicalData = new Dictionary<DateTime, LinkedList<Bar>>();
 
-        public Backtester(string ticker, DateTime from, DateTime to, ILogger logger)
+        public Backtester(string ticker, DateTime start, DateTime end, ILogger logger)
         {
             _ticker = ticker;
             _logger = logger;
             
-            _marketDays = DateTimeUtils.GetMarketDays(from, to).ToList();
+            _marketDays = DateTimeUtils.GetMarketDays(start, end).ToList();
 
             var callbacks = new IBCallbacks(logger);
             _client = new IBClient(callbacks, logger);
@@ -50,7 +50,6 @@ namespace Backtester
         {
 
         }
-
         
 
         public void FetchHistoricalData()
