@@ -12,14 +12,6 @@ namespace HistoricalDataFetcher
 {
     internal class Program
     {
-        public const string root = "historical";
-        public static int _nbRequest = 0;
-        public static IBBroker _broker;
-        public static ConsoleLogger _logger;
-
-        public static TimeSpan MarketStart = DateTimeUtils.MarketStartTime;
-        public static TimeSpan MarketEnd = DateTimeUtils.MarketEndTime;
-
         static void Main(string[] args)
         {
             string ticker = args[0];
@@ -28,35 +20,63 @@ namespace HistoricalDataFetcher
             if (args.Length == 3)
                 endDate = DateTime.Parse(args[2]);
 
+            var hdf = new HistoricalDataFetcher(ticker, startDate, endDate);    
+            hdf.Start();
+        }
+    }
+
+    internal class HistoricalDataFetcher
+    {
+        public const string root = "historical";
+        public int _nbRequest = 0;
+        public IBBroker _broker;
+        public ConsoleLogger _logger;
+
+        string _ticker;
+        DateTime _startDate;
+        DateTime _endDate;
+
+        public static TimeSpan MarketStart = DateTimeUtils.MarketStartTime;
+        public static TimeSpan MarketEnd = DateTimeUtils.MarketEndTime;
+
+        public HistoricalDataFetcher(string ticker, DateTime start, DateTime end)
+        {
+            _ticker = ticker;
+            _startDate = start;
+            _endDate = end;
             _logger = new ConsoleLogger();
             _broker = new IBBroker(321, new NoLogger());
+        }
+
+        public void Start()
+        {
             _broker.Connect();
 
-            var contract = _broker.GetContract(ticker);
+            var contract = _broker.GetContract(_ticker);
             if (contract == null)
-                throw new ArgumentException($"can't find contract for ticker {ticker}");
+                throw new ArgumentException($"can't find contract for ticker {_ticker}");
 
-            string tickerDir = Path.Combine(root, ticker);
+            string tickerDir = Path.Combine(root, _ticker);
             if (!Directory.Exists(tickerDir))
                 Directory.CreateDirectory(tickerDir);
             
 
-            if(startDate < endDate)
+            if(_startDate < _endDate)
             {
-                foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(startDate, endDate))
+                foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
                 {
                     GetDataForDay(pair.Item1, contract, tickerDir);
                 }
             }
             else
             {
-                GetDataForDay(startDate, contract, tickerDir);
+                GetDataForDay(_startDate, contract, tickerDir);
             }
 
             _logger.LogInfo($"\nComplete!\n");
         }
 
-        private static void GetDataForDay(DateTime date, Contract contract, string tickerDir)
+        void GetDataForDay(DateTime date, Contract contract, string tickerDir)
         {
             var marketStart = DateTimeUtils.MarketStartTime;
             var marketEnd = DateTimeUtils.MarketEndTime;
@@ -105,11 +125,11 @@ namespace HistoricalDataFetcher
             string filename = Path.Combine(outDir, $"full.json");
             if (!File.Exists(filename))
             {
-                Serialization.SerializeBars(filename, dailyBars);
+                BarsUtils.SerializeBars(filename, dailyBars);
             }
         }
 
-        private static LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current, string outDir)
+        LinkedList<Bar> FetchHistoricalData(Contract contract, DateTime current, string outDir)
         {
             if (!Directory.Exists(outDir))
                 Directory.CreateDirectory(outDir);
@@ -119,7 +139,7 @@ namespace HistoricalDataFetcher
             if (File.Exists(filename))
             {
                 _logger.LogInfo($"File '{filename}' exists. Restoring from dicks.");
-                bars = new LinkedList<Bar>(Serialization.DeserializeBars(filename));
+                bars = new LinkedList<Bar>(BarsUtils.DeserializeBars(filename));
             }
             else
             {
@@ -130,7 +150,7 @@ namespace HistoricalDataFetcher
 
             if (!File.Exists(filename))
             {
-                Serialization.SerializeBars(filename, bars);
+                BarsUtils.SerializeBars(filename, bars);
             }
 
             return bars;
