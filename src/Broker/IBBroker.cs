@@ -9,6 +9,7 @@ using TradingBot.Utils;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Collections;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 namespace TradingBot.Broker
@@ -447,22 +448,41 @@ namespace TradingBot.Broker
 
         public LinkedList<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return GetHistoricalDataAsync(contract, barLength, string.Empty, count).Result;   
+            return GetHistoricalDataAsync(contract, barLength, DateTime.MinValue, count).Result;   
         }
 
-        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, string endDateTime, int count)
+        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var tmpList = new LinkedList<MarketData.Bar>();
             var reqId = NextRequestId;
 
             var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
-            SetupHistoricalDataCallbacks(tmpList, reqId, barLength, resolveResult);
+            SetupHistoricalBarCallbacks(tmpList, reqId, barLength, resolveResult);
 
             //string timeFormat = "yyyyMMdd-HH:mm:ss";
+
+            // Duration         : Allowed Bar Sizes
+            // 60 S             : 1 sec - 1 mins
+            // 120 S            : 1 sec - 2 mins
+            // 1800 S (30 mins) : 1 sec - 30 mins
+            // 3600 S (1 hr)    : 5 secs - 1 hr
+            // 14400 S (4hr)	: 10 secs - 3 hrs
+            // 28800 S (8 hrs)  : 30 secs - 8 hrs
+            // 1 D              : 1 min - 1 day
+            // 2 D              : 2 mins - 1 day
+            // 1 W              : 3 mins - 1 week
+            // 1 M              : 30 mins - 1 month
+            // 1 Y              : 1 day - 1 month
+
             string durationStr = null;
             string barSizeStr = null;
             switch (barLength)
             {
+                case BarLength._1Sec :
+                    durationStr = $"{count} S";
+                    barSizeStr = "1 sec";
+                    break;
+
                 case BarLength._5Sec:
                     durationStr = $"{5 * count} S";
                     barSizeStr = "5 secs";
@@ -477,12 +497,14 @@ namespace TradingBot.Broker
                     throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
             }
 
-            _client.RequestHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, false);
+            string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
+
+            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, false);
 
             return resolveResult.Task;
         }
 
-        private void SetupHistoricalDataCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
+        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
         {
             var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
             {
@@ -535,6 +557,45 @@ namespace TradingBot.Broker
         {
             pnl.Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key;
             PnLReceived?.Invoke(pnl);
+        }
+
+        public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time)
+        {
+            return RequestHistoricalTicks(contract, time).Result;
+        }
+
+        Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time)
+        {
+            var tmpList = new LinkedList<BidAsk>();
+            var reqId = NextRequestId;
+
+            var resolveResult = new TaskCompletionSource<IEnumerable<BidAsk>>();
+            var historicalTicksBidAsk = new Action<int, IEnumerable<BidAsk>, bool>((rId, bas, isDone) =>
+            {
+                if (rId == reqId)
+                {
+                    foreach(var ba in bas)
+                        tmpList.AddLast(ba);
+
+                    if (isDone)
+                        resolveResult.SetResult(tmpList);
+                }
+            });
+                        
+            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+
+            _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
+            _client.Callbacks.Message += error;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
+                _client.Callbacks.Message -= error;
+            });
+
+            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", 1000, "BidAsk", false, true);
+
+            return resolveResult.Task;
         }
     }
 }

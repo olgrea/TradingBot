@@ -189,7 +189,7 @@ namespace HistoricalDataFetcher
             {
 
                 _logger.LogInfo($"Retrieving bid ask from TWS for '{filename}'.");
-                //var bidask = _broker.GetPastBidAsks(contract, current);
+                var bidask = _broker.GetPastBidAsks(contract, current);
 
                 // Note that when BID_ASK historical data is requested, each request is counted twice
                 NbRequest++;
