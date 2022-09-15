@@ -282,11 +282,11 @@ namespace TradingBot.Broker.Client
         {
             IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk() 
             {
-                 Bid = t.PriceBid,
-                 BidSize = Convert.ToInt32(t.SizeBid),
-                 Ask = t.PriceAsk,
-                 AskSize = Convert.ToInt32(t.SizeAsk),
-
+                Bid = t.PriceBid,
+                BidSize = Convert.ToInt32(t.SizeBid),
+                Ask = t.PriceAsk,
+                AskSize = Convert.ToInt32(t.SizeAsk),
+                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
             });
 
             HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
