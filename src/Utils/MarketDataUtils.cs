@@ -37,40 +37,5 @@ namespace TradingBot.Utils
             var json = JsonSerializer.Serialize(data);
             File.WriteAllText(path, json);
         }
-
-        public static Bar MakeBar(LinkedList<Bar> list, BarLength barLength)
-        {
-            int seconds = (int)barLength;
-
-            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
-            var e = list.GetEnumerator();
-            e.MoveNext();
-
-            // The 1st bar shouldn't be included.
-            e.MoveNext();
-
-            int nbBars = seconds / 5;
-            for (int i = 0; i < nbBars; i++, e.MoveNext())
-            {
-                Bar current = e.Current;
-                if (i == 0)
-                {
-                    bar.Close = current.Close;
-                }
-
-                bar.High = Math.Max(bar.High, current.High);
-                bar.Low = Math.Min(bar.Low, current.Low);
-                bar.Volume += current.Volume;
-                bar.TradeAmount += current.TradeAmount;
-
-                if (i == nbBars - 1)
-                {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
-                }
-            }
-
-            return bar;
-        }
     }
 }

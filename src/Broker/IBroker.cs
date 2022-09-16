@@ -36,8 +36,7 @@ namespace TradingBot.Broker
         void CancelBarsRequest(Contract contract, BarLength barLength);
         
         void PlaceOrder(Contract contract, Order order);
-        // TODO : remove TWS specific stuff
-        void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false);
+        void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);
         void CancelOrder(Order order);
 

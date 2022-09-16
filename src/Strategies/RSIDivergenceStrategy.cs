@@ -57,7 +57,7 @@ namespace TradingBot.Strategies
         {
             var lookup = Indicators.ToLookup(i => i.BarLength);
             foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>().Where(v => lookup.Contains(v)))
-                InitIndicators(_trader, barLength, lookup[barLength]);
+                InitIndicators(barLength, lookup[barLength]);
 
             _trader.Broker.Bar1MinReceived += OnBarReceived;
             _trader.Broker.Bar5SecReceived += OnBarReceived;
@@ -81,15 +81,14 @@ namespace TradingBot.Strategies
             base.Stop();
         }
 
-        //TODO : move this elsewhere
-        internal static void InitIndicators(Trader trader, BarLength barLength, IEnumerable<IIndicator> indicators)
+        void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
         {
             if (!indicators.Any())
                 return;
 
             var longestPeriod = indicators.Max(i => i.NbPeriods);
 
-            var pastBars = trader.Broker.GetPastBars(trader.Contract, barLength, longestPeriod).ToList();
+            var pastBars = _trader.Broker.GetPastBars(_trader.Contract, barLength, longestPeriod).ToList();
 
             foreach (var indicator in indicators)
             {
