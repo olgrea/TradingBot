@@ -78,11 +78,12 @@ namespace HistoricalDataFetcher
 
             if(_startDate < _endDate)
             {
-                foreach((DateTime, DateTime) pair in DateTimeUtils.GetMarketDays(_startDate, _endDate))
-                {
+                var marketDays = DateTimeUtils.GetMarketDays(_startDate, _endDate).ToList();
+                foreach ((DateTime, DateTime) pair in marketDays)
                     GetDataForDay<Bar>(pair.Item1, contract);
+
+                foreach ((DateTime, DateTime) pair in marketDays)
                     GetDataForDay<BidAsk>(pair.Item1, contract);
-                }
             }
             else
             {
@@ -126,7 +127,7 @@ namespace HistoricalDataFetcher
             // - Making more than 60 requests within any ten minute period.
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
-            if (NbRequest == 60)
+            if (_nbRequest == 60)
             {
                 _logger.LogInfo($"60 requests made : waiting 10 minutes...");
                 for (int i = 0; i < 10; ++i)
@@ -137,9 +138,9 @@ namespace HistoricalDataFetcher
                     else
                         _logger.LogInfo($"Resuming historical data fetching");
                 }
-                NbRequest = 0;
+                _nbRequest = 0;
             }
-            else if (NbRequest != 0 && NbRequest % 5 == 0)
+            else if (_nbRequest != 0 && _nbRequest % 5 == 0)
             {
                 _logger.LogInfo($"{NbRequest} requests made : waiting 2 seconds...");
                 Task.Delay(2000).Wait();
@@ -158,7 +159,7 @@ namespace HistoricalDataFetcher
             else
             {
                 data = Fetch<TData>(filename, contract, time);
-                if (PossibleMarketHoliday(time, data))
+                if (IsPossibleMarketHoliday(time, data))
                 {
                     _logger.LogInfo($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
                     return new LinkedList<TData>();
@@ -170,7 +171,7 @@ namespace HistoricalDataFetcher
             return data;
         }
 
-        bool PossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData, new()
+        bool IsPossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData, new()
         {
             // TODO : better way to know if the market was opened or not?
             // On market holidays, TWS seems to return the bars of the previous trading day.
@@ -198,15 +199,18 @@ namespace HistoricalDataFetcher
 
             // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
             // There doesn't seem to be a way to convert ticks to seconds... 1 tick != 1 seconds apparently. 
-            // So we just do multiple requests as long as we don't have 30 minutes.
+            // So we just do requests as long as we don't have 30 minutes.
             IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
             DateTime current = time;
-            while (time - current <= TimeSpan.FromMinutes(30))
+            TimeSpan _30min = TimeSpan.FromMinutes(30);
+            TimeSpan _25min = TimeSpan.FromMinutes(25);
+            var diff = time - current;
+            while (diff <= _30min)
             {
                 int tickCount = 1000;
 
                 // Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
-                if(time - current > TimeSpan.FromMinutes(25))
+                if(diff > _25min)
                     tickCount = 100;
 
                 var ticks = _broker.RequestHistoricalTicks(contract, current, tickCount).Result;
@@ -215,15 +219,25 @@ namespace HistoricalDataFetcher
                 NbRequest++;
                 NbRequest++;
 
-                if (PossibleMarketHoliday(current, ticks))
+                if (IsPossibleMarketHoliday(current, ticks))
                     return new LinkedList<TData>();
 
                 bidask = ticks.Concat(bidask);
 
                 current = ticks.First().Time;
+                diff = time - current;
             }
 
-            return new LinkedList<TData>(bidask.Where(b => time - b.Time <= TimeSpan.FromMinutes(30)).Cast<TData>());
+            // Remove out of range data.
+            var list = new LinkedList<TData>(bidask.Cast<TData>());
+            var currNode = list.First;
+            while (currNode != null && currNode.Value.Time < time - _30min)
+            {
+                list.RemoveFirst();
+                currNode = list.First;
+            }
+
+            return list;
         }
 
         private LinkedList<TData> FetchBars<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
