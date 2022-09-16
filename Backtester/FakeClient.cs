@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TradingBot.Broker;
@@ -28,7 +25,6 @@ namespace Backtester
             public static double TimeScale = 3600.0d / 32400;
             public static int OneSecond = (int)Math.Round(1 * 1000 * TimeScale);
         }
-        Stopwatch _st = new Stopwatch();
 
         ConcurrentQueue<Action> _messageQueue;
         Task _consumerTask;
@@ -48,9 +44,9 @@ namespace Backtester
 
         //TODO : use IBApi classes?
         Dictionary<Contract, Order> _openOrders = new Dictionary<Contract, Order>();
-        Position _position = new Position();
         Dictionary<Contract, Order> _executedOrders = new Dictionary<Contract, Order>();
 
+        LinkedList<Bar> _5SecBars = new LinkedList<Bar>();
         LinkedList<Bar> _dailyBars;
         LinkedListNode<Bar> _currentBarNode;
 
@@ -59,10 +55,12 @@ namespace Backtester
 
         bool _positionRequested = false;
         int _reqId5SecBar = -1;
+        int _reqIdBidAsk = -1;
         int _reqIdPnL = -1;
 
         int _nextValidOrderId = 0;
         int NextValidOrderId => _nextValidOrderId++;
+        Position Position => _fakeAccount.Positions.FirstOrDefault();
 
         public FakeClient(IBClient client, ILogger logger)
         {
@@ -159,7 +157,6 @@ namespace Backtester
                 var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
                 var delayToken = delayCancellation.Token;
 
-                _st.Start();
                 while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
                 {
                     try
@@ -169,6 +166,10 @@ namespace Backtester
                         
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
                         _currentBarNode = _currentBarNode.Next;
+                        
+                        _5SecBars.AddFirst(_currentBarNode);
+                        if (_5SecBars.Count > 5)
+                            _5SecBars.RemoveLast();
                     }
                     catch (OperationCanceledException)
                     {
@@ -186,7 +187,6 @@ namespace Backtester
 
         void StopPassingTimeTask()
         {
-            _st.Stop();
             _passingTimeCancellation.Cancel();
             _passingTimeCancellation.Dispose();
             _passingTimeCancellation = null;
@@ -195,9 +195,9 @@ namespace Backtester
 
         public void PlaceOrder(Contract contract, Order order)
         {
+            //TODO : make sure correct callbacks are called in the right order
 
-            //TODO : make sure correct callbacks are called
-
+            // create position
 
             // get price at current time
 
@@ -212,7 +212,10 @@ namespace Backtester
             throw new NotImplementedException();
         }
 
-        public void CancelAllOrders() { }
+        public void CancelAllOrders() 
+        {
+
+        }
 
         public void RequestAccount(string accountCode, bool receiveUpdates = true)
         {
@@ -275,18 +278,46 @@ namespace Backtester
 
         void OnClockTick_FiveSecondBar(DateTime newTime)
         {
-            var elapsed = _st.ElapsedMilliseconds;
-            //_logger.LogDebug($"newTime={newTime}\t{elapsed}");
-
-            if(newTime.Second % 5 == 0)
+            if (_currentFakeTime.Second % 5 == 0)
             {
-                var b = _currentBarNode.Value;
+                var b = Make5SecBar(_currentBarNode);
                 _messageQueue.Enqueue(() => 
                 {
                     DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                     Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
                 });
             }
+        }
+
+        Bar Make5SecBar(LinkedListNode<Bar> node)
+        {
+            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = BarLength._5Sec };
+
+            int nbBars = 5;
+            LinkedListNode<Bar> currNode = node;
+            for (int i = 0; i < nbBars; i++)
+            {
+                Bar current = currNode.Value;
+                if (i == 0)
+                {
+                    bar.Close = current.Close;
+                }
+
+                bar.High = Math.Max(bar.High, current.High);
+                bar.Low = Math.Min(bar.Low, current.Low);
+                bar.Volume += current.Volume;
+                bar.TradeAmount += current.TradeAmount;
+
+                if (i == nbBars - 1)
+                {
+                    bar.Open = current.Open;
+                    bar.Time = current.Time;
+                }
+
+                currNode = currNode.Next;
+            }
+
+            return bar;
         }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
@@ -308,21 +339,30 @@ namespace Backtester
 
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
+            if (Position == null)
+                return;
+
             var newBar = _currentBarNode.Value;
             var currentPrice = (newBar.Close + newBar.High + newBar.Low) / 3;
 
-            var oldPos = new Position(_position);
-            _position.MarketPrice = currentPrice;
-            _position.MarketValue = currentPrice * _position.PositionAmount;
-            _position.UnrealizedPNL = _position.PositionAmount * (_position.MarketValue - _position.AverageCost);
+            var oldPos = new Position(Position);
+            Position.MarketPrice = currentPrice;
+            Position.MarketValue = currentPrice * Position.PositionAmount;
+            Position.UnrealizedPNL = Position.PositionAmount * (Position.MarketValue - Position.AverageCost);
 
-            if(_positionRequested && oldPos != _position)
+            if(_positionRequested && oldPos != Position)
+            {
                 SendPosition();
+                ForceAccountUpdate();
+            }
         }
 
         public void RequestPositions()
         {
             _positionRequested = true;
+            if (Position == null)
+                return;
+
             SendPosition();
             _messageQueue.Enqueue(() =>
             {
@@ -332,9 +372,12 @@ namespace Backtester
 
         void SendPosition()
         {
+            if (Position == null)
+                return;
+
             _messageQueue.Enqueue(() =>
             {
-                Callbacks.position(_fakeAccount.Code, _position.Contract.ToIBApiContract(), _position.PositionAmount, _position.AverageCost);
+                Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
             });
         }
 
@@ -352,9 +395,12 @@ namespace Backtester
 
         void OnClockTick_PnL(DateTime newTime)
         {
+            if (Position == null)
+                return;
+
             _messageQueue.Enqueue(() => 
             {
-                Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(_position.PositionAmount), _position.RealizedPNL, _position.UnrealizedPNL, _position.RealizedPNL, _position.MarketValue);
+                Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
             });
         }
 
@@ -371,12 +417,18 @@ namespace Backtester
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
-            throw new NotImplementedException();
+            _reqIdBidAsk = reqId;
+            // TODO : load just a subset from disk. The dataset is memory heavy.
+        }
+
+        void OnClockTick_BidAsk(DateTime newTime)
+        {
+
         }
 
         public void CancelTickByTickData(int reqId)
         {
-            throw new NotImplementedException();
+            _reqIdBidAsk = -1;
         }
 
         public void RequestValidOrderIds()
