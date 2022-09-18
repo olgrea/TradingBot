@@ -50,6 +50,9 @@ namespace Backtester
         LinkedList<Bar> _dailyBars;
         LinkedListNode<Bar> _currentBarNode;
 
+        LinkedList<BidAsk> _dailyBidAsks;
+        LinkedListNode<BidAsk> _currentBidAskNode;
+
         ILogger _logger;
         IBClient _client;
 
@@ -82,13 +85,15 @@ namespace Backtester
 
         public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
 
-        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars)
+        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
             _currentFakeTime = startTime;
             _start = startTime;
             _end = endTime;
             _dailyBars = new LinkedList<Bar>(dailyBars);
             _currentBarNode = _dailyBars.First;
+            _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
+            _currentBidAskNode = _dailyBidAsks.First;
             _initialized = true;
         }
 
@@ -166,6 +171,7 @@ namespace Backtester
                         
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
                         _currentBarNode = _currentBarNode.Next;
+                        _currentBidAskNode = _currentBidAskNode.Next;
                         
                         _5SecBars.AddFirst(_currentBarNode);
                         if (_5SecBars.Count > 5)
@@ -412,22 +418,65 @@ namespace Backtester
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
-            throw new NotImplementedException();
+            int nbBars = -1;
+            switch(barSizeStr)
+            {
+                case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
+                case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
+                default: throw new NotImplementedException();
+            }
+
+            if(!string.IsNullOrEmpty(endDateTime))
+                throw new NotImplementedException();
+
+            LinkedListNode<Bar> first = _currentBarNode;
+            LinkedListNode<Bar> current = first;
+            const string format = "yyyyMMdd  HH:mm:ss";
+
+            for (int i = 0; i < nbBars; i++, current = current.Previous)
+            {
+                _messageQueue.Enqueue(() => 
+                {
+                    Callbacks.historicalData(reqId, new IBApi.Bar(
+                        current.Value.Time.ToString(format), 
+                        current.Value.Open, 
+                        current.Value.High, 
+                        current.Value.Low, 
+                        current.Value.Close, 
+                        current.Value.Volume, 
+                        current.Value.TradeAmount, 
+                        0));
+                });
+            }
+
+            _messageQueue.Enqueue(() =>
+            {
+                Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(format), current.Value.Time.ToString(format));
+            });
         }
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
+            if (tickType != "BidAsk")
+                throw new NotImplementedException();
+
+            // TODO : maybe load just a subset from disk. 
             _reqIdBidAsk = reqId;
-            // TODO : load just a subset from disk. The dataset is memory heavy.
+            ClockTick += OnClockTick_BidAsk;
         }
 
         void OnClockTick_BidAsk(DateTime newTime)
         {
-
+            var ba = _currentBidAskNode.Value;
+            _messageQueue.Enqueue(() => 
+            {
+                Callbacks.tickByTickBidAsk(_reqIdBidAsk, newTime.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
+            });
         }
 
         public void CancelTickByTickData(int reqId)
         {
+            ClockTick -= OnClockTick_BidAsk;
             _reqIdBidAsk = -1;
         }
 
@@ -435,11 +484,6 @@ namespace Backtester
         {
             int next = NextValidOrderId;
             _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
-        }
-
-        public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
-        {
-            throw new NotImplementedException();
         }
     }
 }
