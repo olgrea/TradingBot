@@ -203,35 +203,33 @@ namespace HistoricalDataFetcher
             IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
-            TimeSpan _25min = TimeSpan.FromMinutes(25);
+            TimeSpan _20min = TimeSpan.FromMinutes(20);
             var diff = time - current;
+            int tickCount = 1000;
             while (diff <= _30min)
             {
-                int tickCount = 1000;
-
                 // Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
-                if(diff > _25min)
+                if(diff > _20min)
                     tickCount = 100;
 
                 var ticks = _broker.RequestHistoricalTicks(contract, current, tickCount).Result;
 
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
-                NbRequest++;
-                NbRequest++;
-
+                NbRequest++; NbRequest++;
                 if (IsPossibleMarketHoliday(current, ticks))
                     return new LinkedList<TData>();
 
                 bidask = ticks.Concat(bidask);
-
                 current = ticks.First().Time;
+
                 diff = time - current;
             }
 
             // Remove out of range data.
             var list = new LinkedList<TData>(bidask.Cast<TData>());
             var currNode = list.First;
-            while (currNode != null && currNode.Value.Time < time - _30min)
+            var timeOfDay = (time - _30min).TimeOfDay;
+            while (currNode != null && currNode.Value.Time.TimeOfDay < timeOfDay)
             {
                 list.RemoveFirst();
                 currNode = list.First;
