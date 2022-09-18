@@ -23,6 +23,5 @@ namespace TradingBot.Broker.Client
         void CancelOrder(int orderId);
         void CancelAllOrders();
         void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH);
-        void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize);
     }
 }

@@ -634,7 +634,7 @@ namespace TradingBot.Broker
                 _client.Callbacks.Message -= error;
             });
 
-            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+            (_client as IBClient).RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
 
             return resolveResult.Task;
         }
