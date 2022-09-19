@@ -89,7 +89,9 @@ namespace TradingBot.Broker.Client
                     break;
 
                 case "TRAIL":
+                    // TODO : verify this
                     ibo.AuxPrice = Convert.ToDouble((order as TrailingStopOrder).StopPrice);
+                    ibo.TrailStopPrice = Convert.ToDouble((order as TrailingStopOrder).TrailingAmount);
                     ibo.TrailingPercent = (order as TrailingStopOrder).TrailingPercent;
                     break;
 
@@ -125,7 +127,9 @@ namespace TradingBot.Broker.Client
                 case "TRAIL":
                     tbo = new TrailingStopOrder()
                     {
+                        //TODO : verify this
                         StopPrice = ibo.AuxPrice,
+                        TrailingAmount = ibo.TrailStopPrice,
                         TrailingPercent = ibo.TrailingPercent,
                     };
                     break;

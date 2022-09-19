@@ -48,9 +48,11 @@ namespace Backtester
 
             var fakeClient = new FakeClient(_client, _logger);
             var broker = new IBBroker(1337, fakeClient, _logger);
-            Trader trader = new Trader("GME", broker, _logger);
+            Trader trader = new Trader(_ticker, broker, _logger);
             trader.AddStrategyForTicker<RSIDivergenceStrategy>();
             
+            var contract = broker.GetContract(_ticker);
+
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(day.Item1);
@@ -60,7 +62,7 @@ namespace Backtester
                 // For backtesting, we need to have enough past bars to be able to initialize all indicators.
                 // So we will set the start time a couple seconds later, corresponding to the highest NbPeriods * BarLength;
                 var secondsToAdd = trader.Strategies.Max(s => s.Indicators.Max(i => i.NbPeriods * (int)i.BarLength));
-                fakeClient.Init(day.Item1.AddSeconds(secondsToAdd), day.Item2, bars, bidAsks);
+                fakeClient.Init(contract, day.Item1.AddSeconds(secondsToAdd), day.Item2, bars, bidAsks);
                 
                 try
                 {
