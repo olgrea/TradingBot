@@ -19,6 +19,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NLog" Version="5.0.4" />
+    <PackageReference Include="NLog.Schema" Version="5.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\src\TradingBot.csproj" />
   </ItemGroup>
 
