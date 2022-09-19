@@ -26,7 +26,7 @@ namespace HistoricalDataFetcher
 
     internal class HistoricalDataFetcher
     {
-        public const string RootDir = "historical";
+        public const string RootDir = @"D:\historical";
 
         public int _nbRequest = 0;
 
