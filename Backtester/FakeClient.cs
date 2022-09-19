@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -36,6 +37,7 @@ namespace Backtester
         DateTime _currentFakeTime;
 
         event Action<DateTime> ClockTick;
+        event Action<BidAsk> BidAskSubscription;
         Task _passingTimeTask;
         CancellationTokenSource _passingTimeCancellation;
 
@@ -43,8 +45,8 @@ namespace Backtester
         Account _fakeAccount;
 
         //TODO : use IBApi classes?
-        Dictionary<Contract, Order> _openOrders = new Dictionary<Contract, Order>();
-        Dictionary<Contract, Order> _executedOrders = new Dictionary<Contract, Order>();
+        List<Order> _openOrders = new List<Order>();
+        List<Order> _executedOrders = new List<Order>();
 
         LinkedList<Bar> _5SecBars = new LinkedList<Bar>();
         LinkedList<Bar> _dailyBars;
@@ -64,6 +66,7 @@ namespace Backtester
         int _nextValidOrderId = 0;
         int NextValidOrderId => _nextValidOrderId++;
         Position Position => _fakeAccount.Positions.FirstOrDefault();
+        Contract Contract => Position?.Contract;
 
         public FakeClient(IBClient client, ILogger logger)
         {
@@ -173,7 +176,11 @@ namespace Backtester
                         _currentBarNode = _currentBarNode.Next;
                         
                         while(_currentBidAskNode.Value.Time < _currentFakeTime)
+                        {
+                            EvaluateOpenOrders(_currentBidAskNode.Value);
+                            BidAskSubscription?.Invoke(_currentBidAskNode.Value);
                             _currentBidAskNode = _currentBidAskNode.Next;
+                        }
                         
                         _5SecBars.AddFirst(_currentBarNode);
                         if (_5SecBars.Count > 5)
@@ -206,13 +213,12 @@ namespace Backtester
             //TODO : make sure correct callbacks are called in the right order
 
             // create position
-
+            
             // get price at current time
 
 
             // get actual commission using what if
             double commission = GetCommission(contract, order);
-            
         }
 
         double GetCommission(Contract contract, Order order)
@@ -247,6 +253,93 @@ namespace Backtester
             _client.PlaceOrder(contract, order, true);
 
             return resolveResult.Task;
+        }
+
+        void EvaluateOpenOrders(BidAsk bidAsk)
+        {
+            foreach(Order o in _openOrders)
+            {
+                if(o is LimitOrder lo)
+                {
+                    EvaluateLimitOrder(bidAsk, lo);
+                }
+                else if(o is StopOrder so)
+                {
+                    EvaluateStopOrder(bidAsk, so);
+                }
+                else if (o is TrailingStopOrder tso)
+                {
+                    EvaluateTrailingStopOrder(bidAsk, tso);
+                }
+                else if(o is MarketIfTouchedOrder mito)
+                {
+                    EvaluateMarketIfTouchedOrder(bidAsk, mito);
+                }
+            }
+        }
+
+        private void EvaluateMarketIfTouchedOrder(BidAsk bidAsk, MarketIfTouchedOrder mito)
+        {
+            if (mito.Action == OrderAction.BUY && Math.Abs(mito.TouchPrice - bidAsk.Ask) < 0.005)
+            {
+                
+            }
+            else if (mito.Action == OrderAction.SELL && Math.Abs(mito.TouchPrice - bidAsk.Bid) < 0.005)
+            {
+
+            }
+        }
+
+        private void EvaluateTrailingStopOrder(BidAsk bidAsk, TrailingStopOrder tso)
+        {
+            //TODO : handle trailing percent
+            if (tso.Action == OrderAction.BUY && Math.Abs(tso.StopPrice - bidAsk.Ask) < 0.005)
+            {
+
+            }
+            else if (tso.Action == OrderAction.SELL && Math.Abs(tso.StopPrice - bidAsk.Bid) < 0.005)
+            {
+
+            }
+        }
+
+        private void EvaluateStopOrder(BidAsk bidAsk, StopOrder so)
+        {
+            if (so.Action == OrderAction.BUY && Math.Abs(so.StopPrice - bidAsk.Ask) < 0.005)
+            {
+
+            }
+            else if (so.Action == OrderAction.SELL && Math.Abs(so.StopPrice - bidAsk.Bid) < 0.005)
+            {
+
+            }
+        }
+
+        private void EvaluateLimitOrder(BidAsk bidAsk, LimitOrder lo)
+        {
+            if (lo.Action == OrderAction.BUY && Math.Abs(lo.LmtPrice - bidAsk.Ask) < 0.005)
+            {
+
+            }
+            else if (lo.Action == OrderAction.SELL && Math.Abs(lo.LmtPrice - bidAsk.Bid) < 0.005)
+            {
+
+            }
+        }
+
+        void ExecuteOrder(Order order, double price)
+        {
+            if(order.Action == OrderAction.BUY)
+            {
+                var total = order.TotalQuantity * price;
+
+
+
+            }
+            else if (order.Action == OrderAction.SELL)
+            {
+
+            }
         }
 
         public void CancelOrder(int orderId)
@@ -370,11 +463,14 @@ namespace Backtester
 
         public void RequestOpenOrders()
         {
+            if (!_openOrders.Any())
+                return;
+
             var openOrders = _openOrders;
             _messageQueue.Enqueue(() =>
             {
                 foreach (var o in openOrders)
-                    Callbacks.openOrder(o.Value.Id, o.Key.ToIBApiContract(), o.Value.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
+                    Callbacks.openOrder(o.Id, Contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
                 Callbacks.openOrderEnd();
             });
         }
@@ -498,28 +594,20 @@ namespace Backtester
 
             // TODO : maybe load just a subset from disk. 
             _reqIdBidAsk = reqId;
-            ClockTick += OnClockTick_BidAsk;
+            BidAskSubscription += SendBidAsk;
         }
 
-        void OnClockTick_BidAsk(DateTime newTime)
+        void SendBidAsk(BidAsk ba)
         {
-            // Sending all bid/ask from the last second 
-            var node = _currentBidAskNode;
-            var previousTime = newTime.AddSeconds(-1);
-            _messageQueue.Enqueue(() => 
+            _messageQueue.Enqueue(() =>
             {
-                while (node.Value.Time >= previousTime)
-                {
-                    var ba = node.Value;
-                    Callbacks.tickByTickBidAsk(_reqIdBidAsk, ba.Time.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
-                    node = node.Previous;
-                }
+                Callbacks.tickByTickBidAsk(_reqIdBidAsk, ba.Time.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
             });
         }
 
         public void CancelTickByTickData(int reqId)
         {
-            ClockTick -= OnClockTick_BidAsk;
+            BidAskSubscription -= SendBidAsk;
             _reqIdBidAsk = -1;
         }
 
