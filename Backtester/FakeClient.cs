@@ -45,7 +45,6 @@ namespace Backtester
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
 
-        //TODO : use IBApi classes?
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
 
@@ -235,8 +234,6 @@ namespace Backtester
             _messageQueue.Enqueue(() =>
             {
                 var orderState = new IBApi.OrderState() { Status = "Submitted" };
-
-                //TODO : verify thisssss
                 Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
             });
 
@@ -245,7 +242,7 @@ namespace Backtester
 
         double GetCommission(Contract contract, Order order)
         {
-            //TODO : verify
+            //TODO : verify commission
             var os = GetCommissionFromOrder(contract, order).Result;
             return os.Commission;
         }
@@ -424,7 +421,7 @@ namespace Backtester
             string execId = NextExecId.ToString();
             _messageQueue.Enqueue(() =>
             {
-                //TODO : verify thisssss
+                //TODO : verify orderStatus() execution
                 Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.RequestInfo.ParentId, price, 0, "", 0);
 
                 var exec = new IBApi.Execution()
@@ -702,7 +699,6 @@ namespace Backtester
             if (tickType != "BidAsk")
                 throw new NotImplementedException();
 
-            // TODO : maybe load just a subset from disk. 
             _reqIdBidAsk = reqId;
             BidAskSubscription += SendBidAsk;
         }
