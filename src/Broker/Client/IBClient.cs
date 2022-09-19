@@ -139,6 +139,14 @@ namespace TradingBot.Broker.Client
             _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
         }
 
+        internal void PlaceOrder(Contract contract, Orders.Order order, bool whatIf)
+        {
+            _logger.LogDebug($"Requesting order placement for {contract} : {order}");
+            var ibo = order.ToIBApiOrder();
+            ibo.WhatIf = whatIf;
+            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+        }
+
         public void CancelOrder(int orderId)
         {
             _logger.LogDebug($"Requesting order cancellation for order id : {orderId}");

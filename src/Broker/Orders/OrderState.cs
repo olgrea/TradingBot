@@ -13,5 +13,10 @@ namespace TradingBot.Broker.Orders
         public string WarningText { get; set; }
         public DateTime CompletedTime { get; set; }
         public string CompletedStatus { get; set; }
+        
+        public double Commission { get; set; }
+        public double MinCommission { get; set; }
+        public double MaxCommission { get; set; }
+        public string CommissionCurrency { get; set; }
     }
 }
