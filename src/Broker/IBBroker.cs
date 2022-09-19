@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Collections;
+using System.Drawing;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 namespace TradingBot.Broker
@@ -578,7 +579,7 @@ namespace TradingBot.Broker
             });
         }
 
-        void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
+        internal static void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
         {
             if (msg is ClientError)
             {

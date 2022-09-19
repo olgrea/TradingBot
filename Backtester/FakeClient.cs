@@ -209,10 +209,44 @@ namespace Backtester
 
             // get price at current time
 
-            
+
             // get actual commission using what if
+            double commission = GetCommission(contract, order);
+            
+        }
 
+        double GetCommission(Contract contract, Order order)
+        {
+            //TODO : verify
+            var os = GetCommissionFromOrder(contract, order).Result;
+            return os.Commission;
+        }
 
+        internal Task<OrderState> GetCommissionFromOrder(Contract contract, Order order)
+        {
+            var orderId = order.Id;
+            var resolveResult = new TaskCompletionSource<OrderState>();
+            var openOrder = new Action<Contract, Order, OrderState>((c, o, os) =>
+            {
+                if (orderId == o.Id)
+                {
+                    resolveResult.SetResult(os);
+                }
+            });
+
+            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+
+            Callbacks.OpenOrder += openOrder;
+            Callbacks.Message += error;
+                        resolveResult.Task.ContinueWith(t =>
+            {
+                Callbacks.OpenOrder -= openOrder;
+                Callbacks.Message -= error;
+            });
+
+            _client.PlaceOrder(contract, order, true);
+
+            return resolveResult.Task;
         }
 
         public void CancelOrder(int orderId)
