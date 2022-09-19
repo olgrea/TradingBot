@@ -66,6 +66,8 @@ namespace Backtester
 
         int _nextValidOrderId = 0;
         int NextValidOrderId => _nextValidOrderId++;
+        int _nextExecId = 0;
+        int NextExecId => _nextExecId++;
         Position Position => _fakeAccount.Positions.FirstOrDefault();
         Contract Contract => Position?.Contract;
 
@@ -218,9 +220,6 @@ namespace Backtester
 
             // get price at current time
 
-
-            // get actual commission using what if
-            double commission = GetCommission(contract, order);
         }
 
         double GetCommission(Contract contract, Order order)
@@ -392,7 +391,33 @@ namespace Backtester
             var o = _openOrders.First(o => o == order);
             _openOrders.Remove(o);
             _executedOrders.Add(o);
-            //TODO : send executed order and commission stuff
+            //TODO : really really need to make sure I have the correct prices
+
+            double commission = GetCommission(Contract, order);
+            string execId = NextExecId.ToString();
+            _messageQueue.Enqueue(() =>
+            {
+                var exec = new IBApi.Execution()
+                {
+                    ExecId = execId,
+                    OrderId = o.Id,
+                    Time = _currentFakeTime.ToString("yyyyMMdd  HH:mm:ss"),
+                    AcctNumber = _fakeAccount.Code,
+                    Exchange = Contract.Exchange,
+                    Side = o.Action == OrderAction.BUY ? "BOT" : "SLD",
+                    Shares = o.TotalQuantity,
+                    AvgPrice = total,
+                };
+                Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec);
+
+                Callbacks.commissionReport(new IBApi.CommissionReport() 
+                {
+                     Commission = commission,
+                     Currency = "USD",
+                     ExecId = execId,
+                     RealizedPNL = Position.RealizedPNL,
+                });
+            });
         }
 
         public void CancelOrder(int orderId)
