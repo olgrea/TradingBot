@@ -171,7 +171,9 @@ namespace Backtester
                         
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
                         _currentBarNode = _currentBarNode.Next;
-                        _currentBidAskNode = _currentBidAskNode.Next;
+                        
+                        while(_currentBidAskNode.Value.Time < _currentFakeTime)
+                            _currentBidAskNode = _currentBidAskNode.Next;
                         
                         _5SecBars.AddFirst(_currentBarNode);
                         if (_5SecBars.Count > 5)
@@ -467,10 +469,17 @@ namespace Backtester
 
         void OnClockTick_BidAsk(DateTime newTime)
         {
-            var ba = _currentBidAskNode.Value;
+            // Sending all bid/ask from the last second 
+            var node = _currentBidAskNode;
+            var previousTime = newTime.AddSeconds(-1);
             _messageQueue.Enqueue(() => 
             {
-                Callbacks.tickByTickBidAsk(_reqIdBidAsk, newTime.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
+                while (node.Value.Time >= previousTime)
+                {
+                    var ba = node.Value;
+                    Callbacks.tickByTickBidAsk(_reqIdBidAsk, ba.Time.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
+                    node = node.Previous;
+                }
             });
         }
 
