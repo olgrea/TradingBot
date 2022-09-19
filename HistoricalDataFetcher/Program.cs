@@ -203,14 +203,14 @@ namespace HistoricalDataFetcher
             IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
-            TimeSpan _20min = TimeSpan.FromMinutes(20);
+            //TimeSpan _20min = TimeSpan.FromMinutes(20);
             var diff = time - current;
             int tickCount = 1000;
             while (diff <= _30min)
             {
-                // Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
-                if(diff > _20min)
-                    tickCount = 100;
+                //// Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
+                //if(diff > _20min)
+                //    tickCount = 100;
 
                 var ticks = _broker.RequestHistoricalTicks(contract, current, tickCount).Result;
 
