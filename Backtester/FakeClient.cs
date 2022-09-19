@@ -213,13 +213,34 @@ namespace Backtester
         public void PlaceOrder(Contract contract, Order order)
         {
             Debug.Assert(Position != null);
+            Debug.Assert(order.Id > 0);
 
-            //TODO : make sure correct callbacks are called in the right order
+            var openOrder = _openOrders.FirstOrDefault(o => o == order);
+            if (openOrder == null)
+            {
+                //TODO validate order? What to validate?
+                _openOrders.Add(order);
 
-            // create position
+                _messageQueue.Enqueue(() =>
+                {
+                    var orderState = new IBApi.OrderState() { Status = "Submitted" };
+                    Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
+                });
+            }
+            else //modify order
+            {
+                openOrder = order;
+            }
 
-            // get price at current time
+            _messageQueue.Enqueue(() =>
+            {
+                var orderState = new IBApi.OrderState() { Status = "Submitted" };
 
+                //TODO : verify thisssss
+                Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
+            });
+
+            EvaluateOpenOrders(_currentBidAskNode.Value);
         }
 
         double GetCommission(Contract contract, Order order)
@@ -260,7 +281,11 @@ namespace Backtester
         {
             foreach(Order o in _openOrders)
             {
-                if(o is LimitOrder lo)
+                if (o is MarketOrder mo)
+                {
+                    EvaluateMarketOrder(bidAsk, mo);
+                }
+                else if (o is LimitOrder lo)
                 {
                     EvaluateLimitOrder(bidAsk, lo);
                 }
@@ -381,11 +406,13 @@ namespace Backtester
                 Position.PositionAmount += order.TotalQuantity;
                 Position.AverageCost = (Position.AverageCost + total) / 2;
                 UpdateUnrealizedPNL(price);
+                _fakeAccount.CashBalances["USD"] -= total;
             }
             else if (order.Action == OrderAction.SELL)
             {
                 Position.PositionAmount -= order.TotalQuantity;
                 Position.RealizedPNL = order.TotalQuantity * (Position.MarketValue - Position.AverageCost);
+                _fakeAccount.CashBalances["USD"] += total;
             }
 
             var o = _openOrders.First(o => o == order);
@@ -397,6 +424,9 @@ namespace Backtester
             string execId = NextExecId.ToString();
             _messageQueue.Enqueue(() =>
             {
+                //TODO : verify thisssss
+                Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.RequestInfo.ParentId, price, 0, "", 0);
+
                 var exec = new IBApi.Execution()
                 {
                     ExecId = execId,
@@ -422,12 +452,21 @@ namespace Backtester
 
         public void CancelOrder(int orderId)
         {
-            throw new NotImplementedException();
+            var order = _openOrders.First(o => o.Id == orderId);
+            if(order != null)
+            {
+                _openOrders.Remove(order);
+                _messageQueue.Enqueue(() =>
+                {
+                    Callbacks.orderStatus(order.Id, "Cancelled ", 0,0,0,0,0,0,0,"", 0);
+                });
+            }
         }
 
         public void CancelAllOrders() 
         {
-
+            foreach (var o in _openOrders)
+                CancelOrder(o.Id);
         }
 
         public void RequestAccount(string accountCode, bool receiveUpdates = true)
