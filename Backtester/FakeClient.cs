@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,8 +56,8 @@ namespace Backtester
         LinkedList<BidAsk> _dailyBidAsks;
         LinkedListNode<BidAsk> _currentBidAskNode;
 
-        ILogger _logger;
         IBClient _client;
+        ILogger _logger;
 
         bool _positionRequested = false;
         int _reqId5SecBar = -1;
@@ -73,23 +74,21 @@ namespace Backtester
             _client = client;
             _logger = logger;
             _messageQueue = new ConcurrentQueue<Action>();
-
-            _fakeAccount = new Account()
-            {
-                Code = "FAKEACCOUNT123",
-                CashBalances = new Dictionary<string, double>()
-                {
-                     {"USD", 5000}
-                }
-            };
         }
 
         public IBCallbacks Callbacks => _client.Callbacks;
 
         public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
 
-        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        public void Init(Contract contract, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
+            _fakeAccount = new Account()
+            {
+                Code = "FAKEACCOUNT123",
+                CashBalances = new Dictionary<string, double>() { {"USD", 5000} },
+                Positions = new List<Position>() { new Position() { Contract = contract} },
+            };
+
             _currentFakeTime = startTime;
             _start = startTime;
             _end = endTime;
@@ -125,6 +124,7 @@ namespace Backtester
 
         void Stop()
         {
+            ClockTick -= OnClockTick_UpdateUnrealizedPNL;
             ClockTick -= OnClockTick_AccountSubscription;
             ClockTick -= OnClockTick_FiveSecondBar;
             ClockTick -= OnClockTick_PnL;
@@ -210,10 +210,12 @@ namespace Backtester
 
         public void PlaceOrder(Contract contract, Order order)
         {
+            Debug.Assert(Position != null);
+
             //TODO : make sure correct callbacks are called in the right order
 
             // create position
-            
+
             // get price at current time
 
 
@@ -278,68 +280,119 @@ namespace Backtester
             }
         }
 
-        private void EvaluateMarketIfTouchedOrder(BidAsk bidAsk, MarketIfTouchedOrder mito)
+        private void EvaluateMarketOrder(BidAsk bidAsk, MarketOrder o)
         {
-            if (mito.Action == OrderAction.BUY && Math.Abs(mito.TouchPrice - bidAsk.Ask) < 0.005)
+            if (o.Action == OrderAction.BUY)
             {
-                
+                ExecuteOrder(o, bidAsk.Ask);
             }
-            else if (mito.Action == OrderAction.SELL && Math.Abs(mito.TouchPrice - bidAsk.Bid) < 0.005)
+            else if (o.Action == OrderAction.SELL)
             {
-
+                ExecuteOrder(o, bidAsk.Bid);
             }
         }
 
-        private void EvaluateTrailingStopOrder(BidAsk bidAsk, TrailingStopOrder tso)
+        private void EvaluateMarketIfTouchedOrder(BidAsk bidAsk, MarketIfTouchedOrder o)
         {
-            //TODO : handle trailing percent
-            if (tso.Action == OrderAction.BUY && Math.Abs(tso.StopPrice - bidAsk.Ask) < 0.005)
+            if (o.Action == OrderAction.BUY && o.TouchPrice >= bidAsk.Ask)
             {
-
+                ExecuteOrder(o, bidAsk.Ask);
             }
-            else if (tso.Action == OrderAction.SELL && Math.Abs(tso.StopPrice - bidAsk.Bid) < 0.005)
+            else if (o.Action == OrderAction.SELL && o.TouchPrice <= bidAsk.Bid)
             {
-
+                ExecuteOrder(o, bidAsk.Bid);
             }
         }
 
-        private void EvaluateStopOrder(BidAsk bidAsk, StopOrder so)
+        private void EvaluateTrailingStopOrder(BidAsk bidAsk, TrailingStopOrder o)
         {
-            if (so.Action == OrderAction.BUY && Math.Abs(so.StopPrice - bidAsk.Ask) < 0.005)
-            {
+            Debug.Assert(o.StopPrice > 0);
 
+            //TODO : validate computations
+            if (o.Action == OrderAction.BUY)
+            {
+                if (o.StopPrice <= bidAsk.Ask)
+                {
+                    ExecuteOrder(o, bidAsk.Ask);
+                }
+                else if (o.TrailingPercent != double.MinValue)
+                {
+                    var currentPercent = 1 - (o.StopPrice / bidAsk.Ask);
+                    if (currentPercent > o.TrailingPercent)
+                        o.StopPrice = bidAsk.Ask +  o.TrailingPercent * bidAsk.Ask;
+                }
+                else
+                {
+                    var currentStopPrice = bidAsk.Ask + o.TrailingAmount;
+                    if (currentStopPrice < o.StopPrice)
+                        o.StopPrice = currentStopPrice;
+                }
             }
-            else if (so.Action == OrderAction.SELL && Math.Abs(so.StopPrice - bidAsk.Bid) < 0.005)
+            else if (o.Action == OrderAction.SELL)
             {
-
+                if (o.StopPrice >= bidAsk.Bid)
+                {
+                    ExecuteOrder(o, bidAsk.Bid);
+                }
+                else if (o.TrailingPercent != double.MinValue)
+                {
+                    var currentPercent = 1 - (bidAsk.Bid / o.StopPrice);
+                    if (currentPercent > o.TrailingPercent)
+                        o.StopPrice = bidAsk.Bid - o.TrailingPercent * bidAsk.Bid;
+                }
+                else
+                {
+                    var currentStopPrice = bidAsk.Bid - o.TrailingAmount;
+                    if (currentStopPrice < o.StopPrice)
+                        o.StopPrice = currentStopPrice;
+                }
             }
         }
 
-        private void EvaluateLimitOrder(BidAsk bidAsk, LimitOrder lo)
+        private void EvaluateStopOrder(BidAsk bidAsk, StopOrder o)
         {
-            if (lo.Action == OrderAction.BUY && Math.Abs(lo.LmtPrice - bidAsk.Ask) < 0.005)
+            if (o.Action == OrderAction.BUY && o.StopPrice >= bidAsk.Ask)
             {
-
+                ExecuteOrder(o, bidAsk.Ask);
             }
-            else if (lo.Action == OrderAction.SELL && Math.Abs(lo.LmtPrice - bidAsk.Bid) < 0.005)
+            else if (o.Action == OrderAction.SELL && o.StopPrice <= bidAsk.Bid)
             {
+                ExecuteOrder(o, bidAsk.Bid);
+            }
+        }
 
+        private void EvaluateLimitOrder(BidAsk bidAsk, LimitOrder o)
+        {
+            if (o.Action == OrderAction.BUY && o.LmtPrice >= bidAsk.Ask)
+            {
+                ExecuteOrder(o, bidAsk.Ask);
+            }
+            else if (o.Action == OrderAction.SELL && o.LmtPrice <= bidAsk.Bid)
+            {
+                ExecuteOrder(o, bidAsk.Bid);
             }
         }
 
         void ExecuteOrder(Order order, double price)
         {
+            var total = order.TotalQuantity * price;
+
             if(order.Action == OrderAction.BUY)
             {
-                var total = order.TotalQuantity * price;
-
-
-
+                Position.PositionAmount += order.TotalQuantity;
+                Position.AverageCost = (Position.AverageCost + total) / 2;
+                UpdateUnrealizedPNL(price);
             }
             else if (order.Action == OrderAction.SELL)
             {
-
+                Position.PositionAmount -= order.TotalQuantity;
+                Position.RealizedPNL = order.TotalQuantity * (Position.MarketValue - Position.AverageCost);
             }
+
+            var o = _openOrders.First(o => o == order);
+            _openOrders.Remove(o);
+            _executedOrders.Add(o);
+            //TODO : send executed order and commission stuff
         }
 
         public void CancelOrder(int orderId)
@@ -477,16 +530,11 @@ namespace Backtester
 
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
-            if (Position == null)
-                return;
-
             var newBar = _currentBarNode.Value;
             var currentPrice = (newBar.Close + newBar.High + newBar.Low) / 3;
 
             var oldPos = new Position(Position);
-            Position.MarketPrice = currentPrice;
-            Position.MarketValue = currentPrice * Position.PositionAmount;
-            Position.UnrealizedPNL = Position.PositionAmount * (Position.MarketValue - Position.AverageCost);
+            UpdateUnrealizedPNL(currentPrice);
 
             if(_positionRequested && oldPos != Position)
             {
@@ -495,12 +543,16 @@ namespace Backtester
             }
         }
 
+        void UpdateUnrealizedPNL(double currentPrice)
+        {
+            Position.MarketPrice = currentPrice;
+            Position.MarketValue = currentPrice * Position.PositionAmount;
+            Position.UnrealizedPNL = Position.PositionAmount * (Position.MarketValue - Position.AverageCost);
+        }
+
         public void RequestPositions()
         {
             _positionRequested = true;
-            if (Position == null)
-                return;
-
             SendPosition();
             _messageQueue.Enqueue(() =>
             {
@@ -510,9 +562,6 @@ namespace Backtester
 
         void SendPosition()
         {
-            if (Position == null)
-                return;
-
             _messageQueue.Enqueue(() =>
             {
                 Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
@@ -533,9 +582,6 @@ namespace Backtester
 
         void OnClockTick_PnL(DateTime newTime)
         {
-            if (Position == null)
-                return;
-
             _messageQueue.Enqueue(() => 
             {
                 Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);

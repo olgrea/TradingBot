@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Broker.Orders
 {
@@ -40,6 +42,19 @@ namespace TradingBot.Broker.Orders
         protected Order(string orderType) => OrderType = orderType;
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            Debug.Assert(Id > 0);
+            var other = obj as Order;
+            return other != null && other.Id == Id;
+        }
+
+        public override int GetHashCode()
+        {
+            Debug.Assert(Id > 0);
+            return Id.GetHashCode();
+        }
     }
 
     internal class MarketOrder : Order
@@ -68,9 +83,10 @@ namespace TradingBot.Broker.Orders
     internal class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        public double StopPrice { get; set; }
-
-        // Ignored if StopPrice is set
-        public double TrailingPercent { get; set; }
+        internal double StopPrice { get; set; } 
+        
+        public double TrailingAmount{ get; set; }
+        // Takes priority over TrailingAmount if set
+        public double TrailingPercent { get; set; } = double.MinValue;
     }
 }
