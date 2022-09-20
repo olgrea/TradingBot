@@ -28,7 +28,7 @@ namespace HistoricalDataFetcher
 
     internal class DataFetcher
     {
-        public const string RootDir = @"D:\historical";
+        public const string RootDir = MarketDataUtils.RootDir;
 
         public int _nbRequest = 0;
 
