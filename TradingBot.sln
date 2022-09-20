@@ -10,13 +10,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "src\TradingBo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleApp", "ConsoleApp\ConsoleApp.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevTesting", "DevTesting\DevTesting.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester", "Backtester\Backtester.csproj", "{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataFetcher", "HistoricalDataFetcher\HistoricalDataFetcher.csproj", "{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
