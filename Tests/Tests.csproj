@@ -15,4 +15,10 @@
     <PackageReference Include="NUnit3TestAdapter" Version="4.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Backtester\Backtester.csproj" />
+    <ProjectReference Include="..\HistoricalDataFetcher\HistoricalDataFetcher.csproj" />
+    <ProjectReference Include="..\src\TradingBot.csproj" />
+  </ItemGroup>
+
 </Project>

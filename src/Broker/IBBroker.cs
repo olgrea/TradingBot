@@ -13,6 +13,7 @@ using System.Collections;
 using System.Drawing;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
+[assembly: InternalsVisibleToAttribute("Tests")]
 namespace TradingBot.Broker
 {
     internal class DataSubscriptions

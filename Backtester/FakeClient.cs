@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
+using System.Timers;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -36,6 +36,7 @@ namespace Backtester
         DateTime _start;
         DateTime _end;
         DateTime _currentFakeTime;
+        string _ticker;
 
         event Action<DateTime> ClockTick;
         event Action<BidAsk> BidAskSubscription;
@@ -44,6 +45,7 @@ namespace Backtester
 
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
+        double _totalCommission = 0;
 
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
@@ -63,12 +65,13 @@ namespace Backtester
         int _reqIdBidAsk = -1;
         int _reqIdPnL = -1;
 
-        int _nextValidOrderId = 0;
-        int NextValidOrderId => _nextValidOrderId++;
+        int _nextValidOrderId = 1;
+        internal int NextValidOrderId => _nextValidOrderId++;
         int _nextExecId = 0;
         int NextExecId => _nextExecId++;
         Position Position => _fakeAccount.Positions.FirstOrDefault();
-        Contract Contract => Position?.Contract;
+        internal Contract Contract => Position?.Contract;
+        internal Account Account => _fakeAccount;
 
         public FakeClient(IBClient client, ILogger logger)
         {
@@ -81,29 +84,46 @@ namespace Backtester
 
         public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
 
-        public void Init(Contract contract, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+
+        //TODO : investigate refactor I don't like that init method
+        public void Init(string ticker, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
+            _ticker = ticker;
+            var contract = GetContractsAsync(_ticker).Result.First();
             _fakeAccount = new Account()
             {
                 Code = "FAKEACCOUNT123",
                 CashBalances = new Dictionary<string, double>() { {"USD", 5000} },
-                Positions = new List<Position>() { new Position() { Contract = contract} },
+                Positions = new List<Position>() { new Position() { Contract = contract } }, 
             };
 
             _currentFakeTime = startTime;
             _start = startTime;
             _end = endTime;
+            
             _dailyBars = new LinkedList<Bar>(dailyBars);
-            _currentBarNode = _dailyBars.First;
+            _currentBarNode = InitFirstNode(_dailyBars);
+            
             _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
-            _currentBidAskNode = _dailyBidAsks.First;
+            _currentBidAskNode = InitFirstNode(_dailyBidAsks);
+
             _initialized = true;
         }
 
+        LinkedListNode<T> InitFirstNode<T>(LinkedList<T> list) where T : IMarketData
+        {
+            var current = list.First;
+            while (current.Value.Time < _start)
+                current = current.Next;
+            return current;
+        }
+
+        // called by IBBroker
         public void Connect(string host, int port, int clientId)
         {
             _client.Connect(host, port, clientId);
-            Start();
+            if(_initialized)
+                Start();
         }
 
         public void Disconnect()
@@ -112,26 +132,58 @@ namespace Backtester
             _client.Disconnect();
         }
 
-        void Start()
+        internal void Start()
         {
             if (!_initialized)
                 throw new InvalidOperationException("Fake client has not been initialized.");
+            
+            var contract = GetContractsAsync(_ticker).Result.First();
+            _fakeAccount.Positions = new List<Position>() { new Position() { Contract = contract } };
 
+            ClockTick += OnClockTick_UpdateBarNode;
+            ClockTick += OnClockTick_UpdateBidAskNode;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
-
             StartConsumerTask();
             StartPassingTimeTask();
         }
 
-        void Stop()
+        internal void Stop()
         {
+            ClockTick -= OnClockTick_UpdateBarNode;
+            ClockTick -= OnClockTick_UpdateBidAskNode;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
+            StopPassingTimeTask();
+            StopConsumerTask();
+        }
+
+        internal void Reset()
+        {
+            if(_passingTimeTask != null)
+                Stop();
+
             ClockTick -= OnClockTick_AccountSubscription;
             ClockTick -= OnClockTick_FiveSecondBar;
             ClockTick -= OnClockTick_PnL;
 
-            StopPassingTimeTask();
-            StopConsumerTask();
+            var contract = Contract;
+            _fakeAccount = null;
+
+            _currentFakeTime = _start;
+            _currentBarNode = null;
+            _currentBidAskNode = null;
+
+            _executedOrders.Clear();
+            _openOrders.Clear();
+
+            _positionRequested = false;
+            _reqId5SecBar = -1;
+            _reqIdBidAsk = -1;
+            _reqIdPnL = -1;
+
+            _nextExecId = 0;
+            _nextValidOrderId = 1;
+
+            _initialized = false;
         }
 
         void StartConsumerTask()
@@ -151,8 +203,8 @@ namespace Backtester
 
         void StopConsumerTask()
         {
-            _consumerTaskCancellation.Cancel();
-            _consumerTaskCancellation.Dispose();
+            _consumerTaskCancellation?.Cancel();
+            _consumerTaskCancellation?.Dispose();
             _consumerTaskCancellation = null;
             _consumerTask = null;
         }
@@ -172,22 +224,9 @@ namespace Backtester
                     {
                         ClockTick?.Invoke(_currentFakeTime);
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
-                        
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                        _currentBarNode = _currentBarNode.Next;
-                        
-                        while(_currentBidAskNode.Value.Time < _currentFakeTime)
-                        {
-                            EvaluateOpenOrders(_currentBidAskNode.Value);
-                            BidAskSubscription?.Invoke(_currentBidAskNode.Value);
-                            _currentBidAskNode = _currentBidAskNode.Next;
-                        }
-                        
-                        _5SecBars.AddFirst(_currentBarNode);
-                        if (_5SecBars.Count > 5)
-                            _5SecBars.RemoveLast();
                     }
-                    catch (OperationCanceledException)
+                    catch (AggregateException e)
                     {
                         delayCancellation.Dispose();
                         if (!mainToken.IsCancellationRequested)
@@ -203,8 +242,8 @@ namespace Backtester
 
         void StopPassingTimeTask()
         {
-            _passingTimeCancellation.Cancel();
-            _passingTimeCancellation.Dispose();
+            _passingTimeCancellation?.Cancel();
+            _passingTimeCancellation?.Dispose();
             _passingTimeCancellation = null;
             _passingTimeTask = null;
         }
@@ -299,6 +338,8 @@ namespace Backtester
                     EvaluateMarketIfTouchedOrder(bidAsk, mito);
                 }
             }
+
+            _openOrders.RemoveAll(o => _executedOrders.Contains(o));
         }
 
         private void EvaluateMarketOrder(BidAsk bidAsk, MarketOrder o)
@@ -413,11 +454,13 @@ namespace Backtester
             }
 
             var o = _openOrders.First(o => o == order);
-            _openOrders.Remove(o);
             _executedOrders.Add(o);
             //TODO : really really need to make sure I have the correct prices
 
             double commission = GetCommission(Contract, order);
+            _fakeAccount.CashBalances["USD"] -= commission;
+            _totalCommission += commission;
+
             string execId = NextExecId.ToString();
             _messageQueue.Enqueue(() =>
             {
@@ -433,7 +476,8 @@ namespace Backtester
                     Exchange = Contract.Exchange,
                     Side = o.Action == OrderAction.BUY ? "BOT" : "SLD",
                     Shares = o.TotalQuantity,
-                    AvgPrice = total,
+                    Price = total,
+                    AvgPrice = price
                 };
                 Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec);
 
@@ -589,6 +633,25 @@ namespace Backtester
             });
         }
 
+        void OnClockTick_UpdateBarNode(DateTime newTime)
+        {
+            _5SecBars.AddFirst(_currentBarNode.Value);
+            if (_5SecBars.Count > 5)
+                _5SecBars.RemoveLast();
+
+            _currentBarNode = _currentBarNode.Next;
+        }
+
+        void OnClockTick_UpdateBidAskNode(DateTime newTime)
+        {
+            while (_currentBidAskNode.Value.Time < newTime)
+            {
+                EvaluateOpenOrders(_currentBidAskNode.Value);
+                BidAskSubscription?.Invoke(_currentBidAskNode.Value);
+                _currentBidAskNode = _currentBidAskNode.Next;
+            }
+        }
+
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
             var newBar = _currentBarNode.Value;
@@ -721,6 +784,48 @@ namespace Backtester
         {
             int next = NextValidOrderId;
             _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
+        }
+
+        Task<List<Contract>> GetContractsAsync(string ticker)
+        {
+            var sampleContract = new Stock()
+            {
+                Currency = "USD",
+                Exchange = "SMART",
+                Symbol = ticker,
+                SecType = "STK"
+            };
+
+            var reqId = 1;
+
+            var resolveResult = new TaskCompletionSource<List<Contract>>();
+            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+            var tmpContracts = new List<Contract>();
+            var contractDetails = new Action<int, Contract>((rId, c) =>
+            {
+                if (rId == reqId)
+                    tmpContracts.Add(c);
+            });
+            var contractDetailsEnd = new Action<int>(rId =>
+            {
+                if (rId == reqId)
+                    resolveResult.SetResult(tmpContracts);
+            });
+
+            _client.Callbacks.ContractDetails += contractDetails;
+            _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
+            _client.Callbacks.Message += error;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.ContractDetails -= contractDetails;
+                _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
+                _client.Callbacks.Message -= error;
+            });
+
+            _client.RequestContract(reqId, sampleContract);
+
+            return resolveResult.Task;
         }
     }
 }

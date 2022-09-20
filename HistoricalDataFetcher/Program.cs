@@ -6,7 +6,9 @@ using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
 using System.IO;
+using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleToAttribute("Tests")]
 namespace HistoricalDataFetcher
 {
     internal class Program
@@ -19,12 +21,12 @@ namespace HistoricalDataFetcher
             if (args.Length == 3)
                 endDate = DateTime.Parse(args[2]);
 
-            var hdf = new HistoricalDataFetcher(ticker, startDate, endDate);    
+            var hdf = new DataFetcher(ticker, startDate, endDate);    
             hdf.Start();
         }
     }
 
-    internal class HistoricalDataFetcher
+    internal class DataFetcher
     {
         public const string RootDir = @"D:\historical";
 
@@ -50,7 +52,7 @@ namespace HistoricalDataFetcher
         public static TimeSpan MarketStart = DateTimeUtils.MarketStartTime;
         public static TimeSpan MarketEnd = DateTimeUtils.MarketEndTime;
 
-        public HistoricalDataFetcher(string ticker, DateTime start, DateTime end)
+        public DataFetcher(string ticker, DateTime start, DateTime end)
         {
             _ticker = ticker;
 
