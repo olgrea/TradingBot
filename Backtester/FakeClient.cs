@@ -226,7 +226,7 @@ namespace Backtester
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
                     }
-                    catch (AggregateException e)
+                    catch (AggregateException)
                     {
                         delayCancellation.Dispose();
                         if (!mainToken.IsCancellationRequested)

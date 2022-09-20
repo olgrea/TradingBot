@@ -12,6 +12,8 @@ using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Reflection.Metadata.Ecma335;
+using NUnit.Framework.Internal.Execution;
 
 namespace Tests.Backtester
 {
@@ -82,8 +84,8 @@ namespace Tests.Backtester
         [Test]
         public void MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
+            // Setup
             _fakeClient.Init(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
-            
             var order = new MarketOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -91,30 +93,23 @@ namespace Tests.Backtester
                 TotalQuantity = 50
             };
 
+            // Test
             var expectedPrice = _upwardBidAsks.First().Ask;
-
-            var tcs = new TaskCompletionSource<double>();
-            var executedAction = new Action<Contract, OrderExecution>((c, oe) => { tcs.SetResult(oe.AvgPrice); });
-            try
+            var actualPrice = AsyncToSync(() =>
             {
-                _callbacks.ExecDetails += executedAction;
                 _fakeClient.Start();
-
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
-                tcs.Task.Wait(2000);
-            }
-            finally
-            {
-                _callbacks.ExecDetails -= executedAction;
-            }
 
-            var actualPrice = tcs.Task.Result;
+            }, ref _callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+
+            // Assert
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
         [Test]
         public void MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
+            // Setup
             _fakeClient.Init(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
@@ -127,25 +122,71 @@ namespace Tests.Backtester
             position.PositionAmount = 50;
             position.AverageCost = 28.00;
 
+            // Test
             var expectedPrice = _upwardBidAsks.First().Bid;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
 
-            var tcs = new TaskCompletionSource<double>();
-            var executedAction = new Action<Contract, OrderExecution>((c, oe) => { tcs.SetResult(oe.AvgPrice); });
+            }, ref _callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        public TResult AsyncToSync<T1, TResult>(Action async, ref Action<T1> @event, Func<T1, TResult> resultFunc)
+        {
+            var tcs = new TaskCompletionSource<TResult>();
+            var callback = new Action<T1>(t1 => tcs.SetResult(resultFunc(t1)));
             try
             {
-                _callbacks.ExecDetails += executedAction;
-                _fakeClient.Start();
-
-                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+                @event += callback;
+                async.Invoke();
                 tcs.Task.Wait(2000);
             }
             finally
             {
-                _callbacks.ExecDetails -= executedAction;
+                @event -= callback;
             }
 
-            var actualPrice = tcs.Task.Result;
-            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
+        }
+
+        public TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc)
+        {
+            var tcs = new TaskCompletionSource<TResult>();
+            var callback = new Action<T1, T2>((t1, t2) => tcs.SetResult(resultFunc(t1, t2)));
+            try
+            {
+                @event += callback;
+                async.Invoke();
+                tcs.Task.Wait(2000);
+            }
+            finally
+            {
+                @event -= callback;
+            }
+
+            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
+        }
+
+        public TResult AsyncToSync<T1, T2, T3, TResult>(Action async, ref Action<T1, T2, T3> @event, Func<T1, T2, T3, TResult> resultFunc)
+        {
+            var tcs = new TaskCompletionSource<TResult>();
+            var callback = new Action<T1, T2, T3>((t1, t2, t3) => tcs.SetResult(resultFunc(t1, t2, t3)));
+            try
+            {
+                @event += callback;
+                async.Invoke();
+                tcs.Task.Wait(2000);
+            }
+            finally
+            {
+                @event -= callback;
+            }
+
+            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
         }
     }
 }
