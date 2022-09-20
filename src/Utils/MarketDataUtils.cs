@@ -9,6 +9,8 @@ namespace TradingBot.Utils
 {
     internal class MarketDataUtils
     {
+        public const string RootDir = @"D:\historical";
+
         public static string MakeDailyDataPath<TData>(string ticker, DateTime date) where TData : IMarketData, new()
         {
             return Path.Combine(ticker, typeof(TData).Name, date.ToString("yyyy-MM-dd"), "full.json");

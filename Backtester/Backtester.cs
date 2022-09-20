@@ -19,7 +19,7 @@ namespace Backtester
 {
     internal class Backtester
     {
-        const string RootDir = @"D:\dev\repos\TradingBot\HistoricalDataFetcher\bin\Debug\netcoreapp3.1\historical";
+        const string RootDir = MarketDataUtils.RootDir;
 
         DateTime _startTime;
         DateTime _endTime;
