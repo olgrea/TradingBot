@@ -24,7 +24,7 @@ namespace TradingBot.Broker.Orders
         public int ClientId { get; set; }
         public int ParentId { get; set; }
         public int PermId { get; set; }
-        public bool Transmit { get; set; } // if false, order will be created but not transmitted
+        public bool Transmit { get; set; } = true; // if false, order will be created but not transmitted
         public string OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
     }

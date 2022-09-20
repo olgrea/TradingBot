@@ -22,11 +22,12 @@ namespace Backtester
         /// - To have 1 day pass in 1 hour => TimeScale = 3600.0d/32400 ~ 111 ms/sec
         /// - To have 1 week (5 days) pass in 1 hour => TimeScale = 3600.0d/162000 ~ 22 ms/sec
         /// </summary>
-        static class TimeDelays
+        internal static class TimeDelays
         {
             public static double TimeScale = 3600.0d / 32400;
             public static int OneSecond = (int)Math.Round(1 * 1000 * TimeScale);
         }
+        Stopwatch _st = new Stopwatch();
 
         ConcurrentQueue<Action> _messageQueue;
         Task _consumerTask;
@@ -65,38 +66,49 @@ namespace Backtester
         int _reqIdBidAsk = -1;
         int _reqIdPnL = -1;
 
-        int _nextValidOrderId = 1;
+        int _nextValidOrderId;
         internal int NextValidOrderId => _nextValidOrderId++;
         int _nextExecId = 0;
         int NextExecId => _nextExecId++;
         Position Position => _fakeAccount.Positions.FirstOrDefault();
+
+        Contract _contract;
         internal Contract Contract => Position?.Contract;
         internal Account Account => _fakeAccount;
 
-        public FakeClient(IBClient client, ILogger logger)
+        public FakeClient(string ticker, ILogger logger)
         {
-            _client = client;
+            _client = new IBClient(new IBCallbacks(logger), logger);
+            _client.Connect(IBBroker.DefaultIP, IBBroker.DefaultPort, 9999);
+
+            _nextValidOrderId = GetNextValidId().Result;
+            Callbacks = new IBCallbacks(logger);
+
+            _ticker = ticker;
+            _contract = GetContractsAsync(_ticker).Result.First();
+            InitFakeAccount();
+
             _logger = logger;
             _messageQueue = new ConcurrentQueue<Action>();
         }
 
-        public IBCallbacks Callbacks => _client.Callbacks;
+        public IBCallbacks Callbacks { get; private set; }
 
         public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
 
-
-        //TODO : investigate refactor I don't like that init method
-        public void Init(string ticker, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        private void InitFakeAccount()
         {
-            _ticker = ticker;
-            var contract = GetContractsAsync(_ticker).Result.First();
             _fakeAccount = new Account()
             {
                 Code = "FAKEACCOUNT123",
-                CashBalances = new Dictionary<string, double>() { {"USD", 5000} },
-                Positions = new List<Position>() { new Position() { Contract = contract } }, 
+                CashBalances = new Dictionary<string, double>() { { "USD", 5000 } },
+                Positions = new List<Position>() { new Position() { Contract = _contract } }
             };
+        }
 
+        //TODO : investigate refactor I don't like that init method
+        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        {
             _currentFakeTime = startTime;
             _start = startTime;
             _end = endTime;
@@ -121,7 +133,6 @@ namespace Backtester
         // called by IBBroker
         public void Connect(string host, int port, int clientId)
         {
-            _client.Connect(host, port, clientId);
             if(_initialized)
                 Start();
         }
@@ -129,7 +140,6 @@ namespace Backtester
         public void Disconnect()
         {
             Stop();
-            _client.Disconnect();
         }
 
         internal void Start()
@@ -137,9 +147,6 @@ namespace Backtester
             if (!_initialized)
                 throw new InvalidOperationException("Fake client has not been initialized.");
             
-            var contract = GetContractsAsync(_ticker).Result.First();
-            _fakeAccount.Positions = new List<Position>() { new Position() { Contract = contract } };
-
             ClockTick += OnClockTick_UpdateBarNode;
             ClockTick += OnClockTick_UpdateBidAskNode;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
@@ -165,9 +172,9 @@ namespace Backtester
             ClockTick -= OnClockTick_FiveSecondBar;
             ClockTick -= OnClockTick_PnL;
 
-            var contract = Contract;
-            _fakeAccount = null;
+            InitFakeAccount();
 
+            _st.Reset();
             _currentFakeTime = _start;
             _currentBarNode = null;
             _currentBidAskNode = null;
@@ -180,8 +187,7 @@ namespace Backtester
             _reqIdBidAsk = -1;
             _reqIdPnL = -1;
 
-            _nextExecId = 0;
-            _nextValidOrderId = 1;
+            _nextValidOrderId = GetNextValidId().Result;
 
             _initialized = false;
         }
@@ -213,6 +219,7 @@ namespace Backtester
         {
             _passingTimeCancellation = new CancellationTokenSource();
             var mainToken = _passingTimeCancellation.Token;
+            _st.Start();
             _passingTimeTask = Task.Factory.StartNew(() =>
             {
                 var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
@@ -225,6 +232,7 @@ namespace Backtester
                         ClockTick?.Invoke(_currentFakeTime);
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
+                        //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
                     }
                     catch (AggregateException)
                     {
@@ -242,6 +250,7 @@ namespace Backtester
 
         void StopPassingTimeTask()
         {
+            _st.Stop();
             _passingTimeCancellation?.Cancel();
             _passingTimeCancellation?.Dispose();
             _passingTimeCancellation = null;
@@ -300,12 +309,12 @@ namespace Backtester
 
             var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
 
-            Callbacks.OpenOrder += openOrder;
-            Callbacks.Message += error;
-                        resolveResult.Task.ContinueWith(t =>
+            _client.Callbacks.OpenOrder += openOrder;
+            _client.Callbacks.Message += error;
+            resolveResult.Task.ContinueWith(t =>
             {
-                Callbacks.OpenOrder -= openOrder;
-                Callbacks.Message -= error;
+                _client.Callbacks.OpenOrder -= openOrder;
+                _client.Callbacks.Message -= error;
             });
 
             _client.PlaceOrder(contract, order, true);
@@ -644,8 +653,11 @@ namespace Backtester
 
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
         {
+            //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
             while (_currentBidAskNode.Value.Time < newTime)
             {
+                //_logger.LogDebug($"  {_currentBidAskNode.Value.Ask:C}");
+                _logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}\t{_currentBidAskNode.Value.Ask:C}");
                 EvaluateOpenOrders(_currentBidAskNode.Value);
                 BidAskSubscription?.Invoke(_currentBidAskNode.Value);
                 _currentBidAskNode = _currentBidAskNode.Next;
@@ -824,6 +836,29 @@ namespace Backtester
             });
 
             _client.RequestContract(reqId, sampleContract);
+
+            return resolveResult.Task;
+        }
+
+        Task<int> GetNextValidId()
+        {
+            var resolveResult = new TaskCompletionSource<int>();
+            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+            var nextValidId = new Action<int>(id =>
+            {
+                resolveResult.SetResult(id);
+            });
+
+            _client.Callbacks.NextValidId += nextValidId;
+            _client.Callbacks.Message += error;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.NextValidId -= nextValidId;
+                _client.Callbacks.Message -= error;
+            });
+
+            _client.RequestValidOrderIds();
 
             return resolveResult.Task;
         }

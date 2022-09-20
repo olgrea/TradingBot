@@ -12,7 +12,6 @@ using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Reflection.Metadata.Ecma335;
 using NUnit.Framework.Internal.Execution;
 
 namespace Tests.Backtester
@@ -33,7 +32,6 @@ namespace Tests.Backtester
         IEnumerable<Bar> _upwardBars;
 
         FakeClient _fakeClient;
-        IBCallbacks _callbacks;
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -43,11 +41,10 @@ namespace Tests.Backtester
             _upwardBidAsks = Deserialize<BidAsk>(_upwardFileTime, _upwardStart);
             _upwardBars = Deserialize<Bar>(_upwardFileTime, _upwardStart);
 
-            var logger = new ConsoleLogger();
-            _callbacks = new IBCallbacks(logger);
-            var client = new IBClient(_callbacks, logger);
-            _fakeClient = new FakeClient(client, logger);
-            _fakeClient.Connect(IBBroker.DefaultIP, IBBroker.DefaultPort, 8008);
+            var logger = new NoLogger();
+            _fakeClient = new FakeClient(Ticker, logger);
+
+            FakeClient.TimeDelays.TimeScale = 3600.0d / 162000;
         }
 
         IEnumerable<T> Deserialize<T>(DateTime fileTime, DateTime start) where T : IMarketData, new()
@@ -60,12 +57,6 @@ namespace Tests.Backtester
         public void OneTimeTearDown()
         {
             _fakeClient.Disconnect();
-        }
-
-        [SetUp]
-        public void SetUp()
-        {
-            
         }
 
         [TearDown]
@@ -85,7 +76,7 @@ namespace Tests.Backtester
         public void MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeClient.Init(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -100,7 +91,7 @@ namespace Tests.Backtester
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
 
-            }, ref _callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
 
             // Assert
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
@@ -110,7 +101,7 @@ namespace Tests.Backtester
         public void MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeClient.Init(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -129,13 +120,65 @@ namespace Tests.Backtester
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
 
-            }, ref _callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
 
             // Assert
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
-        public TResult AsyncToSync<T1, TResult>(Action async, ref Action<T1> @event, Func<T1, TResult> resultFunc)
+        [Test]
+        public void LimitOrder_Buy_OverAskPrice_GetsFilledAtCurrentAskPrice()
+        {
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new LimitOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                LmtPrice = _upwardBidAsks.First().Ask + 0.5,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedPrice = _upwardBidAsks.First().Ask;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        [Test]
+        public void LimitOrder_Buy_UnderAskPrice_GetsFilledWhenLimitPriceIsReached()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new LimitOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                LmtPrice = _downwardBidAsks.First().Ask - 0.1,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First(ba => ba.Ask <= order.LmtPrice).Ask;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        TResult AsyncToSync<T1, TResult>(Action async, ref Action<T1> @event, Func<T1, TResult> resultFunc, int timeoutInSec = 2)
         {
             var tcs = new TaskCompletionSource<TResult>();
             var callback = new Action<T1>(t1 => tcs.SetResult(resultFunc(t1)));
@@ -143,7 +186,7 @@ namespace Tests.Backtester
             {
                 @event += callback;
                 async.Invoke();
-                tcs.Task.Wait(2000);
+                tcs.Task.Wait(timeoutInSec*1000);
             }
             finally
             {
@@ -153,7 +196,7 @@ namespace Tests.Backtester
             return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
         }
 
-        public TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc)
+        TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc, int timeoutInSec = 2)
         {
             var tcs = new TaskCompletionSource<TResult>();
             var callback = new Action<T1, T2>((t1, t2) => tcs.SetResult(resultFunc(t1, t2)));
@@ -161,7 +204,7 @@ namespace Tests.Backtester
             {
                 @event += callback;
                 async.Invoke();
-                tcs.Task.Wait(2000);
+                tcs.Task.Wait(timeoutInSec*1000);
             }
             finally
             {
@@ -171,7 +214,7 @@ namespace Tests.Backtester
             return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
         }
 
-        public TResult AsyncToSync<T1, T2, T3, TResult>(Action async, ref Action<T1, T2, T3> @event, Func<T1, T2, T3, TResult> resultFunc)
+        TResult AsyncToSync<T1, T2, T3, TResult>(Action async, ref Action<T1, T2, T3> @event, Func<T1, T2, T3, TResult> resultFunc, int timeoutInSec = 2)
         {
             var tcs = new TaskCompletionSource<TResult>();
             var callback = new Action<T1, T2, T3>((t1, t2, t3) => tcs.SetResult(resultFunc(t1, t2, t3)));
@@ -179,7 +222,7 @@ namespace Tests.Backtester
             {
                 @event += callback;
                 async.Invoke();
-                tcs.Task.Wait(2000);
+                tcs.Task.Wait(timeoutInSec*1000);
             }
             finally
             {
