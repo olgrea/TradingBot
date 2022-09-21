@@ -284,8 +284,6 @@ namespace Backtester
                 var orderState = new IBApi.OrderState() { Status = "Submitted" };
                 Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
             });
-
-            EvaluateOpenOrders(_currentBidAskNode.Value);
         }
 
         double GetCommission(Contract contract, Order order)
@@ -657,7 +655,7 @@ namespace Backtester
             while (_currentBidAskNode.Value.Time < newTime)
             {
                 //_logger.LogDebug($"  {_currentBidAskNode.Value.Ask:C}");
-                _logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}\t{_currentBidAskNode.Value.Ask:C}");
+                //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}\t{_currentBidAskNode.Value.Ask:C}");
                 EvaluateOpenOrders(_currentBidAskNode.Value);
                 BidAskSubscription?.Invoke(_currentBidAskNode.Value);
                 _currentBidAskNode = _currentBidAskNode.Next;
