@@ -178,6 +178,67 @@ namespace Tests.Backtester
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
+
+        [Test]
+        public void LimitOrder_Sell_OverBidPrice_GetsFilledWhenLimitPriceIsReached()
+        {
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new LimitOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                LmtPrice = _upwardBidAsks.First().Bid + 0.03,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _upwardBidAsks.First(ba => ba.Bid >= order.LmtPrice).Bid;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        [Test]
+        public void LimitOrder_Sell_UnderBidPrice_GetsFilledAtCurrentBidPrice()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new LimitOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                LmtPrice = _downwardBidAsks.First().Bid - 0.1,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First().Bid;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
         TResult AsyncToSync<T1, TResult>(Action async, ref Action<T1> @event, Func<T1, TResult> resultFunc, int timeoutInSec = 2)
         {
             var tcs = new TaskCompletionSource<TResult>();

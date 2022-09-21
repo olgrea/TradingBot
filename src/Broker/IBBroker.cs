@@ -584,9 +584,19 @@ namespace TradingBot.Broker
         {
             if (msg is ClientError)
             {
+                Exception e;
                 if (msg is ClientException ex)
+                {
                     resolveResult.SetException(ex.Exception);
+                    e = new Exception(msg.Message, ex.Exception);
+                }
+                else
+                {
+                    e = new Exception(msg.Message);
+                }
+
                 resolveResult.SetResult(default(T));
+                throw e;
             }
         }
 
