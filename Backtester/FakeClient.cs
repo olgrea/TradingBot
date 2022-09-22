@@ -305,7 +305,7 @@ namespace Backtester
                 }
             });
 
-            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<OrderState>.TaskError(msg, resolveResult));
 
             _client.Callbacks.OpenOrder += openOrder;
             _client.Callbacks.Message += error;
@@ -809,7 +809,7 @@ namespace Backtester
             var reqId = 1;
 
             var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<List<Contract>>.TaskError(msg, resolveResult));
             var tmpContracts = new List<Contract>();
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
@@ -841,7 +841,7 @@ namespace Backtester
         Task<int> GetNextValidId()
         {
             var resolveResult = new TaskCompletionSource<int>();
-            var error = new Action<ClientMessage>(msg => IBBroker.TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<int>.TaskError(msg, resolveResult));
             var nextValidId = new Action<int>(id =>
             {
                 resolveResult.SetResult(id);

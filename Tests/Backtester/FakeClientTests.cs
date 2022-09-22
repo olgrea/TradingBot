@@ -86,7 +86,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First().Ask;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -115,7 +115,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First().Bid;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -141,7 +141,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First().Ask;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -167,7 +167,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _downwardBidAsks.First(ba => ba.Ask <= order.LmtPrice).Ask;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -198,7 +198,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First(ba => ba.Bid >= order.LmtPrice).Bid;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -228,7 +228,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _downwardBidAsks.First().Bid;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -254,7 +254,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First(ba => ba.Ask >= order.StopPrice).Ask;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -280,7 +280,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _downwardBidAsks.First().Ask;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -311,7 +311,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _upwardBidAsks.First().Bid;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -341,7 +341,7 @@ namespace Tests.Backtester
 
             // Test
             var expectedPrice = _downwardBidAsks.First(ba => ba.Bid <= order.StopPrice).Bid;
-            var actualPrice = AsyncToSync(() =>
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
                 _fakeClient.PlaceOrder(_fakeClient.Contract, order);
@@ -352,22 +352,117 @@ namespace Tests.Backtester
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
-        TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc, int timeoutInSec = 30)
+        [Test]
+        public void MarketIfTouchedOrder_Buy_OverAskPrice_GetsFilledAtCurrentPrice()
         {
-            var tcs = new TaskCompletionSource<TResult>();
-            var callback = new Action<T1, T2>((t1, t2) => tcs.SetResult(resultFunc(t1, t2)));
-            try
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new MarketIfTouchedOrder()
             {
-                @event += callback;
-                async.Invoke();
-                tcs.Task.Wait(timeoutInSec*1000);
-            }
-            finally
-            {
-                @event -= callback;
-            }
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                TouchPrice = _upwardBidAsks.First().Ask + 0.02,
+                TotalQuantity = 50
+            };
 
-            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
+            // Test
+            var expectedPrice = _upwardBidAsks.First().Ask;
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        [Test]
+        public void MarketIfTouchedOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new MarketIfTouchedOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                TouchPrice = _downwardBidAsks.First().Ask - 0.03,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First(ba => ba.Ask <= order.TouchPrice).Ask;
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+
+        [Test]
+        public void MarketIfTouchedOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
+        {
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new MarketIfTouchedOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                TouchPrice = _upwardBidAsks.First().Bid + 0.03,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _upwardBidAsks.First(ba => ba.Bid >= order.TouchPrice).Bid;
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        [Test]
+        public void MarketIfTouchedOrder_Sell_UnderBidPrice_GetsFilledAtCurrentPrice()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new MarketIfTouchedOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                TouchPrice = _downwardBidAsks.First().Bid - 0.02,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First().Bid;
+            var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
     }
 }

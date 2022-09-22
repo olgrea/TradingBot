@@ -5,6 +5,8 @@ using TradingBot.Utils;
 
 namespace TradingBot.Broker.Client
 {
+    //TODO : test when TWS is not launched
+
     internal class IBClient : IIBClient
     {
         EClientSocket _clientSocket;
