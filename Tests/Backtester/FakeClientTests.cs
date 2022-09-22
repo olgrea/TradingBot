@@ -153,7 +153,7 @@ namespace Tests.Backtester
         }
 
         [Test]
-        public void LimitOrder_Buy_UnderAskPrice_GetsFilledWhenLimitPriceIsReached()
+        public void LimitOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
             _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
@@ -161,7 +161,7 @@ namespace Tests.Backtester
             {
                 Id = _fakeClient.NextValidOrderId,
                 Action = OrderAction.BUY,
-                LmtPrice = _downwardBidAsks.First().Ask - 0.1,
+                LmtPrice = _downwardBidAsks.First().Ask - 0.02,
                 TotalQuantity = 50
             };
 
@@ -180,7 +180,7 @@ namespace Tests.Backtester
 
 
         [Test]
-        public void LimitOrder_Sell_OverBidPrice_GetsFilledWhenLimitPriceIsReached()
+        public void LimitOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
             _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
@@ -239,46 +239,123 @@ namespace Tests.Backtester
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
-        TResult AsyncToSync<T1, TResult>(Action async, ref Action<T1> @event, Func<T1, TResult> resultFunc, int timeoutInSec = 2)
+        [Test]
+        public void StopOrder_Buy_OverAskPrice_GetsFilledWhenPriceIsReached()
         {
-            var tcs = new TaskCompletionSource<TResult>();
-            var callback = new Action<T1>(t1 => tcs.SetResult(resultFunc(t1)));
-            try
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new StopOrder()
             {
-                @event += callback;
-                async.Invoke();
-                tcs.Task.Wait(timeoutInSec*1000);
-            }
-            finally
-            {
-                @event -= callback;
-            }
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                StopPrice = _upwardBidAsks.First().Ask + 0.02,
+                TotalQuantity = 50
+            };
 
-            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
+            // Test
+            var expectedPrice = _upwardBidAsks.First(ba => ba.Ask >= order.StopPrice).Ask;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; });
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
 
-        TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc, int timeoutInSec = 2)
+        [Test]
+        public void StopOrder_Buy_UnderAskPrice_GetsFilledAtCurrentPrice()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new StopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                StopPrice = _downwardBidAsks.First().Ask - 0.1,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First().Ask;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+
+        [Test]
+        public void StopOrder_Sell_OverBidPrice_GetsFilledAtCurrentPrice()
+        {
+            // Setup
+            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            var order = new StopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                StopPrice = _upwardBidAsks.First().Bid + 0.03,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _upwardBidAsks.First().Bid;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        [Test]
+        public void StopOrder_Sell_UnderBidPrice_GetsFilledWhenPriceIsReached()
+        {
+            // Setup
+            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            var order = new StopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                StopPrice = _downwardBidAsks.First().Bid - 0.02,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedPrice = _downwardBidAsks.First(ba => ba.Bid <= order.StopPrice).Bid;
+            var actualPrice = AsyncToSync(() =>
+            {
+                _fakeClient.Start();
+                _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+
+            }, ref _fakeClient.Callbacks.ExecDetails, (c, oe) => { return oe.AvgPrice; }, 30);
+
+            // Assert
+            Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
+        }
+
+        TResult AsyncToSync<T1, T2, TResult>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc, int timeoutInSec = 30)
         {
             var tcs = new TaskCompletionSource<TResult>();
             var callback = new Action<T1, T2>((t1, t2) => tcs.SetResult(resultFunc(t1, t2)));
-            try
-            {
-                @event += callback;
-                async.Invoke();
-                tcs.Task.Wait(timeoutInSec*1000);
-            }
-            finally
-            {
-                @event -= callback;
-            }
-
-            return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
-        }
-
-        TResult AsyncToSync<T1, T2, T3, TResult>(Action async, ref Action<T1, T2, T3> @event, Func<T1, T2, T3, TResult> resultFunc, int timeoutInSec = 2)
-        {
-            var tcs = new TaskCompletionSource<TResult>();
-            var callback = new Action<T1, T2, T3>((t1, t2, t3) => tcs.SetResult(resultFunc(t1, t2, t3)));
             try
             {
                 @event += callback;

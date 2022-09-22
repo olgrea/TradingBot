@@ -420,11 +420,11 @@ namespace Backtester
 
         private void EvaluateStopOrder(BidAsk bidAsk, StopOrder o)
         {
-            if (o.Action == OrderAction.BUY && o.StopPrice >= bidAsk.Ask)
+            if (o.Action == OrderAction.BUY && o.StopPrice <= bidAsk.Ask)
             {
                 ExecuteOrder(o, bidAsk.Ask);
             }
-            else if (o.Action == OrderAction.SELL && o.StopPrice <= bidAsk.Bid)
+            else if (o.Action == OrderAction.SELL && o.StopPrice >= bidAsk.Bid)
             {
                 ExecuteOrder(o, bidAsk.Bid);
             }
