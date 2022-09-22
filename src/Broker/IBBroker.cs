@@ -126,7 +126,7 @@ namespace TradingBot.Broker
         {
             var resolveResult = new TaskCompletionSource<int>();
             var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<int>.TaskError(msg, resolveResult));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.Message += error;
@@ -166,7 +166,7 @@ namespace TradingBot.Broker
                 resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
             });
 
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<bool>.TaskError(msg, resolveResult));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.ManagedAccounts += managedAccounts;
@@ -223,7 +223,7 @@ namespace TradingBot.Broker
             });
             var updatePortfolio = new Action<Position>(pos => account.Positions.Add(pos));
             var accountDownloadEnd = new Action<string>(accountCode => resolveResult.SetResult(account));
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<Account>.TaskError(msg, resolveResult));
 
             _client.Callbacks.UpdateAccountTime += updateAccountTime;
             _client.Callbacks.UpdateAccountValue += updateAccountValue;
@@ -266,7 +266,7 @@ namespace TradingBot.Broker
             var reqId = NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<List<Contract>>.TaskError(msg, resolveResult));
             var tmpContracts = new List<Contract>();
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
@@ -566,7 +566,7 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<LinkedList<MarketData.Bar>>.TaskError(msg, resolveResult));
 
             _client.Callbacks.HistoricalData += historicalData;
             _client.Callbacks.HistoricalDataEnd += historicalDataEnd;
@@ -578,26 +578,6 @@ namespace TradingBot.Broker
                 _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
                 _client.Callbacks.Message -= error;
             });
-        }
-
-        internal static void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
-        {
-            if (msg is ClientError)
-            {
-                Exception e;
-                if (msg is ClientException ex)
-                {
-                    resolveResult.SetException(ex.Exception);
-                    e = new Exception(msg.Message, ex.Exception);
-                }
-                else
-                {
-                    e = new Exception(msg.Message);
-                }
-
-                resolveResult.SetResult(default(T));
-                throw e;
-            }
         }
 
         void TickByTickBidAsk(int reqId, BidAsk bidAsk)
@@ -635,7 +615,7 @@ namespace TradingBot.Broker
                 }
             });
                         
-            var error = new Action<ClientMessage>(msg => TaskError(msg, resolveResult));
+            var error = new Action<ClientMessage>(msg => AsyncHelper<IEnumerable<BidAsk>>.TaskError(msg, resolveResult));
 
             _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
             _client.Callbacks.Message += error;
