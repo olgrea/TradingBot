@@ -83,10 +83,10 @@ namespace TradingBot.Broker.Orders
     internal class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        internal double StopPrice { get; set; } = double.MinValue;
+        internal double StopPrice { get; set; } = double.MaxValue;
         
-        public double TrailingAmount{ get; set; }
+        public double TrailingAmount{ get; set; } = double.MaxValue;
         // Takes priority over TrailingAmount if set
-        public double TrailingPercent { get; set; } = double.MinValue;
+        public double TrailingPercent { get; set; } = double.MaxValue;
     }
 }
