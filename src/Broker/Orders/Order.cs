@@ -83,7 +83,7 @@ namespace TradingBot.Broker.Orders
     internal class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        internal double StopPrice { get; set; } 
+        internal double StopPrice { get; set; } = double.MinValue;
         
         public double TrailingAmount{ get; set; }
         // Takes priority over TrailingAmount if set

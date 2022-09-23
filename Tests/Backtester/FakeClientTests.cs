@@ -464,5 +464,121 @@ namespace Tests.Backtester
             // Assert
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
+
+        [Test]
+        public void TrailingStopOrder_Buy_TrailingAmout_StopPriceFallsWhenMarketFalls()
+        {
+            // Setup
+            var end = _downwardStart.AddMinutes(3);
+            _fakeClient.Init(_downwardStart, end, _downwardBars, _downwardBidAsks);
+            var order = new TrailingStopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                TrailingAmount = 0.2,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask + order.TrailingAmount);
+            _fakeClient.Start();
+            _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+            _fakeClient.WaitUntilDayIsOver();
+
+            var actualStopPrice = order.StopPrice;
+
+            // Assert
+            Assert.False(_fakeClient.IsExecuted(order));
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
+        }
+
+        [Test]
+        public void TrailingStopOrder_Buy_TrailingPercent_StopPriceFallsWhenMarketFalls()
+        {
+            // Setup
+            var end = _downwardStart.AddMinutes(3);
+            _fakeClient.Init(_downwardStart, end, _downwardBars, _downwardBidAsks);
+            var order = new TrailingStopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.BUY,
+                TrailingPercent = 0.1,
+                TotalQuantity = 50
+            };
+
+            // Test
+            var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask * order.TrailingPercent + ba.Ask);
+            _fakeClient.Start();
+            _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+            _fakeClient.WaitUntilDayIsOver();
+
+            var actualStopPrice = order.StopPrice;
+
+            // Assert
+            Assert.False(_fakeClient.IsExecuted(order));
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
+        }
+
+        [Test]
+        public void TrailingStopOrder_Sell_TrailingAmout_StopPriceRisesWhenMarketRises()
+        {
+            // Setup
+            var end = _upwardStart.AddMinutes(3);
+            _fakeClient.Init(_upwardStart, end, _upwardBars, _upwardBidAsks);
+            var order = new TrailingStopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                TrailingAmount = 0.2,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - order.TrailingAmount);
+            _fakeClient.Start();
+            _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+            _fakeClient.WaitUntilDayIsOver();
+
+            var actualStopPrice = order.StopPrice;
+
+            // Assert
+            Assert.False(_fakeClient.IsExecuted(order));
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
+        }
+
+        [Test]
+        public void TrailingStopOrder_Sell_TrailingPercent_StopPriceRisesWhenMarketRises()
+        {
+            // Setup
+            var end = _upwardStart.AddMinutes(3);
+            _fakeClient.Init(_upwardStart, end, _upwardBars, _upwardBidAsks);
+            var order = new TrailingStopOrder()
+            {
+                Id = _fakeClient.NextValidOrderId,
+                Action = OrderAction.SELL,
+                TrailingPercent = 0.1,
+                TotalQuantity = 50
+            };
+
+            var position = _fakeClient.Account.Positions.First();
+            position.PositionAmount = 50;
+            position.AverageCost = 28.00;
+
+            // Test
+            var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - ba.Bid * order.TrailingPercent);
+            _fakeClient.Start();
+            _fakeClient.PlaceOrder(_fakeClient.Contract, order);
+            _fakeClient.WaitUntilDayIsOver();
+
+            var actualStopPrice = order.StopPrice;
+
+            // Assert
+            Assert.False(_fakeClient.IsExecuted(order));
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
+        }
     }
 }
