@@ -46,6 +46,9 @@ namespace Backtester
 
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
+        Contract _contract;
+        int _nextValidOrderId;
+        int _nextExecId = 0;
         double _totalCommission = 0;
 
         List<Order> _openOrders = new List<Order>();
@@ -65,17 +68,14 @@ namespace Backtester
         int _reqId5SecBar = -1;
         int _reqIdBidAsk = -1;
         int _reqIdPnL = -1;
-
-        int _nextValidOrderId;
+        
         internal int NextValidOrderId => _nextValidOrderId++;
-        int _nextExecId = 0;
         int NextExecId => _nextExecId++;
         Position Position => _fakeAccount.Positions.FirstOrDefault();
-
-        Contract _contract;
         internal Contract Contract => Position?.Contract;
         internal Account Account => _fakeAccount;
-
+        internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
+        
         public FakeClient(string ticker, ILogger logger)
         {
             _client = new IBClient(new IBCallbacks(logger), logger);
@@ -320,6 +320,16 @@ namespace Backtester
             return resolveResult.Task;
         }
 
+        internal bool IsExecuted(Order order)
+        {
+            bool isExecuted = _executedOrders.Contains(order);
+            if(isExecuted)
+            {
+                Trace.Assert(!_openOrders.Contains(order));
+            }
+            return isExecuted;
+        }
+
         void EvaluateOpenOrders(BidAsk bidAsk)
         {
             foreach(Order o in _openOrders)
@@ -375,23 +385,29 @@ namespace Backtester
 
         private void EvaluateTrailingStopOrder(BidAsk bidAsk, TrailingStopOrder o)
         {
-            Debug.Assert(o.StopPrice > 0);
-
             //TODO : validate computations
             if (o.Action == OrderAction.BUY)
             {
+                if (o.StopPrice == double.MinValue)
+                {
+                    o.StopPrice = o.TrailingPercent != double.MinValue ? 
+                        bidAsk.Ask + o.TrailingPercent * bidAsk.Ask : 
+                        bidAsk.Ask + o.TrailingAmount;
+                }
+
                 if (o.StopPrice <= bidAsk.Ask)
                 {
                     ExecuteOrder(o, bidAsk.Ask);
                 }
                 else if (o.TrailingPercent != double.MinValue)
                 {
-                    var currentPercent = 1 - (o.StopPrice / bidAsk.Ask);
+                    var currentPercent = (o.StopPrice - bidAsk.Ask) / bidAsk.Ask;
                     if (currentPercent > o.TrailingPercent)
                         o.StopPrice = bidAsk.Ask +  o.TrailingPercent * bidAsk.Ask;
                 }
                 else
                 {
+                    // The price must be updated if the ask falls
                     var currentStopPrice = bidAsk.Ask + o.TrailingAmount;
                     if (currentStopPrice < o.StopPrice)
                         o.StopPrice = currentStopPrice;
@@ -399,20 +415,28 @@ namespace Backtester
             }
             else if (o.Action == OrderAction.SELL)
             {
+                if (o.StopPrice == double.MinValue)
+                {
+                    o.StopPrice = o.TrailingPercent != double.MinValue ?
+                        bidAsk.Bid - o.TrailingPercent * bidAsk.Bid : 
+                        bidAsk.Bid - o.TrailingAmount;
+                }
+
                 if (o.StopPrice >= bidAsk.Bid)
                 {
                     ExecuteOrder(o, bidAsk.Bid);
                 }
                 else if (o.TrailingPercent != double.MinValue)
                 {
-                    var currentPercent = 1 - (bidAsk.Bid / o.StopPrice);
+                    var currentPercent = (o.StopPrice - bidAsk.Bid) / -bidAsk.Bid;
                     if (currentPercent > o.TrailingPercent)
                         o.StopPrice = bidAsk.Bid - o.TrailingPercent * bidAsk.Bid;
                 }
                 else
                 {
+                    // The price must be updated if the bid rises
                     var currentStopPrice = bidAsk.Bid - o.TrailingAmount;
-                    if (currentStopPrice < o.StopPrice)
+                    if (currentStopPrice > o.StopPrice)
                         o.StopPrice = currentStopPrice;
                 }
             }
