@@ -25,7 +25,7 @@ namespace Backtester
         internal static class TimeDelays
         {
             public static double TimeScale = 3600.0d / 32400;
-            public static int OneSecond = (int)Math.Round(1 * 1000 * TimeScale);
+            public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
         }
         Stopwatch _st = new Stopwatch();
 
@@ -229,19 +229,27 @@ namespace Backtester
                 {
                     try
                     {
+                        // TODO : Possible slowdown when time scale is really low...
                         ClockTick?.Invoke(_currentFakeTime);
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
                         //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
                     }
-                    catch (AggregateException)
+                    catch (AggregateException e)
                     {
-                        delayCancellation.Dispose();
-                        if (!mainToken.IsCancellationRequested)
+                        //TODO : verify error handling
+                        if(e.InnerException is OperationCanceledException)
                         {
-                            delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
-                            delayToken = delayCancellation.Token;
+                            delayCancellation.Dispose();
+                            if (!mainToken.IsCancellationRequested)
+                            {
+                                delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
+                                delayToken = delayCancellation.Token;
+                            }
+                            return;
                         }
+                        
+                        throw e;
                     }
                 }
 
@@ -388,9 +396,9 @@ namespace Backtester
             //TODO : validate computations
             if (o.Action == OrderAction.BUY)
             {
-                if (o.StopPrice == double.MinValue)
+                if (o.StopPrice == double.MaxValue)
                 {
-                    o.StopPrice = o.TrailingPercent != double.MinValue ? 
+                    o.StopPrice = o.TrailingPercent != double.MaxValue ? 
                         bidAsk.Ask + o.TrailingPercent * bidAsk.Ask : 
                         bidAsk.Ask + o.TrailingAmount;
                 }
@@ -399,7 +407,7 @@ namespace Backtester
                 {
                     ExecuteOrder(o, bidAsk.Ask);
                 }
-                else if (o.TrailingPercent != double.MinValue)
+                else if (o.TrailingPercent != double.MaxValue)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Ask) / bidAsk.Ask;
                     if (currentPercent > o.TrailingPercent)
@@ -415,9 +423,9 @@ namespace Backtester
             }
             else if (o.Action == OrderAction.SELL)
             {
-                if (o.StopPrice == double.MinValue)
+                if (o.StopPrice == double.MaxValue)
                 {
-                    o.StopPrice = o.TrailingPercent != double.MinValue ?
+                    o.StopPrice = o.TrailingPercent != double.MaxValue ?
                         bidAsk.Bid - o.TrailingPercent * bidAsk.Bid : 
                         bidAsk.Bid - o.TrailingAmount;
                 }
@@ -426,7 +434,7 @@ namespace Backtester
                 {
                     ExecuteOrder(o, bidAsk.Bid);
                 }
-                else if (o.TrailingPercent != double.MinValue)
+                else if (o.TrailingPercent != double.MaxValue)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Bid) / -bidAsk.Bid;
                     if (currentPercent > o.TrailingPercent)
