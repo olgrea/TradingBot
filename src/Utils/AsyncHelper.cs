@@ -7,16 +7,6 @@ namespace TradingBot.Utils
 {
     internal class AsyncHelper<TResult>
     {
-        public static void TaskError<T>(ClientMessage msg, TaskCompletionSource<T> resolveResult)
-        {
-            if (msg is ClientError)
-            {
-                if (msg is ClientException ex)
-                    resolveResult.SetException(ex.Exception);
-                resolveResult.SetResult(default(T));
-            }
-        }
-
         public static TResult AsyncToSync<T1, T2>(Action async, ref Action<T1, T2> @event, Func<T1, T2, TResult> resultFunc, int timeoutInSec = 30)
         {
             var tcs = new TaskCompletionSource<TResult>();

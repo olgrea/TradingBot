@@ -19,6 +19,7 @@ namespace TradingBot
     public class Trader
     {
         ILogger _logger;
+        TraderMessageHandler _messageHandler;
         IBroker _broker;
 
         string _ticker;
@@ -36,6 +37,8 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
+            
+            _messageHandler = new TraderMessageHandler(this);
         }
 
         internal Trader(string ticker, IBroker broker, ILogger logger)
@@ -94,8 +97,6 @@ namespace TradingBot
             _broker.OrderExecuted += OnOrderExecuted;
             _broker.CommissionInfoReceived += OnCommissionInfoReceived;
 
-            _broker.ClientMessageReceived += OnClientMessageReceived;
-
             _broker.RequestPositions();
             _broker.RequestPnL(_contract);
             //_broker.RequestBars(_contract, BarLength._5Sec);
@@ -113,8 +114,6 @@ namespace TradingBot
             _broker.OrderExecuted -= OnOrderExecuted;
             _broker.CommissionInfoReceived -= OnCommissionInfoReceived;
 
-            _broker.ClientMessageReceived -= OnClientMessageReceived;
-
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
             _broker.CancelBidAskRequest(_contract);
@@ -131,14 +130,6 @@ namespace TradingBot
                         _USDCashBalance = double.Parse(value, CultureInfo.InvariantCulture);
                     break;
             }
-        }
-
-        void OnClientMessageReceived(ClientMessage message)
-        {
-            if(message is ClientNotification)
-                _logger.LogInfo($"OnClientMessageReceived : {message.Message}");
-            else
-                _logger.LogError($"Error : {message.Message}");
         }
 
         void OnPositionReceived(Position position)
@@ -193,6 +184,32 @@ namespace TradingBot
 
             UnsubscribeToData();
             _broker.Disconnect();
+        }
+
+        class TraderMessageHandler : IMessageHandler
+        {
+            Trader _trader;
+            public TraderMessageHandler(Trader trader)
+            {
+                _trader = trader;
+                Successor = trader._broker.MessageHandler;
+                trader._broker.MessageHandler = this;
+            }
+
+            public IMessageHandler Successor {get; set;}
+
+            public void OnMessage(TWSMessage msg)
+            {
+                switch (msg.ErrorCode)
+                {
+                    //TODO : handle disconnections
+
+
+                    default:
+                        Successor.OnMessage(msg);
+                        break;
+                }
+            }
         }
     }
 }

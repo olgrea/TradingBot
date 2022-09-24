@@ -313,14 +313,10 @@ namespace Backtester
                 }
             });
 
-            var error = new Action<ClientMessage>(msg => AsyncHelper<OrderState>.TaskError(msg, resolveResult));
-
             _client.Callbacks.OpenOrder += openOrder;
-            _client.Callbacks.Message += error;
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.OpenOrder -= openOrder;
-                _client.Callbacks.Message -= error;
             });
 
             _client.PlaceOrder(contract, order, true);
@@ -841,7 +837,6 @@ namespace Backtester
             var reqId = 1;
 
             var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var error = new Action<ClientMessage>(msg => AsyncHelper<List<Contract>>.TaskError(msg, resolveResult));
             var tmpContracts = new List<Contract>();
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
@@ -856,13 +851,11 @@ namespace Backtester
 
             _client.Callbacks.ContractDetails += contractDetails;
             _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
-            _client.Callbacks.Message += error;
 
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.ContractDetails -= contractDetails;
                 _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
-                _client.Callbacks.Message -= error;
             });
 
             _client.RequestContract(reqId, sampleContract);
@@ -873,19 +866,15 @@ namespace Backtester
         Task<int> GetNextValidId()
         {
             var resolveResult = new TaskCompletionSource<int>();
-            var error = new Action<ClientMessage>(msg => AsyncHelper<int>.TaskError(msg, resolveResult));
             var nextValidId = new Action<int>(id =>
             {
                 resolveResult.SetResult(id);
             });
 
             _client.Callbacks.NextValidId += nextValidId;
-            _client.Callbacks.Message += error;
-
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.NextValidId -= nextValidId;
-                _client.Callbacks.Message -= error;
             });
 
             _client.RequestValidOrderIds();
