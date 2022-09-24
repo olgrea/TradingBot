@@ -298,7 +298,7 @@ namespace Backtester
         {
             //TODO : verify commission
             var os = GetCommissionFromOrder(contract, order).Result;
-            return os.Commission;
+            return os.Commission != double.MaxValue ? os.Commission : 0.0;
         }
 
         internal Task<OrderState> GetCommissionFromOrder(Contract contract, Order order)

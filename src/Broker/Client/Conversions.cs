@@ -125,9 +125,7 @@ namespace TradingBot.Broker.Client
                 case "TRAIL":
                     tbo = new TrailingStopOrder()
                     {
-                        //TODO : verify this
                         StopPrice = ibo.AuxPrice,
-                        TrailingAmount = ibo.TrailStopPrice,
                         TrailingPercent = ibo.TrailingPercent,
                     };
                     break;
