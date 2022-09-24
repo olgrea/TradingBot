@@ -66,6 +66,7 @@ namespace TradingBot.Broker
             _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
             _logger = logger;
+            MessageHandler = new IBBrokerMessageHandler(this);
 
             _orderManager = new OrderManager(this, _client, _logger);
         }
@@ -87,10 +88,10 @@ namespace TradingBot.Broker
             remove => _client.Callbacks.Position -= value;
         }
         public event Action<PnL> PnLReceived;
-        public event Action<ClientMessage> ClientMessageReceived
+        public IMessageHandler MessageHandler
         {
-            add => _client.Callbacks.Message += value;
-            remove => _client.Callbacks.Message -= value;
+            get => _client.Callbacks.MessageHandler;
+            set => _client.Callbacks.MessageHandler = value;
         }
         public event Action<Contract, Order, OrderState> OrderOpened
         {
@@ -126,14 +127,11 @@ namespace TradingBot.Broker
         {
             var resolveResult = new TaskCompletionSource<int>();
             var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
-            var error = new Action<ClientMessage>(msg => AsyncHelper<int>.TaskError(msg, resolveResult));
 
             _client.Callbacks.NextValidId += nextValidId;
-            _client.Callbacks.Message += error;
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.NextValidId -= nextValidId;
-                _client.Callbacks.Message -= error;
             });
 
             _client.RequestValidOrderIds();
@@ -166,16 +164,12 @@ namespace TradingBot.Broker
                 resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
             });
 
-            var error = new Action<ClientMessage>(msg => AsyncHelper<bool>.TaskError(msg, resolveResult));
-
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.ManagedAccounts += managedAccounts;
-            _client.Callbacks.Message += error;
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.NextValidId -= nextValidId;
                 _client.Callbacks.ManagedAccounts -= managedAccounts;
-                _client.Callbacks.Message -= error;
 
                 if (_nextValidOrderId > 0)
                     ClientConnected?.Invoke();
@@ -223,13 +217,11 @@ namespace TradingBot.Broker
             });
             var updatePortfolio = new Action<Position>(pos => account.Positions.Add(pos));
             var accountDownloadEnd = new Action<string>(accountCode => resolveResult.SetResult(account));
-            var error = new Action<ClientMessage>(msg => AsyncHelper<Account>.TaskError(msg, resolveResult));
 
             _client.Callbacks.UpdateAccountTime += updateAccountTime;
             _client.Callbacks.UpdateAccountValue += updateAccountValue;
             _client.Callbacks.UpdatePortfolio += updatePortfolio;
             _client.Callbacks.AccountDownloadEnd += accountDownloadEnd;
-            _client.Callbacks.Message += error;
 
             resolveResult.Task.ContinueWith(t =>
             {
@@ -237,10 +229,11 @@ namespace TradingBot.Broker
                 _client.Callbacks.UpdateAccountValue -= updateAccountValue;
                 _client.Callbacks.UpdatePortfolio -= updatePortfolio;
                 _client.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
-                _client.Callbacks.Message -= error;
 
                 if (!receiveUpdates)
                     _client.RequestAccount(_accountCode, false);
+
+                _subscriptions.AccountUpdates = receiveUpdates;
             });
 
             _client.RequestAccount(_accountCode, true);
@@ -266,7 +259,6 @@ namespace TradingBot.Broker
             var reqId = NextRequestId;
 
             var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var error = new Action<ClientMessage>(msg => AsyncHelper<List<Contract>>.TaskError(msg, resolveResult));
             var tmpContracts = new List<Contract>();
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
@@ -281,13 +273,11 @@ namespace TradingBot.Broker
 
             _client.Callbacks.ContractDetails += contractDetails;
             _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
-            _client.Callbacks.Message += error;
 
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.ContractDetails -= contractDetails;
                 _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
-                _client.Callbacks.Message -= error;
             });
 
             _client.RequestContract(reqId, sampleContract);
@@ -566,17 +556,13 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ClientMessage>(msg => AsyncHelper<LinkedList<MarketData.Bar>>.TaskError(msg, resolveResult));
-
             _client.Callbacks.HistoricalData += historicalData;
             _client.Callbacks.HistoricalDataEnd += historicalDataEnd;
-            _client.Callbacks.Message += error;
 
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.HistoricalData -= historicalData;
                 _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
-                _client.Callbacks.Message -= error;
             });
         }
 
@@ -615,20 +601,48 @@ namespace TradingBot.Broker
                 }
             });
                         
-            var error = new Action<ClientMessage>(msg => AsyncHelper<IEnumerable<BidAsk>>.TaskError(msg, resolveResult));
-
             _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
-            _client.Callbacks.Message += error;
-
             resolveResult.Task.ContinueWith(t =>
             {
                 _client.Callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
-                _client.Callbacks.Message -= error;
             });
 
             (_client as IBClient).RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
 
             return resolveResult.Task;
+        }
+
+        class IBBrokerMessageHandler : IMessageHandler
+        {
+            IBBroker _broker;
+            public IBBrokerMessageHandler(IBBroker broker)
+            {
+                _broker = broker;
+                Successor = _broker._client.Callbacks.MessageHandler;
+                _broker._client.Callbacks.MessageHandler = this;
+            }
+
+            public IMessageHandler Successor { get; private set; }
+
+            public void OnMessage(TWSMessage msg)
+            {
+                switch (msg.ErrorCode)
+                {
+                    //case 1011: // Connectivity between IB and TWS has been restored- data lost.*
+                    //    RestoreSubscriptions();
+                    //    break;
+
+                    default:
+                        Successor.OnMessage(msg);
+                        break;
+                }
+            }
+
+            void RestoreSubscriptions()
+            {
+                // TODO : RestoreSubscriptions
+                var subs = _broker._subscriptions;
+            }
         }
     }
 }

@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
 using IBApi;
-using MathNet.Numerics.LinearAlgebra.Factorization;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
@@ -15,11 +12,66 @@ namespace TradingBot.Broker.Client
 {
     internal class IBCallbacks : EWrapper
     {
+        class DefaultMessageHandler : IMessageHandler
+        {
+            IBCallbacks _callbacks;
+
+            IMessageHandler IMessageHandler.Successor { get; }
+
+            public DefaultMessageHandler(IBCallbacks callbacks)
+            {
+                _callbacks = callbacks;
+            }
+
+            public void OnMessage(TWSMessage msg)
+            {
+                var e = new ClientException(msg.Id, msg.ErrorCode, msg.Message);
+
+                if (IsWarningMessage(msg.ErrorCode))
+                {
+                    _callbacks._logger.LogWarning($"{msg.Message} ({msg.ErrorCode})");
+                    return;
+                }
+
+                switch (msg.ErrorCode)
+                {
+                    case 501: // Already Connected
+                        _callbacks._logger.LogDebug(msg.Message);
+                        break;
+
+                    default:
+                        throw e;
+                }
+            }
+
+            public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
+
+            //// https://interactivebrokers.github.io/tws-api/message_codes.html
+            //// https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClientErrors.html
+            //public static bool IsSystemMessage(int code) => code >= 1100 && code <= 1300;
+            //public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
+            //public static bool IsClientErrorMessage(int code) => 
+            //    (code >= 501 && code <= 508 && code != 507) ||
+            //    (code >= 510 && code <= 549) ||
+            //    (code >= 551 && code <= 584) ||
+            //    code == 10038;
+
+            //public static bool IsTWSErrorMessage(int code) =>
+            //    (code >= 100 && code <= 168) ||
+            //    (code >= 200 && code <= 449) ||
+            //    code == 507 ||
+            //    (code >= 10000 && code <= 10027) ||
+            //    code == 10090 ||
+            //    (code >= 10148 && code <= 10284);
+        };
+
+
         ILogger _logger;
 
         public IBCallbacks(ILogger logger)
         {
             _logger = logger;
+            MessageHandler = new DefaultMessageHandler(this);
         }
 
         public Action ConnectAck;
@@ -294,40 +346,20 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"historicalTicksBidAsk");
         }
 
-        public Action<ClientMessage> Message;
+        public IMessageHandler MessageHandler;
         public void error(Exception e)
         {
-            _logger.LogError(e.Message);
-            Message?.Invoke(new ClientException(e));
+            MessageHandler?.OnMessage(new APIError(e));
         }
 
         public void error(string str)
         {
-            _logger.LogError(str);
-            Message?.Invoke(new ClientError(str));
+            MessageHandler?.OnMessage(new TWSMessage(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            var str = $"{id} {errorCode} {errorMsg}";
-            if (errorCode == 502)
-                str += $"\nMake sure the API is enabled in Trader Workstation";
-
-
-            // Note: id == -1 indicates a notification and not true error condition...
-            ClientMessage msg;
-            if (id < 0)
-            {
-                _logger.LogDebug(str);
-                msg = new ClientNotification(errorMsg);
-            }
-            else
-            {
-                _logger.LogError(str);
-                msg = new ClientError(id, errorCode, errorMsg);
-            }
-
-            Message?.Invoke(msg);
+            MessageHandler?.OnMessage(new TWSMessage(id, errorCode, errorMsg));
         }
 
         #region Not Implemented
