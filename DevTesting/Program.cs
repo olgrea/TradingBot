@@ -1,7 +1,6 @@
 ﻿using System;
 using TradingBot;
 using TradingBot.Strategies;
-using TradingBot.Utils;
 
 namespace ConsoleApp
 {
@@ -9,7 +8,7 @@ namespace ConsoleApp
     {
         static void Main(string[] args)
         {
-            Trader trader = new Trader("GME", 1337, new ConsoleLogger());
+            Trader trader = new Trader("GME");
             trader.AddStrategyForTicker<RSIDivergenceStrategy>();
             
             trader.Start();

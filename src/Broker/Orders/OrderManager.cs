@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using TradingBot.Utils;
 using TradingBot.Broker.Client;
+using NLog;
 
 namespace TradingBot.Broker.Orders
 {
@@ -37,7 +38,7 @@ namespace TradingBot.Broker.Orders
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
             if (!order.RequestInfo.Transmit)
-                _logger.LogWarning($"Order will not be submitted automatically since \"{nameof(order.RequestInfo.Transmit)}\" is set to false.");
+                _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.RequestInfo.Transmit)}\" is set to false.");
 
             _ordersRequested[order.Id] = order;
             _client.PlaceOrder(contract, order);

@@ -13,11 +13,15 @@ using TradingBot.Strategies;
 using TradingBot.Indicators;
 using TradingBot.Utils;
 using System.Globalization;
+using NLog;
 
 namespace TradingBot
 {
     public class Trader
     {
+        //TODO : required loggers : 
+        // trading report : normal logs, cvs file format
+        // general log with everything
         ILogger _logger;
         TraderErrorHandler _errorHandler;
         IBroker _broker;
@@ -30,26 +34,29 @@ namespace TradingBot
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
 
-        public Trader(string ticker, int clientId, ILogger logger)
+        public Trader(string ticker)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
 
             _ticker = ticker;
-            _logger = logger;
-            _broker = new IBBroker(clientId, logger);
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
+            _broker = new IBBroker(1337);
             
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
             _broker.ErrorHandler = _errorHandler;
         }
 
-        internal Trader(string ticker, IBroker broker, ILogger logger)
+        internal Trader(string ticker, IBroker broker)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(broker != null);
 
             _ticker = ticker;
-            _logger = logger;
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
             _broker = broker;
+
+            _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
+            _broker.ErrorHandler = _errorHandler;
         }
 
         internal IBroker Broker => _broker;
@@ -67,7 +74,7 @@ namespace TradingBot
             
             if (!_strategies.Any())
             {
-                _logger.LogError("No strategies set for this trader");
+                _logger.Error("No strategies set for this trader");
                 return;
             }
 
@@ -76,7 +83,7 @@ namespace TradingBot
             var acc = _broker.GetAccount();
             if(!acc.CashBalances.ContainsKey("USD"))
             {
-                _logger.LogError("No USD cash funds in this account. This trader only trades in USD.");
+                _logger.Error("No USD cash funds in this account. This trader only trades in USD.");
                 return;
             }
             _USDCashBalance = acc.CashBalances["USD"];
@@ -138,7 +145,7 @@ namespace TradingBot
             if (position.Contract.Symbol == _ticker)
             {
                 _contractPosition = position;
-                _logger.LogInfo($"OnPositionReceived : {position}");
+                _logger.Info($"OnPositionReceived : {position}");
             }
         }
 
@@ -147,28 +154,28 @@ namespace TradingBot
             if(pnl.Contract.Symbol == _ticker)
             {
                 _PnL = pnl;
-                _logger.LogInfo($"OnPnLReceived : {pnl}");
+                _logger.Info($"OnPnLReceived : {pnl}");
             }
         }
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
         {
-            _logger.LogInfo($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
+            _logger.Info($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
         }
 
         void OnOrderStatusChanged(OrderStatus status)
         {
-            _logger.LogInfo($"OnOrderStatusChanged : {status.Status}");
+            _logger.Info($"OnOrderStatusChanged : {status.Status}");
         }
 
         void OnOrderExecuted(Contract contract, OrderExecution execution)
         {
-            _logger.LogInfo($"OnOrderOpened : {contract} {execution}");
+            _logger.Info($"OnOrderOpened : {contract} {execution}");
         }
 
         void OnCommissionInfoReceived(CommissionInfo commissionInfo)
         {
-            _logger.LogInfo($"OnCommissionInfoReceived : {commissionInfo}");
+            _logger.Info($"OnCommissionInfoReceived : {commissionInfo}");
         }
 
         public double GetAvailableFunds()

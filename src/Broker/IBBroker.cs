@@ -9,6 +9,7 @@ using TradingBot.Utils;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using NLog;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -29,6 +30,7 @@ namespace TradingBot.Broker
         public const string DefaultIP = "127.0.0.1";
 
         static HashSet<int> _clientIds = new HashSet<int>();
+        static Random rand = new Random();
         
         int _clientId = 1337;
         int _nextValidOrderId = -1;
@@ -44,26 +46,54 @@ namespace TradingBot.Broker
         int NextRequestId => _reqId++;
         int NextValidOrderId => _nextValidOrderId++;
 
-        public IBBroker(int clientId, ILogger logger) : this(clientId, new IBClient(logger), logger)
+        public IBBroker()
         {
+            var clientId = rand.Next();
+            if (!IsValid(clientId))
+                throw new ArgumentException($"The client id {clientId} is already assigned.");
+
+            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
+            _client = new IBClient(_logger);
+            Init(_client, _logger);
         }
 
-        internal IBBroker(int clientId, IIBClient client, ILogger logger)
+        public IBBroker(int clientId)
+        {
+            if (!IsValid(clientId))
+                throw new ArgumentException($"The client id {clientId} is already assigned.");
+            
+            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
+            _client = new IBClient(_logger);
+            Init(_client, _logger);
+        }
+
+        internal IBBroker(int clientId, IIBClient client)
+        {
+            if (!IsValid(clientId))
+                throw new ArgumentException($"The client id {clientId} is already assigned.");
+
+            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
+            _client = client;
+            Init(_client, _logger);
+        }
+
+        bool IsValid(int clientId)
         {
             if (_clientIds.Contains(clientId))
-                throw new ArgumentException($"The client id {clientId} is already assigned.");
+                return false;
 
             _clientId = clientId;
             _clientIds.Add(clientId);
-            
+            return true;
+        }
+
+        void Init(IIBClient client, ILogger logger)
+        {
             _subscriptions = new DataSubscriptions();
 
-            _client = client;
             _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
             _client.Callbacks.PnlSingle += PnlSingle;
             _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
-
-            _logger = logger;
 
             _orderManager = new OrderManager(this, _client, _logger);
         }
@@ -152,7 +182,7 @@ namespace TradingBot.Broker
             {
                 if (_nextValidOrderId < 0)
                 {
-                    _logger.LogInfo($"Client connected.");
+                    _logger.Info($"Client connected.");
                 }
                 _nextValidOrderId = id;
             });

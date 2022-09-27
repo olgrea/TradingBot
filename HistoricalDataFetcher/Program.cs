@@ -7,6 +7,7 @@ using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
 using System.IO;
 using System.Runtime.CompilerServices;
+using NLog;
 
 [assembly: InternalsVisibleToAttribute("Tests")]
 namespace HistoricalDataFetcher
@@ -43,7 +44,7 @@ namespace HistoricalDataFetcher
         }
 
         public IBBroker _broker;
-        public ConsoleLogger _logger;
+        public ILogger _logger;
 
         string _ticker;
         DateTime _startDate;
@@ -61,9 +62,8 @@ namespace HistoricalDataFetcher
             _startDate = new DateTime(start.Year, start.Month, start.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
             _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
 
-            _logger = new ConsoleLogger();
-            _broker = new IBBroker(321, new NoLogger());
-            //_broker = new IBBroker(321, _logger);
+            _logger = LogManager.GetLogger($"{nameof(DataFetcher)}");
+            _broker = new IBBroker(321);
         }
 
         public void Start()
@@ -93,7 +93,7 @@ namespace HistoricalDataFetcher
                 GetDataForDay<BidAsk>(_startDate, contract);
             }
 
-            _logger.LogInfo($"\nComplete!\n");
+            _logger.Info($"\nComplete!\n");
         }
 
         void GetDataForDay<TData>(DateTime date, Contract contract) where TData : IMarketData, new()
@@ -105,7 +105,7 @@ namespace HistoricalDataFetcher
             DateTime current = new DateTime(date.Year, date.Month, date.Day, marketEnd.Hours, marketEnd.Minutes, marketEnd.Seconds, DateTimeKind.Local);
             
             IEnumerable<TData> dailyData = new LinkedList<TData>();
-            _logger.LogInfo($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+            _logger.Info($"Getting data for {contract.Symbol} on {date.ToString("yyyy-MM-dd")} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             while (current >= morning)
             {
@@ -117,6 +117,7 @@ namespace HistoricalDataFetcher
                 dailyData = data.Concat(dailyData);
             }
 
+            //TODO : cvs format for bars to display them in Excel?
             string filename = Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<TData>(_ticker, date));
             MarketDataUtils.SerializeData(filename, dailyData);
         }
@@ -131,20 +132,20 @@ namespace HistoricalDataFetcher
 
             if (_nbRequest == 60)
             {
-                _logger.LogInfo($"60 requests made : waiting 10 minutes...");
+                _logger.Info($"60 requests made : waiting 10 minutes...");
                 for (int i = 0; i < 10; ++i)
                 {
                     Task.Delay(60 * 1000).Wait();
                     if (i < 9)
-                        _logger.LogInfo($"{9 - i} minutes left...");
+                        _logger.Info($"{9 - i} minutes left...");
                     else
-                        _logger.LogInfo($"Resuming historical data fetching");
+                        _logger.Info($"Resuming historical data fetching");
                 }
                 _nbRequest = 0;
             }
             else if (_nbRequest != 0 && _nbRequest % 5 == 0)
             {
-                _logger.LogInfo($"{NbRequest} requests made : waiting 2 seconds...");
+                _logger.Info($"{NbRequest} requests made : waiting 2 seconds...");
                 Task.Delay(2000).Wait();
             }
         }
@@ -155,7 +156,7 @@ namespace HistoricalDataFetcher
             LinkedList<TData> data;
             if (File.Exists(filename))
             {
-                _logger.LogInfo($"File '{filename}' exists. Restoring from disk.");
+                _logger.Info($"File '{filename}' exists. Restoring from disk.");
                 data = new LinkedList<TData>(MarketDataUtils.DeserializeData<TData>(filename));
             }
             else
@@ -163,7 +164,7 @@ namespace HistoricalDataFetcher
                 data = Fetch<TData>(filename, contract, time);
                 if (IsPossibleMarketHoliday(time, data))
                 {
-                    _logger.LogInfo($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
+                    _logger.Info($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
                     return new LinkedList<TData>();
                 }
 
@@ -197,7 +198,7 @@ namespace HistoricalDataFetcher
 
         private LinkedList<TData> FetchBidAsk<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
         {
-            _logger.LogInfo($"Retrieving bid ask from TWS for '{filename}'.");
+            _logger.Info($"Retrieving bid ask from TWS for '{filename}'.");
 
             // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
             // There doesn't seem to be a way to convert ticks to seconds... 1 tick != 1 seconds apparently. 
@@ -242,7 +243,7 @@ namespace HistoricalDataFetcher
 
         private LinkedList<TData> FetchBars<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
         {
-            _logger.LogInfo($"Retrieving bars from TWS for '{filename}'.");
+            _logger.Info($"Retrieving bars from TWS for '{filename}'.");
             var bars = _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800).Result;
             NbRequest++;
             return new LinkedList<TData>(bars.Cast<TData>());

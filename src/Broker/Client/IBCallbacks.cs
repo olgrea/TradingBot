@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using IBApi;
+using NLog;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
+using ILogger = NLog.ILogger;
 
 namespace TradingBot.Broker.Client
 {
@@ -23,21 +25,21 @@ namespace TradingBot.Broker.Client
         public Action ConnectAck;
         public void connectAck()
         {
-            _logger.LogDebug($"Connecting client to TWS...");
+            _logger.Debug($"Connecting client to TWS...");
             ConnectAck?.Invoke();
         }
 
         public Action ConnectionClosed;
         public void connectionClosed()
         {
-            _logger.LogDebug($"Connection closed");
+            _logger.Debug($"Connection closed");
             ConnectionClosed?.Invoke();
         }
 
         public Action<string> ManagedAccounts;
         public void managedAccounts(string accountsList)
         {
-            _logger.LogDebug($"Account list : {accountsList}");
+            _logger.Debug($"Account list : {accountsList}");
             ManagedAccounts?.Invoke(accountsList);
         }
 
@@ -50,14 +52,14 @@ namespace TradingBot.Broker.Client
         public Action<string> UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
-            _logger.LogDebug($"Getting account time : {timestamp}");
+            _logger.Debug($"Getting account time : {timestamp}");
             UpdateAccountTime?.Invoke(timestamp);
         }
 
         public Action<string, string, string> UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
-            _logger.LogDebug($"account value : {key} {value} {currency}");
+            _logger.Debug($"account value : {key} {value} {currency}");
             UpdateAccountValue?.Invoke(key, value, currency);
 
             //TODO : handle "AccountReady"
@@ -84,7 +86,7 @@ namespace TradingBot.Broker.Client
                 RealizedPNL = realizedPNL,
             };
 
-            _logger.LogDebug($"Getting portfolio : \n{pos}");
+            _logger.Debug($"Getting portfolio : \n{pos}");
             UpdatePortfolio?.Invoke(pos);
         }
 
@@ -104,14 +106,14 @@ namespace TradingBot.Broker.Client
                 AverageCost = avgCost,
             };
 
-            _logger.LogDebug($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
+            _logger.Debug($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
             Position?.Invoke(p);
         }
 
         public Action PositionEnd;
         public void positionEnd()
         {
-            _logger.LogDebug($"positionEnd");
+            _logger.Debug($"positionEnd");
             PositionEnd?.Invoke();
         }
 
@@ -127,7 +129,7 @@ namespace TradingBot.Broker.Client
                 RealizedPnL = realizedPnL
             };
 
-            _logger.LogDebug($"PnL : {pnl}");
+            _logger.Debug($"PnL : {pnl}");
             PnlSingle?.Invoke(reqId, pnl);
         }
 
@@ -179,21 +181,21 @@ namespace TradingBot.Broker.Client
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
             // orderState only used then IBApi.Order.WhatIf = true ?? 
-            _logger.LogDebug($"openOrder {orderId} : {orderState.Status}");
+            _logger.Debug($"openOrder {orderId} : {orderState.Status}");
             OpenOrder?.Invoke(contract.ToTBContract(), order.ToTBOrder(), orderState.ToTBOrderState());
         }
 
         public Action OpenOrderEnd;
         public void openOrderEnd()
         {
-            _logger.LogDebug($"openOrderEnd");
+            _logger.Debug($"openOrderEnd");
             OpenOrderEnd?.Invoke();
         }
 
         public Action<OrderStatus> OrderStatus;
         public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
-            _logger.LogDebug($"orderStatus {orderId} : status={status} filled={filled} remaining={remaining} avgFillprice={avgFillPrice} avgFillPrice={lastFillPrice}");
+            _logger.Debug($"orderStatus {orderId} : status={status} filled={filled} remaining={remaining} avgFillprice={avgFillPrice} avgFillPrice={lastFillPrice}");
 
             var os = new OrderStatus()
             {
@@ -218,35 +220,35 @@ namespace TradingBot.Broker.Client
         public Action<Contract, OrderExecution> ExecDetails;
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
-            _logger.LogDebug($"execDetails : reqId={reqId}");
+            _logger.Debug($"execDetails : reqId={reqId}");
             ExecDetails?.Invoke(contract.ToTBContract(), execution.ToTBExecution());
         }
 
         public Action<int> ExecDetailsEnd;
         public void execDetailsEnd(int reqId)
         {
-            _logger.LogDebug($"execDetailsEnd : reqId={reqId}");
+            _logger.Debug($"execDetailsEnd : reqId={reqId}");
             ExecDetailsEnd?.Invoke(reqId);
         }
 
         public Action<CommissionInfo> CommissionReport;
         public void commissionReport(CommissionReport commissionReport)
         {
-            _logger.LogDebug($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+            _logger.Debug($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
             CommissionReport?.Invoke(commissionReport.ToTBCommission());
         }
 
         public Action<Contract, Orders.Order, Orders.OrderState> CompletedOrder;
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            _logger.LogDebug($"completedOrder {order.OrderId} : {orderState.Status}");
+            _logger.Debug($"completedOrder {order.OrderId} : {orderState.Status}");
             CompletedOrder?.Invoke(contract.ToTBContract(), order.ToTBOrder(), orderState.ToTBOrderState());
         }
 
         public Action CompletedOrdersEnd;
         public void completedOrdersEnd()
         {
-            _logger.LogDebug($"completedOrdersEnd");
+            _logger.Debug($"completedOrdersEnd");
             CompletedOrdersEnd?.Invoke();
         }
 
@@ -266,14 +268,14 @@ namespace TradingBot.Broker.Client
                 Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
             HistoricalData?.Invoke(reqId, b);
-            _logger.LogDebug($"historicalData for : {bar.Time}");
+            _logger.Debug($"historicalData for : {bar.Time}");
         }
 
         public Action<int, string, string> HistoricalDataEnd;
         public void historicalDataEnd(int reqId, string start, string end)
         {
             HistoricalDataEnd?.Invoke(reqId, start, end);
-            _logger.LogDebug($"historicalDataEnd");
+            _logger.Debug($"historicalDataEnd");
         }
 
         public Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
@@ -289,7 +291,7 @@ namespace TradingBot.Broker.Client
             });
 
             HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
-            _logger.LogDebug($"historicalTicksBidAsk");
+            _logger.Debug($"historicalTicksBidAsk");
         }
 
         public IErrorHandler ErrorHandler;
