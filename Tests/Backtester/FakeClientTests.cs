@@ -56,8 +56,7 @@ namespace Tests.Backtester
             _upThenDownBidAsks = Deserialize<BidAsk>(_upThenDownFileTime, _upThenDownStart);
             _upThenDownBars = Deserialize<Bar>(_upThenDownFileTime, _upThenDownStart);
 
-            var logger = new NoLogger();
-            _fakeClient = new FakeClient(Ticker, logger);
+            _fakeClient = new FakeClient(Ticker);
 
             FakeClient.TimeDelays.TimeScale = 0.001;
         }

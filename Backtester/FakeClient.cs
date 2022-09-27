@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
@@ -76,19 +77,19 @@ namespace Backtester
         internal Account Account => _fakeAccount;
         internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClient(string ticker, ILogger logger)
+        public FakeClient(string ticker)
         {
-            _client = new IBClient(new IBCallbacks(logger), logger);
+            _logger = LogManager.GetLogger(nameof(FakeClient));
+            _client = new IBClient(new IBCallbacks(_logger), _logger);
             _client.Connect(IBBroker.DefaultIP, IBBroker.DefaultPort, 9999);
 
             _nextValidOrderId = GetNextValidId().Result;
-            Callbacks = new IBCallbacks(logger);
+            Callbacks = new IBCallbacks(_logger);
 
             _ticker = ticker;
             _contract = GetContractsAsync(_ticker).Result.First();
             InitFakeAccount();
 
-            _logger = logger;
             _messageQueue = new ConcurrentQueue<Action>();
         }
 

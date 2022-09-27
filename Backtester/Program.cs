@@ -16,7 +16,7 @@ namespace Backtester
             if (args.Length == 3)
                 endDate = DateTime.Parse(args[2]);
 
-            var bt = new Backtester(ticker, startDate, endDate, new ConsoleLogger());
+            var bt = new Backtester(ticker, startDate, endDate);
             bt.Start();
         }
     }

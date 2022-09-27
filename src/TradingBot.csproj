@@ -28,4 +28,10 @@
     <ProjectReference Include="C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="nlog.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

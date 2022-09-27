@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using MathNet.Numerics.LinearAlgebra.Factorization;
+using NLog;
 using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
@@ -29,7 +30,7 @@ namespace Backtester
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
 
-        public Backtester(string ticker, DateTime startDate, DateTime endDate, ILogger logger)
+        public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
             _ticker = ticker;
 
@@ -40,15 +41,15 @@ namespace Backtester
             _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, 11, 17 ,00);
             _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, 11, 47, 00);
             
-            _logger = logger;
+            _logger = LogManager.GetLogger($"{nameof(Backtester)}"); ;
         }
 
         public void Start()
         {
-            var fakeClient = new FakeClient(_ticker, _logger);
+            var fakeClient = new FakeClient(_ticker);
 
-            var broker = new IBBroker(1337, fakeClient, _logger);
-            Trader trader = new Trader(_ticker, broker, _logger);
+            var broker = new IBBroker(1337, fakeClient);
+            Trader trader = new Trader(_ticker, broker);
             trader.AddStrategyForTicker<RSIDivergenceStrategy>();
 
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))

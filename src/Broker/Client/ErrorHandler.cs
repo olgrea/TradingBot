@@ -1,5 +1,7 @@
 ﻿using System.Threading.Tasks;
+using NLog;
 using TradingBot.Utils;
+using ILogger = NLog.ILogger;
 
 namespace TradingBot.Broker.Client
 {
@@ -23,17 +25,18 @@ namespace TradingBot.Broker.Client
 
             if (IsWarningMessage(msg.ErrorCode))
             {
-                _logger.LogWarning($"{msg.Message} ({msg.ErrorCode})");
+                _logger.Warn($"{msg.Message} ({msg.ErrorCode})");
                 return;
             }
 
             switch (msg.ErrorCode)
             {
                 case 501: // Already Connected
-                    _logger.LogDebug(msg.Message);
+                    _logger.Debug(msg.Message);
                     break;
 
                 default:
+                    _logger.Error(e);
                     throw e;
             }
         }
