@@ -52,7 +52,7 @@ namespace TradingBot
             Trace.Assert(broker != null);
 
             _ticker = ticker;
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}").WithProperty("ticker", ticker);
             _broker = broker;
 
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
@@ -78,6 +78,7 @@ namespace TradingBot
                 return;
             }
 
+            _logger.Info("This trader will monitor {ticker} using strategies : ...", _ticker);
             _contract = _broker.GetContract(_ticker);
 
             var acc = _broker.GetAccount();
