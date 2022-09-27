@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
 using IBApi;
-using MathNet.Numerics.LinearAlgebra.Factorization;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
@@ -20,6 +17,7 @@ namespace TradingBot.Broker.Client
         public IBCallbacks(ILogger logger)
         {
             _logger = logger;
+            ErrorHandler = new DefaultErrorHandler(logger);
         }
 
         public Action ConnectAck;
@@ -294,40 +292,20 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"historicalTicksBidAsk");
         }
 
-        public Action<ClientMessage> Message;
+        public IErrorHandler ErrorHandler;
         public void error(Exception e)
         {
-            _logger.LogError(e.Message);
-            Message?.Invoke(new ClientException(e));
+            ErrorHandler?.OnError(new APIError(e));
         }
 
         public void error(string str)
         {
-            _logger.LogError(str);
-            Message?.Invoke(new ClientError(str));
+            ErrorHandler?.OnError(new ErrorMessage(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            var str = $"{id} {errorCode} {errorMsg}";
-            if (errorCode == 502)
-                str += $"\nMake sure the API is enabled in Trader Workstation";
-
-
-            // Note: id == -1 indicates a notification and not true error condition...
-            ClientMessage msg;
-            if (id < 0)
-            {
-                _logger.LogDebug(str);
-                msg = new ClientNotification(errorMsg);
-            }
-            else
-            {
-                _logger.LogError(str);
-                msg = new ClientError(id, errorCode, errorMsg);
-            }
-
-            Message?.Invoke(msg);
+            ErrorHandler?.OnError(new ErrorMessage(id, errorCode, errorMsg));
         }
 
         #region Not Implemented
