@@ -12,66 +12,12 @@ namespace TradingBot.Broker.Client
 {
     internal class IBCallbacks : EWrapper
     {
-        class DefaultMessageHandler : IMessageHandler
-        {
-            IBCallbacks _callbacks;
-
-            IMessageHandler IMessageHandler.Successor { get; }
-
-            public DefaultMessageHandler(IBCallbacks callbacks)
-            {
-                _callbacks = callbacks;
-            }
-
-            public void OnMessage(TWSMessage msg)
-            {
-                var e = new ClientException(msg.Id, msg.ErrorCode, msg.Message);
-
-                if (IsWarningMessage(msg.ErrorCode))
-                {
-                    _callbacks._logger.LogWarning($"{msg.Message} ({msg.ErrorCode})");
-                    return;
-                }
-
-                switch (msg.ErrorCode)
-                {
-                    case 501: // Already Connected
-                        _callbacks._logger.LogDebug(msg.Message);
-                        break;
-
-                    default:
-                        throw e;
-                }
-            }
-
-            public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
-
-            //// https://interactivebrokers.github.io/tws-api/message_codes.html
-            //// https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClientErrors.html
-            //public static bool IsSystemMessage(int code) => code >= 1100 && code <= 1300;
-            //public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
-            //public static bool IsClientErrorMessage(int code) => 
-            //    (code >= 501 && code <= 508 && code != 507) ||
-            //    (code >= 510 && code <= 549) ||
-            //    (code >= 551 && code <= 584) ||
-            //    code == 10038;
-
-            //public static bool IsTWSErrorMessage(int code) =>
-            //    (code >= 100 && code <= 168) ||
-            //    (code >= 200 && code <= 449) ||
-            //    code == 507 ||
-            //    (code >= 10000 && code <= 10027) ||
-            //    code == 10090 ||
-            //    (code >= 10148 && code <= 10284);
-        };
-
-
         ILogger _logger;
 
         public IBCallbacks(ILogger logger)
         {
             _logger = logger;
-            MessageHandler = new DefaultMessageHandler(this);
+            MessageHandler = new MessageHandler(logger);
         }
 
         public Action ConnectAck;
@@ -346,7 +292,7 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"historicalTicksBidAsk");
         }
 
-        public IMessageHandler MessageHandler;
+        public MessageHandler MessageHandler;
         public void error(Exception e)
         {
             MessageHandler?.OnMessage(new APIError(e));

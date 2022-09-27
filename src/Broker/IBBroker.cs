@@ -9,8 +9,6 @@ using TradingBot.Utils;
 using System.Threading.Tasks;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Collections;
-using System.Drawing;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -66,10 +64,11 @@ namespace TradingBot.Broker
             _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
             _logger = logger;
-            MessageHandler = new IBBrokerMessageHandler(this);
 
             _orderManager = new OrderManager(this, _client, _logger);
         }
+
+        internal DataSubscriptions Subscriptions => _subscriptions;
 
         public event Action ClientConnected;
         public event Action ClientDisconnected;
@@ -88,7 +87,7 @@ namespace TradingBot.Broker
             remove => _client.Callbacks.Position -= value;
         }
         public event Action<PnL> PnLReceived;
-        public IMessageHandler MessageHandler
+        public MessageHandler MessageHandler
         {
             get => _client.Callbacks.MessageHandler;
             set => _client.Callbacks.MessageHandler = value;
@@ -610,39 +609,6 @@ namespace TradingBot.Broker
             (_client as IBClient).RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
 
             return resolveResult.Task;
-        }
-
-        class IBBrokerMessageHandler : IMessageHandler
-        {
-            IBBroker _broker;
-            public IBBrokerMessageHandler(IBBroker broker)
-            {
-                _broker = broker;
-                Successor = _broker._client.Callbacks.MessageHandler;
-                _broker._client.Callbacks.MessageHandler = this;
-            }
-
-            public IMessageHandler Successor { get; private set; }
-
-            public void OnMessage(TWSMessage msg)
-            {
-                switch (msg.ErrorCode)
-                {
-                    //case 1011: // Connectivity between IB and TWS has been restored- data lost.*
-                    //    RestoreSubscriptions();
-                    //    break;
-
-                    default:
-                        Successor.OnMessage(msg);
-                        break;
-                }
-            }
-
-            void RestoreSubscriptions()
-            {
-                // TODO : RestoreSubscriptions
-                var subs = _broker._subscriptions;
-            }
         }
     }
 }
