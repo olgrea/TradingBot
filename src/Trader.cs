@@ -36,9 +36,11 @@ namespace TradingBot
 
             _ticker = ticker;
             _logger = logger;
-            _broker = new IBBroker(clientId, logger);
+            var broker = new IBBroker(clientId, logger);
+            _broker = broker;
             
-            _messageHandler = new TraderMessageHandler(this);
+            _messageHandler = new TraderMessageHandler(this, broker, _logger);
+            _broker.MessageHandler = _messageHandler;
         }
 
         internal Trader(string ticker, IBroker broker, ILogger logger)
@@ -184,32 +186,6 @@ namespace TradingBot
 
             UnsubscribeToData();
             _broker.Disconnect();
-        }
-
-        class TraderMessageHandler : IMessageHandler
-        {
-            Trader _trader;
-            public TraderMessageHandler(Trader trader)
-            {
-                _trader = trader;
-                Successor = trader._broker.MessageHandler;
-                trader._broker.MessageHandler = this;
-            }
-
-            public IMessageHandler Successor {get; set;}
-
-            public void OnMessage(TWSMessage msg)
-            {
-                switch (msg.ErrorCode)
-                {
-                    //TODO : handle disconnections
-
-
-                    default:
-                        Successor.OnMessage(msg);
-                        break;
-                }
-            }
         }
     }
 }

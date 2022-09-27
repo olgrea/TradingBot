@@ -27,7 +27,7 @@ namespace TradingBot.Broker
         event Action<CommissionInfo> CommissionInfoReceived;
         event Action<Position> PositionReceived;
         event Action<PnL> PnLReceived;
-        IMessageHandler MessageHandler { get; set; }
+        MessageHandler MessageHandler { get; set; }
 
         void RequestBidAsk(Contract contract);
         void CancelBidAskRequest(Contract contract);
