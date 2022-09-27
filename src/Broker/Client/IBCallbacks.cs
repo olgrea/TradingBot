@@ -17,7 +17,7 @@ namespace TradingBot.Broker.Client
         public IBCallbacks(ILogger logger)
         {
             _logger = logger;
-            MessageHandler = new MessageHandler(logger);
+            ErrorHandler = new DefaultErrorHandler(logger);
         }
 
         public Action ConnectAck;
@@ -292,20 +292,20 @@ namespace TradingBot.Broker.Client
             _logger.LogDebug($"historicalTicksBidAsk");
         }
 
-        public MessageHandler MessageHandler;
+        public IErrorHandler ErrorHandler;
         public void error(Exception e)
         {
-            MessageHandler?.OnMessage(new APIError(e));
+            ErrorHandler?.OnError(new APIError(e));
         }
 
         public void error(string str)
         {
-            MessageHandler?.OnMessage(new TWSMessage(str));
+            ErrorHandler?.OnError(new ErrorMessage(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            MessageHandler?.OnMessage(new TWSMessage(id, errorCode, errorMsg));
+            ErrorHandler?.OnError(new ErrorMessage(id, errorCode, errorMsg));
         }
 
         #region Not Implemented

@@ -87,10 +87,10 @@ namespace TradingBot.Broker
             remove => _client.Callbacks.Position -= value;
         }
         public event Action<PnL> PnLReceived;
-        public MessageHandler MessageHandler
+        public IErrorHandler ErrorHandler
         {
-            get => _client.Callbacks.MessageHandler;
-            set => _client.Callbacks.MessageHandler = value;
+            get => _client.Callbacks.ErrorHandler;
+            set => _client.Callbacks.ErrorHandler = value;
         }
         public event Action<Contract, Order, OrderState> OrderOpened
         {
