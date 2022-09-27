@@ -19,6 +19,7 @@ namespace TradingBot
     public class Trader
     {
         ILogger _logger;
+        TraderErrorHandler _errorHandler;
         IBroker _broker;
 
         string _ticker;
@@ -36,6 +37,9 @@ namespace TradingBot
             _ticker = ticker;
             _logger = logger;
             _broker = new IBBroker(clientId, logger);
+            
+            _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
+            _broker.ErrorHandler = _errorHandler;
         }
 
         internal Trader(string ticker, IBroker broker, ILogger logger)
@@ -94,8 +98,6 @@ namespace TradingBot
             _broker.OrderExecuted += OnOrderExecuted;
             _broker.CommissionInfoReceived += OnCommissionInfoReceived;
 
-            _broker.ClientMessageReceived += OnClientMessageReceived;
-
             _broker.RequestPositions();
             _broker.RequestPnL(_contract);
             //_broker.RequestBars(_contract, BarLength._5Sec);
@@ -113,8 +115,6 @@ namespace TradingBot
             _broker.OrderExecuted -= OnOrderExecuted;
             _broker.CommissionInfoReceived -= OnCommissionInfoReceived;
 
-            _broker.ClientMessageReceived -= OnClientMessageReceived;
-
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
             _broker.CancelBidAskRequest(_contract);
@@ -131,14 +131,6 @@ namespace TradingBot
                         _USDCashBalance = double.Parse(value, CultureInfo.InvariantCulture);
                     break;
             }
-        }
-
-        void OnClientMessageReceived(ClientMessage message)
-        {
-            if(message is ClientNotification)
-                _logger.LogInfo($"OnClientMessageReceived : {message.Message}");
-            else
-                _logger.LogError($"Error : {message.Message}");
         }
 
         void OnPositionReceived(Position position)

@@ -211,23 +211,18 @@ namespace TradingBot.Strategies
                     }
                 });
 
-                var error = new Action<ClientMessage>(msg =>
-                {
-                    if(msg is ClientError)
-                    {
-                        completion.SetResult(_strategy.States[nameof(MonitoringState)]);
-                    }
-                });
+                //var error = new Action<TWSMessage>(msg =>
+                //{
+                //    completion.SetResult(_strategy.States[nameof(MonitoringState)]);
+                //});
 
                 Trader.Broker.OrderOpened += orderPlaced;
                 Trader.Broker.OrderExecuted += orderExecuted;
-                Trader.Broker.ClientMessageReceived += error;
 
                 completion.Task.ContinueWith(t => 
                 {
                     Trader.Broker.OrderOpened -= orderPlaced;
                     Trader.Broker.OrderExecuted -= orderExecuted;
-                    Trader.Broker.ClientMessageReceived -= error;
                 });
 
                 Trader.Broker.PlaceOrder(Trader.Contract, chain);
