@@ -2,16 +2,16 @@
 
 namespace TradingBot.Broker.Client
 {
-    internal class TWSMessage
+    internal class ErrorMessage
     {
-        public TWSMessage(int id, int errorCode, string msg)
+        public ErrorMessage(int id, int errorCode, string msg)
         {
             Id = id;
             Message = msg;
             ErrorCode = errorCode;
         }
 
-        public TWSMessage(string msg)
+        public ErrorMessage(string msg)
         {
             Message = msg;  
         }
@@ -21,7 +21,7 @@ namespace TradingBot.Broker.Client
         public int ErrorCode { get; set; } = -1;
     }
 
-    internal class APIError : TWSMessage
+    internal class APIError : ErrorMessage
     {
         public APIError(Exception ex) : base(ex.Message)
         {

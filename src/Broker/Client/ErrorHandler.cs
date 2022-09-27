@@ -3,16 +3,21 @@ using TradingBot.Utils;
 
 namespace TradingBot.Broker.Client
 {
-    class MessageHandler
+    internal interface IErrorHandler
+    {
+        void OnError(ErrorMessage msg);
+    }
+
+    internal class DefaultErrorHandler : IErrorHandler
     {
         protected ILogger _logger;
 
-        public MessageHandler(ILogger logger)
+        public DefaultErrorHandler(ILogger logger)
         {
             _logger = logger;
         }
 
-        public virtual void OnMessage(TWSMessage msg)
+        public virtual void OnError(ErrorMessage msg)
         {
             var e = new ClientException(msg.Id, msg.ErrorCode, msg.Message);
 
@@ -54,15 +59,15 @@ namespace TradingBot.Broker.Client
         //    (code >= 10148 && code <= 10284);
     }
 
-    internal class IBBrokerMessageHandler : MessageHandler
+    internal class IBBrokerErrorHandler : DefaultErrorHandler
     {
         IBBroker _broker;
-        public IBBrokerMessageHandler(IBBroker broker, ILogger logger) : base(logger)
+        public IBBrokerErrorHandler(IBBroker broker, ILogger logger) : base(logger)
         {
             _broker = broker;
         }
 
-        public override void OnMessage(TWSMessage msg)
+        public override void OnError(ErrorMessage msg)
         {
             switch (msg.ErrorCode)
             {
@@ -71,7 +76,7 @@ namespace TradingBot.Broker.Client
                 //    break;
 
                 default:
-                    base.OnMessage(msg);
+                    base.OnError(msg);
                     break;
             }
         }
@@ -83,15 +88,15 @@ namespace TradingBot.Broker.Client
         }
     }
 
-    internal class TraderMessageHandler : IBBrokerMessageHandler
+    internal class TraderErrorHandler : IBBrokerErrorHandler
     {
         Trader _trader;
-        public TraderMessageHandler(Trader trader, IBBroker broker, ILogger logger) : base(broker, logger)
+        public TraderErrorHandler(Trader trader, IBBroker broker, ILogger logger) : base(broker, logger)
         {
             _trader = trader;
         }
 
-        public override void OnMessage(TWSMessage msg)
+        public override void OnError(ErrorMessage msg)
         {
             switch (msg.ErrorCode)
             {
@@ -99,7 +104,7 @@ namespace TradingBot.Broker.Client
 
 
                 default:
-                    base.OnMessage(msg);
+                    base.OnError(msg);
                     break;
             }
         }

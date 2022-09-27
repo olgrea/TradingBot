@@ -19,7 +19,7 @@ namespace TradingBot
     public class Trader
     {
         ILogger _logger;
-        TraderMessageHandler _messageHandler;
+        TraderErrorHandler _errorHandler;
         IBroker _broker;
 
         string _ticker;
@@ -36,11 +36,10 @@ namespace TradingBot
 
             _ticker = ticker;
             _logger = logger;
-            var broker = new IBBroker(clientId, logger);
-            _broker = broker;
+            _broker = new IBBroker(clientId, logger);
             
-            _messageHandler = new TraderMessageHandler(this, broker, _logger);
-            _broker.MessageHandler = _messageHandler;
+            _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
+            _broker.ErrorHandler = _errorHandler;
         }
 
         internal Trader(string ticker, IBroker broker, ILogger logger)
