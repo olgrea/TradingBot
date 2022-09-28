@@ -25,6 +25,7 @@ namespace TradingBot.Broker.Orders
             _client = client;
 
             _client.Callbacks.OpenOrder += OnOrderOpened;
+            _client.Callbacks.OrderStatus += OnOrderStatus;
             _client.Callbacks.ExecDetails += OnOrderExecuted;
         }
 
@@ -46,8 +47,6 @@ namespace TradingBot.Broker.Orders
 
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
         {
-            //TODO : add a bajillion logs everywhere
-
             if (contract == null || chain == null || chain.Order == null)
                 return;
 
@@ -60,6 +59,15 @@ namespace TradingBot.Broker.Orders
                 PlaceTWSOrderChain(contract, chain);
                 return;
             }
+            
+            if(chain.AttachedOrders.Any())
+            {
+                _logger.Debug($"Placing order {chain.Order} from order chain. {chain.AttachedOrders.Count} order(s) will be placed after the parent one gets filled.");
+            }
+            else
+            {
+                _logger.Debug($"Placing last order {chain.Order} from chain.");
+            }
 
             PlaceOrder(contract, chain.Order);
             _chainOrdersRequested[chain.Order.Id] = chain;
@@ -67,6 +75,7 @@ namespace TradingBot.Broker.Orders
 
         void PlaceTWSOrderChain(Contract contract, OrderChain chain)
         {
+            _logger.Debug("Placing order chain using TWS mechanism.");
             var list = AssignOrderIdsAndFlatten(chain);
 
             for (int i = 0; i < list.Count; i++)
@@ -88,7 +97,30 @@ namespace TradingBot.Broker.Orders
         {
             if (state.Status == Status.Submitted || state.Status == Status.PreSubmitted /*for paper trading accounts*/)
             {
-                _ordersSubmitted[order.Id] = order;
+                if(!_ordersSubmitted.ContainsKey(order.Id)) // new order submitted
+                {
+                    _logger.Debug($"New order placed : {order}");
+                    _ordersSubmitted[order.Id] = order;
+                }
+                else // modified order?
+                {
+                    _logger.Debug($"Order with id {order.Id} modified to : {order}.");
+                    _ordersSubmitted[order.Id] = order;
+                    if(_chainOrdersRequested.ContainsKey(order.Id))
+                        _chainOrdersRequested[order.Id] = order;
+                }
+            }
+        }
+
+        void OnOrderStatus(OrderStatus os)
+        {
+            if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
+            {
+                if(_chainOrdersRequested.ContainsKey(os.Info.OrderId))
+                {
+                    _logger.Warn($"Order {os.Info.OrderId} was part of an order chain and has been cancelled. Attached orders will also be cancelled.");
+                    _chainOrdersRequested.Remove(os.Info.OrderId);
+                }
             }
         }
 
@@ -103,20 +135,24 @@ namespace TradingBot.Broker.Orders
         void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
         {
             var executedOrder = chain.Order;
+            _logger.Debug($"Order from chain executed : {executedOrder}");
 
             // First cancel all siblings, if any
             if (chain.Parent != null && _chainOrdersRequested.ContainsKey(chain.Parent.Id))
             {
                 var parent = _chainOrdersRequested[chain.Parent.Id];
+                _logger.Debug($"Cancelling {parent.AttachedOrders.Count} sibling orders.");
                 foreach (OrderChain child in parent.AttachedOrders)
                 {
                     if (child.Order.Id == executedOrder.Id)
                         continue;
-                    CancelOrder(child.Order);
+                    
                     _chainOrdersRequested.Remove(child.Order.Id);
+                    CancelOrder(child.Order);
                 }
             }
 
+            _logger.Debug($"Placing {chain.AttachedOrders.Count} attached orders.");
             // Then place all child of the executed order
             foreach (OrderChain child in chain.AttachedOrders)
             {
@@ -127,12 +163,23 @@ namespace TradingBot.Broker.Orders
         public void ModifyOrder(Contract contract, Order order)
         {
             Trace.Assert(order.Id > 0);
+            if(!_ordersSubmitted.ContainsKey(order.Id))
+            {
+                throw new ArgumentException($"The order {order} hasn't been placed yet and therefore cannot be cancelled");
+            }
+
+            _logger.Debug($"Modifying order {order}.");
             _client.PlaceOrder(contract, order);
         }
 
         public void CancelOrder(Order order)
         {
             Trace.Assert(order.Id > 0);
+            if (!_ordersSubmitted.ContainsKey(order.Id))
+            {
+                throw new ArgumentException($"The order {order} hasn't been placed and therefore cannot be cancelled");
+            }
+
             _client.CancelOrder(order.Id);
         }
 
