@@ -22,10 +22,5 @@
         public double AverageCost { get; set; }
         public double UnrealizedPNL { get; set; }
         public double RealizedPNL { get; set; }
-
-        public override string ToString()
-        {
-            return $"{Contract} : {PositionAmount} {MarketPrice} {MarketValue} {AverageCost} {UnrealizedPNL} {RealizedPNL}";
-        }
     }
 }
