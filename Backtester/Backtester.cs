@@ -72,6 +72,8 @@ namespace Backtester
                 {
 
                 }
+
+                //TODO : Save results, reset trader and fake clients
             }
         }
 

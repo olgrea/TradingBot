@@ -29,6 +29,7 @@ namespace TradingBot
         string _ticker;
         Contract _contract;
         double _USDCashBalance;
+        double _commissions;
         Position _contractPosition;
         PnL _PnL;
 
@@ -52,7 +53,7 @@ namespace TradingBot
             Trace.Assert(broker != null);
 
             _ticker = ticker;
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}").WithProperty("ticker", ticker);
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
             _broker = broker;
 
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
@@ -73,21 +74,21 @@ namespace TradingBot
             _broker.Connect();
             
             if (!_strategies.Any())
-            {
-                _logger.Error("No strategies set for this trader");
-                return;
-            }
-
-            _logger.Info("This trader will monitor {ticker} using strategies : ...", _ticker);
-            _contract = _broker.GetContract(_ticker);
+                throw new Exception("No strategies set for this trader");
 
             var acc = _broker.GetAccount();
             if(!acc.CashBalances.ContainsKey("USD"))
-            {
-                _logger.Error("No USD cash funds in this account. This trader only trades in USD.");
-                return;
-            }
+                throw new Exception($"No USD cash funds in account {acc.Code}. This trader only trades in USD.");
             _USDCashBalance = acc.CashBalances["USD"];
+
+            _contract = _broker.GetContract(_ticker);
+            if (_contract == null)
+                throw new Exception($"Unable to find contract for ticker {_ticker}.");
+
+            string msg = $"This trader will monitor {_ticker} using strategies : ";
+            foreach (var strat in _strategies)
+                msg += $"{strat.GetType()}, ";
+            _logger.Info(msg);
 
             SubscribeToData();
 

@@ -147,7 +147,9 @@ namespace Backtester
         {
             if (!_initialized)
                 throw new InvalidOperationException("Fake client has not been initialized.");
-            
+
+            _logger.Info($"Fake client started : {_currentFakeTime} to {_end}");
+
             ClockTick += OnClockTick_UpdateBarNode;
             ClockTick += OnClockTick_UpdateBidAskNode;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
@@ -157,6 +159,8 @@ namespace Backtester
 
         internal void Stop()
         {
+            _logger.Info($"Fake client stopped at {_currentFakeTime}");
+
             ClockTick -= OnClockTick_UpdateBarNode;
             ClockTick -= OnClockTick_UpdateBidAskNode;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
@@ -177,6 +181,8 @@ namespace Backtester
 
             _st.Reset();
             _currentFakeTime = _start;
+            _logger.Debug($"Fake client reset to {_currentFakeTime}");
+
             _currentBarNode = null;
             _currentBidAskNode = null;
 
@@ -221,6 +227,7 @@ namespace Backtester
             _passingTimeCancellation = new CancellationTokenSource();
             var mainToken = _passingTimeCancellation.Token;
             _st.Start();
+            _logger.Trace($"Passing time task started");
             _passingTimeTask = Task.Factory.StartNew(() =>
             {
                 var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
@@ -247,6 +254,9 @@ namespace Backtester
                                 delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
                                 delayToken = delayCancellation.Token;
                             }
+                            else
+                                _logger.Trace($"Passing time task cancelled");
+
                             return;
                         }
                         
@@ -277,6 +287,7 @@ namespace Backtester
                 //TODO validate order? What to validate?
                 _openOrders.Add(order);
 
+                _logger.Debug($"New order submitted : {order}");
                 _messageQueue.Enqueue(() =>
                 {
                     var orderState = new IBApi.OrderState() { Status = "Submitted" };
@@ -285,6 +296,7 @@ namespace Backtester
             }
             else //modify order
             {
+                _logger.Debug($"Order modified : {order}");
                 openOrder = order;
             }
 
@@ -297,7 +309,7 @@ namespace Backtester
 
         double GetCommission(Contract contract, Order order)
         {
-            //TODO : verify commission
+            //TODO : verify commission... Didn't seem to be working
             var os = GetCommissionFromOrder(contract, order).Result;
             return os.Commission != double.MaxValue ? os.Commission : 0.0;
         }
@@ -310,6 +322,7 @@ namespace Backtester
             {
                 if (orderId == o.Id)
                 {
+                    _logger.Trace($"GetCommissionFromOrder : result set");
                     resolveResult.SetResult(os);
                 }
             });
@@ -339,6 +352,8 @@ namespace Backtester
         {
             foreach(Order o in _openOrders)
             {
+                _logger.Debug($"Evaluating Order {o} at BidAsk : {bidAsk}");
+
                 if (o is MarketOrder mo)
                 {
                     EvaluateMarketOrder(bidAsk, mo);
@@ -380,10 +395,12 @@ namespace Backtester
         {
             if (o.Action == OrderAction.BUY && o.TouchPrice >= bidAsk.Ask)
             {
+                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. Ask : {bidAsk.Ask:c}");
                 ExecuteOrder(o, bidAsk.Ask);
             }
             else if (o.Action == OrderAction.SELL && o.TouchPrice <= bidAsk.Bid)
             {
+                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. Bid : {bidAsk.Bid:c}");
                 ExecuteOrder(o, bidAsk.Bid);
             }
         }
@@ -402,20 +419,28 @@ namespace Backtester
 
                 if (o.StopPrice <= bidAsk.Ask)
                 {
+                    _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Ask : {bidAsk.Ask:c}");
                     ExecuteOrder(o, bidAsk.Ask);
                 }
                 else if (o.TrailingPercent != double.MaxValue)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Ask) / bidAsk.Ask;
                     if (currentPercent > o.TrailingPercent)
-                        o.StopPrice = bidAsk.Ask +  o.TrailingPercent * bidAsk.Ask;
+                    {
+                        var newVal = bidAsk.Ask +  o.TrailingPercent * bidAsk.Ask;
+                        _logger.Trace($"{o} : current%={currentPercent} trail%={o.TrailingPercent} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
+                        o.StopPrice = newVal;
+                    }
                 }
                 else
                 {
                     // The price must be updated if the ask falls
                     var currentStopPrice = bidAsk.Ask + o.TrailingAmount;
                     if (currentStopPrice < o.StopPrice)
+                    {
                         o.StopPrice = currentStopPrice;
+                        _logger.Trace($"{o} : adjusting stop price of {o.StopPrice:c} to {currentStopPrice:c}");
+                    }
                 }
             }
             else if (o.Action == OrderAction.SELL)
@@ -429,20 +454,28 @@ namespace Backtester
 
                 if (o.StopPrice >= bidAsk.Bid)
                 {
+                    _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Bid: {bidAsk.Bid:c}");
                     ExecuteOrder(o, bidAsk.Bid);
                 }
                 else if (o.TrailingPercent != double.MaxValue)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Bid) / -bidAsk.Bid;
                     if (currentPercent > o.TrailingPercent)
-                        o.StopPrice = bidAsk.Bid - o.TrailingPercent * bidAsk.Bid;
+                    {
+                        var newVal = bidAsk.Bid - o.TrailingPercent * bidAsk.Bid;
+                        _logger.Trace($"{o} : current%={currentPercent} trail%={o.TrailingPercent} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
+                        o.StopPrice = newVal;
+                    }
                 }
                 else
                 {
                     // The price must be updated if the bid rises
                     var currentStopPrice = bidAsk.Bid - o.TrailingAmount;
                     if (currentStopPrice > o.StopPrice)
+                    {
                         o.StopPrice = currentStopPrice;
+                        _logger.Trace($"{o} : adjusting stop price of {o.StopPrice:c} to {currentStopPrice:c}");
+                    }
                 }
             }
         }
@@ -451,10 +484,12 @@ namespace Backtester
         {
             if (o.Action == OrderAction.BUY && o.StopPrice <= bidAsk.Ask)
             {
+                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Ask : {bidAsk.Ask:c}");
                 ExecuteOrder(o, bidAsk.Ask);
             }
             else if (o.Action == OrderAction.SELL && o.StopPrice >= bidAsk.Bid)
             {
+                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Bid: {bidAsk.Bid:c}");
                 ExecuteOrder(o, bidAsk.Bid);
             }
         }
@@ -463,29 +498,40 @@ namespace Backtester
         {
             if (o.Action == OrderAction.BUY && o.LmtPrice >= bidAsk.Ask)
             {
+                _logger.Debug($"{o} : lmt price of {o.LmtPrice:c} reached. Ask : {bidAsk.Ask:c}");
                 ExecuteOrder(o, bidAsk.Ask);
             }
             else if (o.Action == OrderAction.SELL && o.LmtPrice <= bidAsk.Bid)
             {
+                _logger.Debug($"{o} : lmt price of {o.LmtPrice:c} reached. Bid : {bidAsk.Bid:c}");
                 ExecuteOrder(o, bidAsk.Bid);
             }
         }
 
         void ExecuteOrder(Order order, double price)
         {
+            _logger.Info($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
+            // TODO : take into account commisison in computations? probably
             if(order.Action == OrderAction.BUY)
             {
                 Position.PositionAmount += order.TotalQuantity;
                 Position.AverageCost = (Position.AverageCost + total) / 2;
+                _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
+
                 UpdateUnrealizedPNL(price);
                 _fakeAccount.CashBalances["USD"] -= total;
             }
             else if (order.Action == OrderAction.SELL)
             {
                 Position.PositionAmount -= order.TotalQuantity;
+                _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
+
                 Position.RealizedPNL = order.TotalQuantity * (Position.MarketValue - Position.AverageCost);
+                _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {Position.RealizedPNL:c}");
+
+                UpdateUnrealizedPNL(price);
                 _fakeAccount.CashBalances["USD"] += total;
             }
 
@@ -494,8 +540,12 @@ namespace Backtester
             //TODO : really really need to make sure I have the correct prices
 
             double commission = GetCommission(Contract, order);
+            _logger.Debug($"{order} : commission : {commission:c}");
+
             _fakeAccount.CashBalances["USD"] -= commission;
             _totalCommission += commission;
+
+            _logger.Debug($"Account {_fakeAccount.Code} :  New USD cash balance : {_fakeAccount.CashBalances["USD"]:c}");
 
             string execId = NextExecId.ToString();
             _messageQueue.Enqueue(() =>
@@ -532,12 +582,15 @@ namespace Backtester
             var order = _openOrders.First(o => o.Id == orderId);
             if(order != null)
             {
+                _logger.Debug($"Order {orderId} cancelled.");
                 _openOrders.Remove(order);
                 _messageQueue.Enqueue(() =>
                 {
                     Callbacks.orderStatus(order.Id, "Cancelled ", 0,0,0,0,0,0,0,"", 0);
                 });
             }
+            else
+                _logger.Warn($"Cannot cancel order {orderId} (not found)");
         }
 
         public void CancelAllOrders() 
@@ -555,11 +608,13 @@ namespace Backtester
 
             if (receiveUpdates)
             {
+                _logger.Debug($"Account updates requested");
                 _lastAccountUpdate = _currentFakeTime;
                 ClockTick += OnClockTick_AccountSubscription;
             }
             else
             {
+                _logger.Debug($"Account updates cancelled");
                 ClockTick -= OnClockTick_AccountSubscription;
             }
         }
@@ -576,11 +631,11 @@ namespace Backtester
 
         void SendAccountUpdate()
         {
+            _logger.Debug($"Sending account updates...");
             var currentTime = _currentFakeTime;
             _lastAccountUpdate = currentTime;
             _messageQueue.Enqueue(() => 
             {
-                //TODO : insert delay between calls?
                 Callbacks.updateAccountTime(currentTime.ToString()); //TODO : make sure format is correct
                 Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(), "USD", _fakeAccount.Code);
                 Callbacks.accountDownloadEnd(_fakeAccount.Code);
@@ -591,6 +646,7 @@ namespace Backtester
         {
             var cd = new IBApi.ContractDetails();
             cd.Contract = contract.ToIBApiContract();
+            _logger.Debug($"(reqId={reqId}) : Contract {contract} requested.");
 
             _messageQueue.Enqueue(() => 
             { 
@@ -601,8 +657,12 @@ namespace Backtester
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)
         {
-            _reqId5SecBar = reqId;
-            ClockTick += OnClockTick_FiveSecondBar;
+            if(_reqId5SecBar < 0)
+            {
+                _logger.Debug($"(reqId={reqId}) : 5 sec bars requested.");
+                _reqId5SecBar = reqId;
+                ClockTick += OnClockTick_FiveSecondBar;
+            }
         }
 
         void OnClockTick_FiveSecondBar(DateTime newTime)
@@ -651,8 +711,12 @@ namespace Backtester
 
         public void CancelFiveSecondsBarsRequest(int reqId)
         {
-            _reqId5SecBar = -1;
-            ClockTick -= OnClockTick_FiveSecondBar;
+            if(reqId == _reqId5SecBar)
+            {
+                _logger.Debug($"(reqId={reqId}) : 5 sec bars cancelled.");
+                _reqId5SecBar = -1;
+                ClockTick -= OnClockTick_FiveSecondBar;
+            }
         }
 
         public void RequestOpenOrders()
@@ -680,11 +744,9 @@ namespace Backtester
 
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
         {
-            //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
             while (_currentBidAskNode.Value.Time < newTime)
             {
-                //_logger.LogDebug($"  {_currentBidAskNode.Value.Ask:C}");
-                //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}\t{_currentBidAskNode.Value.Ask:C}");
                 EvaluateOpenOrders(_currentBidAskNode.Value);
                 BidAskSubscription?.Invoke(_currentBidAskNode.Value);
                 _currentBidAskNode = _currentBidAskNode.Next;
@@ -693,8 +755,8 @@ namespace Backtester
 
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
-            var newBar = _currentBarNode.Value;
-            var currentPrice = (newBar.Close + newBar.High + newBar.Low) / 3;
+            var ba = _currentBidAskNode.Value;
+            var currentPrice = ba.Ask;
 
             var oldPos = new Position(Position);
             UpdateUnrealizedPNL(currentPrice);
@@ -710,7 +772,11 @@ namespace Backtester
         {
             Position.MarketPrice = currentPrice;
             Position.MarketValue = currentPrice * Position.PositionAmount;
-            Position.UnrealizedPNL = Position.PositionAmount * (Position.MarketValue - Position.AverageCost);
+
+            var positionValue = Position.PositionAmount * Position.AverageCost;
+            Position.UnrealizedPNL = Position.MarketValue - positionValue;
+
+            _logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
 
         public void RequestPositions()
@@ -725,6 +791,7 @@ namespace Backtester
 
         void SendPosition()
         {
+            _logger.Debug($"Sending current position for {Position.Contract}");
             _messageQueue.Enqueue(() =>
             {
                 Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
@@ -764,7 +831,7 @@ namespace Backtester
             {
                 case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
                 case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
-                default: throw new NotImplementedException();
+                    throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
             }
 
             if(!string.IsNullOrEmpty(endDateTime))
@@ -772,14 +839,13 @@ namespace Backtester
 
             LinkedListNode<Bar> first = _currentBarNode;
             LinkedListNode<Bar> current = first;
-            const string format = "yyyyMMdd  HH:mm:ss";
 
             for (int i = 0; i < nbBars; i++, current = current.Previous)
             {
                 _messageQueue.Enqueue(() => 
                 {
                     Callbacks.historicalData(reqId, new IBApi.Bar(
-                        current.Value.Time.ToString(format), 
+                        current.Value.Time.ToString(Bar.TWSTimeFormat), 
                         current.Value.Open, 
                         current.Value.High, 
                         current.Value.Low, 
@@ -792,14 +858,14 @@ namespace Backtester
 
             _messageQueue.Enqueue(() =>
             {
-                Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(format), current.Value.Time.ToString(format));
+                Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat));
             });
         }
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
             if (tickType != "BidAsk")
-                throw new NotImplementedException();
+                throw new NotImplementedException("Only \"BidAsk\" tick by tick data is implemented");
 
             _reqIdBidAsk = reqId;
             BidAskSubscription += SendBidAsk;
@@ -842,12 +908,18 @@ namespace Backtester
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
                 if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync temp step : adding {c}");
                     tmpContracts.Add(c);
+                }
             });
             var contractDetailsEnd = new Action<int>(rId =>
             {
                 if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync end step : set result");
                     resolveResult.SetResult(tmpContracts);
+                }
             });
 
             _client.Callbacks.ContractDetails += contractDetails;
@@ -869,6 +941,7 @@ namespace Backtester
             var resolveResult = new TaskCompletionSource<int>();
             var nextValidId = new Action<int>(id =>
             {
+                _logger.Trace($"GetNextValidId end step : set result {id}");
                 resolveResult.SetResult(id);
             });
 
