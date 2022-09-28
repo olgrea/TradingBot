@@ -55,6 +55,11 @@ namespace TradingBot.Broker.Orders
             Debug.Assert(Id > 0);
             return Id.GetHashCode();
         }
+
+        public override string ToString()
+        {
+            return $"{Action} {TotalQuantity} {OrderType} (id={Id})";
+        }
     }
 
     internal class MarketOrder : Order

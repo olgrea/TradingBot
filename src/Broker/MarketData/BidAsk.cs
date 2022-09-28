@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace TradingBot.Broker.MarketData
 {
@@ -11,5 +9,10 @@ namespace TradingBot.Broker.MarketData
         public double Ask { get; set; }
         public int AskSize { get; set; }
         public DateTime Time { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Time} : B={Bid:c} x{BidSize}, A={Ask:c} x{AskSize}";
+        }
     }
 }
