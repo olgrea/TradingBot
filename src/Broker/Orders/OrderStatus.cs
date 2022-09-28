@@ -1,4 +1,5 @@
 ﻿using System;
+using IBApi;
 
 namespace TradingBot.Broker.Orders
 {
@@ -11,5 +12,10 @@ namespace TradingBot.Broker.Orders
         public double AvgFillPrice { get; set; }
         public double LastFillPrice { get; set; }
         public double MktCapPrice { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Info.OrderId} {Status} : filled={Filled:c} remaining={Remaining:c} avgFillprice={AvgFillPrice:c} lastFillPrice={LastFillPrice:c}";
+        }
     }
 }

@@ -16,7 +16,7 @@ namespace TradingBot.Broker.Orders
 
         public override string ToString()
         {
-            return $"execId={ExecId} {Time} : orderId={OrderId} {Action} shares={Shares} price={Price} avgPrice={AvgPrice} exchange={Exchange}";
+            return $"execId={ExecId} {Time} : orderId={OrderId} {Action} shares={Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange}";
         }
     }
 }

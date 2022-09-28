@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace TradingBot.Broker.MarketData
@@ -16,6 +17,8 @@ namespace TradingBot.Broker.MarketData
 
     public class Bar : IMarketData
     {
+        public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
+
         public double Open { get; set; }
         public double Close { get; set; }
         public double High { get; set; }
@@ -36,6 +39,11 @@ namespace TradingBot.Broker.MarketData
         public override int GetHashCode()
         {
             return Time.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return $"{Time} : O={Open:c} H={High:c} L={Low:c} C={Close:c}";
         }
     }
 }
