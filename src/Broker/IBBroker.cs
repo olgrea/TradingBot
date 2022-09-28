@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using NLog;
+using System.Diagnostics;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -180,16 +181,14 @@ namespace TradingBot.Broker
             var resolveResult = new TaskCompletionSource<bool>();
             var nextValidId = new Action<int>(id =>
             {
-                if (_nextValidOrderId < 0)
-                {
-                    _logger.Info($"Client connected.");
-                }
+                _logger.Trace($"ConnectAsync : next valid id {id}");
                 _nextValidOrderId = id;
             });
 
             var managedAccounts = new Action<string>(acc =>
             {
                 _accountCode = acc;
+                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
                 resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
             });
 
@@ -201,7 +200,10 @@ namespace TradingBot.Broker
                 _client.Callbacks.ManagedAccounts -= managedAccounts;
 
                 if (_nextValidOrderId > 0)
+                {
                     ClientConnected?.Invoke();
+                    _logger.Info($"Client {clientId} Connected");
+                }
             });
 
             _client.Connect(host, port, clientId);
@@ -215,67 +217,12 @@ namespace TradingBot.Broker
             ClientDisconnected?.Invoke();
         }
 
-        public Accounts.Account GetAccount()
+        public Account GetAccount()
         {
-            return GetAccountAsync().Result;
-        }
-
-        Task<Account> GetAccountAsync(bool receiveUpdates = true)
-        {
-            var account = new Account() { Code = _accountCode };
-
-            var resolveResult = new TaskCompletionSource<Account>();
-
-            var updateAccountTime = new Action<string>(time => account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture));
-            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
-            {
-                switch (key)
-                {
-                    case "CashBalance":
-                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "RealizedPnL":
-                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "UnrealizedPnL":
-                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-                }
-            });
-            var updatePortfolio = new Action<Position>(pos => account.Positions.Add(pos));
-            var accountDownloadEnd = new Action<string>(accountCode => resolveResult.SetResult(account));
-
-            _client.Callbacks.UpdateAccountTime += updateAccountTime;
-            _client.Callbacks.UpdateAccountValue += updateAccountValue;
-            _client.Callbacks.UpdatePortfolio += updatePortfolio;
-            _client.Callbacks.AccountDownloadEnd += accountDownloadEnd;
-
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.UpdateAccountTime -= updateAccountTime;
-                _client.Callbacks.UpdateAccountValue -= updateAccountValue;
-                _client.Callbacks.UpdatePortfolio -= updatePortfolio;
-                _client.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
-
-                if (!receiveUpdates)
-                    _client.RequestAccount(_accountCode, false);
-
-                _subscriptions.AccountUpdates = receiveUpdates;
-            });
-
-            _client.RequestAccount(_accountCode, true);
-
-            return resolveResult.Task;
+            return _client.GetAccountAsync(_accountCode).Result;
         }
 
         public Contract GetContract(string ticker)
-        {
-            return GetContractsAsync(ticker).Result?.FirstOrDefault();
-        }
-
-        Task<List<Contract>> GetContractsAsync(string ticker)
         {
             var sampleContract = new Stock()
             {
@@ -285,33 +232,7 @@ namespace TradingBot.Broker
                 SecType = "STK"
             };
 
-            var reqId = NextRequestId;
-
-            var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var tmpContracts = new List<Contract>();
-            var contractDetails = new Action<int, Contract>((rId, c) =>
-            {
-                if (rId == reqId)
-                    tmpContracts.Add(c);
-            });
-            var contractDetailsEnd = new Action<int>(rId =>
-            {
-                if (rId == reqId)
-                    resolveResult.SetResult(tmpContracts);
-            });
-
-            _client.Callbacks.ContractDetails += contractDetails;
-            _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
-
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.ContractDetails -= contractDetails;
-                _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
-            });
-
-            _client.RequestContract(reqId, sampleContract);
-
-            return resolveResult.Task;
+            return _client.GetContractsAsync(NextRequestId, sampleContract).Result?.FirstOrDefault();
         }
 
         public void RequestBidAsk(Contract contract)
@@ -339,6 +260,7 @@ namespace TradingBot.Broker
             if (_subscriptions.FiveSecBars.ContainsKey(contract))
                 return;
 
+            _logger.Debug($"Requesting bar of length {barLength}");
             int reqId = NextRequestId;
             _subscriptions.FiveSecBars[contract] = reqId;
 
@@ -348,7 +270,11 @@ namespace TradingBot.Broker
 
         void OnFiveSecondsBarReceived(int reqId, MarketData.Bar bar)
         {
+            Trace.Assert(_subscriptions.FiveSecBars.ContainsValue(reqId));
+            
             var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
+            
+            _logger.Debug($"FiveSecondsBarReceived for {contract}");
 
             if (!_fiveSecBars.ContainsKey(contract))
             {
@@ -386,13 +312,14 @@ namespace TradingBot.Broker
 
         Bar MakeBar(LinkedList<Bar> list, BarLength barLength)
         {
+            _logger.Trace($"Making a {barLength}s bar using {list.Count} 5s bars");
             int seconds = (int)barLength;
 
             Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
             var e = list.GetEnumerator();
             e.MoveNext();
 
-            // The 1st bar shouldn't be included.
+            // The 1st bar shouldn't be included... don't remember why
             e.MoveNext();
 
             int nbBars = seconds / 5;
@@ -423,8 +350,15 @@ namespace TradingBot.Broker
         {
             switch (bar.BarLength)
             {
-                case BarLength._5Sec: Bar5SecReceived?.Invoke(contract, bar); break;
-                case BarLength._1Min: Bar1MinReceived?.Invoke(contract, bar); break;
+                case BarLength._5Sec:
+                    _logger.Trace($"Invoking Bar5SecReceived for {contract}");
+                    Bar5SecReceived?.Invoke(contract, bar); 
+                    break;
+                
+                case BarLength._1Min:
+                    _logger.Trace($"Invoking Bar1MinReceived for {contract}");
+                    Bar1MinReceived?.Invoke(contract, bar); 
+                    break;
             }
         }
 
@@ -510,89 +444,12 @@ namespace TradingBot.Broker
 
         public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return GetHistoricalDataAsync(contract, barLength, DateTime.MinValue, count).Result;   
+            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, DateTime.MinValue, count).Result;   
         }
-
-        internal Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
+   
+        internal IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
-            var tmpList = new LinkedList<MarketData.Bar>();
-            var reqId = NextRequestId;
-
-            var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
-            SetupHistoricalBarCallbacks(tmpList, reqId, barLength, resolveResult);
-
-            //string timeFormat = "yyyyMMdd-HH:mm:ss";
-
-            // Duration         : Allowed Bar Sizes
-            // 60 S             : 1 sec - 1 mins
-            // 120 S            : 1 sec - 2 mins
-            // 1800 S (30 mins) : 1 sec - 30 mins
-            // 3600 S (1 hr)    : 5 secs - 1 hr
-            // 14400 S (4hr)	: 10 secs - 3 hrs
-            // 28800 S (8 hrs)  : 30 secs - 8 hrs
-            // 1 D              : 1 min - 1 day
-            // 2 D              : 2 mins - 1 day
-            // 1 W              : 3 mins - 1 week
-            // 1 M              : 30 mins - 1 month
-            // 1 Y              : 1 day - 1 month
-
-            string durationStr = null;
-            string barSizeStr = null;
-            switch (barLength)
-            {
-                case BarLength._1Sec :
-                    durationStr = $"{count} S";
-                    barSizeStr = "1 secs";
-                    break;
-
-                case BarLength._5Sec:
-                    durationStr = $"{5 * count} S";
-                    barSizeStr = "5 secs";
-                    break;
-
-                case BarLength._1Min:
-                    durationStr = $"{60 * count} S";
-                    barSizeStr = "1 min";
-                    break;
-
-                default:
-                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
-            }
-
-            string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
-
-            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, false);
-
-            return resolveResult.Task;
-        }
-
-        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
-        {
-            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
-            {
-                if (rId == reqId)
-                {
-                    bar.BarLength = barLength;
-                    tmpList.AddLast(bar);
-                }
-            });
-
-            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
-            {
-                if (rId == reqId)
-                {
-                    resolveResult.SetResult(tmpList);
-                }
-            });
-
-            _client.Callbacks.HistoricalData += historicalData;
-            _client.Callbacks.HistoricalDataEnd += historicalDataEnd;
-
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.HistoricalData -= historicalData;
-                _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
-            });
+            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, endDateTime, count).Result;
         }
 
         void TickByTickBidAsk(int reqId, BidAsk bidAsk)
@@ -609,36 +466,7 @@ namespace TradingBot.Broker
 
         public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count)
         {
-            return RequestHistoricalTicks(contract, time, count).Result;
-        }
-
-        internal Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count)
-        {
-            var tmpList = new LinkedList<BidAsk>();
-            var reqId = NextRequestId;
-
-            var resolveResult = new TaskCompletionSource<IEnumerable<BidAsk>>();
-            var historicalTicksBidAsk = new Action<int, IEnumerable<BidAsk>, bool>((rId, bas, isDone) =>
-            {
-                if (rId == reqId)
-                {
-                    foreach(var ba in bas)
-                        tmpList.AddLast(ba);
-
-                    if (isDone)
-                        resolveResult.SetResult(tmpList);
-                }
-            });
-                        
-            _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
-            });
-
-            (_client as IBClient).RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
-
-            return resolveResult.Task;
+            return _client.RequestHistoricalTicks(NextRequestId, contract, time, count).Result;
         }
     }
 }

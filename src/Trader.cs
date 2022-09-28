@@ -29,7 +29,10 @@ namespace TradingBot
         string _ticker;
         Contract _contract;
         double _USDCashBalance;
-        double _commissions;
+
+        // TODO track account changes
+        //double _commissions;
+
         Position _contractPosition;
         PnL _PnL;
 

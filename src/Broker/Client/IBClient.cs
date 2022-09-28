@@ -1,7 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using IBApi;
 using NLog;
+using TradingBot.Broker.Accounts;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Broker.Client
 {
@@ -64,6 +69,66 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqIds(-1); // param is deprecated
         }
 
+        public Task<Account> GetAccountAsync(string accountCode)
+        {
+            var account = new Account() { Code = accountCode };
+
+            var resolveResult = new TaskCompletionSource<Account>();
+
+            var updateAccountTime = new Action<string>(time =>
+            {
+                _logger.Trace($"GetAccountAsync updateAccountTime : {time}");
+                account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture);
+            });
+            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
+            {
+                _logger.Trace($"GetAccountAsync updateAccountValue : key={key}, value={value}");
+                switch (key)
+                {
+                    case "CashBalance":
+                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "RealizedPnL":
+                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "UnrealizedPnL":
+                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+                }
+            });
+            var updatePortfolio = new Action<Position>(pos =>
+            {
+                _logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
+                account.Positions.Add(pos);
+            });
+            var accountDownloadEnd = new Action<string>(accountCode =>
+            {
+                _logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
+                resolveResult.SetResult(account);
+            });
+
+            _callbacks.UpdateAccountTime += updateAccountTime;
+            _callbacks.UpdateAccountValue += updateAccountValue;
+            _callbacks.UpdatePortfolio += updatePortfolio;
+            _callbacks.AccountDownloadEnd += accountDownloadEnd;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _callbacks.UpdateAccountTime -= updateAccountTime;
+                _callbacks.UpdateAccountValue -= updateAccountValue;
+                _callbacks.UpdatePortfolio -= updatePortfolio;
+                _callbacks.AccountDownloadEnd -= accountDownloadEnd;
+
+                RequestAccount(accountCode, false);
+            });
+
+            RequestAccount(accountCode, true);
+
+            return resolveResult.Task;
+        }
+
         public void RequestAccount(string accountCode, bool receiveUpdates = true)
         {
             _logger.Debug($"Requesting values from account {accountCode}");
@@ -120,6 +185,41 @@ namespace TradingBot.Broker.Client
             _clientSocket.cancelTickByTickData(reqId);
         }
 
+        public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
+        {
+            var resolveResult = new TaskCompletionSource<List<Contract>>();
+            var tmpContracts = new List<Contract>();
+            var contractDetails = new Action<int, Contract>((rId, c) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync temp step : adding {c}");
+                    tmpContracts.Add(c);
+                }
+            });
+            var contractDetailsEnd = new Action<int>(rId =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync end step : set result");
+                    resolveResult.SetResult(tmpContracts);
+                }
+            });
+
+            _callbacks.ContractDetails += contractDetails;
+            _callbacks.ContractDetailsEnd += contractDetailsEnd;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _callbacks.ContractDetails -= contractDetails;
+                _callbacks.ContractDetailsEnd -= contractDetailsEnd;
+            });
+
+            RequestContract(reqId, contract);
+
+            return resolveResult.Task;
+        }
+
         public void RequestContract(int reqId, Contract contract)
         {
             _logger.Debug($"Requesting contract {contract} (reqId={reqId})");
@@ -159,10 +259,126 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqGlobalCancel();
         }
 
+        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        {
+            var tmpList = new LinkedList<MarketData.Bar>();
+
+            var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
+            SetupHistoricalBarCallbacks(tmpList, reqId, barLength, resolveResult);
+
+            //string timeFormat = "yyyyMMdd-HH:mm:ss";
+
+            // Duration         : Allowed Bar Sizes
+            // 60 S             : 1 sec - 1 mins
+            // 120 S            : 1 sec - 2 mins
+            // 1800 S (30 mins) : 1 sec - 30 mins
+            // 3600 S (1 hr)    : 5 secs - 1 hr
+            // 14400 S (4hr)	: 10 secs - 3 hrs
+            // 28800 S (8 hrs)  : 30 secs - 8 hrs
+            // 1 D              : 1 min - 1 day
+            // 2 D              : 2 mins - 1 day
+            // 1 W              : 3 mins - 1 week
+            // 1 M              : 30 mins - 1 month
+            // 1 Y              : 1 day - 1 month
+
+            string durationStr = null;
+            string barSizeStr = null;
+            switch (barLength)
+            {
+                case BarLength._1Sec:
+                    durationStr = $"{count} S";
+                    barSizeStr = "1 secs";
+                    break;
+
+                case BarLength._5Sec:
+                    durationStr = $"{5 * count} S";
+                    barSizeStr = "5 secs";
+                    break;
+
+                case BarLength._1Min:
+                    durationStr = $"{60 * count} S";
+                    barSizeStr = "1 min";
+                    break;
+
+                default:
+                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
+            }
+
+            string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
+
+            RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, false);
+
+            return resolveResult.Task;
+        }
+
+        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
+        {
+            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
+                    bar.BarLength = barLength;
+                    tmpList.AddLast(bar);
+                }
+            });
+
+            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
+                    resolveResult.SetResult(tmpList);
+                }
+            });
+
+            _callbacks.HistoricalData += historicalData;
+            _callbacks.HistoricalDataEnd += historicalDataEnd;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _callbacks.HistoricalData -= historicalData;
+                _callbacks.HistoricalDataEnd -= historicalDataEnd;
+            });
+        }
+
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
             _logger.Debug($"Requesting historical data for {contract} :\nendDateTime={endDateTime}, durationStr={durationStr}, barSizeStr={barSizeStr}, onlyRTH={onlyRTH}");
             _clientSocket.reqHistoricalData(reqId, contract.ToIBApiContract(), endDateTime, durationStr, barSizeStr, "TRADES", Convert.ToInt32(onlyRTH), 1, false, null);
+        }
+
+        public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(int reqId, Contract contract, DateTime time, int count)
+        {
+            var tmpList = new LinkedList<BidAsk>();
+
+            var resolveResult = new TaskCompletionSource<IEnumerable<BidAsk>>();
+            var historicalTicksBidAsk = new Action<int, IEnumerable<BidAsk>, bool>((rId, bas, isDone) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"RequestHistoricalTicks - adding {bas.Count()} bidasks");
+                    
+                    foreach (var ba in bas)
+                        tmpList.AddLast(ba);
+
+                    if (isDone)
+                    {
+                        _logger.Trace($"RequestHistoricalTicks - SetResult");
+                        resolveResult.SetResult(tmpList);
+                    }
+                }
+            });
+
+            _callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
+            });
+
+            RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+
+            return resolveResult.Task;
         }
 
         public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
