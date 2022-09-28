@@ -58,7 +58,7 @@ namespace TradingBot.Broker.Orders
 
         public override string ToString()
         {
-            return $"Order {Id} : {Action} {TotalQuantity} {OrderType}";
+            return $"[{Id}] : {Action} {TotalQuantity} {OrderType}";
         }
     }
 
