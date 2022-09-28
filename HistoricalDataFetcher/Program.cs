@@ -215,7 +215,7 @@ namespace HistoricalDataFetcher
                 //if(diff > _20min)
                 //    tickCount = 100;
 
-                var ticks = _broker.RequestHistoricalTicks(contract, current, tickCount).Result;
+                var ticks = _broker.GetPastBidAsks(contract, current, tickCount);
 
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
                 NbRequest++; NbRequest++;
@@ -244,7 +244,7 @@ namespace HistoricalDataFetcher
         private LinkedList<TData> FetchBars<TData>(string filename, Contract contract, DateTime time) where TData : IMarketData, new()
         {
             _logger.Info($"Retrieving bars from TWS for '{filename}'.");
-            var bars = _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800).Result;
+            var bars = _broker.GetPastBars(contract, BarLength._1Sec, time, 1800);
             NbRequest++;
             return new LinkedList<TData>(bars.Cast<TData>());
         }

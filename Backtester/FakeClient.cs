@@ -87,7 +87,7 @@ namespace Backtester
             Callbacks = new IBCallbacks(_logger);
 
             _ticker = ticker;
-            _contract = GetContractsAsync(_ticker).Result.First();
+            _contract = GetContract(_ticker);
             InitFakeAccount();
 
             _messageQueue = new ConcurrentQueue<Action>();
@@ -599,10 +599,25 @@ namespace Backtester
                 CancelOrder(o.Id);
         }
 
+        public Task<Account> GetAccountAsync(string accountCode)
+        {
+            Exception e = new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
+
+            var tcs = new TaskCompletionSource<Account>();
+            if (accountCode != _fakeAccount.Code)
+            {
+                tcs.SetException(e);
+                throw e;
+            }
+
+            tcs.SetResult(_fakeAccount);
+            return tcs.Task;
+        }
+
         public void RequestAccount(string accountCode, bool receiveUpdates = true)
         {
             if (accountCode != _fakeAccount.Code)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
             _messageQueue.Enqueue(SendAccountUpdate);
 
@@ -824,6 +839,11 @@ namespace Backtester
             _reqIdPnL = -1;
         }
 
+        public Task<LinkedList<Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        {
+            throw new NotImplementedException();
+        }
+
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
             int nbBars = -1;
@@ -835,7 +855,7 @@ namespace Backtester
             }
 
             if(!string.IsNullOrEmpty(endDateTime))
-                throw new NotImplementedException();
+                throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
 
             LinkedListNode<Bar> first = _currentBarNode;
             LinkedListNode<Bar> current = first;
@@ -860,6 +880,11 @@ namespace Backtester
             {
                 Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat));
             });
+        }
+
+        public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(int reqId, Contract contract, DateTime time, int count)
+        {
+            throw new NotImplementedException();
         }
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
@@ -891,7 +916,7 @@ namespace Backtester
             _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
 
-        Task<List<Contract>> GetContractsAsync(string ticker)
+        Contract GetContract(string ticker)
         {
             var sampleContract = new Stock()
             {
@@ -901,39 +926,12 @@ namespace Backtester
                 SecType = "STK"
             };
 
-            var reqId = 1;
+            return _client.GetContractsAsync(1, sampleContract).Result?.FirstOrDefault();
+        }
 
-            var resolveResult = new TaskCompletionSource<List<Contract>>();
-            var tmpContracts = new List<Contract>();
-            var contractDetails = new Action<int, Contract>((rId, c) =>
-            {
-                if (rId == reqId)
-                {
-                    _logger.Trace($"GetContractsAsync temp step : adding {c}");
-                    tmpContracts.Add(c);
-                }
-            });
-            var contractDetailsEnd = new Action<int>(rId =>
-            {
-                if (rId == reqId)
-                {
-                    _logger.Trace($"GetContractsAsync end step : set result");
-                    resolveResult.SetResult(tmpContracts);
-                }
-            });
-
-            _client.Callbacks.ContractDetails += contractDetails;
-            _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
-
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.ContractDetails -= contractDetails;
-                _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
-            });
-
-            _client.RequestContract(reqId, sampleContract);
-
-            return resolveResult.Task;
+        public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
+        {
+            return _client.GetContractsAsync(reqId, contract);
         }
 
         Task<int> GetNextValidId()
