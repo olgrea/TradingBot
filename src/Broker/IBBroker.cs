@@ -20,6 +20,8 @@ namespace TradingBot.Broker
     {
         public bool AccountUpdates { get; set; }
         public bool Positions { get; set; }
+
+        //TODO : remove all that "by Contract" stuff?
         public Dictionary<Contract, int> BidAsk { get; set; } = new Dictionary<Contract, int>();
         public Dictionary<Contract, int> FiveSecBars { get; set; } = new Dictionary<Contract, int>();
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
@@ -103,8 +105,11 @@ namespace TradingBot.Broker
 
         public event Action ClientConnected;
         public event Action ClientDisconnected;
+
+        // TODO : revert back to dictionary of Action<> ?
         public event Action<Contract, Bar> Bar5SecReceived;
         public event Action<Contract, Bar> Bar1MinReceived;
+
         public event Action<Contract, BidAsk> BidAskReceived;
 
         public event Action<string, string, string> AccountValueUpdated
@@ -309,7 +314,6 @@ namespace TradingBot.Broker
             }
         }
 
-
         Bar MakeBar(LinkedList<Bar> list, BarLength barLength)
         {
             _logger.Trace($"Making a {barLength}s bar using {list.Count} 5s bars");
@@ -359,6 +363,26 @@ namespace TradingBot.Broker
                     _logger.Trace($"Invoking Bar1MinReceived for {contract}");
                     Bar1MinReceived?.Invoke(contract, bar); 
                     break;
+            }
+        }
+
+        public void SubscribeToBars(BarLength barLength, Action<Contract, Bar> callback)
+        {
+            switch (barLength)
+            {
+                case BarLength._5Sec: Bar5SecReceived += callback; break;
+                case BarLength._1Min: Bar1MinReceived += callback; break;
+                default: throw new NotImplementedException();
+            }
+        }
+
+        public void UnsubscribeToBars(BarLength barLength, Action<Contract, Bar> callback)
+        {
+            switch (barLength)
+            {
+                case BarLength._5Sec: Bar5SecReceived -= callback; break;
+                case BarLength._1Min: Bar1MinReceived -= callback; break;
+                default: throw new NotImplementedException();
             }
         }
 

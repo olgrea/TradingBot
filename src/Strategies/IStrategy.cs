@@ -9,9 +9,5 @@ namespace TradingBot.Strategies
     {
         void Start();
         void Stop();
-
-        IEnumerable<IIndicator> Indicators { get; }
-        IReadOnlyDictionary<string, IState> States { get; }
-        IState CurrentState { get; }
     }
 }

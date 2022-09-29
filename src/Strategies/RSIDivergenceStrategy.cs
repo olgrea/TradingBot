@@ -11,154 +11,67 @@ using System.Diagnostics;
 
 namespace TradingBot.Strategies
 {
-    public class RSIDivergenceStrategy : StrategyBase
+    public class RSIDivergenceStrategy : Strategy
     {
-        Trader _trader;
-
-        public RSIDivergenceStrategy(Trader trader)
+        public RSIDivergenceStrategy(Trader trader) : base(trader)
         {
-            _trader = trader;
+            AddState(new InitState(this));
+            AddState(new MonitoringState(this));
+            AddState(new OversoldState(this));
+            AddState(new BoughtState(this));
+            
+            SetStartState<InitState>();
 
-            States = new Dictionary<string, IState>()
-            {
-                { nameof(InitState), new InitState(this, trader)},
-                { nameof(MonitoringState), new MonitoringState(this, trader)},
-                { nameof(OversoldState), new OversoldState(this, trader)},
-                { nameof(BoughtState), new BoughtState(this, trader)},
-            };
-
-            BollingerBands_1Min = new BollingerBands(BarLength._1Min);
-            RSIDivergence_1Min = new RSIDivergence(BarLength._1Min);
-            RSIDivergence_5Sec = new RSIDivergence(BarLength._5Sec);
-
-            Indicators = new List<IIndicator>()
-            {
-                BollingerBands_1Min,
-                RSIDivergence_1Min,
-                RSIDivergence_5Sec
-            };
+            AddIndicator(new BollingerBands(BarLength._1Min));
+            AddIndicator(new RSIDivergence(BarLength._1Min));
+            AddIndicator(new RSIDivergence(BarLength._5Sec));
         }
 
-        internal BollingerBands BollingerBands_1Min { get; private set; }
-        internal RSIDivergence RSIDivergence_1Min { get; private set; }
-        internal RSIDivergence RSIDivergence_5Sec { get; private set; }
+        internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
+        internal RSIDivergence RSIDivergence_1Min => GetIndicator<RSIDivergence>(BarLength._1Min);
+        internal RSIDivergence RSIDivergence_5Sec => GetIndicator<RSIDivergence>(BarLength._5Sec);
 
         internal OrderChain Order { get; set; }
 
-        void OnBarReceived(Contract contract, Bar bar)
-        {
-            foreach(var indicator in Indicators.Where(i => i.BarLength == bar.BarLength))
-            {
-                indicator.Update(bar);
-            }
-        }
-
-        public override void Start()
-        {
-            var lookup = Indicators.ToLookup(i => i.BarLength);
-            foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>().Where(v => lookup.Contains(v)))
-                InitIndicators(barLength, lookup[barLength]);
-
-            _trader.Broker.Bar1MinReceived += OnBarReceived;
-            _trader.Broker.Bar5SecReceived += OnBarReceived;
-            _trader.Broker.RequestBars(_trader.Contract, BarLength._1Min);
-            _trader.Broker.RequestBars(_trader.Contract, BarLength._5Sec);
-
-            CurrentState = States[nameof(InitState)];
-            base.Start();
-        }
-
-        public override void Stop()
-        {
-            foreach (var indicator in Indicators)
-                indicator.Reset();
-
-            _trader.Broker.Bar1MinReceived -= OnBarReceived;
-            _trader.Broker.Bar5SecReceived -= OnBarReceived;
-            _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._1Min);
-            _trader.Broker.CancelBarsRequest(_trader.Contract, BarLength._5Sec);
-
-            base.Stop();
-        }
-
-        void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
-        {
-            if (!indicators.Any())
-                return;
-
-            var longestPeriod = indicators.Max(i => i.NbPeriods);
-
-            var pastBars = _trader.Broker.GetPastBars(_trader.Contract, barLength, longestPeriod).ToList();
-
-            foreach (var indicator in indicators)
-            {
-                for (int i = pastBars.Count - indicator.NbPeriods + 1; i < pastBars.Count; ++i)
-                    indicator.Update(pastBars[i]);
-            }
-        }
-
         #region States
 
-        class InitState : IState
+        class InitState : State<RSIDivergenceStrategy>
         {
-            RSIDivergenceStrategy _strategy;
+            public InitState(RSIDivergenceStrategy strategy) : base(strategy) {} 
 
-            public InitState(RSIDivergenceStrategy strategy, Trader trader)
-            {
-                _strategy = strategy;
-                Trader = trader;
-            } 
-
-            public Trader Trader { get; }
-
-            public IState Evaluate()
+            public override IState Evaluate()
             {
                 if (_strategy.Indicators.All(i => i.IsReady))
-                    return _strategy.States[nameof(MonitoringState)];
+                    return _strategy.GetState<MonitoringState>();
                 else
                     return this;
             }
         }
 
-        class MonitoringState : IState
+        class MonitoringState : State<RSIDivergenceStrategy>
         {
-            RSIDivergenceStrategy _strategy;
+            public MonitoringState(RSIDivergenceStrategy strategy) : base(strategy) { }
 
-            public MonitoringState(RSIDivergenceStrategy strategy, Trader trader)
-            {
-                _strategy = strategy;
-                Trader = trader;
-            }
-
-            public Trader Trader { get; }
-
-            public IState Evaluate()
+            public override IState Evaluate()
             {
                 // We want to find a bar candle that goes below the lower BB
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB
                     && _strategy.RSIDivergence_1Min.Value < 0)
-                    return _strategy.States[nameof(OversoldState)];
+                    return _strategy.GetState<OversoldState>();
                 else
                     return this;
             }
         }
 
-        class OversoldState : IState
+        class OversoldState : State<RSIDivergenceStrategy>
         {
-            RSIDivergenceStrategy _strategy;
             Bar _lastBar;
             double _lastRSIdivValue = double.MinValue;
             int _counter = 0;
 
-            public OversoldState(RSIDivergenceStrategy strategy, Trader trader)
-            {
-                _strategy = strategy;
-                Trader = trader;
-            }
+            public OversoldState(RSIDivergenceStrategy strategy) : base(strategy) { }
 
-            public Trader Trader { get; }
-
-            public IState Evaluate()
+            public override IState Evaluate()
             {
                 // At this moment, we switch to a 5 secs resolution.
                 var RSIdiv5sec = _strategy.RSIDivergence_5Sec;
@@ -183,7 +96,7 @@ namespace TradingBot.Strategies
                 }
                 else
                 {
-                    double funds = Trader.GetAvailableFunds();
+                    double funds = _strategy.Trader.GetAvailableFunds();
                     var order = BuildOrderChain(funds);
                     var nextState = PlaceOrder(order);
                     ResetState();
@@ -207,7 +120,7 @@ namespace TradingBot.Strategies
                 {
                     if (chain.Order.Id == oe.OrderId)
                     {
-                        completion.SetResult(_strategy.States[nameof(BoughtState)]);
+                        completion.SetResult(_strategy.GetState<BoughtState>());
                     }
                 });
 
@@ -216,16 +129,16 @@ namespace TradingBot.Strategies
                 //    completion.SetResult(_strategy.States[nameof(MonitoringState)]);
                 //});
 
-                Trader.Broker.OrderOpened += orderPlaced;
-                Trader.Broker.OrderExecuted += orderExecuted;
+                _strategy.Trader.Broker.OrderOpened += orderPlaced;
+                _strategy.Trader.Broker.OrderExecuted += orderExecuted;
 
                 completion.Task.ContinueWith(t => 
                 {
-                    Trader.Broker.OrderOpened -= orderPlaced;
-                    Trader.Broker.OrderExecuted -= orderExecuted;
+                    _strategy.Trader.Broker.OrderOpened -= orderPlaced;
+                    _strategy.Trader.Broker.OrderExecuted -= orderExecuted;
                 });
 
-                Trader.Broker.PlaceOrder(Trader.Contract, chain);
+                _strategy.Trader.Broker.PlaceOrder(_strategy.Trader.Contract, chain);
                 return completion.Task;
             }
 
@@ -260,18 +173,10 @@ namespace TradingBot.Strategies
             }
         }
 
-        class BoughtState : IState
+        class BoughtState : State<RSIDivergenceStrategy>
         {
-            RSIDivergenceStrategy _strategy;
-            public BoughtState(RSIDivergenceStrategy strategy, Trader trader)
-            {
-                _strategy = strategy;
-                Trader = trader;
-            }
-
-            public Trader Trader { get; }
-
-            public IState Evaluate()
+            public BoughtState(RSIDivergenceStrategy strategy) : base(strategy) { }
+            public override IState Evaluate()
             {
                 // TODO : adjust opened orders
                 return this;
