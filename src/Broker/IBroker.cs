@@ -34,7 +34,10 @@ namespace TradingBot.Broker
 
         void RequestBars(Contract contract, BarLength barLength);
         void CancelBarsRequest(Contract contract, BarLength barLength);
-        
+        void SubscribeToBars(BarLength barLength, Action<Contract, Bar> callback);
+        void UnsubscribeToBars(BarLength barLength, Action<Contract, Bar> callback);
+
+
         void PlaceOrder(Contract contract, Order order);
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);

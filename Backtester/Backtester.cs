@@ -60,7 +60,7 @@ namespace Backtester
 
                 // For backtesting, we need to have enough past bars to be able to initialize all indicators.
                 // So we will set the start time a couple seconds later, corresponding to the highest NbPeriods * BarLength;
-                var secondsToAdd = trader.Strategies.Max(s => s.Indicators.Max(i => i.NbPeriods * (int)i.BarLength));
+                var secondsToAdd = trader.Strategies.OfType<Strategy>().Max(s => s.Indicators.Max(i => i.NbPeriods * (int)i.BarLength));
                 fakeClient.Init(day.Item1.AddSeconds(secondsToAdd), day.Item2, bars, bidAsks);
                 
                 try
