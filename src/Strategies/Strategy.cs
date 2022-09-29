@@ -92,7 +92,10 @@ namespace TradingBot.Strategies
             {
                 while (!token.IsCancellationRequested)
                 {
-                    _currentState = _currentState?.Evaluate();
+                    var nextState = _currentState?.Evaluate();
+                    if (nextState != _currentState)
+                        Trader.Logger.Debug($"Strategy {GetType().Name} : state change : {nextState.GetType().Name}");
+                    _currentState = nextState;
                 }
             }
             ,token
@@ -118,7 +121,6 @@ namespace TradingBot.Strategies
 
         public virtual void Stop()
         {
-
             foreach (var kvp in _indicators)
             {
                 Trader.Broker.UnsubscribeToBars(kvp.Key, OnBarReceived);

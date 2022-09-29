@@ -670,7 +670,7 @@ namespace Backtester
         {
             if (_currentFakeTime.Second % 5 == 0)
             {
-                var b = Make5SecBar(_currentBarNode);
+                var b = MakeBar(_currentBarNode, BarLength._5Sec);
                 _messageQueue.Enqueue(() => 
                 {
                     DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
@@ -679,18 +679,19 @@ namespace Backtester
             }
         }
 
-        Bar Make5SecBar(LinkedListNode<Bar> node)
+        Bar MakeBar(LinkedListNode<Bar> node, BarLength barLength)
         {
-            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = BarLength._5Sec };
+            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
 
-            int nbBars = 5;
+            int nbBars = Convert.ToInt32(barLength);
             LinkedListNode<Bar> currNode = node;
             for (int i = 0; i < nbBars; i++)
             {
                 Bar current = currNode.Value;
                 if (i == 0)
                 {
-                    bar.Close = current.Close;
+                    bar.Open = current.Open;
+                    bar.Time = current.Time;
                 }
 
                 bar.High = Math.Max(bar.High, current.High);
@@ -700,8 +701,7 @@ namespace Backtester
 
                 if (i == nbBars - 1)
                 {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
+                    bar.Close = current.Close;
                 }
 
                 currNode = currNode.Next;
@@ -827,7 +827,26 @@ namespace Backtester
 
         public Task<LinkedList<Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
-            throw new NotImplementedException();
+            var tcs = new TaskCompletionSource<LinkedList<Bar>>();
+
+            if(endDateTime != default(DateTime))
+                throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
+
+            LinkedList<Bar> list = new LinkedList<Bar>();
+            LinkedListNode<Bar> first = _currentBarNode;
+            LinkedListNode<Bar> current = first;
+
+            int nbBars = count * (int)barLength;
+            for (int i = 0; i <= nbBars; i++, current = current.Previous)
+            {
+                if(i != 0 && i % (int)barLength == 0)
+                {
+                    list.AddFirst(MakeBar(current, barLength));
+                }
+            }
+
+            tcs.SetResult(list);
+            return tcs.Task;
         }
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
@@ -886,7 +905,7 @@ namespace Backtester
         {
             _messageQueue.Enqueue(() =>
             {
-                Callbacks.tickByTickBidAsk(_reqIdBidAsk, ba.Time.ToUniversalTime().Ticks, ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
+                Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
             });
         }
 
