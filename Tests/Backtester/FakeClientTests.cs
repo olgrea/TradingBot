@@ -1,19 +1,13 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Backtester;
+using HistoricalDataFetcher;
 using NUnit.Framework;
 using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
-using System.IO;
-using HistoricalDataFetcher;
-using Backtester;
-using TradingBot.Broker.Client;
-using TradingBot.Broker;
 using TradingBot.Broker.Orders;
-using System.Threading;
-using System.Threading.Tasks;
-using NUnit.Framework.Internal.Execution;
-using MathNet.Numerics.LinearAlgebra.Factorization;
+using TradingBot.Utils;
 
 namespace Tests.Backtester
 {
@@ -55,9 +49,7 @@ namespace Tests.Backtester
             _downThenUpBars = Deserialize<Bar>(_downThenUpFileTime, _downThenUpStart);
             _upThenDownBidAsks = Deserialize<BidAsk>(_upThenDownFileTime, _upThenDownStart);
             _upThenDownBars = Deserialize<Bar>(_upThenDownFileTime, _upThenDownStart);
-
-            _fakeClient = new FakeClient(Ticker);
-
+            
             FakeClient.TimeDelays.TimeScale = 0.001;
         }
 
@@ -86,11 +78,17 @@ namespace Tests.Backtester
 
          */
 
+        FakeClient MakeFakeClient(string ticker, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        {
+            return new FakeClient(ticker, startTime, endTime, dailyBars, dailyBidAsks);
+        }
+
         [Test]
         public void MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+
             var order = new MarketOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -115,7 +113,7 @@ namespace Tests.Backtester
         public void MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -144,7 +142,7 @@ namespace Tests.Backtester
         public void LimitOrder_Buy_OverAskPrice_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -170,7 +168,7 @@ namespace Tests.Backtester
         public void LimitOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -197,7 +195,7 @@ namespace Tests.Backtester
         public void LimitOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -227,7 +225,7 @@ namespace Tests.Backtester
         public void LimitOrder_Sell_UnderBidPrice_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -257,7 +255,7 @@ namespace Tests.Backtester
         public void StopOrder_Buy_OverAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -283,7 +281,7 @@ namespace Tests.Backtester
         public void StopOrder_Buy_UnderAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -310,7 +308,7 @@ namespace Tests.Backtester
         public void StopOrder_Sell_OverBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -340,7 +338,7 @@ namespace Tests.Backtester
         public void StopOrder_Sell_UnderBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -370,7 +368,7 @@ namespace Tests.Backtester
         public void MarketIfTouchedOrder_Buy_OverAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -396,7 +394,7 @@ namespace Tests.Backtester
         public void MarketIfTouchedOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -423,7 +421,7 @@ namespace Tests.Backtester
         public void MarketIfTouchedOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeClient.Init(_upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -453,7 +451,7 @@ namespace Tests.Backtester
         public void MarketIfTouchedOrder_Sell_UnderBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeClient.Init(_downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -484,7 +482,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeClient.Init(_downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, end, _downwardBars, _downwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -511,7 +509,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeClient.Init(_downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downwardStart, end, _downwardBars, _downwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -538,7 +536,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeClient.Init(_upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, end, _upwardBars, _upwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -569,7 +567,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeClient.Init(_upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upwardStart, end, _upwardBars, _upwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -600,7 +598,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeClient.Init(_downThenUpStart, end, _downThenUpBars, _downThenUpBidAsks);
+            _fakeClient = new FakeClient(Ticker, _downThenUpStart, end, _downThenUpBars, _downThenUpBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,
@@ -630,7 +628,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeClient.Init(_upThenDownStart, end, _upThenDownBars, _upThenDownBidAsks);
+            _fakeClient = new FakeClient(Ticker, _upThenDownStart, end, _upThenDownBars, _upThenDownBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeClient.NextValidOrderId,

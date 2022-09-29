@@ -36,10 +36,8 @@ namespace TradingBot.Broker
         static Random rand = new Random();
         
         int _clientId = 1337;
-        int _nextValidOrderId = -1;
         int _reqId = 0;
-        string _accountCode;
-
+        
         DataSubscriptions _subscriptions;
         IIBClient _client;
         ILogger _logger;
@@ -47,7 +45,6 @@ namespace TradingBot.Broker
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
         int NextRequestId => _reqId++;
-        int NextValidOrderId => _nextValidOrderId++;
 
         public IBBroker()
         {
@@ -149,13 +146,9 @@ namespace TradingBot.Broker
             remove => _client.Callbacks.CommissionReport -= value;
         }
 
-        public int GetNextValidOrderId(bool fromTWS = false)
+        public int GetNextValidOrderId()
         {
-            if (fromTWS)
-            {
-                return GetNextValidOrderIdAsync().Result;
-            }
-            return NextValidOrderId;
+            return GetNextValidOrderIdAsync().Result;
         }
 
         Task<int> GetNextValidOrderIdAsync()
@@ -176,46 +169,10 @@ namespace TradingBot.Broker
 
         public void Connect()
         {
-            ConnectAsync(DefaultIP, DefaultPort, _clientId).Wait();
+            _client.ConnectAsync(DefaultIP, DefaultPort, _clientId).Wait();
+            ClientConnected?.Invoke();
         }
-
-        Task<bool> ConnectAsync(string host, int port, int clientId)
-        {
-            //TODO: Handle IB server resets
-
-            var resolveResult = new TaskCompletionSource<bool>();
-            var nextValidId = new Action<int>(id =>
-            {
-                _logger.Trace($"ConnectAsync : next valid id {id}");
-                _nextValidOrderId = id;
-            });
-
-            var managedAccounts = new Action<string>(acc =>
-            {
-                _accountCode = acc;
-                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-                resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
-            });
-
-            _client.Callbacks.NextValidId += nextValidId;
-            _client.Callbacks.ManagedAccounts += managedAccounts;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.NextValidId -= nextValidId;
-                _client.Callbacks.ManagedAccounts -= managedAccounts;
-
-                if (_nextValidOrderId > 0)
-                {
-                    ClientConnected?.Invoke();
-                    _logger.Info($"Client {clientId} Connected");
-                }
-            });
-
-            _client.Connect(host, port, clientId);
-
-            return resolveResult.Task;
-        }
-
+                
         public void Disconnect()
         {
             _client.Disconnect();
@@ -224,7 +181,7 @@ namespace TradingBot.Broker
 
         public Account GetAccount()
         {
-            return _client.GetAccountAsync(_accountCode).Result;
+            return _client.GetAccountAsync().Result;
         }
 
         public Contract GetContract(string ticker)
@@ -454,7 +411,7 @@ namespace TradingBot.Broker
 
             int reqId = NextRequestId;
             _subscriptions.Pnl[contract] = reqId;
-            _client.RequestPnL(reqId, _accountCode, contract.Id);
+            _client.RequestPnL(reqId, contract.Id);
         }
 
         public void CancelPnLSubscription(Contract contract)

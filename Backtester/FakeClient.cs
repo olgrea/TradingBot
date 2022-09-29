@@ -34,7 +34,6 @@ namespace Backtester
         Task _consumerTask;
         CancellationTokenSource _consumerTaskCancellation;
 
-        bool _initialized = false;
         DateTime _start;
         DateTime _end;
         DateTime _currentFakeTime;
@@ -77,20 +76,23 @@ namespace Backtester
         internal Account Account => _fakeAccount;
         internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClient(string ticker)
+        public FakeClient(string ticker, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
             _logger = LogManager.GetLogger(nameof(FakeClient));
             _client = new IBClient(new IBCallbacks(_logger), _logger);
-            _client.Connect(IBBroker.DefaultIP, IBBroker.DefaultPort, 9999);
-
-            _nextValidOrderId = GetNextValidId().Result;
             Callbacks = new IBCallbacks(_logger);
-
             _ticker = ticker;
-            _contract = GetContract(_ticker);
-            InitFakeAccount();
-
             _messageQueue = new ConcurrentQueue<Action>();
+            
+            _currentFakeTime = startTime;
+            _start = startTime;
+            _end = endTime;
+
+            _dailyBars = new LinkedList<Bar>(dailyBars);
+            _currentBarNode = InitFirstNode(_dailyBars);
+
+            _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
+            _currentBidAskNode = InitFirstNode(_dailyBidAsks);
         }
 
         public IBCallbacks Callbacks { get; private set; }
@@ -107,22 +109,6 @@ namespace Backtester
             };
         }
 
-        //TODO : investigate refactor I don't like that init method
-        public void Init(DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
-        {
-            _currentFakeTime = startTime;
-            _start = startTime;
-            _end = endTime;
-            
-            _dailyBars = new LinkedList<Bar>(dailyBars);
-            _currentBarNode = InitFirstNode(_dailyBars);
-            
-            _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
-            _currentBidAskNode = InitFirstNode(_dailyBidAsks);
-
-            _initialized = true;
-        }
-
         LinkedListNode<T> InitFirstNode<T>(LinkedList<T> list) where T : IMarketData
         {
             var current = list.First;
@@ -131,11 +117,24 @@ namespace Backtester
             return current;
         }
 
-        // called by IBBroker
+        public Task<bool> ConnectAsync(string host, int port, int clientId)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            _client.ConnectAsync(IBBroker.DefaultIP, IBBroker.DefaultPort, 9999).Wait();
+            
+            _nextValidOrderId = GetNextValidId().Result;
+            _contract = GetContract(_ticker);
+            InitFakeAccount();
+
+            Start();
+
+            tcs.SetResult(true);
+            return tcs.Task;
+        }
+
         public void Connect(string host, int port, int clientId)
         {
-            if(_initialized)
-                Start();
+            ConnectAsync(host, port, clientId).Wait();  
         }
 
         public void Disconnect()
@@ -145,9 +144,6 @@ namespace Backtester
 
         internal void Start()
         {
-            if (!_initialized)
-                throw new InvalidOperationException("Fake client has not been initialized.");
-
             _logger.Info($"Fake client started : {_currentFakeTime} to {_end}");
 
             ClockTick += OnClockTick_UpdateBarNode;
@@ -195,8 +191,6 @@ namespace Backtester
             _reqIdPnL = -1;
 
             _nextValidOrderId = GetNextValidId().Result;
-
-            _initialized = false;
         }
 
         void StartConsumerTask()
@@ -599,17 +593,9 @@ namespace Backtester
                 CancelOrder(o.Id);
         }
 
-        public Task<Account> GetAccountAsync(string accountCode)
+        public Task<Account> GetAccountAsync()
         {
-            Exception e = new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
-
             var tcs = new TaskCompletionSource<Account>();
-            if (accountCode != _fakeAccount.Code)
-            {
-                tcs.SetException(e);
-                throw e;
-            }
-
             tcs.SetResult(_fakeAccount);
             return tcs.Task;
         }
@@ -791,7 +777,7 @@ namespace Backtester
             var positionValue = Position.PositionAmount * Position.AverageCost;
             Position.UnrealizedPNL = Position.MarketValue - positionValue;
 
-            _logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
+            //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
 
         public void RequestPositions()
@@ -818,7 +804,7 @@ namespace Backtester
             _positionRequested = false;
         }
 
-        public void RequestPnL(int reqId, string accountCode, int contractId)
+        public void RequestPnL(int reqId, int contractId)
         {
             //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
             _reqIdPnL = reqId;
