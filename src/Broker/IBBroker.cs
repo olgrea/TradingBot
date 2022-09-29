@@ -425,7 +425,7 @@ namespace TradingBot.Broker
 
         public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, DateTime.MinValue, count).Result;   
+            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, default(DateTime), count).Result;   
         }
    
         internal IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, DateTime endDateTime, int count)

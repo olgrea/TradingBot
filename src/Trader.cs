@@ -63,6 +63,7 @@ namespace TradingBot
             _broker.ErrorHandler = _errorHandler;
         }
 
+        internal ILogger Logger => _logger;
         internal IBroker Broker => _broker;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
@@ -149,8 +150,11 @@ namespace TradingBot
         {
             if (position.Contract.Symbol == _ticker)
             {
+                if(_contractPosition.PositionAmount != position.PositionAmount)
+                {
+                    _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost}");
+                }
                 _contractPosition = position;
-                _logger.Info($"OnPositionReceived : {position}");
             }
         }
 
@@ -159,7 +163,6 @@ namespace TradingBot
             if(pnl.Contract.Symbol == _ticker)
             {
                 _PnL = pnl;
-                _logger.Info($"OnPnLReceived : {pnl}");
             }
         }
 
