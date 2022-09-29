@@ -42,32 +42,19 @@ namespace Backtester
 
         public void Start()
         {
-            var fakeClient = new FakeClient(_ticker);
-
-            var broker = new IBBroker(1337, fakeClient);
-            Trader trader = new Trader(_ticker, broker);
-            trader.AddStrategyForTicker<TestStrategy>();
-
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(day.Item1);
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
-                // For backtesting, we need to have enough past bars to be able to initialize all indicators.
-                // So we will set the start time a couple seconds later, corresponding to the highest NbPeriods * BarLength;
-                var secondsToAdd = trader.Strategies.OfType<Strategy>().Max(s => s.Indicators.Max(i => i.NbPeriods * (int)i.BarLength));
-                fakeClient.Init(day.Item1.AddSeconds(secondsToAdd), day.Item2, bars, bidAsks);
+                var fakeClient = new FakeClient(_ticker, day.Item1, day.Item2, bars, bidAsks);
+                var broker = new IBBroker(1337, fakeClient);
+                Trader trader = new Trader(_ticker, broker);
+                trader.AddStrategyForTicker<TestStrategy>();
                 
-                try
-                {
-                    trader.Start();
-                    fakeClient.WaitUntilDayIsOver();
-                }
-                catch (OperationCanceledException)
-                {
-
-                }
+                trader.Start();
+                fakeClient.WaitUntilDayIsOver();
 
                 //TODO : Save results, reset trader and fake clients
             }

@@ -18,6 +18,8 @@ namespace TradingBot.Broker.Client
         IBCallbacks _callbacks;
         ILogger _logger;
         Task _processMsgTask;
+        int _nextValidOrderId = -1;
+        string _accountCode;
 
         public IBClient(ILogger logger)
         {
@@ -46,6 +48,42 @@ namespace TradingBot.Broker.Client
             _logger.Debug($"Reader started and is listening to messages from TWS");
         }
 
+        public Task<bool> ConnectAsync(string host, int port, int clientId)
+        {
+            //TODO: Handle IB server resets
+
+            var resolveResult = new TaskCompletionSource<bool>();
+            var nextValidId = new Action<int>(id =>
+            {
+                _logger.Trace($"ConnectAsync : next valid id {id}");
+                _nextValidOrderId = id;
+            });
+
+            var managedAccounts = new Action<string>(acc =>
+            {
+                _accountCode = acc;
+                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
+                resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
+            });
+
+            _callbacks.NextValidId += nextValidId;
+            _callbacks.ManagedAccounts += managedAccounts;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _callbacks.NextValidId -= nextValidId;
+                _callbacks.ManagedAccounts -= managedAccounts;
+
+                if (_nextValidOrderId > 0)
+                {
+                    _logger.Info($"Client {clientId} Connected");
+                }
+            });
+
+            Connect(host, port, clientId);
+
+            return resolveResult.Task;
+        }
+
         public IBCallbacks Callbacks => _callbacks;
 
         void ProcessMsg()
@@ -69,9 +107,9 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqIds(-1); // param is deprecated
         }
 
-        public Task<Account> GetAccountAsync(string accountCode)
+        public Task<Account> GetAccountAsync()
         {
-            var account = new Account() { Code = accountCode };
+            var account = new Account() { Code = _accountCode };
 
             var resolveResult = new TaskCompletionSource<Account>();
 
@@ -121,10 +159,10 @@ namespace TradingBot.Broker.Client
                 _callbacks.UpdatePortfolio -= updatePortfolio;
                 _callbacks.AccountDownloadEnd -= accountDownloadEnd;
 
-                RequestAccount(accountCode, false);
+                RequestAccount(_accountCode, false);
             });
 
-            RequestAccount(accountCode, true);
+            RequestAccount(_accountCode, true);
 
             return resolveResult.Task;
         }
@@ -147,10 +185,10 @@ namespace TradingBot.Broker.Client
             _clientSocket.cancelPositions();
         }
 
-        public void RequestPnL(int reqId, string accountCode, int contractId)
+        public void RequestPnL(int reqId, int contractId)
         {
             _logger.Debug($"Requesting PnL for contract id : {contractId}");
-            _clientSocket.reqPnLSingle(reqId, accountCode, "", contractId);
+            _clientSocket.reqPnLSingle(reqId, _accountCode, "", contractId);
         }
 
         public void CancelPnL(int contractId)
