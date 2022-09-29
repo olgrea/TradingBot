@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using MathNet.Numerics.LinearAlgebra.Factorization;
 using NLog;
 using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
 using TradingBot.Utils;
@@ -50,7 +46,7 @@ namespace Backtester
 
             var broker = new IBBroker(1337, fakeClient);
             Trader trader = new Trader(_ticker, broker);
-            trader.AddStrategyForTicker<RSIDivergenceStrategy>();
+            trader.AddStrategyForTicker<TestStrategy>();
 
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
 using TradingBot.Broker;
+using System.Diagnostics;
 
 namespace TradingBot.Strategies
 {
@@ -25,7 +26,7 @@ namespace TradingBot.Strategies
         }
 
         public Trader Trader { get; protected set; }
-        public List<IIndicator> Indicators { get; private set; } = new List<IIndicator>();
+        public IEnumerable<IIndicator> Indicators => _indicators.SelectMany(i => i.Value);
 
         protected void SetStartState<TState>()
         {
@@ -37,8 +38,6 @@ namespace TradingBot.Strategies
             if (!_indicators.ContainsKey(indicator.BarLength))
             {
                 _indicators.Add(indicator.BarLength, new List<IIndicator>());
-                Trader.Broker.SubscribeToBars(indicator.BarLength, OnBarReceived);
-                Trader.Broker.RequestBars(Trader.Contract, indicator.BarLength);
             }
 
             _indicators[indicator.BarLength].Add(indicator);
@@ -74,7 +73,11 @@ namespace TradingBot.Strategies
         public virtual void Start()
         {
             foreach(var kvp in _indicators)
+            {
                 InitIndicators(kvp.Key, kvp.Value);
+                Trader.Broker.SubscribeToBars(kvp.Key, OnBarReceived);
+                Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
+            }
 
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
