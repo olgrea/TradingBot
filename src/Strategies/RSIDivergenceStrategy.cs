@@ -6,7 +6,6 @@ using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
 using System.Threading.Tasks;
-using TradingBot.Broker.Client;
 using System.Diagnostics;
 
 namespace TradingBot.Strategies
