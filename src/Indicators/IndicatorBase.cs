@@ -12,7 +12,7 @@ namespace TradingBot.Indicators
         public IndicatorBase(BarLength barLength, int nbPeriods)
         {
             NbPeriods = nbPeriods;
-            BarLength = BarLength;
+            BarLength = barLength;
         }
 
         public LinkedList<Bar> Bars => _bars;
