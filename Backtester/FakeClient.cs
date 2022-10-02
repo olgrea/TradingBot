@@ -258,12 +258,17 @@ namespace Backtester
             });
         }
 
-        double GetCommission(Contract contract, Order order)
+        double GetCommission(Contract contract, Order order, double price)
         {
             //TODO : verify commission... Didn't seem to be working with 'what if' = true
             //https://www.interactivebrokers.ca/en/index.php?f=1590
 
-            return 0.0;
+            // fixed rates
+            double @fixed = 0.005;
+            double min = 1.0;
+            double max = order.TotalQuantity * price * 0.01; // 1% of trade value
+                        
+            return Math.Min(Math.Max(@fixed * order.TotalQuantity, min), max);
         }
 
         internal bool IsExecuted(Order order)
@@ -467,7 +472,7 @@ namespace Backtester
             _executedOrders.Add(o);
             //TODO : really really need to make sure I have the correct prices
 
-            double commission = GetCommission(Contract, order);
+            double commission = GetCommission(Contract, order, price);
             _logger.Debug($"{order} : commission : {commission:c}");
 
             _fakeAccount.CashBalances["USD"] -= commission;
