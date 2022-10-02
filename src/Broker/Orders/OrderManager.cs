@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
-using TradingBot.Utils;
 using TradingBot.Broker.Client;
 using NLog;
 
@@ -17,6 +16,7 @@ namespace TradingBot.Broker.Orders
         Dictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
         Dictionary<int, OrderChain> _chainOrdersRequested = new Dictionary<int, OrderChain>();
         Dictionary<int, Order> _ordersSubmitted = new Dictionary<int, Order>();
+        Dictionary<int, OrderStatus> _ordersFilled = new Dictionary<int, OrderStatus>();
 
         public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
         {
@@ -29,6 +29,8 @@ namespace TradingBot.Broker.Orders
             _client.Callbacks.ExecDetails += OnOrderExecuted;
         }
 
+        public event Action<OrderStatus, OrderExecution> OrderUpdated;
+
         public void PlaceOrder(Contract contract, Order order)
         {
             if (contract == null || order == null)
@@ -38,8 +40,8 @@ namespace TradingBot.Broker.Orders
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
-            if (!order.RequestInfo.Transmit)
-                _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.RequestInfo.Transmit)}\" is set to false.");
+            if (!order.Info.Transmit)
+                _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.Info.Transmit)}\" is set to false.");
 
             _ordersRequested[order.Id] = order;
             _client.PlaceOrder(contract, order);
@@ -84,7 +86,7 @@ namespace TradingBot.Broker.Orders
 
                 // only the last child must be set to true to prevent parent orders from being
                 // submitted (and possibly filled) before all orders are submitted.
-                o.RequestInfo.Transmit = i == list.Count - 1;
+                o.Info.Transmit = i == list.Count - 1;
 
                 Trace.Assert(o.Id > 0 && !_ordersRequested.ContainsKey(o.Id));
 
@@ -109,7 +111,15 @@ namespace TradingBot.Broker.Orders
                     if(_chainOrdersRequested.ContainsKey(order.Id))
                         _chainOrdersRequested[order.Id] = order;
                 }
+
             }
+
+            var os = new OrderStatus() 
+            {
+                Status = state.Status,
+                Info = order.Info,
+            };
+            OrderUpdated?.Invoke(os, null);
         }
 
         void OnOrderStatus(OrderStatus os)
@@ -121,7 +131,13 @@ namespace TradingBot.Broker.Orders
                     _logger.Warn($"Order {os.Info.OrderId} was part of an order chain and has been cancelled. Attached orders will also be cancelled.");
                     _chainOrdersRequested.Remove(os.Info.OrderId);
                 }
+
             }
+
+            if(os.Status == Status.Filled)
+                _ordersFilled.Add(os.Info.OrderId, os);
+            
+            OrderUpdated?.Invoke(os, null);
         }
 
         void OnOrderExecuted(Contract contract, OrderExecution execution)
@@ -130,6 +146,9 @@ namespace TradingBot.Broker.Orders
             {
                 PlaceNextOrdersInChain(contract, _chainOrdersRequested[execution.OrderId]);
             }
+
+            _ordersFilled.TryGetValue(execution.OrderId, out OrderStatus os);
+            OrderUpdated?.Invoke(os, execution);
         }
 
         void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
@@ -201,7 +220,7 @@ namespace TradingBot.Broker.Orders
                 for (int i = 0; i < count; i++)
                 {
                     var child = chain.AttachedOrders[i].Order;
-                    child.RequestInfo.ParentId = parentId;
+                    child.Info.ParentId = parentId;
                     AssignOrderIdsAndFlatten(chain.AttachedOrders[i], list);
                 }
             }

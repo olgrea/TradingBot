@@ -3,7 +3,7 @@ using IBApi;
 
 namespace TradingBot.Broker.Orders
 {
-    internal class OrderStatus
+    public class OrderStatus
     {
         public RequestInfo Info { get; set; }
         public Status Status { get; set; }

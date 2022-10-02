@@ -2,12 +2,12 @@
 
 namespace TradingBot.Broker.Orders
 {
-    internal enum Status
+    public enum Status
     {
         Unknown, ApiPending, PendingSubmit, PendingCancel, PreSubmitted, Submitted, ApiCancelled, Cancelled, Filled, Inactive
     }
 
-    internal class OrderState
+    public class OrderState
     {
         public Status Status { get; set; }
         public string WarningText { get; set; }

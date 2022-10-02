@@ -5,9 +5,7 @@ using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
-using TradingBot.Utils;
 using System.Threading.Tasks;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using NLog;
 using System.Diagnostics;
@@ -114,32 +112,27 @@ namespace TradingBot.Broker
             add => _client.Callbacks.UpdateAccountValue += value;
             remove => _client.Callbacks.UpdateAccountValue -= value;
         }
+
         public event Action<Position> PositionReceived
         {
             add => _client.Callbacks.Position += value;
             remove => _client.Callbacks.Position -= value;
         }
+
         public event Action<PnL> PnLReceived;
+
         public IErrorHandler ErrorHandler
         {
             get => _client.Callbacks.ErrorHandler;
             set => _client.Callbacks.ErrorHandler = value;
         }
-        public event Action<Contract, Order, OrderState> OrderOpened
+
+        public event Action<OrderStatus, OrderExecution> OrderUpdated
         {
-            add => _client.Callbacks.OpenOrder += value;
-            remove => _client.Callbacks.OpenOrder -= value;
+            add => _orderManager.OrderUpdated += value;
+            remove => _orderManager.OrderUpdated -= value;
         }
-        public event Action<OrderStatus> OrderStatusChanged
-        {
-            add => _client.Callbacks.OrderStatus += value;
-            remove => _client.Callbacks.OrderStatus -= value;
-        }
-        public event Action<Contract, OrderExecution> OrderExecuted
-        {
-            add => _client.Callbacks.ExecDetails += value;
-            remove => _client.Callbacks.ExecDetails -= value;
-        }
+
         public event Action<CommissionInfo> CommissionInfoReceived
         {
             add => _client.Callbacks.CommissionReport += value;

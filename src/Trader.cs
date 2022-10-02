@@ -14,6 +14,7 @@ using TradingBot.Indicators;
 using TradingBot.Utils;
 using System.Globalization;
 using NLog;
+using System.Threading.Tasks;
 
 namespace TradingBot
 {
@@ -106,10 +107,7 @@ namespace TradingBot
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
 
-            _broker.OrderOpened += OnOrderOpened;
-            _broker.OrderStatusChanged += OnOrderStatusChanged;
-            _broker.OrderExecuted += OnOrderExecuted;
-            _broker.CommissionInfoReceived += OnCommissionInfoReceived;
+            _broker.OrderUpdated += OnOrderUpdated;
 
             _broker.RequestPositions();
             _broker.RequestPnL(_contract);
@@ -123,10 +121,7 @@ namespace TradingBot
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
 
-            _broker.OrderOpened -= OnOrderOpened;
-            _broker.OrderStatusChanged -= OnOrderStatusChanged;
-            _broker.OrderExecuted -= OnOrderExecuted;
-            _broker.CommissionInfoReceived -= OnCommissionInfoReceived;
+            _broker.OrderUpdated -= OnOrderUpdated;
 
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
@@ -166,24 +161,9 @@ namespace TradingBot
             }
         }
 
-        void OnOrderOpened(Contract contract, Order order, OrderState state)
+        void OnOrderUpdated(OrderStatus os, OrderExecution oe)
         {
-            _logger.Info($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
-        }
-
-        void OnOrderStatusChanged(OrderStatus status)
-        {
-            _logger.Info($"OnOrderStatusChanged : {status.Status}");
-        }
-
-        void OnOrderExecuted(Contract contract, OrderExecution execution)
-        {
-            _logger.Info($"OnOrderOpened : {contract} {execution}");
-        }
-
-        void OnCommissionInfoReceived(CommissionInfo commissionInfo)
-        {
-            _logger.Info($"OnCommissionInfoReceived : {commissionInfo}");
+            //_logger.Info($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
         }
 
         public double GetAvailableFunds()
