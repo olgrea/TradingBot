@@ -545,7 +545,7 @@ namespace Backtester
             _messageQueue.Enqueue(() =>
             {
                 //TODO : verify orderStatus() execution
-                Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.RequestInfo.ParentId, price, 0, "", 0);
+                Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0);
 
                 var exec = new IBApi.Execution()
                 {

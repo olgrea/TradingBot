@@ -24,9 +24,6 @@ namespace TradingBot.Strategies
         }
 
         internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
-
-        internal OrderChain Order { get; set; }
-
         #region States
 
         class InitState : State<TestStrategy>
@@ -44,34 +41,66 @@ namespace TradingBot.Strategies
 
         class MonitoringState : State<TestStrategy>
         {
-            public MonitoringState(TestStrategy strategy) : base(strategy) { }
+            Order _order;
+            bool _orderPlaced = false;
+            bool _orderExecuted = false;
+
+            public MonitoringState(TestStrategy strategy) : base(strategy) {}
 
             public override IState Evaluate()
             {
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB)
                 {
-                    // TODO : create async method in trader
-                    _strategy.Trader.Broker.PlaceOrder(_strategy.Trader.Contract, new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 });
-                    return _strategy.GetState<BoughtState>();
+                    // TODO : create async method in trader?
+                    if(!_orderPlaced)
+                    {
+                        _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
+                        _strategy.PlaceOrder(_order);
+                    }
                 }
-                else
-                    return this;
+                
+                return _orderExecuted ? _strategy.GetState<BoughtState>() : this;
+            }
+
+            public override void OrderUpdated(OrderStatus os, OrderExecution oe)
+            {
+                if (_order.Id == os.Info.OrderId)
+                {
+                    _orderPlaced = os.Status == Status.PreSubmitted || os.Status == Status.Submitted || os.Status == Status.Filled;
+                    _orderExecuted = oe != null && oe.OrderId == os.Info.OrderId;
+                }
             }
         }
 
         class BoughtState : State<TestStrategy>
         {
-            public BoughtState(TestStrategy strategy) : base(strategy) { }
+            Order _order;
+            bool _orderPlaced = false;
+            bool _orderExecuted = false;
+
+            public BoughtState(TestStrategy strategy) : base(strategy) {}
+
             public override IState Evaluate()
             {
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close > _strategy.BollingerBands_1Min.UpperBB)
                 {
-                    // TODO : create async method in trader
-                    _strategy.Trader.Broker.PlaceOrder(_strategy.Trader.Contract, new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 });
-                    return _strategy.GetState<MonitoringState>();
+                    if (!_orderPlaced)
+                    {
+                        _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
+                        _strategy.PlaceOrder(_order);
+                    }
                 }
-                else
-                    return this;
+                
+                return _orderExecuted ? _strategy.GetState<MonitoringState>() : this;
+            }
+
+            public override void OrderUpdated(OrderStatus os, OrderExecution oe)
+            {
+                if (_order.Id == os.Info.OrderId)
+                {
+                    _orderPlaced = os.Status == Status.PreSubmitted || os.Status == Status.Submitted || os.Status == Status.Filled;
+                    _orderExecuted = oe != null && oe.OrderId == os.Info.OrderId;
+                }
             }
         }
 

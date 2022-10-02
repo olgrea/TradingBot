@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using TradingBot.Broker.Orders;
 
 namespace TradingBot.Strategies
 {
@@ -13,5 +14,6 @@ namespace TradingBot.Strategies
         }
 
         public abstract IState Evaluate();
+        public virtual void OrderUpdated(OrderStatus os, OrderExecution oe) { }
     }
 }

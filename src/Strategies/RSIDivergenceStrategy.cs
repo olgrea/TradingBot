@@ -128,14 +128,14 @@ namespace TradingBot.Strategies
                 //    completion.SetResult(_strategy.States[nameof(MonitoringState)]);
                 //});
 
-                _strategy.Trader.Broker.OrderOpened += orderPlaced;
-                _strategy.Trader.Broker.OrderExecuted += orderExecuted;
+                //_strategy.Trader.Broker.OrderOpened += orderPlaced;
+                //_strategy.Trader.Broker.OrderExecuted += orderExecuted;
 
-                completion.Task.ContinueWith(t => 
-                {
-                    _strategy.Trader.Broker.OrderOpened -= orderPlaced;
-                    _strategy.Trader.Broker.OrderExecuted -= orderExecuted;
-                });
+                //completion.Task.ContinueWith(t => 
+                //{
+                //    _strategy.Trader.Broker.OrderOpened -= orderPlaced;
+                //    _strategy.Trader.Broker.OrderExecuted -= orderExecuted;
+                //});
 
                 _strategy.Trader.Broker.PlaceOrder(_strategy.Trader.Contract, chain);
                 return completion.Task;

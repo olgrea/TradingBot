@@ -5,12 +5,12 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Broker.Orders
 {
-    internal enum OrderAction
+    public enum OrderAction
     {
         BUY, SELL
     }
 
-    internal enum OcaType
+    public enum OcaType
     {
         NONE = 0,
         CANCEL_WITH_BLOCK = 1,
@@ -18,7 +18,7 @@ namespace TradingBot.Broker.Orders
         REDUCE_NON_BLOCK = 3,
     }
 
-    internal class RequestInfo
+    public class RequestInfo
     {
         public int OrderId { get; set; }
         public int ClientId { get; set; }
@@ -31,11 +31,11 @@ namespace TradingBot.Broker.Orders
 
     internal abstract class Order
     {
-        public RequestInfo RequestInfo { get; } = new RequestInfo();
+        public RequestInfo Info { get; } = new RequestInfo();
         public int Id
         {
-            get => RequestInfo.OrderId;
-            set => RequestInfo.OrderId = value;
+            get => Info.OrderId;
+            set => Info.OrderId = value;
         }
 
         public readonly string OrderType;

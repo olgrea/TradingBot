@@ -66,12 +66,12 @@ namespace TradingBot.Broker.Client
                 TotalQuantity = order.TotalQuantity,
 
                 OrderId = order.Id,
-                ClientId = order.RequestInfo.ClientId,
-                ParentId = order.RequestInfo.ParentId,
-                PermId = order.RequestInfo.PermId,
-                Transmit = order.RequestInfo.Transmit,
-                OcaGroup = order.RequestInfo.OcaGroup,
-                OcaType = (int)order.RequestInfo.OcaType,
+                ClientId = order.Info.ClientId,
+                ParentId = order.Info.ParentId,
+                PermId = order.Info.PermId,
+                Transmit = order.Info.Transmit,
+                OcaGroup = order.Info.OcaGroup,
+                OcaType = (int)order.Info.OcaType,
 
                 OutsideRth = true,
                 Tif = "DAY"
@@ -142,12 +142,12 @@ namespace TradingBot.Broker.Client
             tbo.TotalQuantity = ibo.TotalQuantity;
 
             tbo.Id = ibo.OrderId;
-            tbo.RequestInfo.ClientId = ibo.ClientId;
-            tbo.RequestInfo.Transmit = ibo.Transmit;
-            tbo.RequestInfo.ParentId = ibo.ParentId;
-            tbo.RequestInfo.PermId = ibo.PermId;
-            tbo.RequestInfo.OcaGroup = ibo.OcaGroup;
-            tbo.RequestInfo.OcaType = (OcaType)ibo.OcaType;
+            tbo.Info.ClientId = ibo.ClientId;
+            tbo.Info.Transmit = ibo.Transmit;
+            tbo.Info.ParentId = ibo.ParentId;
+            tbo.Info.PermId = ibo.PermId;
+            tbo.Info.OcaGroup = ibo.OcaGroup;
+            tbo.Info.OcaType = (OcaType)ibo.OcaType;
 
             return tbo;
         }

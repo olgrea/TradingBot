@@ -1,6 +1,6 @@
 ﻿namespace TradingBot.Broker.Orders
 {
-    internal class CommissionInfo
+    public class CommissionInfo
     {
         public string ExecId { get; set; }
         public double Commission { get; set; }

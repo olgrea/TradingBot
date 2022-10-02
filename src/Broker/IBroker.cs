@@ -21,9 +21,7 @@ namespace TradingBot.Broker
         event Action<string, string, string> AccountValueUpdated;
         event Action<Contract, Bar> Bar5SecReceived;
         event Action<Contract, Bar> Bar1MinReceived;
-        event Action<Contract, Order, OrderState> OrderOpened;
-        event Action<OrderStatus> OrderStatusChanged;
-        event Action<Contract, OrderExecution> OrderExecuted;
+        event Action<OrderStatus, OrderExecution> OrderUpdated;
         event Action<CommissionInfo> CommissionInfoReceived;
         event Action<Position> PositionReceived;
         event Action<PnL> PnLReceived;

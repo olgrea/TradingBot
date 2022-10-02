@@ -8,6 +8,7 @@ using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
 using TradingBot.Broker;
 using System.Diagnostics;
+using TradingBot.Broker.Orders;
 
 namespace TradingBot.Strategies
 {
@@ -79,6 +80,8 @@ namespace TradingBot.Strategies
                 Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
             }
 
+            Trader.Broker.OrderUpdated += OnOrderUpdated;
+
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
 
@@ -101,6 +104,21 @@ namespace TradingBot.Strategies
             ,token
             ,TaskCreationOptions.LongRunning
             ,TaskScheduler.Default);
+        }
+
+        internal void PlaceOrder(Order o)
+        {
+            Trader.Broker.PlaceOrder(Trader.Contract, o);
+        }
+
+        internal void PlaceOrder(OrderChain c)
+        {
+            Trader.Broker.PlaceOrder(Trader.Contract, c);
+        }
+
+        void OnOrderUpdated(OrderStatus os, OrderExecution oe)
+        {
+            _currentState.OrderUpdated(os, oe);
         }
 
         void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
@@ -129,6 +147,8 @@ namespace TradingBot.Strategies
                 foreach (var indicator in kvp.Value)
                     indicator.Reset();
             }
+            
+            Trader.Broker.OrderUpdated -= OnOrderUpdated;
 
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
