@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
 using TradingBot.Broker;
-using System.Diagnostics;
 using TradingBot.Broker.Orders;
 
 namespace TradingBot.Strategies
@@ -28,11 +26,6 @@ namespace TradingBot.Strategies
 
         public Trader Trader { get; protected set; }
         public IEnumerable<IIndicator> Indicators => _indicators.SelectMany(i => i.Value);
-
-        protected void SetStartState<TState>()
-        {
-            _currentState = GetState<TState>();
-        }
 
         protected void AddIndicator(IIndicator indicator)
         {
@@ -60,15 +53,28 @@ namespace TradingBot.Strategies
 
             return _indicators[barLength].OfType<TIndicator>().FirstOrDefault();
         }
-
-        protected void AddState(IState state)
+        protected void SetStartState<TState>() where TState : IState
         {
-            _states[state.GetType().Name] = state;
+            _currentState = GetState<TState>();
         }
 
-        protected IState GetState<TState>()
+        protected void AddState<TState>() where TState : IState
         {
-            return _states[typeof(TState).Name];
+            var t = typeof(TState);
+            _states[t.Name] = (TState)Activator.CreateInstance(t, this);
+        }
+
+        protected IState GetState<TState>() where TState : IState
+        {
+            var t = typeof(TState);
+            if (!_states.ContainsKey(t.Name))
+                throw new ArgumentException("Invalid state type");
+
+            // reset state on state change
+            if(_currentState?.GetType() != t)
+                _states[t.Name] = (TState)Activator.CreateInstance(t, this);
+
+            return _states[t.Name];
         }
 
         public virtual void Start()
@@ -80,13 +86,13 @@ namespace TradingBot.Strategies
                 Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
             }
 
-            Trader.Broker.OrderUpdated += OnOrderUpdated;
-
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
 
             if (_evaluateTask != null && !_evaluateTask.IsCompleted)
                 return;
+
+            Trader.Broker.OrderUpdated += OnOrderUpdated;
 
             _cancellationTokenSource = new CancellationTokenSource();
             var token = _cancellationTokenSource.Token;

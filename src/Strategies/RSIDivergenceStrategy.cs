@@ -14,10 +14,10 @@ namespace TradingBot.Strategies
     {
         public RSIDivergenceStrategy(Trader trader) : base(trader)
         {
-            AddState(new InitState(this));
-            AddState(new MonitoringState(this));
-            AddState(new OversoldState(this));
-            AddState(new BoughtState(this));
+            AddState<InitState>();
+            AddState<MonitoringState>();
+            AddState<OversoldState>();
+            AddState<BoughtState>();
             
             SetStartState<InitState>();
 
