@@ -1,12 +1,7 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
+﻿using System.Linq;
 using TradingBot.Broker.MarketData;
-using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
-using System.Threading.Tasks;
-using System.Diagnostics;
 
 namespace TradingBot.Strategies
 {
@@ -14,9 +9,9 @@ namespace TradingBot.Strategies
     {
         public TestStrategy(Trader trader) : base(trader)
         {
-            AddState(new InitState(this));
-            AddState(new MonitoringState(this));
-            AddState(new BoughtState(this));
+            AddState<InitState>();
+            AddState<MonitoringState>();
+            AddState<BoughtState>();
 
             SetStartState<InitState>();
 
@@ -24,6 +19,7 @@ namespace TradingBot.Strategies
         }
 
         internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
+
         #region States
 
         class InitState : State<TestStrategy>
