@@ -1,29 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
-using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
-using TradingBot.Indicators;
-using TradingBot.Utils;
 using System.Globalization;
 using NLog;
-using System.Threading.Tasks;
 
 namespace TradingBot
 {
     public class Trader
     {
-        //TODO : required loggers : 
-        // trading report : normal logs, cvs file format
-        // general log with everything
         ILogger _logger;
+        ILogger _csvLogger;
         TraderErrorHandler _errorHandler;
         IBroker _broker;
 
@@ -44,7 +36,10 @@ namespace TradingBot
             Trace.Assert(!string.IsNullOrEmpty(ticker));
 
             _ticker = ticker;
+            
             _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
+            _csvLogger = LogManager.GetLogger($"Report-{ticker}");
+
             _broker = new IBBroker(1337);
             
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
@@ -108,11 +103,10 @@ namespace TradingBot
             _broker.PnLReceived += OnPnLReceived;
 
             _broker.OrderUpdated += OnOrderUpdated;
+            _broker.OrderExecuted += OnOrderExecuted;
 
             _broker.RequestPositions();
             _broker.RequestPnL(_contract);
-            //_broker.RequestBars(_contract, BarLength._5Sec);
-            _broker.RequestBidAsk(_contract);
         }
 
         void UnsubscribeToData()
@@ -122,12 +116,10 @@ namespace TradingBot
             _broker.PnLReceived -= OnPnLReceived;
 
             _broker.OrderUpdated -= OnOrderUpdated;
+            _broker.OrderExecuted -= OnOrderExecuted;
 
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
-            _broker.CancelBidAskRequest(_contract);
-            
-            //_broker.CancelBarsRequest(_contract, BarLength._5Sec);
         }
 
         void OnAccountValueUpdated(string key, string value, string currency)
@@ -161,9 +153,40 @@ namespace TradingBot
             }
         }
 
-        void OnOrderUpdated(OrderStatus os, OrderExecution oe)
+        void OnOrderUpdated(Order o, OrderStatus os)
         {
-            //_logger.Info($"OnOrderOpened : {contract} orderId={order.Id} status={state.Status}");
+            if(os.Status == Status.Submitted || os.Status == Status.PreSubmitted)
+            {
+                _logger.Info($"OrderOpened : {_contract} {o} status={os.Status}");
+            }
+            else if(os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
+            {
+                _logger.Info($"OrderCancelled : {_contract} {o} status={os.Status}");
+            }
+            else if (os.Status == Status.Filled)
+            {
+                if(os.Remaining > 0)
+                {
+                    _logger.Info($"Order Partially filled : {_contract} {o} filled={os.Filled} remaining={os.Remaining}");
+                }
+                else
+                {
+                    _logger.Info($"Order filled : {_contract} {o}");
+                }
+            }
+        }
+
+        void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
+        {
+            _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
+            _csvLogger.Info("{cashBalance} {ticker} {action} {qty} {price} {total} {commission}"
+                , _USDCashBalance
+                , _contract.Symbol
+                , oe.Action
+                , oe.Shares
+                , oe.AvgPrice
+                , oe.Action == OrderAction.BUY ? -oe.Price : oe.Price
+                , -ci.Commission);
         }
 
         public double GetAvailableFunds()
