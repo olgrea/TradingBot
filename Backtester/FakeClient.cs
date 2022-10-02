@@ -446,7 +446,6 @@ namespace Backtester
             _logger.Info($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
-            // TODO : take into account commisison in computations? probably
             if(order.Action == OrderAction.BUY)
             {
                 Position.PositionAmount += order.TotalQuantity;
@@ -470,7 +469,6 @@ namespace Backtester
 
             var o = _openOrders.First(o => o == order);
             _executedOrders.Add(o);
-            //TODO : really really need to make sure I have the correct prices
 
             double commission = GetCommission(Contract, order, price);
             _logger.Debug($"{order} : commission : {commission:c}");

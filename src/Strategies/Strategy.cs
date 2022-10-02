@@ -92,8 +92,6 @@ namespace TradingBot.Strategies
             if (_evaluateTask != null && !_evaluateTask.IsCompleted)
                 return;
 
-            Trader.Broker.OrderUpdated += OnOrderUpdated;
-
             _cancellationTokenSource = new CancellationTokenSource();
             var token = _cancellationTokenSource.Token;
 
@@ -122,10 +120,8 @@ namespace TradingBot.Strategies
             Trader.Broker.PlaceOrder(Trader.Contract, c);
         }
 
-        void OnOrderUpdated(OrderStatus os, OrderExecution oe)
-        {
-            _currentState.OrderUpdated(os, oe);
-        }
+        internal bool IsOpened(Order order) => Trader.Broker.IsOpened(order);
+        internal bool IsExecuted(Order order) => Trader.Broker.IsExecuted(order);
 
         void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
         {
@@ -153,8 +149,6 @@ namespace TradingBot.Strategies
                 foreach (var indicator in kvp.Value)
                     indicator.Reset();
             }
-            
-            Trader.Broker.OrderUpdated -= OnOrderUpdated;
 
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();

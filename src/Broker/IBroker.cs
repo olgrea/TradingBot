@@ -21,8 +21,8 @@ namespace TradingBot.Broker
         event Action<string, string, string> AccountValueUpdated;
         event Action<Contract, Bar> Bar5SecReceived;
         event Action<Contract, Bar> Bar1MinReceived;
-        event Action<OrderStatus, OrderExecution> OrderUpdated;
-        event Action<CommissionInfo> CommissionInfoReceived;
+        event Action<Order, OrderStatus> OrderUpdated;
+        event Action<OrderExecution, CommissionInfo> OrderExecuted;
         event Action<Position> PositionReceived;
         event Action<PnL> PnLReceived;
         IErrorHandler ErrorHandler { get; set; }
@@ -40,6 +40,8 @@ namespace TradingBot.Broker
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);
         void CancelOrder(Order order);
+        bool IsOpened(Order order);
+        bool IsExecuted(Order order);
 
         void RequestPnL(Contract contract);
         void CancelPnLSubscription(Contract contract);

@@ -29,7 +29,7 @@ namespace TradingBot.Broker.Orders
         public OcaType OcaType { get; set; }
     }
 
-    internal abstract class Order
+    public abstract class Order
     {
         public RequestInfo Info { get; } = new RequestInfo();
         public int Id

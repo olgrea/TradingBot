@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
@@ -38,8 +39,6 @@ namespace TradingBot.Strategies
         class MonitoringState : State<TestStrategy>
         {
             Order _order;
-            bool _orderPlaced = false;
-            bool _orderExecuted = false;
 
             public MonitoringState(TestStrategy strategy) : base(strategy) {}
 
@@ -47,31 +46,22 @@ namespace TradingBot.Strategies
             {
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB)
                 {
-                    if(!_orderPlaced)
-                    {
+                    if(_order == null)
                         _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
+
+                    if(!_strategy.IsOpened(_order))
+                    {
                         _strategy.PlaceOrder(_order);
                     }
                 }
                 
-                return _orderExecuted ? _strategy.GetState<BoughtState>() : this;
-            }
-
-            public override void OrderUpdated(OrderStatus os, OrderExecution oe)
-            {
-                if (_order.Id == os.Info.OrderId)
-                {
-                    _orderPlaced = os.Status == Status.PreSubmitted || os.Status == Status.Submitted || os.Status == Status.Filled;
-                    _orderExecuted = oe != null && oe.OrderId == os.Info.OrderId;
-                }
+                return _strategy.IsExecuted(_order) ? _strategy.GetState<BoughtState>() : this;
             }
         }
 
         class BoughtState : State<TestStrategy>
         {
             Order _order;
-            bool _orderPlaced = false;
-            bool _orderExecuted = false;
 
             public BoughtState(TestStrategy strategy) : base(strategy) {}
 
@@ -79,23 +69,16 @@ namespace TradingBot.Strategies
             {
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close > _strategy.BollingerBands_1Min.UpperBB)
                 {
-                    if (!_orderPlaced)
-                    {
+                    if (_order == null)
                         _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
+
+                    if (!_strategy.IsOpened(_order))
+                    {
                         _strategy.PlaceOrder(_order);
                     }
                 }
                 
-                return _orderExecuted ? _strategy.GetState<MonitoringState>() : this;
-            }
-
-            public override void OrderUpdated(OrderStatus os, OrderExecution oe)
-            {
-                if (_order.Id == os.Info.OrderId)
-                {
-                    _orderPlaced = os.Status == Status.PreSubmitted || os.Status == Status.Submitted || os.Status == Status.Filled;
-                    _orderExecuted = oe != null && oe.OrderId == os.Info.OrderId;
-                }
+                return _strategy.IsExecuted(_order) ? _strategy.GetState<MonitoringState>() : this;
             }
         }
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using TradingBot.Broker.Client;
 using NLog;
+using System.Reflection.Metadata.Ecma335;
 
 namespace TradingBot.Broker.Orders
 {
@@ -15,8 +16,9 @@ namespace TradingBot.Broker.Orders
 
         Dictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
         Dictionary<int, OrderChain> _chainOrdersRequested = new Dictionary<int, OrderChain>();
-        Dictionary<int, Order> _ordersSubmitted = new Dictionary<int, Order>();
-        Dictionary<int, OrderStatus> _ordersFilled = new Dictionary<int, OrderStatus>();
+        Dictionary<int, Order> _ordersOpened = new Dictionary<int, Order>();
+        Dictionary<int, Order> _ordersExecuted = new Dictionary<int, Order>();
+        Dictionary<string, OrderExecution> _executions = new Dictionary<string, OrderExecution>();
 
         public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
         {
@@ -27,9 +29,14 @@ namespace TradingBot.Broker.Orders
             _client.Callbacks.OpenOrder += OnOrderOpened;
             _client.Callbacks.OrderStatus += OnOrderStatus;
             _client.Callbacks.ExecDetails += OnOrderExecuted;
+            _client.Callbacks.CommissionReport += OnCommissionInfo;
         }
 
-        public event Action<OrderStatus, OrderExecution> OrderUpdated;
+        public event Action<Order, OrderStatus> OrderUpdated;
+        public event Action<OrderExecution, CommissionInfo> OrderExecuted;
+
+        public bool IsOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
+        public bool IsExecuted(Order order) => order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id);
 
         public void PlaceOrder(Contract contract, Order order)
         {
@@ -99,15 +106,15 @@ namespace TradingBot.Broker.Orders
         {
             if (state.Status == Status.Submitted || state.Status == Status.PreSubmitted /*for paper trading accounts*/)
             {
-                if(!_ordersSubmitted.ContainsKey(order.Id)) // new order submitted
+                if(!_ordersOpened.ContainsKey(order.Id)) // new order submitted
                 {
                     _logger.Debug($"New order placed : {order}");
-                    _ordersSubmitted[order.Id] = order;
+                    _ordersOpened[order.Id] = order;
                 }
                 else // modified order?
                 {
                     _logger.Debug($"Order with id {order.Id} modified to : {order}.");
-                    _ordersSubmitted[order.Id] = order;
+                    _ordersOpened[order.Id] = order;
                     if(_chainOrdersRequested.ContainsKey(order.Id))
                         _chainOrdersRequested[order.Id] = order;
                 }
@@ -119,7 +126,7 @@ namespace TradingBot.Broker.Orders
                 Status = state.Status,
                 Info = order.Info,
             };
-            OrderUpdated?.Invoke(os, null);
+            OrderUpdated?.Invoke(order, os);
         }
 
         void OnOrderStatus(OrderStatus os)
@@ -134,10 +141,8 @@ namespace TradingBot.Broker.Orders
 
             }
 
-            if(os.Status == Status.Filled)
-                _ordersFilled.Add(os.Info.OrderId, os);
-            
-            OrderUpdated?.Invoke(os, null);
+            _ordersOpened.TryGetValue(os.Info.OrderId, out Order order);
+            OrderUpdated?.Invoke(order, os);
         }
 
         void OnOrderExecuted(Contract contract, OrderExecution execution)
@@ -147,8 +152,15 @@ namespace TradingBot.Broker.Orders
                 PlaceNextOrdersInChain(contract, _chainOrdersRequested[execution.OrderId]);
             }
 
-            _ordersFilled.TryGetValue(execution.OrderId, out OrderStatus os);
-            OrderUpdated?.Invoke(os, execution);
+            var order = _ordersOpened[execution.OrderId];
+            _ordersExecuted.Add(execution.OrderId, order);
+            _executions.Add(execution.ExecId, execution);
+        }
+
+        void OnCommissionInfo(CommissionInfo ci)
+        {
+            var exec = _executions[ci.ExecId];
+            OrderExecuted?.Invoke(exec, ci);
         }
 
         void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
@@ -182,7 +194,7 @@ namespace TradingBot.Broker.Orders
         public void ModifyOrder(Contract contract, Order order)
         {
             Trace.Assert(order.Id > 0);
-            if(!_ordersSubmitted.ContainsKey(order.Id))
+            if(!_ordersOpened.ContainsKey(order.Id))
             {
                 throw new ArgumentException($"The order {order} hasn't been placed yet and therefore cannot be cancelled");
             }
@@ -194,7 +206,7 @@ namespace TradingBot.Broker.Orders
         public void CancelOrder(Order order)
         {
             Trace.Assert(order.Id > 0);
-            if (!_ordersSubmitted.ContainsKey(order.Id))
+            if (!_ordersOpened.ContainsKey(order.Id))
             {
                 throw new ArgumentException($"The order {order} hasn't been placed and therefore cannot be cancelled");
             }
