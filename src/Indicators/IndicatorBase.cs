@@ -15,6 +15,7 @@ namespace TradingBot.Indicators
             BarLength = barLength;
         }
 
+        // TODO : remove bars from indicators?
         public LinkedList<Bar> Bars => _bars;
         public BarLength BarLength { get; private set; }
         public int NbPeriods { get; private set; }

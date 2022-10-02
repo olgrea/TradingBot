@@ -37,7 +37,6 @@ namespace Backtester
         DateTime _start;
         DateTime _end;
         DateTime _currentFakeTime;
-        string _ticker;
 
         event Action<DateTime> ClockTick;
         event Action<BidAsk> BidAskSubscription;
@@ -46,8 +45,8 @@ namespace Backtester
 
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
-        Contract _contract;
-        int _nextValidOrderId;
+        
+        int _nextValidOrderId = 1;
         int _nextExecId = 0;
         double _totalCommission = 0;
 
@@ -61,7 +60,6 @@ namespace Backtester
         LinkedList<BidAsk> _dailyBidAsks;
         LinkedListNode<BidAsk> _currentBidAskNode;
 
-        IBClient _client;
         ILogger _logger;
 
         bool _positionRequested = false;
@@ -76,12 +74,10 @@ namespace Backtester
         internal Account Account => _fakeAccount;
         internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClient(string ticker, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        public FakeClient(Contract contract, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
             _logger = LogManager.GetLogger(nameof(FakeClient));
-            _client = new IBClient(new IBCallbacks(_logger), _logger);
             Callbacks = new IBCallbacks(_logger);
-            _ticker = ticker;
             _messageQueue = new ConcurrentQueue<Action>();
             
             _currentFakeTime = startTime;
@@ -93,21 +89,18 @@ namespace Backtester
 
             _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
             _currentBidAskNode = InitFirstNode(_dailyBidAsks);
+
+            _fakeAccount = new Account()
+            {
+                Code = "FAKEACCOUNT123",
+                CashBalances = new Dictionary<string, double>() { { "USD", 5000 } },
+                Positions = new List<Position>() { new Position() { Contract = contract } }
+            };
         }
 
         public IBCallbacks Callbacks { get; private set; }
 
         public void WaitUntilDayIsOver() => _passingTimeTask.Wait();
-
-        private void InitFakeAccount()
-        {
-            _fakeAccount = new Account()
-            {
-                Code = "FAKEACCOUNT123",
-                CashBalances = new Dictionary<string, double>() { { "USD", 5000 } },
-                Positions = new List<Position>() { new Position() { Contract = _contract } }
-            };
-        }
 
         LinkedListNode<T> InitFirstNode<T>(LinkedList<T> list) where T : IMarketData
         {
@@ -120,14 +113,7 @@ namespace Backtester
         public Task<bool> ConnectAsync(string host, int port, int clientId)
         {
             var tcs = new TaskCompletionSource<bool>();
-            _client.ConnectAsync(IBBroker.DefaultIP, IBBroker.DefaultPort, 9999).Wait();
-            
-            _nextValidOrderId = GetNextValidId().Result;
-            _contract = GetContract(_ticker);
-            InitFakeAccount();
-
             Start();
-
             tcs.SetResult(true);
             return tcs.Task;
         }
@@ -162,35 +148,6 @@ namespace Backtester
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
             StopPassingTimeTask();
             StopConsumerTask();
-        }
-
-        internal void Reset()
-        {
-            if(_passingTimeTask != null)
-                Stop();
-
-            ClockTick -= OnClockTick_AccountSubscription;
-            ClockTick -= OnClockTick_FiveSecondBar;
-            ClockTick -= OnClockTick_PnL;
-
-            InitFakeAccount();
-
-            _st.Reset();
-            _currentFakeTime = _start;
-            _logger.Debug($"Fake client reset to {_currentFakeTime}");
-
-            _currentBarNode = null;
-            _currentBidAskNode = null;
-
-            _executedOrders.Clear();
-            _openOrders.Clear();
-
-            _positionRequested = false;
-            _reqId5SecBar = -1;
-            _reqIdBidAsk = -1;
-            _reqIdPnL = -1;
-
-            _nextValidOrderId = GetNextValidId().Result;
         }
 
         void StartConsumerTask()
@@ -303,33 +260,10 @@ namespace Backtester
 
         double GetCommission(Contract contract, Order order)
         {
-            //TODO : verify commission... Didn't seem to be working
-            var os = GetCommissionFromOrder(contract, order).Result;
-            return os.Commission != double.MaxValue ? os.Commission : 0.0;
-        }
+            //TODO : verify commission... Didn't seem to be working with 'what if' = true
+            //https://www.interactivebrokers.ca/en/index.php?f=1590
 
-        internal Task<OrderState> GetCommissionFromOrder(Contract contract, Order order)
-        {
-            var orderId = order.Id;
-            var resolveResult = new TaskCompletionSource<OrderState>();
-            var openOrder = new Action<Contract, Order, OrderState>((c, o, os) =>
-            {
-                if (orderId == o.Id)
-                {
-                    _logger.Trace($"GetCommissionFromOrder : result set");
-                    resolveResult.SetResult(os);
-                }
-            });
-
-            _client.Callbacks.OpenOrder += openOrder;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.OpenOrder -= openOrder;
-            });
-
-            _client.PlaceOrder(contract, order, true);
-
-            return resolveResult.Task;
+            return 0.0;
         }
 
         internal bool IsExecuted(Order order)
@@ -544,7 +478,7 @@ namespace Backtester
             string execId = NextExecId.ToString();
             _messageQueue.Enqueue(() =>
             {
-                //TODO : verify orderStatus() execution
+                //TODO : verify that orderStatus() is called on order execution
                 Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0);
 
                 var exec = new IBApi.Execution()
@@ -921,42 +855,11 @@ namespace Backtester
             _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
 
-        Contract GetContract(string ticker)
-        {
-            var sampleContract = new Stock()
-            {
-                Currency = "USD",
-                Exchange = "SMART",
-                Symbol = ticker,
-                SecType = "STK"
-            };
-
-            return _client.GetContractsAsync(1, sampleContract).Result?.FirstOrDefault();
-        }
-
         public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
         {
-            return _client.GetContractsAsync(reqId, contract);
-        }
-
-        Task<int> GetNextValidId()
-        {
-            var resolveResult = new TaskCompletionSource<int>();
-            var nextValidId = new Action<int>(id =>
-            {
-                _logger.Trace($"GetNextValidId end step : set result {id}");
-                resolveResult.SetResult(id);
-            });
-
-            _client.Callbacks.NextValidId += nextValidId;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.NextValidId -= nextValidId;
-            });
-
-            _client.RequestValidOrderIds();
-
-            return resolveResult.Task;
+            var tcs = new TaskCompletionSource<List<Contract>>();
+            tcs.SetResult(new List<Contract>() { Contract });
+            return tcs.Task;
         }
     }
 }

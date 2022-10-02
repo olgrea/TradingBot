@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using NLog;
 using TradingBot;
@@ -22,14 +21,12 @@ namespace Backtester
         DateTime _endTime;
 
         ILogger _logger;
-        string _ticker;
+        Contract _contract;
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
 
         public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
-            _ticker = ticker;
-
             var marketStartTime = DateTimeUtils.MarketStartTime;
             var marketEndTime = DateTimeUtils.MarketEndTime;
             //_startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
@@ -37,7 +34,12 @@ namespace Backtester
             _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, 11, 17 ,00);
             _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, 11, 47, 00);
             
-            _logger = LogManager.GetLogger($"{nameof(Backtester)}"); ;
+            _logger = LogManager.GetLogger($"{nameof(Backtester)}");
+            
+            var broker = new IBBroker();
+            broker.Connect();
+            _contract = broker.GetContract(ticker);
+            broker.Disconnect();
         }
 
         public void Start()
@@ -48,9 +50,9 @@ namespace Backtester
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
-                var fakeClient = new FakeClient(_ticker, day.Item1, day.Item2, bars, bidAsks);
+                var fakeClient = new FakeClient(_contract, day.Item1, day.Item2, bars, bidAsks);
                 var broker = new IBBroker(1337, fakeClient);
-                Trader trader = new Trader(_ticker, broker);
+                Trader trader = new Trader(_contract.Symbol, broker);
                 trader.AddStrategyForTicker<TestStrategy>();
                 
                 trader.Start();
@@ -62,8 +64,8 @@ namespace Backtester
 
         public (IEnumerable<Bar>, IEnumerable<BidAsk>) LoadHistoricalData(DateTime date)
         {
-            var barList = MarketDataUtils.DeserializeData<Bar>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<Bar>(_ticker, date)));
-            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<BidAsk>(_ticker, date)));
+            var barList = MarketDataUtils.DeserializeData<Bar>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<Bar>(_contract.Symbol, date)));
+            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<BidAsk>(_contract.Symbol, date)));
             return (barList, bidAskList);
         }
     }

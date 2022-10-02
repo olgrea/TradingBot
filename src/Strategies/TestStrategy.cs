@@ -47,7 +47,6 @@ namespace TradingBot.Strategies
             {
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB)
                 {
-                    // TODO : create async method in trader?
                     if(!_orderPlaced)
                     {
                         _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };

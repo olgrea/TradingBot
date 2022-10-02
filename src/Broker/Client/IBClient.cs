@@ -10,6 +10,8 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Broker.Client
 {
+    //TODO : convert all of this to async/await
+
     internal class IBClient : IIBClient
     {
         EClientSocket _clientSocket;
