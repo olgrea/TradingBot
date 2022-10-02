@@ -126,18 +126,21 @@ namespace TradingBot.Broker
             get => _client.Callbacks.ErrorHandler;
             set => _client.Callbacks.ErrorHandler = value;
         }
-
-        public event Action<OrderStatus, OrderExecution> OrderUpdated
+        
+        public event Action<Order, OrderStatus> OrderUpdated
         {
             add => _orderManager.OrderUpdated += value;
             remove => _orderManager.OrderUpdated -= value;
         }
 
-        public event Action<CommissionInfo> CommissionInfoReceived
+        public event Action<OrderExecution, CommissionInfo> OrderExecuted
         {
-            add => _client.Callbacks.CommissionReport += value;
-            remove => _client.Callbacks.CommissionReport -= value;
+            add => _orderManager.OrderExecuted += value;
+            remove => _orderManager.OrderExecuted -= value;
         }
+
+        public bool IsOpened(Order order) => _orderManager.IsOpened(order);
+        public bool IsExecuted(Order order) => _orderManager.IsExecuted(order); 
 
         public int GetNextValidOrderId()
         {

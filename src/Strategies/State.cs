@@ -14,6 +14,5 @@ namespace TradingBot.Strategies
         }
 
         public abstract IState Evaluate();
-        public virtual void OrderUpdated(OrderStatus os, OrderExecution oe) { }
     }
 }
