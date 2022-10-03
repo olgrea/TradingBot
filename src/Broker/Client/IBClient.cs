@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -173,6 +174,12 @@ namespace TradingBot.Broker.Client
         {
             _logger.Debug($"Requesting values from account {accountCode}");
             _clientSocket.reqAccountUpdates(receiveUpdates, accountCode);
+        }
+
+        public void RequestAvailableFunds(int reqId)
+        {
+            _logger.Debug($"Requesting available funds");
+            _clientSocket.reqAccountSummary(reqId, "All", "AvailableFunds");
         }
 
         public void RequestPositions()

@@ -25,42 +25,42 @@ namespace TradingBot.Broker.Client
         public Action ConnectAck;
         public void connectAck()
         {
-            _logger.Debug($"Connecting client to TWS...");
+            _logger.Trace($"Connecting client to TWS...");
             ConnectAck?.Invoke();
         }
 
         public Action ConnectionClosed;
         public void connectionClosed()
         {
-            _logger.Debug($"Connection closed");
+            _logger.Trace($"Connection closed");
             ConnectionClosed?.Invoke();
         }
 
         public Action<string> ManagedAccounts;
         public void managedAccounts(string accountsList)
         {
-            _logger.Debug($"Account list : {accountsList}");
+            _logger.Trace($"Account list : {accountsList}");
             ManagedAccounts?.Invoke(accountsList);
         }
 
         public Action<int> NextValidId;
         public void nextValidId(int orderId)
         {
-            _logger.Debug($"NextValidId : {orderId}");
+            _logger.Trace($"NextValidId : {orderId}");
             NextValidId?.Invoke(orderId);
         }
 
         public Action<string> UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
-            _logger.Debug($"Getting account time : {timestamp}");
+            _logger.Trace($"Getting account time : {timestamp}");
             UpdateAccountTime?.Invoke(timestamp);
         }
 
         public Action<string, string, string> UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
-            _logger.Debug($"account value : {key} {value} {currency}");
+            _logger.Trace($"account value : {key} {value} {currency}");
             UpdateAccountValue?.Invoke(key, value, currency);
 
             //TODO : handle "AccountReady"
@@ -87,15 +87,29 @@ namespace TradingBot.Broker.Client
                 RealizedPNL = realizedPNL,
             };
 
-            _logger.Debug($"Getting portfolio : \n{pos}");
+            _logger.Trace($"Getting portfolio : \n{pos}");
             UpdatePortfolio?.Invoke(pos);
         }
 
         public Action<string> AccountDownloadEnd;
         public void accountDownloadEnd(string account)
         {
-            _logger.Debug($"accountDownloadEnd ({account})");
+            _logger.Trace($"accountDownloadEnd ({account})");
             AccountDownloadEnd?.Invoke(account);
+        }
+
+        public Action<int, string, string, string, string> AccountSummary;
+        public void accountSummary(int reqId, string account, string tag, string value, string currency)
+        {
+            _logger.Trace($"accountSummary reqId={reqId} account={account} tag={tag} value={value} currency={currency}");
+            AccountSummary?.Invoke(reqId, account, tag, value, currency);
+        }
+
+        public Action<int> AccountSummaryEnd;
+        public void accountSummaryEnd(int reqId)
+        {
+            _logger.Trace($"accountSummaryEnd ({reqId})");
+            AccountSummaryEnd?.Invoke(reqId);
         }
 
         public Action<Position> Position;
@@ -108,14 +122,14 @@ namespace TradingBot.Broker.Client
                 AverageCost = avgCost,
             };
 
-            _logger.Debug($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
+            _logger.Trace($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
             Position?.Invoke(p);
         }
 
         public Action PositionEnd;
         public void positionEnd()
         {
-            _logger.Debug($"positionEnd");
+            _logger.Trace($"positionEnd");
             PositionEnd?.Invoke();
         }
 
@@ -131,7 +145,7 @@ namespace TradingBot.Broker.Client
                 RealizedPnL = realizedPnL
             };
 
-            _logger.Debug($"PnL ({reqId}): {pnl}");
+            _logger.Trace($"PnL ({reqId}): {pnl}");
             PnlSingle?.Invoke(reqId, pnl);
         }
 
@@ -151,7 +165,7 @@ namespace TradingBot.Broker.Client
                 Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime.ToLocalTime(),
             };
 
-            _logger.Debug($"realtimeBar ({reqId}) : {bar}");
+            _logger.Trace($"realtimeBar ({reqId}) : {bar}");
             RealtimeBar?.Invoke(reqId, bar);
         }
 
@@ -168,21 +182,21 @@ namespace TradingBot.Broker.Client
                 Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
             };
 
-            _logger.Debug($"tickByTickBidAsk ({reqId}) : {bidAsk}");
+            _logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
             TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
         public Action<int, Contract> ContractDetails;
         public void contractDetails(int reqId, ContractDetails contractDetails)
         {
-            _logger.Debug($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
+            _logger.Trace($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
             ContractDetails?.Invoke(reqId, contractDetails.Contract.ToTBContract());
         }
 
         public Action<int> ContractDetailsEnd;
         public void contractDetailsEnd(int reqId)
         {
-            _logger.Debug($"contractDetailsEnd ({reqId})");
+            _logger.Trace($"contractDetailsEnd ({reqId})");
             ContractDetailsEnd?.Invoke(reqId);
         }
 
@@ -194,7 +208,7 @@ namespace TradingBot.Broker.Client
             Orders.Order o = order.ToTBOrder();
             Orders.OrderState os = orderState.ToTBOrderState();
             
-            _logger.Debug($"openOrder {orderId} : {c}, {o}, {os.Status}");
+            _logger.Trace($"openOrder {orderId} : {c}, {o}, {os.Status}");
             if (!string.IsNullOrEmpty(os.WarningText))
                 _logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
 
@@ -204,7 +218,7 @@ namespace TradingBot.Broker.Client
         public Action OpenOrderEnd;
         public void openOrderEnd()
         {
-            _logger.Debug($"openOrderEnd");
+            _logger.Trace($"openOrderEnd");
             OpenOrderEnd?.Invoke();
         }
 
@@ -228,7 +242,7 @@ namespace TradingBot.Broker.Client
                 MktCapPrice = mktCapPrice,
             };
 
-            _logger.Debug($"orderStatus {orderId} : {os}");
+            _logger.Trace($"orderStatus {orderId} : {os}");
             OrderStatus?.Invoke(os);
         }
 
@@ -236,21 +250,21 @@ namespace TradingBot.Broker.Client
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
             OrderExecution ex = execution.ToTBExecution();
-            _logger.Debug($"execDetails ({reqId}) : {ex}");
+            _logger.Trace($"execDetails ({reqId}) : {ex}");
             ExecDetails?.Invoke(contract.ToTBContract(), ex);
         }
 
         public Action<int> ExecDetailsEnd;
         public void execDetailsEnd(int reqId)
         {
-            _logger.Debug($"execDetailsEnd : reqId={reqId}");
+            _logger.Trace($"execDetailsEnd : reqId={reqId}");
             ExecDetailsEnd?.Invoke(reqId);
         }
 
         public Action<CommissionInfo> CommissionReport;
         public void commissionReport(CommissionReport commissionReport)
         {
-            _logger.Debug($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+            _logger.Trace($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
             CommissionReport?.Invoke(commissionReport.ToTBCommission());
         }
 
@@ -261,7 +275,7 @@ namespace TradingBot.Broker.Client
             Orders.Order o = order.ToTBOrder();
             Contract c = contract.ToTBContract();
             
-            _logger.Debug($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
+            _logger.Trace($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
             if (!string.IsNullOrEmpty(os.WarningText))
                 _logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
 
@@ -271,7 +285,7 @@ namespace TradingBot.Broker.Client
         public Action CompletedOrdersEnd;
         public void completedOrdersEnd()
         {
-            _logger.Debug($"completedOrdersEnd");
+            _logger.Trace($"completedOrdersEnd");
             CompletedOrdersEnd?.Invoke();
         }
 
@@ -291,14 +305,14 @@ namespace TradingBot.Broker.Client
                 Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketData.Bar.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
             HistoricalData?.Invoke(reqId, b);
-            _logger.Debug($"historicalData : {bar}");
+            _logger.Trace($"historicalData : {bar}");
         }
 
         public Action<int, string, string> HistoricalDataEnd;
         public void historicalDataEnd(int reqId, string start, string end)
         {
             HistoricalDataEnd?.Invoke(reqId, start, end);
-            _logger.Debug($"historicalDataEnd");
+            _logger.Trace($"historicalDataEnd");
         }
 
         public Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
@@ -314,13 +328,13 @@ namespace TradingBot.Broker.Client
             });
 
             HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
-            _logger.Debug($"historicalTicksBidAsk");
+            _logger.Trace($"historicalTicksBidAsk");
         }
 
         public Action<long> CurrentTime;
         public void currentTime(long time)
         {
-            _logger.Debug($"currentTime");
+            _logger.Trace($"currentTime");
             CurrentTime?.Invoke(time);  
         }
 
@@ -341,16 +355,6 @@ namespace TradingBot.Broker.Client
         }
 
         #region Not Implemented
-
-        public void accountSummary(int reqId, string account, string tag, string value, string currency)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void accountSummaryEnd(int reqId)
-        {
-            throw new NotImplementedException();
-        }
 
         public void accountUpdateMulti(int requestId, string account, string modelCode, string key, string value, string currency)
         {

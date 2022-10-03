@@ -24,6 +24,10 @@
     internal class Cash : Contract
     {
         public Cash() => SecType = "CASH";
+        public override string ToString()
+        {
+            return Currency;
+        }
     }
 
     internal class Stock : Contract

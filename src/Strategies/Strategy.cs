@@ -101,7 +101,7 @@ namespace TradingBot.Strategies
                 {
                     var nextState = _currentState?.Evaluate();
                     if (nextState != _currentState)
-                        Trader.Logger.Debug($"Strategy {GetType().Name} : state change : {nextState.GetType().Name}");
+                        Trader.Logger.Info($"Strategy {GetType().Name} state change : {_currentState.GetType().Name} -> {nextState.GetType().Name}");
                     _currentState = nextState;
                 }
             }

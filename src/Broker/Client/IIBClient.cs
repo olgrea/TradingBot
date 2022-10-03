@@ -16,6 +16,7 @@ namespace TradingBot.Broker.Client
         void RequestValidOrderIds();
         Task<Account> GetAccountAsync();
         void RequestAccount(string accountCode, bool receiveUpdates = true);
+        void RequestAvailableFunds(int reqId);
         void RequestPositions();
         void CancelPositions();
         void RequestPnL(int reqId, int contractId);
