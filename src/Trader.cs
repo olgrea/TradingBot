@@ -37,10 +37,7 @@ namespace TradingBot
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         bool _strategiesStarted = false;
 
-        public Trader(string ticker, DateTime startTime, DateTime endTime) : this(ticker, startTime, endTime, new IBBroker())
-        {
-
-        }
+        public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) : this(ticker, startTime, endTime, new IBBroker(clientId)) {}
 
         internal Trader(string ticker, DateTime startTime, DateTime endTime, IBroker broker)
         {
@@ -77,7 +74,13 @@ namespace TradingBot
             _broker.Connect();
 
             var acc = _broker.GetAccount();
-            if(!acc.CashBalances.ContainsKey("USD"))
+
+#if DEBUG
+            if (acc.Code != "DU5962304")
+                throw new Exception($"In debug mode only the paper trading acount \"DU5962304\" is allowed");
+#endif
+
+            if (!acc.CashBalances.ContainsKey("USD"))
                 throw new Exception($"No USD cash funds in account {acc.Code}. This trader only trades in USD.");
             _USDCashBalance = acc.CashBalances["USD"];
 
@@ -89,7 +92,7 @@ namespace TradingBot
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
             foreach (var strat in _strategies)
-                msg += $"{strat.GetType()}, ";
+                msg += $"{strat.GetType().Name}, ";
             _logger.Info(msg);
 
             SubscribeToData();

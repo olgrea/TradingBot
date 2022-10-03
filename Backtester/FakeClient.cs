@@ -876,5 +876,11 @@ namespace Backtester
             tcs.SetResult(new List<Contract>() { Contract });
             return tcs.Task;
         }
+
+        public void RequestAvailableFunds(int reqId)
+        {
+            _messageQueue.Enqueue(() => Callbacks.AccountSummary(reqId, _fakeAccount.Code, "AvailableFunds", _fakeAccount.CashBalances["USD"].ToString(), "USD"));
+            _messageQueue.Enqueue(() => Callbacks.AccountSummaryEnd(reqId));
+        }
     }
 }
