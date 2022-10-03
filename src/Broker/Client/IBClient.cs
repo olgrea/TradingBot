@@ -161,8 +161,6 @@ namespace TradingBot.Broker.Client
                 _callbacks.UpdateAccountValue -= updateAccountValue;
                 _callbacks.UpdatePortfolio -= updatePortfolio;
                 _callbacks.AccountDownloadEnd -= accountDownloadEnd;
-
-                RequestAccount(_accountCode, false);
             });
 
             RequestAccount(_accountCode, true);
@@ -200,10 +198,10 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqPnLSingle(reqId, _accountCode, "", contractId);
         }
 
-        public void CancelPnL(int contractId)
+        public void CancelPnL(int reqId)
         {
-            _logger.Debug($"Cancelling PnL for contract id : {contractId}");
-            _clientSocket.cancelPnL(contractId);
+            _logger.Debug($"Cancelling PnL subscription (reqId={reqId})");
+            _clientSocket.cancelPnLSingle(reqId);
         }
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)

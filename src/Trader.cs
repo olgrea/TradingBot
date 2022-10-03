@@ -28,6 +28,7 @@ namespace TradingBot
         CancellationTokenSource _monitoringTimeCancellation;
 
         string _ticker;
+        Account _account;
         Contract _contract;
         double _USDCashBalance;
 
@@ -73,16 +74,16 @@ namespace TradingBot
             
             _broker.Connect();
 
-            var acc = _broker.GetAccount();
+            _account = _broker.GetAccount();
 
 #if DEBUG
-            if (acc.Code != "DU5962304")
+            if (_account.Code != "DU5962304")
                 throw new Exception($"In debug mode only the paper trading acount \"DU5962304\" is allowed");
 #endif
 
-            if (!acc.CashBalances.ContainsKey("USD"))
-                throw new Exception($"No USD cash funds in account {acc.Code}. This trader only trades in USD.");
-            _USDCashBalance = acc.CashBalances["USD"];
+            if (!_account.CashBalances.ContainsKey("USD"))
+                throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
+            _USDCashBalance = _account.CashBalances["USD"];
 
             _contract = _broker.GetContract(_ticker);
             if (_contract == null)
@@ -172,6 +173,7 @@ namespace TradingBot
 
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
+            _broker.CancelAccountUpdates(_account.Code);
         }
 
         void OnAccountValueUpdated(string key, string value, string currency)
@@ -181,7 +183,7 @@ namespace TradingBot
                 case "CashBalance":
                     if(currency == "USD")
                     {
-                        var newVal = double.Parse(value, CultureInfo.CurrentCulture);
+                        var newVal = double.Parse(value, CultureInfo.InvariantCulture);
                         if(newVal != _USDCashBalance)
                         {
                             _logger.Info($"New Account Cash balance : {newVal:c} USD");
@@ -204,7 +206,8 @@ namespace TradingBot
                     }
                     else 
                     {
-                        _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost:c}/shares");
+                        string unrealized = position.UnrealizedPNL != double.MaxValue ? position.UnrealizedPNL.ToString("c") : "--";
+                        _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost:c}/shares (unrealized PnL : {unrealized})");
                     }
                 }
                 _contractPosition = position;
@@ -215,6 +218,13 @@ namespace TradingBot
         {
             if(pnl.Contract.Symbol == _ticker)
             {
+                if(_PnL?.DailyPnL != pnl.DailyPnL)
+                {
+                    string daily = pnl.DailyPnL != double.MaxValue ? pnl.DailyPnL.ToString("c") : "--";
+                    string realized = pnl.RealizedPnL != double.MaxValue ? pnl.RealizedPnL.ToString("c") : "--";
+                    string unrealized = pnl.UnrealizedPnL != double.MaxValue ? pnl.UnrealizedPnL.ToString("c") : "--";
+                    _logger.Info($"Daily PnL : {daily} (realized : {realized}, unrealized : {unrealized})");
+                }
                 _PnL = pnl;
             }
         }
