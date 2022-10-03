@@ -42,5 +42,12 @@ namespace TradingBot.Broker.Client
 
         public int Id { get; set; } = -1;
         public int ErrorCode { get; set; } = -1;
+
+        public override string Message => $"{base.Message} (code={ErrorCode}, rId={Id})";
+
+        public override string ToString()
+        {
+            return Message;
+        }
     }
 }
