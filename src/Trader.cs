@@ -9,6 +9,7 @@ using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
 using System.Globalization;
 using NLog;
+using static System.Collections.Specialized.BitVector32;
 
 namespace TradingBot
 {
@@ -31,19 +32,9 @@ namespace TradingBot
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
 
-        public Trader(string ticker)
+        public Trader(string ticker) : this(ticker, new IBBroker(1337))
         {
-            Trace.Assert(!string.IsNullOrEmpty(ticker));
 
-            _ticker = ticker;
-            
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
-            _csvLogger = LogManager.GetLogger($"Report-{ticker}");
-
-            _broker = new IBBroker(1337);
-            
-            _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
-            _broker.ErrorHandler = _errorHandler;
         }
 
         internal Trader(string ticker, IBroker broker)
@@ -51,9 +42,11 @@ namespace TradingBot
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(broker != null);
 
-            _ticker = ticker;
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
             _broker = broker;
+            _ticker = ticker;
+            
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
+            _csvLogger = LogManager.GetLogger($"Report-{ticker}");
 
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
             _broker.ErrorHandler = _errorHandler;
@@ -84,6 +77,8 @@ namespace TradingBot
             _contract = _broker.GetContract(_ticker);
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
+
+            _logger.Info($"Starting USD cash balance : {_USDCashBalance:c}");
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
             foreach (var strat in _strategies)
@@ -128,7 +123,14 @@ namespace TradingBot
             {
                 case "CashBalance":
                     if(currency == "USD")
-                        _USDCashBalance = double.Parse(value, CultureInfo.InvariantCulture);
+                    {
+                        var newVal = double.Parse(value, CultureInfo.CurrentCulture);
+                        if(newVal != _USDCashBalance)
+                        {
+                            _logger.Info($"New Account Cash balance : {newVal:c} USD");
+                            _USDCashBalance = newVal;
+                        }
+                    }
                     break;
             }
         }
@@ -137,9 +139,16 @@ namespace TradingBot
         {
             if (position.Contract.Symbol == _ticker)
             {
-                if(_contractPosition.PositionAmount != position.PositionAmount)
+                if(_contractPosition?.PositionAmount != position.PositionAmount)
                 {
-                    _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost}");
+                    if (position.PositionAmount == 0)
+                    {
+                        _logger.Info($"Current Position : none");
+                    }
+                    else 
+                    {
+                        _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost:c}/shares");
+                    }
                 }
                 _contractPosition = position;
             }
@@ -179,14 +188,19 @@ namespace TradingBot
         void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
         {
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
-            _csvLogger.Info("{cashBalance} {ticker} {action} {qty} {price} {total} {commission}"
-                , _USDCashBalance
-                , _contract.Symbol
-                , oe.Action
-                , oe.Shares
-                , oe.AvgPrice
-                , oe.Action == OrderAction.BUY ? -oe.Price : oe.Price
-                , -ci.Commission);
+            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Price, ci.Commission);
+        }
+
+        void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission)
+        {
+            _csvLogger.Info("{action} {qty} {price} {total} {commission} {time}"
+                , action
+                , qty
+                , avgPrice
+                , action == OrderAction.BUY ? -totalPrice : totalPrice
+                , -commission
+                , time
+                );
         }
 
         public double GetAvailableFunds()
@@ -198,8 +212,17 @@ namespace TradingBot
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
 
-            // Kill task
-            //_broker.SellEverything();
+            _broker.CancelAllOrders();
+            if(_contractPosition.PositionAmount > 0)
+            {
+                _broker.PlaceOrder(_contract, new MarketOrder()
+                {
+                    Action = OrderAction.SELL,
+                    TotalQuantity = _contractPosition.PositionAmount,
+                });
+            }
+
+            _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
 
             UnsubscribeToData();
             _broker.Disconnect();

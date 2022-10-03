@@ -31,8 +31,8 @@ namespace Backtester
             var marketEndTime = DateTimeUtils.MarketEndTime;
             //_startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
             //_endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
-            _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, 11, 17 ,00);
-            _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, 11, 47, 00);
+            _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, 11, 10 ,00);
+            _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, 15, 55, 00);
             
             _logger = LogManager.GetLogger($"{nameof(Backtester)}");
             
@@ -40,6 +40,8 @@ namespace Backtester
             broker.Connect();
             _contract = broker.GetContract(ticker);
             broker.Disconnect();
+
+            FakeClient.TimeDelays.TimeScale = 0.001;
         }
 
         public void Start()
@@ -57,6 +59,7 @@ namespace Backtester
                 
                 trader.Start();
                 fakeClient.WaitUntilDayIsOver();
+                trader.Stop();
 
                 //TODO : Save results, reset trader and fake clients
             }

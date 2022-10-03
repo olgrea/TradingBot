@@ -192,7 +192,7 @@ namespace Backtester
                         ClockTick?.Invoke(_currentFakeTime);
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
                         _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                        //_logger.LogDebug($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
+                        //_logger.Info($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
                     }
                     catch (AggregateException e)
                     {
@@ -235,7 +235,7 @@ namespace Backtester
             var openOrder = _openOrders.FirstOrDefault(o => o == order);
             if (openOrder == null)
             {
-                //TODO validate order? What to validate?
+                //TODO validate order : enough cash to buy, enough shares to sell
                 _openOrders.Add(order);
 
                 _logger.Debug($"New order submitted : {order}");
@@ -253,6 +253,8 @@ namespace Backtester
 
             _messageQueue.Enqueue(() =>
             {
+                //TODO : validate callback order. It should reflect what TWS does
+
                 var orderState = new IBApi.OrderState() { Status = "Submitted" };
                 Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
             });
@@ -449,7 +451,7 @@ namespace Backtester
             if(order.Action == OrderAction.BUY)
             {
                 Position.PositionAmount += order.TotalQuantity;
-                Position.AverageCost = (Position.AverageCost + total) / 2;
+                Position.AverageCost = Position.AverageCost > 0 ? (Position.AverageCost + price) / 2 : price;
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
                 UpdateUnrealizedPNL(price);
@@ -460,7 +462,7 @@ namespace Backtester
                 Position.PositionAmount -= order.TotalQuantity;
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
-                Position.RealizedPNL = order.TotalQuantity * (Position.MarketValue - Position.AverageCost);
+                Position.RealizedPNL += order.TotalQuantity * (Position.MarketPrice - Position.AverageCost);
                 _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {Position.RealizedPNL:c}");
 
                 UpdateUnrealizedPNL(price);
@@ -605,7 +607,7 @@ namespace Backtester
 
         void OnClockTick_FiveSecondBar(DateTime newTime)
         {
-            if (_currentFakeTime.Second % 5 == 0)
+            if (newTime.Second % 5 == 0)
             {
                 var b = MakeBar(_currentBarNode, BarLength._5Sec);
                 _messageQueue.Enqueue(() => 
@@ -673,11 +675,13 @@ namespace Backtester
 
         void OnClockTick_UpdateBarNode(DateTime newTime)
         {
-            _5SecBars.AddFirst(_currentBarNode.Value);
-            if (_5SecBars.Count > 5)
-                _5SecBars.RemoveLast();
-
-            _currentBarNode = _currentBarNode.Next;
+            if(_currentBarNode.Value.Time < newTime)
+            {
+                _5SecBars.AddFirst(_currentBarNode.Value);
+                if (_5SecBars.Count > 5)
+                    _5SecBars.RemoveLast();
+                _currentBarNode = _currentBarNode.Next;
+            }
         }
 
         void OnClockTick_UpdateBidAskNode(DateTime newTime)

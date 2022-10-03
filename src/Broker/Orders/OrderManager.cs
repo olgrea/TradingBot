@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using TradingBot.Broker.Client;
 using NLog;
-using System.Reflection.Metadata.Ecma335;
+using System.Collections.Concurrent;
 
 namespace TradingBot.Broker.Orders
 {
@@ -14,11 +14,11 @@ namespace TradingBot.Broker.Orders
         IBBroker _broker;
         IIBClient _client;
 
-        Dictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
-        Dictionary<int, OrderChain> _chainOrdersRequested = new Dictionary<int, OrderChain>();
-        Dictionary<int, Order> _ordersOpened = new Dictionary<int, Order>();
-        Dictionary<int, Order> _ordersExecuted = new Dictionary<int, Order>();
-        Dictionary<string, OrderExecution> _executions = new Dictionary<string, OrderExecution>();
+        ConcurrentDictionary<int, Order> _ordersRequested = new ConcurrentDictionary<int, Order>();
+        ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
+        ConcurrentDictionary<int, Order> _ordersOpened = new ConcurrentDictionary<int, Order>();
+        ConcurrentDictionary<int, Order> _ordersExecuted = new ConcurrentDictionary<int, Order>();
+        ConcurrentDictionary<string, OrderExecution> _executions = new ConcurrentDictionary<string, OrderExecution>();
 
         public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
         {
@@ -35,7 +35,8 @@ namespace TradingBot.Broker.Orders
         public event Action<Order, OrderStatus> OrderUpdated;
         public event Action<OrderExecution, CommissionInfo> OrderExecuted;
 
-        public bool IsOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
+        public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && _ordersRequested.ContainsKey(order.Id);
+        public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
         public bool IsExecuted(Order order) => order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id);
 
         public void PlaceOrder(Contract contract, Order order)
@@ -136,7 +137,7 @@ namespace TradingBot.Broker.Orders
                 if(_chainOrdersRequested.ContainsKey(os.Info.OrderId))
                 {
                     _logger.Warn($"Order {os.Info.OrderId} was part of an order chain and has been cancelled. Attached orders will also be cancelled.");
-                    _chainOrdersRequested.Remove(os.Info.OrderId);
+                    _chainOrdersRequested.TryRemove(os.Info.OrderId, out _);
                 }
 
             }
@@ -153,8 +154,8 @@ namespace TradingBot.Broker.Orders
             }
 
             var order = _ordersOpened[execution.OrderId];
-            _ordersExecuted.Add(execution.OrderId, order);
-            _executions.Add(execution.ExecId, execution);
+            _ordersExecuted.TryAdd(execution.OrderId, order);
+            _executions.TryAdd(execution.ExecId, execution);
         }
 
         void OnCommissionInfo(CommissionInfo ci)
@@ -178,7 +179,7 @@ namespace TradingBot.Broker.Orders
                     if (child.Order.Id == executedOrder.Id)
                         continue;
                     
-                    _chainOrdersRequested.Remove(child.Order.Id);
+                    _chainOrdersRequested.TryRemove(child.Order.Id, out _);
                     CancelOrder(child.Order);
                 }
             }
@@ -212,6 +213,12 @@ namespace TradingBot.Broker.Orders
             }
 
             _client.CancelOrder(order.Id);
+        }
+
+        public void CancelAllOrders()
+        {
+            _chainOrdersRequested.Clear();
+            _client.CancelAllOrders();
         }
 
         List<Order> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)

@@ -40,7 +40,9 @@ namespace TradingBot.Broker
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);
         void CancelOrder(Order order);
-        bool IsOpened(Order order);
+        void CancelAllOrders();
+        bool HasBeenRequested(Order order);
+        bool HasBeenOpened(Order order);
         bool IsExecuted(Order order);
 
         void RequestPnL(Contract contract);

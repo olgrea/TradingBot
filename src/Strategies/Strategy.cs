@@ -120,7 +120,8 @@ namespace TradingBot.Strategies
             Trader.Broker.PlaceOrder(Trader.Contract, c);
         }
 
-        internal bool IsOpened(Order order) => Trader.Broker.IsOpened(order);
+        internal bool HasBeenRequested(Order order) => Trader.Broker.HasBeenRequested(order);
+        internal bool HasBeenOpened(Order order) => Trader.Broker.HasBeenOpened(order);
         internal bool IsExecuted(Order order) => Trader.Broker.IsExecuted(order);
 
         void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
