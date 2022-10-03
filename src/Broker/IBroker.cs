@@ -52,5 +52,6 @@ namespace TradingBot.Broker
         void CancelPositionsSubscription();
         IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count);
         IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count);
+        DateTime GetCurrentTime();
     }
 }

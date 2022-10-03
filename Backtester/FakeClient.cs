@@ -227,6 +227,14 @@ namespace Backtester
             _passingTimeTask = null;
         }
 
+        public Task<long> GetCurrentTime()
+        {
+            var tcs = new TaskCompletionSource<long>();
+            DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
+            tcs.SetResult(dto.ToUnixTimeSeconds());
+            return tcs.Task;
+        }
+
         public void PlaceOrder(Contract contract, Order order)
         {
             Debug.Assert(Position != null);

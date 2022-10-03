@@ -317,6 +317,13 @@ namespace TradingBot.Broker.Client
             _logger.Debug($"historicalTicksBidAsk");
         }
 
+        public Action<long> CurrentTime;
+        public void currentTime(long time)
+        {
+            _logger.Debug($"currentTime");
+            CurrentTime?.Invoke(time);  
+        }
+
         public IErrorHandler ErrorHandler;
         public void error(Exception e)
         {
@@ -356,11 +363,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void bondContractDetails(int reqId, ContractDetails contract)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void currentTime(long time)
         {
             throw new NotImplementedException();
         }

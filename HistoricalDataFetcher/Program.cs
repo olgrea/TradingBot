@@ -50,16 +50,13 @@ namespace HistoricalDataFetcher
         DateTime _startDate;
         DateTime _endDate;
 
-        public static TimeSpan MarketStart = DateTimeUtils.MarketStartTime;
-        public static TimeSpan MarketEnd = DateTimeUtils.MarketEndTime;
-
         public DataFetcher(string ticker, DateTime start, DateTime end)
         {
             _ticker = ticker;
 
             var marketStartTime = DateTimeUtils.MarketStartTime;
             var marketEndTime = DateTimeUtils.MarketEndTime;
-            _startDate = new DateTime(start.Year, start.Month, start.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
+            _startDate = new DateTime(start.Year, start.Month, start.Day, 8, 0, 0);
             _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
 
             _logger = LogManager.GetLogger($"{nameof(DataFetcher)}");

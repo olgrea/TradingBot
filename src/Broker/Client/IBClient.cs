@@ -426,5 +426,18 @@ namespace TradingBot.Broker.Client
             _logger.Debug($"Requesting historical ticks for {contract} :\nstartDateTime={startDateTime}, endDateTime={endDateTime}, nbOfTicks={nbOfTicks}, whatToShow={whatToShow}, onlyRTH={onlyRTH}");
             _clientSocket.reqHistoricalTicks(reqId, contract.ToIBApiContract(), startDateTime, endDateTime, nbOfTicks, whatToShow, Convert.ToInt32(onlyRTH), ignoreSize, null);
         }
+
+        public Task<long> GetCurrentTime()
+        {
+            var tcs = new TaskCompletionSource<long>();
+            
+            var currentTime = new Action<long>(t => tcs.SetResult(t));
+            _callbacks.CurrentTime += currentTime;
+            tcs.Task.ContinueWith(task => _callbacks.CurrentTime -= currentTime);
+            
+            _logger.Debug("Requesting current time");
+            _clientSocket.reqCurrentTime();
+            return tcs.Task;
+        }
     }
 }

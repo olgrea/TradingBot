@@ -1,19 +1,25 @@
 ﻿using System;
+using System.Threading.Tasks;
 using TradingBot;
 using TradingBot.Strategies;
+using TradingBot.Utils;
 
 namespace ConsoleApp
 {
     internal class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            Trader trader = new Trader("GME");
-            trader.AddStrategyForTicker<RSIDivergenceStrategy>();
+            //var start = new DateTime(DateTime.Today.Ticks + DateTimeUtils.MarketStartTime.Ticks, DateTimeKind.Local);
+            //var end = new DateTime(DateTime.Today.Ticks + DateTimeUtils.MarketEndTime.Ticks, DateTimeKind.Local);
             
-            trader.Start();
+            var start = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(10).TimeOfDay.Ticks, DateTimeKind.Local);
+            var end = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(2000).TimeOfDay.Ticks, DateTimeKind.Local);
 
-            Console.ReadKey();
+            Trader trader = new Trader("GME", start, end);
+            trader.AddStrategyForTicker<TestStrategy>();
+            
+            await trader.Start();
             trader.Stop();
         }
     }
