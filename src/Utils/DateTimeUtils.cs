@@ -8,7 +8,7 @@ namespace TradingBot.Utils
     public static class DateTimeUtils
     {
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
-        public static TimeSpan MarketEndTime = new TimeSpan(15, 55, 0);
+        public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 

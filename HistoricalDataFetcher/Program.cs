@@ -8,19 +8,36 @@ using TradingBot.Utils;
 using System.IO;
 using System.Runtime.CompilerServices;
 using NLog;
+using TradingBot.Broker.Client;
+using CommandLine;
 
 [assembly: InternalsVisibleToAttribute("Tests")]
 namespace HistoricalDataFetcher
 {
     internal class Program
     {
+        public class Options
+        {
+            [Option('t', "ticker", Required = true, HelpText = "The symbol of the stock for which to retrieve historical data")]
+            public string Ticker { get; set; } = "";
+
+            [Option('s', "start", Required = true, HelpText = "The start date at which to retrieve historical data. Format : YYYY-MM-dd")]
+            public string StartDate { get; set; } = "";
+
+            [Option('e', "end", Required = false, HelpText = "When specified, historical data will be retrieved from start date to end date. Format : YYYY-MM-dd")]
+            public string EndDate { get; set; } = "";
+        }
+
+
         static void Main(string[] args)
         {
-            string ticker = args[0];
-            DateTime startDate = DateTime.Parse(args[1]);
+            var parsedArgs = Parser.Default.ParseArguments<Options>(args);
+
+            string ticker = parsedArgs.Value.Ticker;
+            DateTime startDate = DateTime.Parse(parsedArgs.Value.StartDate);
             DateTime endDate = startDate;
-            if (args.Length == 3)
-                endDate = DateTime.Parse(args[2]);
+            if (!string.IsNullOrEmpty(parsedArgs.Value.EndDate))
+                endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
             var hdf = new DataFetcher(ticker, startDate, endDate);    
             hdf.Start();
@@ -49,6 +66,28 @@ namespace HistoricalDataFetcher
         string _ticker;
         DateTime _startDate;
         DateTime _endDate;
+        IErrorHandler _errorHandler;
+
+        internal class FetcherErrorHandler : IBBrokerErrorHandler
+        {
+            DataFetcher _fetcher;
+            public FetcherErrorHandler(DataFetcher fetcher, IBBroker broker, ILogger logger) : base(broker, logger)
+            {
+                _fetcher = fetcher;
+            }
+
+            public override void OnError(ErrorMessage msg)
+            {
+                switch (msg.ErrorCode)
+                {
+                    // TODO : handle pacing violation for when the program has been started and restarted a lot
+                    default:
+                        //_fetcher.Wait10Minutes();
+                        base.OnError(msg);
+                        break;
+                }
+            }
+        }
 
         public DataFetcher(string ticker, DateTime start, DateTime end)
         {
@@ -61,6 +100,10 @@ namespace HistoricalDataFetcher
 
             _logger = LogManager.GetLogger($"{nameof(DataFetcher)}");
             _broker = new IBBroker(321);
+
+            _errorHandler = new FetcherErrorHandler(this, _broker as IBBroker, _logger);
+            _broker.ErrorHandler = _errorHandler;
+
         }
 
         public void Start()
@@ -130,20 +173,25 @@ namespace HistoricalDataFetcher
             if (_nbRequest == 60)
             {
                 _logger.Info($"60 requests made : waiting 10 minutes...");
-                for (int i = 0; i < 10; ++i)
-                {
-                    Task.Delay(60 * 1000).Wait();
-                    if (i < 9)
-                        _logger.Info($"{9 - i} minutes left...");
-                    else
-                        _logger.Info($"Resuming historical data fetching");
-                }
+                Wait10Minutes();
                 _nbRequest = 0;
             }
             else if (_nbRequest != 0 && _nbRequest % 5 == 0)
             {
                 _logger.Info($"{NbRequest} requests made : waiting 2 seconds...");
                 Task.Delay(2000).Wait();
+            }
+        }
+
+        void Wait10Minutes()
+        {
+            for (int i = 0; i < 10; ++i)
+            {
+                Task.Delay(60 * 1000).Wait();
+                if (i < 9)
+                    _logger.Info($"{9 - i} minutes left...");
+                else
+                    _logger.Info($"Resuming historical data fetching");
             }
         }
 

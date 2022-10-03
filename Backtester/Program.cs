@@ -1,20 +1,31 @@
 ﻿using System;
-using System.Globalization;
-using TradingBot.Utils;
+using CommandLine;
 
 namespace Backtester
 {
     internal class Program
     {
-        // DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+        public class Options
+        {
+            [Option('t', "ticker", Required = true, HelpText = "The symbol of the stock for which to backtest a strategy")]
+            public string Ticker { get; set; } = "";
+
+            [Option('s', "start", Required = true, HelpText = "The start date at which to start the testing. Format : YYYY-MM-dd")]
+            public string StartDate { get; set; } = "";
+
+            [Option('e', "end", Required = false, HelpText = "When specified, testing will occur between the start and end date. Format : YYYY-MM-dd")]
+            public string EndDate { get; set; } = "";
+        }
 
         static void Main(string[] args)
         {
-            string ticker = args[0];
-            DateTime startDate = DateTime.Parse(args[1]);
+            var parsedArgs = Parser.Default.ParseArguments<Options>(args);
+
+            string ticker = parsedArgs.Value.Ticker;
+            DateTime startDate = DateTime.Parse(parsedArgs.Value.StartDate);
             DateTime endDate = startDate;
-            if (args.Length == 3)
-                endDate = DateTime.Parse(args[2]);
+            if (!string.IsNullOrEmpty(parsedArgs.Value.EndDate))
+                endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
             var bt = new Backtester(ticker, startDate, endDate);
             bt.Start();
