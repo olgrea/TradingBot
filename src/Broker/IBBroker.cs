@@ -189,6 +189,7 @@ namespace TradingBot.Broker
 
         public Account GetAccount()
         {
+            _subscriptions.AccountUpdates = true;
             return _client.GetAccountAsync().Result;
         }
 
@@ -430,6 +431,14 @@ namespace TradingBot.Broker
             {
                 _client.CancelPnL(_subscriptions.Pnl[contract]);
                 _subscriptions.Pnl.Remove(contract);
+            }
+        }
+
+        public void CancelAccountUpdates(string account)
+        {
+            if (_subscriptions.AccountUpdates)
+            {
+                _client.RequestAccount(account, false);
             }
         }
 

@@ -543,6 +543,7 @@ namespace Backtester
         public Task<Account> GetAccountAsync()
         {
             var tcs = new TaskCompletionSource<Account>();
+            ToggleAccountUpdates(true);
             tcs.SetResult(_fakeAccount);
             return tcs.Task;
         }
@@ -553,8 +554,12 @@ namespace Backtester
                 throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
             _messageQueue.Enqueue(SendAccountUpdate);
+            ToggleAccountUpdates(receiveUpdates);
+        }
 
-            if (receiveUpdates)
+        void ToggleAccountUpdates(bool receiveUpdates)
+        {
+            if (receiveUpdates && _lastAccountUpdate == DateTime.MinValue)
             {
                 _logger.Debug($"Account updates requested");
                 _lastAccountUpdate = _currentFakeTime;
@@ -562,6 +567,7 @@ namespace Backtester
             }
             else
             {
+                _lastAccountUpdate = DateTime.MinValue;
                 _logger.Debug($"Account updates cancelled");
                 ClockTick -= OnClockTick_AccountSubscription;
             }

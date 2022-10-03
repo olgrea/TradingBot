@@ -15,6 +15,7 @@ namespace TradingBot.Broker
         void Connect();
         void Disconnect();
         Accounts.Account GetAccount();
+        void CancelAccountUpdates(string account);
         Contract GetContract(string ticker);
 
         event Action<Contract, BidAsk> BidAskReceived;
