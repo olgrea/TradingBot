@@ -139,7 +139,8 @@ namespace TradingBot.Broker
             remove => _orderManager.OrderExecuted -= value;
         }
 
-        public bool IsOpened(Order order) => _orderManager.IsOpened(order);
+        public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
+        public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
         public bool IsExecuted(Order order) => _orderManager.IsExecuted(order); 
 
         public int GetNextValidOrderId()
@@ -250,7 +251,7 @@ namespace TradingBot.Broker
             foreach(BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
             {
                 if (!HasSubscribers(barLength))
-                    return;
+                    continue;
 
                 if(barLength == BarLength._5Sec)
                 {
@@ -387,6 +388,8 @@ namespace TradingBot.Broker
         {
             _orderManager.CancelOrder(order);
         }
+
+        public void CancelAllOrders() => _orderManager.CancelAllOrders();
 
         public void RequestPositions()
         {

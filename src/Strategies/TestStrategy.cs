@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
@@ -44,18 +43,18 @@ namespace TradingBot.Strategies
 
             public override IState Evaluate()
             {
-                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB)
+                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close <= _strategy.BollingerBands_1Min.LowerBB)
                 {
                     if(_order == null)
                         _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
 
-                    if(!_strategy.IsOpened(_order))
+                    if(!_strategy.HasBeenRequested(_order))
                     {
                         _strategy.PlaceOrder(_order);
                     }
                 }
                 
-                return _strategy.IsExecuted(_order) ? _strategy.GetState<BoughtState>() : this;
+                return (_strategy.HasBeenOpened(_order) && _strategy.IsExecuted(_order)) ? _strategy.GetState<BoughtState>() : this;
             }
         }
 
@@ -67,18 +66,18 @@ namespace TradingBot.Strategies
 
             public override IState Evaluate()
             {
-                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close > _strategy.BollingerBands_1Min.UpperBB)
+                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close >= _strategy.BollingerBands_1Min.UpperBB)
                 {
                     if (_order == null)
                         _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
 
-                    if (!_strategy.IsOpened(_order))
+                    if (!_strategy.HasBeenRequested(_order))
                     {
                         _strategy.PlaceOrder(_order);
                     }
                 }
                 
-                return _strategy.IsExecuted(_order) ? _strategy.GetState<MonitoringState>() : this;
+                return (_strategy.HasBeenOpened(_order) && _strategy.IsExecuted(_order)) ? _strategy.GetState<MonitoringState>() : this;
             }
         }
 
