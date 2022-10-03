@@ -44,7 +44,7 @@ namespace Backtester
             FakeClient.TimeDelays.TimeScale = 0.001;
         }
 
-        public void Start()
+        public async void Start()
         {
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
@@ -54,14 +54,11 @@ namespace Backtester
 
                 var fakeClient = new FakeClient(_contract, day.Item1, day.Item2, bars, bidAsks);
                 var broker = new IBBroker(1337, fakeClient);
-                Trader trader = new Trader(_contract.Symbol, broker);
+                Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker);
                 trader.AddStrategyForTicker<TestStrategy>();
                 
-                trader.Start();
-                fakeClient.WaitUntilDayIsOver();
+                await trader.Start();
                 trader.Stop();
-
-                //TODO : Save results, reset trader and fake clients
             }
         }
 

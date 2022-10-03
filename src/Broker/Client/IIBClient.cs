@@ -33,5 +33,6 @@ namespace TradingBot.Broker.Client
         Task<IEnumerable<BidAsk>> RequestHistoricalTicks(int reqId, Contract contract, DateTime time, int count);
         void RequestTickByTickData(int reqId, Contract contract, string tickType);
         void CancelTickByTickData(int reqId);
+        Task<long> GetCurrentTime();
     }
 }

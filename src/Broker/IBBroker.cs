@@ -139,9 +139,20 @@ namespace TradingBot.Broker
             remove => _orderManager.OrderExecuted -= value;
         }
 
+        public event Action<long> CurrentTimeReceived
+        {
+            add => _client.Callbacks.CurrentTime += value;
+            remove => _client.Callbacks.CurrentTime -= value;
+        }
+
         public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
         public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
         public bool IsExecuted(Order order) => _orderManager.IsExecuted(order); 
+
+        public DateTime GetCurrentTime()
+        {
+            return DateTimeOffset.FromUnixTimeSeconds(_client.GetCurrentTime().Result).DateTime.ToLocalTime();
+        }
 
         public int GetNextValidOrderId()
         {

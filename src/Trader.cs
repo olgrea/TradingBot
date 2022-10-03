@@ -9,7 +9,8 @@ using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
 using System.Globalization;
 using NLog;
-using static System.Collections.Specialized.BitVector32;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace TradingBot
 {
@@ -20,30 +21,36 @@ namespace TradingBot
         TraderErrorHandler _errorHandler;
         IBroker _broker;
 
+        DateTime _startTime;
+        DateTime _endTime;
+        DateTime _currentTime;
+        Task _monitoringTimeTask;
+        CancellationTokenSource _monitoringTimeCancellation;
+
         string _ticker;
         Contract _contract;
         double _USDCashBalance;
-
-        // TODO track account changes
-        //double _commissions;
 
         Position _contractPosition;
         PnL _PnL;
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+        bool _strategiesStarted = false;
 
-        public Trader(string ticker) : this(ticker, new IBBroker(1337))
+        public Trader(string ticker, DateTime startTime, DateTime endTime) : this(ticker, startTime, endTime, new IBBroker())
         {
 
         }
 
-        internal Trader(string ticker, IBroker broker)
+        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBroker broker)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(broker != null);
 
-            _broker = broker;
             _ticker = ticker;
+            _startTime = startTime;
+            _endTime = endTime;
+            _broker = broker;
             
             _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
             _csvLogger = LogManager.GetLogger($"Report-{ticker}");
@@ -62,12 +69,12 @@ namespace TradingBot
             _strategies.Add((IStrategy)Activator.CreateInstance(typeof(TStrategy), this));
         }
 
-        public void Start()
+        public Task Start()
         {
-            _broker.Connect();
-            
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
+            
+            _broker.Connect();
 
             var acc = _broker.GetAccount();
             if(!acc.CashBalances.ContainsKey("USD"))
@@ -87,8 +94,55 @@ namespace TradingBot
 
             SubscribeToData();
 
-            foreach (var strat in _strategies)
-                strat.Start();
+            _currentTime = _broker.GetCurrentTime();
+            return StartMonitoringTimeTask();
+        }
+
+        Task StartMonitoringTimeTask()
+        {
+            _monitoringTimeCancellation = new CancellationTokenSource();
+            var mainToken = _monitoringTimeCancellation.Token;
+            _logger.Debug($"Started monitoring current time");
+            _monitoringTimeTask = Task.Factory.StartNew(() =>
+            {
+                while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
+                {
+                    try
+                    {
+                        Task.Delay(1000).Wait();
+                        _currentTime = _broker.GetCurrentTime();
+                        if(!_strategiesStarted && _currentTime >= _startTime)
+                        {
+                            _strategiesStarted = true;
+                            foreach (var strat in _strategies)
+                                strat.Start();
+                        }
+
+                    }
+                    catch (AggregateException e)
+                    {
+                        //TODO : verify error handling
+                        if (e.InnerException is OperationCanceledException)
+                        {
+                            _logger.Trace($"Monitoring time task cancelled");
+                            return;
+                        }
+
+                        throw e;
+                    }
+                }
+
+            }, mainToken);
+
+            return _monitoringTimeTask;
+        }
+
+        void StopMonitoringTimeTask()
+        {
+            _monitoringTimeCancellation?.Cancel();
+            _monitoringTimeCancellation?.Dispose();
+            _monitoringTimeCancellation = null;
+            _monitoringTimeCancellation = null;
         }
 
         void SubscribeToData()
@@ -212,8 +266,13 @@ namespace TradingBot
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
 
+            StopMonitoringTimeTask();
+
+            foreach (var strat in _strategies)
+                strat.Stop();
+
             _broker.CancelAllOrders();
-            if(_contractPosition.PositionAmount > 0)
+            if(_contractPosition?.PositionAmount > 0)
             {
                 _broker.PlaceOrder(_contract, new MarketOrder()
                 {
