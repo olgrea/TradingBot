@@ -50,6 +50,7 @@ namespace TradingBot.Strategies
 
                     if(!_strategy.HasBeenRequested(_order))
                     {
+                        _strategy.Trader.Logger.Info($"Lower band reached. Placing market BUY order.");
                         _strategy.PlaceOrder(_order);
                     }
                 }
@@ -73,6 +74,7 @@ namespace TradingBot.Strategies
 
                     if (!_strategy.HasBeenRequested(_order))
                     {
+                        _strategy.Trader.Logger.Info($"Higher band reached. Placing market SELL order.");
                         _strategy.PlaceOrder(_order);
                     }
                 }

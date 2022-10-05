@@ -37,6 +37,7 @@ namespace TradingBot.Broker.Client
 
                 default:
                     _logger.Error(e);
+                    // TODO : recover or kill remaining tasks so the program can exit
                     throw e;
             }
         }
