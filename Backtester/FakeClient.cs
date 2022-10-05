@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -93,7 +94,7 @@ namespace Backtester
             _fakeAccount = new Account()
             {
                 Code = "FAKEACCOUNT123",
-                CashBalances = new Dictionary<string, double>() { { "USD", 5000 } },
+                CashBalances = new Dictionary<string, double>() { { "USD", 5000.00 } },
                 Positions = new List<Position>() { new Position() { Contract = contract } }
             };
         }
@@ -590,7 +591,7 @@ namespace Backtester
             _messageQueue.Enqueue(() => 
             {
                 Callbacks.updateAccountTime(currentTime.ToString()); //TODO : make sure format is correct
-                Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(), "USD", _fakeAccount.Code);
+                Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code);
                 Callbacks.accountDownloadEnd(_fakeAccount.Code);
             });
         }
@@ -688,7 +689,7 @@ namespace Backtester
 
         void OnClockTick_UpdateBarNode(DateTime newTime)
         {
-            if(_currentBarNode.Value.Time < newTime)
+            if(_currentBarNode?.Value.Time < newTime)
             {
                 _5SecBars.AddFirst(_currentBarNode.Value);
                 if (_5SecBars.Count > 5)
@@ -700,7 +701,7 @@ namespace Backtester
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
         {
             // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
-            while (_currentBidAskNode.Value.Time < newTime)
+            while (_currentBidAskNode?.Value.Time < newTime)
             {
                 EvaluateOpenOrders(_currentBidAskNode.Value);
                 BidAskSubscription?.Invoke(_currentBidAskNode.Value);
