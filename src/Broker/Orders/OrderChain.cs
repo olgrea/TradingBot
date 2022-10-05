@@ -20,5 +20,30 @@ namespace TradingBot.Broker.Orders
         public List<OrderChain> AttachedOrders { get; }
 
         public static implicit operator OrderChain(Order o) => new OrderChain(o);
+
+        public override string ToString()
+        {
+            List<Order> list = Flatten();
+            string str = $"Order chain [{list[0]}";
+            for (int i = 1; i < list.Count; i++)
+                str += $", {list[i]}";
+            return str + "]";
+        }
+
+        public List<Order> Flatten()
+        {
+            var list = new List<Order>();
+            Flatten(this, list);
+            return list;
+        }
+
+        void Flatten(OrderChain o, List<Order> list)
+        {
+            list.Add(o.Order);
+            foreach(OrderChain order in o.AttachedOrders)
+            {
+                Flatten(order, list);
+            }
+        }
     }
 }

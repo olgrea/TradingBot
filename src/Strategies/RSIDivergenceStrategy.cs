@@ -2,11 +2,8 @@
 using System.Linq;
 using System.Collections.Generic;
 using TradingBot.Broker.MarketData;
-using TradingBot.Broker;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
-using System.Threading.Tasks;
-using System.Diagnostics;
 
 namespace TradingBot.Strategies
 {
@@ -30,7 +27,7 @@ namespace TradingBot.Strategies
         internal RSIDivergence RSIDivergence_1Min => GetIndicator<RSIDivergence>(BarLength._1Min);
         internal RSIDivergence RSIDivergence_5Sec => GetIndicator<RSIDivergence>(BarLength._5Sec);
 
-        internal OrderChain Order { get; set; }
+        internal List<Order> Orders { get; set; } = new List<Order>();
 
         #region States
 
@@ -41,7 +38,7 @@ namespace TradingBot.Strategies
             public override IState Evaluate()
             {
                 if (_strategy.Indicators.All(i => i.IsReady))
-                    return _strategy.GetState<MonitoringState>();
+                    return GetState<MonitoringState>();
                 else
                     return this;
             }
@@ -56,7 +53,10 @@ namespace TradingBot.Strategies
                 // We want to find a bar candle that goes below the lower BB
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB
                     && _strategy.RSIDivergence_1Min.Value < 0)
-                    return _strategy.GetState<OversoldState>();
+                {
+                    Logger.Info($"Lower band reached. RSIDivergence < 0. Switching to 5 sec resolution.");
+                    return GetState<OversoldState>();
+                }
                 else
                     return this;
             }
@@ -64,88 +64,36 @@ namespace TradingBot.Strategies
 
         class OversoldState : State<RSIDivergenceStrategy>
         {
-            Bar _lastBar;
-            double _lastRSIdivValue = double.MinValue;
-            int _counter = 0;
-
             public OversoldState(RSIDivergenceStrategy strategy) : base(strategy) { }
 
             public override IState Evaluate()
             {
                 // At this moment, we switch to a 5 secs resolution.
-                var RSIdiv5sec = _strategy.RSIDivergence_5Sec;
 
-                if (_lastBar == null || _lastBar == RSIdiv5sec.LatestBar)
-                {
-                    _lastBar = RSIdiv5sec.LatestBar;
+                if (_strategy.RSIDivergence_5Sec.Value < 0)
                     return this;
+
+                if (!_strategy.Orders.Any())
+                {
+                    //double funds = _strategy.Trader.GetAvailableFunds();
+                    double funds = 5000;
+                    _strategy.Orders = BuildOrderChain(funds).Flatten();
                 }
 
-                // We buy as soon as an upward trend starts. 
-                if(_lastRSIdivValue <= RSIdiv5sec.Value)
+                var buyOrder = _strategy.Orders.First();
+
+                if (!_strategy.HasBeenRequested(buyOrder))
                 {
-                    _counter = 0;
-                    _lastRSIdivValue = RSIdiv5sec.Value;
-                    return this;
+                    Logger.Info($"RSIDivergence > 0. Placing market BUY order.");
+                    PlaceOrder(buyOrder);
                 }
-                else if (_counter < 3)
-                {
-                    _counter++;
-                    return this;
-                }
+
+                if (HasBeenOpened(buyOrder) && IsExecuted(buyOrder))
+                    return GetState<BoughtState>();
+                else if(IsCancelled(buyOrder))
+                    return GetState<MonitoringState>();
                 else
-                {
-                    double funds = _strategy.Trader.GetAvailableFunds();
-                    var order = BuildOrderChain(funds);
-                    var nextState = PlaceOrder(order);
-                    ResetState();
-                    return nextState.Result;
-                }
-            }
-
-            Task<IState> PlaceOrder(OrderChain chain)
-            {
-                var completion = new TaskCompletionSource<IState>();
-                var orderPlaced = new Action<Contract, Order, OrderState>((c, o, os) =>
-                {
-                    Debug.Assert(chain.Order.Id > 0);
-                    if(chain.Order.Id == o.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    {
-                        _strategy.Order = o;
-                    }
-                });
-
-                var orderExecuted = new Action<Contract, OrderExecution>((c, oe) =>
-                {
-                    if (chain.Order.Id == oe.OrderId)
-                    {
-                        completion.SetResult(_strategy.GetState<BoughtState>());
-                    }
-                });
-
-                //var error = new Action<TWSMessage>(msg =>
-                //{
-                //    completion.SetResult(_strategy.States[nameof(MonitoringState)]);
-                //});
-
-                //_strategy.Trader.Broker.OrderOpened += orderPlaced;
-                //_strategy.Trader.Broker.OrderExecuted += orderExecuted;
-
-                //completion.Task.ContinueWith(t => 
-                //{
-                //    _strategy.Trader.Broker.OrderOpened -= orderPlaced;
-                //    _strategy.Trader.Broker.OrderExecuted -= orderExecuted;
-                //});
-
-                _strategy.Trader.Broker.PlaceOrder(_strategy.Trader.Contract, chain);
-                return completion.Task;
-            }
-
-            void ResetState()
-            {
-                _lastBar = null;
-                _lastRSIdivValue = double.MinValue;
-                _counter = 0;
+                    return this;
             }
 
             OrderChain BuildOrderChain(double funds)
@@ -155,7 +103,7 @@ namespace TradingBot.Strategies
 
                 var m = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
 
-                // TODO : manage stop price better. Should be in relation to the bought price.
+                // TODO : manage stop price better. Should be in relation to the bought price. Would need to uses states instead of chain.
                 var trl = new TrailingStopOrder { Action = OrderAction.SELL, TotalQuantity = qty, TrailingPercent = latestBar.Close * 0.003 };
 
                 var qtyLeft = qty - (qty / 2);
@@ -177,11 +125,17 @@ namespace TradingBot.Strategies
             public BoughtState(RSIDivergenceStrategy strategy) : base(strategy) { }
             public override IState Evaluate()
             {
-                // TODO : adjust opened orders
-                return this;
+                // TODO : adjust opened orders? Don't use order chain and just make more states?
+                if(_strategy.Orders.All(o => IsExecuted(o) || IsCancelled(o)))
+                {
+                    _strategy.Orders.Clear();
+                    return GetState<MonitoringState>();
+                }
+                else
+                    return this;
             }
         }
 
-#endregion States
+        #endregion States
     }
 }
