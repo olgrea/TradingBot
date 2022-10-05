@@ -37,6 +37,7 @@ namespace TradingBot
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         bool _strategiesStarted = false;
+        bool _isBacktesting = false;
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) : this(ticker, startTime, endTime, new IBBroker(clientId)) {}
 
@@ -122,7 +123,7 @@ namespace TradingBot
                         _currentTime = _broker.GetCurrentTime();
                         if(!_strategiesStarted && _currentTime >= _startTime)
                         {
-                            _logger.Info($"Starting trading.");
+                            _logger.Info($"Trading started!");
                             _strategiesStarted = true;
                             foreach (var strat in _strategies)
                                 strat.Start();
@@ -141,7 +142,7 @@ namespace TradingBot
                     }
                 }
 
-                _logger.Info($"Trading ending.");
+                _logger.Info($"Trading ended!");
 
             }, mainToken);
 
@@ -230,7 +231,7 @@ namespace TradingBot
                     string daily = pnl.DailyPnL != double.MaxValue ? pnl.DailyPnL.ToString("c") : "--";
                     string realized = pnl.RealizedPnL != double.MaxValue ? pnl.RealizedPnL.ToString("c") : "--";
                     string unrealized = pnl.UnrealizedPnL != double.MaxValue ? pnl.UnrealizedPnL.ToString("c") : "--";
-                    _logger.Info($"Daily PnL : {daily} (realized : {realized}, unrealized : {unrealized})");
+                    _logger.Info($"Daily PnL : {daily} realized : {realized}, unrealized : {unrealized}");
                 }
                 _PnL = pnl;
             }
@@ -262,18 +263,19 @@ namespace TradingBot
         void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
         {
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
-            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares*oe.AvgPrice, ci.Commission);
+            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares*oe.AvgPrice, ci.Commission, ci.RealizedPNL);
         }
 
-        void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission)
+        void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission, double realizedPnL)
         {
-            _csvLogger.Info("{action} {qty} {price} {total} {commission} {time}"
+            _csvLogger.Info("{time} {action} {qty} {price} {total} {commission} {realized}"
+                , time
                 , action
                 , qty
                 , avgPrice
                 , action == OrderAction.BUY ? -totalPrice : totalPrice
                 , commission
-                , time
+                , realizedPnL != double.MaxValue ? realizedPnL : 0.0
                 );
         }
 
@@ -302,6 +304,7 @@ namespace TradingBot
             }
 
             _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
+            _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");
 
             UnsubscribeToData();
             _broker.Disconnect();
