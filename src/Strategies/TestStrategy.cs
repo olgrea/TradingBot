@@ -48,14 +48,14 @@ namespace TradingBot.Strategies
                     if(_order == null)
                         _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
 
-                    if(!_strategy.HasBeenRequested(_order))
+                    if(!HasBeenRequested(_order))
                     {
-                        _strategy.Trader.Logger.Info($"Lower band reached. Placing market BUY order.");
-                        _strategy.PlaceOrder(_order);
+                        Logger.Info($"Lower band reached. Placing market BUY order.");
+                        PlaceOrder(_order);
                     }
                 }
                 
-                return (_strategy.HasBeenOpened(_order) && _strategy.IsExecuted(_order)) ? _strategy.GetState<BoughtState>() : this;
+                return (HasBeenOpened(_order) && IsExecuted(_order)) ? GetState<BoughtState>() : this;
             }
         }
 
@@ -72,14 +72,14 @@ namespace TradingBot.Strategies
                     if (_order == null)
                         _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
 
-                    if (!_strategy.HasBeenRequested(_order))
+                    if (!HasBeenRequested(_order))
                     {
-                        _strategy.Trader.Logger.Info($"Higher band reached. Placing market SELL order.");
-                        _strategy.PlaceOrder(_order);
+                        Logger.Info($"Higher band reached. Placing market SELL order.");
+                        PlaceOrder(_order);
                     }
                 }
                 
-                return (_strategy.HasBeenOpened(_order) && _strategy.IsExecuted(_order)) ? _strategy.GetState<MonitoringState>() : this;
+                return (HasBeenOpened(_order) && IsExecuted(_order)) ? GetState<MonitoringState>() : this;
             }
         }
 

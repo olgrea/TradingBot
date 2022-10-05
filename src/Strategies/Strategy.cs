@@ -64,7 +64,7 @@ namespace TradingBot.Strategies
             _states[t.Name] = (TState)Activator.CreateInstance(t, this);
         }
 
-        protected IState GetState<TState>() where TState : IState
+        internal IState GetState<TState>() where TState : IState
         {
             var t = typeof(TState);
             if (!_states.ContainsKey(t.Name))
@@ -122,6 +122,7 @@ namespace TradingBot.Strategies
 
         internal bool HasBeenRequested(Order order) => Trader.Broker.HasBeenRequested(order);
         internal bool HasBeenOpened(Order order) => Trader.Broker.HasBeenOpened(order);
+        internal bool IsCancelled(Order order) => Trader.Broker.IsCancelled(order);
         internal bool IsExecuted(Order order) => Trader.Broker.IsExecuted(order);
 
         void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)

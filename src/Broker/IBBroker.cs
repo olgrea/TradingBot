@@ -147,6 +147,7 @@ namespace TradingBot.Broker
 
         public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
         public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
+        public bool IsCancelled(Order order) => _orderManager.IsCancelled(order);
         public bool IsExecuted(Order order) => _orderManager.IsExecuted(order); 
 
         public DateTime GetCurrentTime()

@@ -44,6 +44,7 @@ namespace TradingBot.Broker
         void CancelAllOrders();
         bool HasBeenRequested(Order order);
         bool HasBeenOpened(Order order);
+        bool IsCancelled(Order order);
         bool IsExecuted(Order order);
 
         void RequestPnL(Contract contract);
