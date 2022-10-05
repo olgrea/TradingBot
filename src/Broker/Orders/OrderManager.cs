@@ -18,6 +18,7 @@ namespace TradingBot.Broker.Orders
         ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
         ConcurrentDictionary<int, Order> _ordersOpened = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<int, Order> _ordersExecuted = new ConcurrentDictionary<int, Order>();
+        ConcurrentDictionary<int, Order> _ordersCancelled = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<string, OrderExecution> _executions = new ConcurrentDictionary<string, OrderExecution>();
 
         public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
@@ -37,6 +38,7 @@ namespace TradingBot.Broker.Orders
 
         public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && _ordersRequested.ContainsKey(order.Id);
         public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
+        public bool IsCancelled(Order order) => order != null && order.Id > 0 && _ordersCancelled.ContainsKey(order.Id);
         public bool IsExecuted(Order order) => order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id);
 
         public void PlaceOrder(Contract contract, Order order)
@@ -132,6 +134,7 @@ namespace TradingBot.Broker.Orders
 
         void OnOrderStatus(OrderStatus os)
         {
+            _ordersOpened.TryGetValue(os.Info.OrderId, out Order order);
             if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
             {
                 if(_chainOrdersRequested.ContainsKey(os.Info.OrderId))
@@ -139,10 +142,9 @@ namespace TradingBot.Broker.Orders
                     _logger.Warn($"Order {os.Info.OrderId} was part of an order chain and has been cancelled. Attached orders will also be cancelled.");
                     _chainOrdersRequested.TryRemove(os.Info.OrderId, out _);
                 }
-
+                _ordersCancelled.TryAdd(os.Info.OrderId, order);
             }
 
-            _ordersOpened.TryGetValue(os.Info.OrderId, out Order order);
             OrderUpdated?.Invoke(order, os);
         }
 
