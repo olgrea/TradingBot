@@ -17,7 +17,7 @@ namespace ConsoleApp
             [Option('s', "start", Required = true, HelpText = "The start time at which to start trading (format : HH:mm , HH is [0-23] and mm is [0-59]).")]
             public string StartTime { get; set; } = "";
 
-            [Option('e', "end", Required = false, Default="15:55", HelpText = "The end time at which to stop trading. Default is 15h55. (format : HH:mm , HH is [0-23] and mm is [0-59]).")]
+            [Option('e', "end", Required = false, Default="16:00", HelpText = "The end time at which to stop trading. Default is 16h00. (format : HH:mm , HH is [0-23] and mm is [0-59]).")]
             public string EndTime { get; set; } = "";
 
             [Option('i', "clientId", Required = false, Default = 1337, HelpText = "The client id")]

@@ -37,7 +37,6 @@ namespace TradingBot
 
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         bool _strategiesStarted = false;
-        bool _isBacktesting = false;
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) : this(ticker, startTime, endTime, new IBBroker(clientId)) {}
 
@@ -48,8 +47,10 @@ namespace TradingBot
 
             _ticker = ticker;
             _startTime = startTime;
-            _endTime = endTime;
             _broker = broker;
+
+            // We remove 5 minutes to have the time to sell remaining positions, if any, at the end of the day.
+            _endTime = endTime.AddMinutes(-5);
 
             var now = DateTime.Now.ToShortTimeString();
             _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}").WithProperty("start", now);
@@ -79,7 +80,7 @@ namespace TradingBot
             _account = _broker.GetAccount();
 
 #if DEBUG
-            if (_account.Code != "DU5962304")
+            if (_account.Code != "DU5962304" && _account.Code != "FAKEACCOUNT123")
                 throw new Exception($"In debug mode only the paper trading acount \"DU5962304\" is allowed");
 #endif
 
@@ -115,9 +116,9 @@ namespace TradingBot
             _logger.Debug($"Started monitoring current time");
             _monitoringTimeTask = Task.Factory.StartNew(() =>
             {
-                while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
+                try
                 {
-                    try
+                    while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                     {
                         Task.Delay(1000).Wait();
                         _currentTime = _broker.GetCurrentTime();
@@ -129,16 +130,25 @@ namespace TradingBot
                                 strat.Start();
                         }
                     }
-                    catch (AggregateException e)
+                }
+                catch (AggregateException e)
+                {
+                    //TODO : verify error handling
+                    if (e.InnerException is OperationCanceledException)
                     {
-                        //TODO : verify error handling
-                        if (e.InnerException is OperationCanceledException)
-                        {
-                            _logger.Trace($"Monitoring time task cancelled");
-                            return;
-                        }
+                        _logger.Trace($"Monitoring time task cancelled");
+                        return;
+                    }
 
-                        throw e;
+                    throw e;
+                }
+                finally
+                {
+                    _broker.CancelAllOrders();
+                    if (_contractPosition?.PositionAmount > 0)
+                    {
+                        _logger.Info($"Selling all remaining positions.");
+                        SellAllPositions();
                     }
                 }
 
@@ -288,17 +298,10 @@ namespace TradingBot
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
 
-            StopMonitoringTimeTask();
-
             foreach (var strat in _strategies)
                 strat.Stop();
 
-            _broker.CancelAllOrders();
-            if(_contractPosition?.PositionAmount > 0)
-            {
-                _logger.Info($"Trading day ended. Selling all remaining positions.");
-                SellAllPositions();
-            }
+            StopMonitoringTimeTask();
 
             _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
             _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");

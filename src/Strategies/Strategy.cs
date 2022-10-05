@@ -143,6 +143,11 @@ namespace TradingBot.Strategies
 
         public virtual void Stop()
         {
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
+            _currentState = null;
+            _cancellationTokenSource = null;
+
             foreach (var kvp in _indicators)
             {
                 Trader.Broker.UnsubscribeToBars(kvp.Key, OnBarReceived);
@@ -151,11 +156,6 @@ namespace TradingBot.Strategies
                 foreach (var indicator in kvp.Value)
                     indicator.Reset();
             }
-
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _currentState = null;
-            _cancellationTokenSource = null;
         }
     }
 }
