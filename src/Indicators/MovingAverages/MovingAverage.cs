@@ -1,19 +1,19 @@
-﻿using System.Linq;
+﻿using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
-// TODO : encapsulate this
-using MathNet.Numerics.Statistics;
 using TradingBot.Broker.MarketData;
 
-namespace TradingBot.Indicators
+namespace TradingBot.Indicators.MovingAverages
 {
-    internal class MovingAverage : IndicatorBase, IIndicator
+    internal abstract class MovingAverage : IndicatorBase, IIndicator
     {
         protected double _last = double.MinValue;
         protected double _lastDelta = double.MinValue;
 
         public MovingAverage(BarLength barLength, int nbPeriods) : base(barLength, nbPeriods) { }
 
-        public double Value { get; protected set;}
+        public double Value { get; protected set; }
         public double Delta { get; protected set; }
         public double DeltaOfDelta { get; protected set; }
 
@@ -29,11 +29,12 @@ namespace TradingBot.Indicators
             _last = Value;
             _lastDelta = Delta;
 
-            var barsTypicalPrice = Bars.Select(b => (b.Close + b.High + b.Low) / 3);
-            Value = barsTypicalPrice.Mean();
+            Value = ComputeMA();
 
             Delta = Value - _last;
             DeltaOfDelta = Delta - _lastDelta;
         }
+
+        public abstract double ComputeMA();
     }
 }
