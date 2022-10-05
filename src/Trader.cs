@@ -49,9 +49,10 @@ namespace TradingBot
             _startTime = startTime;
             _endTime = endTime;
             _broker = broker;
-            
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}");
-            _csvLogger = LogManager.GetLogger($"Report-{ticker}");
+
+            var now = DateTime.Now.ToShortTimeString();
+            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}").WithProperty("start", now);
+            _csvLogger = LogManager.GetLogger($"Report-{ticker}").WithProperty("start", now);
 
             _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
             _broker.ErrorHandler = _errorHandler;
@@ -261,7 +262,7 @@ namespace TradingBot
         void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
         {
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
-            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Price, ci.Commission);
+            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares*oe.AvgPrice, ci.Commission);
         }
 
         void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission)
@@ -271,7 +272,7 @@ namespace TradingBot
                 , qty
                 , avgPrice
                 , action == OrderAction.BUY ? -totalPrice : totalPrice
-                , -commission
+                , commission
                 , time
                 );
         }

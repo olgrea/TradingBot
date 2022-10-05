@@ -37,11 +37,11 @@ namespace ConsoleApp
             if (endTime > DateTimeUtils.MarketEndTime)
                 throw new ArgumentException($"The end time must be at most {DateTimeUtils.MarketEndTime}");
 
-            //var start = new DateTime(DateTime.Today.Ticks + startTime.Ticks, DateTimeKind.Local);
-            //var end = new DateTime(DateTime.Today.Ticks + endTime.Ticks, DateTimeKind.Local);
+            var start = new DateTime(DateTime.Today.Ticks + startTime.Ticks, DateTimeKind.Local);
+            var end = new DateTime(DateTime.Today.Ticks + endTime.Ticks, DateTimeKind.Local);
 
-            var start = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(10).TimeOfDay.Ticks, DateTimeKind.Local);
-            var end = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(30).TimeOfDay.Ticks, DateTimeKind.Local);
+            //var start = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(10).TimeOfDay.Ticks, DateTimeKind.Local);
+            //var end = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(30).TimeOfDay.Ticks, DateTimeKind.Local);
 
             Trader trader = new Trader(ticker, start, end, parsedArgs.Value.ClientId);
             trader.AddStrategyForTicker<TestStrategy>();
