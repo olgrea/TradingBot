@@ -27,13 +27,9 @@ namespace Backtester
 
         public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
-            var marketStartTime = DateTimeUtils.MarketStartTime;
-            var marketEndTime = DateTimeUtils.MarketEndTime;
-            //_startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, marketStartTime.Hours, marketStartTime.Minutes, marketStartTime.Seconds);
-            //_endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
-            _startTime = new DateTime(startDate.Year, startDate.Month, startDate.Day, 11, 10 ,00);
-            _endTime = new DateTime(endDate.Year, endDate.Month, endDate.Day, 15, 55, 00);
-            
+            _startTime = new DateTime(startDate.Ticks + DateTimeUtils.MarketStartTime.Ticks, DateTimeKind.Local);
+            _endTime = new DateTime(endDate.Ticks + DateTimeUtils.MarketEndTime.Ticks, DateTimeKind.Local);
+
             _logger = LogManager.GetLogger($"{nameof(Backtester)}");
             
             var broker = new IBBroker();
@@ -44,7 +40,7 @@ namespace Backtester
             FakeClient.TimeDelays.TimeScale = 0.001;
         }
 
-        public async void Start()
+        public void Start()
         {
             foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
             {
@@ -57,7 +53,7 @@ namespace Backtester
                 Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker);
                 trader.AddStrategyForTicker<TestStrategy>();
                 
-                await trader.Start();
+                trader.Start().Wait();
                 trader.Stop();
             }
         }
