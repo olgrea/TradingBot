@@ -19,6 +19,9 @@ namespace ConsoleApp
 
             [Option('e', "end", Required = false, Default="15:55", HelpText = "The end time at which to stop trading. Default is 15h55. (format : HH:mm , HH is [0-23] and mm is [0-59]).")]
             public string EndTime { get; set; } = "";
+
+            [Option('i', "clientId", Required = false, Default = 1337, HelpText = "The client id")]
+            public int ClientId { get; set; }
         }
 
         static async Task Main(string[] args)
@@ -40,7 +43,7 @@ namespace ConsoleApp
             var start = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(10).TimeOfDay.Ticks, DateTimeKind.Local);
             var end = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(30).TimeOfDay.Ticks, DateTimeKind.Local);
 
-            Trader trader = new Trader(ticker, start, end, 1337);
+            Trader trader = new Trader(ticker, start, end, parsedArgs.Value.ClientId);
             trader.AddStrategyForTicker<TestStrategy>();
             
             await trader.Start();

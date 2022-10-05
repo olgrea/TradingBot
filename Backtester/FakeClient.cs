@@ -270,7 +270,6 @@ namespace Backtester
 
         double GetCommission(Contract contract, Order order, double price)
         {
-            //TODO : verify commission... Didn't seem to be working with 'what if' = true
             //https://www.interactivebrokers.ca/en/index.php?f=1590
 
             // fixed rates

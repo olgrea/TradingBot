@@ -99,6 +99,10 @@ namespace TradingBot
             SubscribeToData();
 
             _currentTime = _broker.GetCurrentTime();
+
+            _logger.Info($"Current server time : {_currentTime}");
+            _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
+
             return StartMonitoringTimeTask();
         }
 
@@ -117,11 +121,11 @@ namespace TradingBot
                         _currentTime = _broker.GetCurrentTime();
                         if(!_strategiesStarted && _currentTime >= _startTime)
                         {
+                            _logger.Info($"Starting trading.");
                             _strategiesStarted = true;
                             foreach (var strat in _strategies)
                                 strat.Start();
                         }
-
                     }
                     catch (AggregateException e)
                     {
@@ -135,6 +139,8 @@ namespace TradingBot
                         throw e;
                     }
                 }
+
+                _logger.Info($"Trading ending.");
 
             }, mainToken);
 
