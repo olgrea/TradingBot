@@ -296,11 +296,8 @@ namespace TradingBot
             _broker.CancelAllOrders();
             if(_contractPosition?.PositionAmount > 0)
             {
-                _broker.PlaceOrder(_contract, new MarketOrder()
-                {
-                    Action = OrderAction.SELL,
-                    TotalQuantity = _contractPosition.PositionAmount,
-                });
+                _logger.Info($"Trading day ended. Selling all remaining positions.");
+                SellAllPositions();
             }
 
             _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
@@ -308,6 +305,33 @@ namespace TradingBot
 
             UnsubscribeToData();
             _broker.Disconnect();
+        }
+
+        private void SellAllPositions()
+        {
+            MarketOrder mo = new MarketOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = _contractPosition.PositionAmount,
+            };
+
+            // TODO : really need to implement async/await...
+            var tcs = new TaskCompletionSource<bool>();
+            var orderExecuted = new Action<OrderExecution, CommissionInfo>((oe, ci) =>
+            {
+                if (oe.OrderId == mo.Id)
+                    tcs.SetResult(true);
+            });
+            _broker.OrderExecuted += orderExecuted;
+            tcs.Task.ContinueWith(t =>
+            {
+                _broker.OrderExecuted -= orderExecuted;
+                if (!t.IsCompletedSuccessfully)
+                    throw new Exception("The trader ended with unclosed positions!");
+            });
+
+            _broker.PlaceOrder(_contract, mo);
+            tcs.Task.Wait(2000);
         }
     }
 }
