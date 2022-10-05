@@ -20,6 +20,9 @@ namespace TradingBot.Indicators
         public int NbPeriods => _slowRsi.NbPeriods;
         public Bar LatestBar => _fastRsi.Bars.Last.Value;
 
+        public RSI SlowRSI => _slowRsi;
+        public RSI FastRSI => _fastRsi;
+
         public void Reset()
         {
             _slowRsi.Reset();

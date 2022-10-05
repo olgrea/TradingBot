@@ -44,8 +44,7 @@ namespace TradingBot.Indicators
             }
             else
             {
-                //TODO : support multiple types of MA
-                // This is a running moving average (RMA)
+                // smoothed moving average (SMA)
                 var a = 1 / NbPeriods;
                 var avgU = a * _diffs.Last.Value + (1 - a) * _lastAvgU;
                 var avgD = a * _diffs.Last.Value + (1 - a) * _lastAvgD;
