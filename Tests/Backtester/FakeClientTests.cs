@@ -399,7 +399,7 @@ namespace Tests.Backtester
             };
 
             // Test
-            var expectedPrice = _downwardBidAsks.First(ba => ba.Ask <= order.TouchPrice).Ask;
+            var expectedPrice = _downwardBidAsks.First(ba => ba.Bid <= order.TouchPrice).Ask;
             var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
@@ -430,7 +430,7 @@ namespace Tests.Backtester
             position.AverageCost = 28.00;
 
             // Test
-            var expectedPrice = _upwardBidAsks.First(ba => ba.Bid >= order.TouchPrice).Bid;
+            var expectedPrice = _upwardBidAsks.First(ba => ba.Ask >= order.TouchPrice).Bid;
             var actualPrice = AsyncHelper<double>.AsyncToSync(() =>
             {
                 _fakeClient.Start();
