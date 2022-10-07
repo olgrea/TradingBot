@@ -27,13 +27,16 @@ namespace TradingBot.Strategies
         internal RSIDivergence RSIDivergence_1Min => GetIndicator<RSIDivergence>(BarLength._1Min);
         internal RSIDivergence RSIDivergence_5Sec => GetIndicator<RSIDivergence>(BarLength._5Sec);
 
-        internal List<Order> Orders { get; set; } = new List<Order>();
+        internal Order BuyOrder { get; set; }
+        internal Order MITOrder { get; set; }
+        internal Order StopOrder { get; set; }
+        internal Dictionary<int, OrderExecution> Executions = new Dictionary<int, OrderExecution>();
 
         #region States
 
         class InitState : State<RSIDivergenceStrategy>
         {
-            public InitState(RSIDivergenceStrategy strategy) : base(strategy) {} 
+            public InitState(RSIDivergenceStrategy strategy) : base(strategy) {}
 
             public override IState Evaluate()
             {
@@ -70,69 +73,197 @@ namespace TradingBot.Strategies
             {
                 // At this moment, we switch to a 5 secs resolution.
 
-                if (_strategy.RSIDivergence_5Sec.Value < 0)
+                // TODO : to test
+                if (_strategy.RSIDivergence_5Sec.Value < 0 || _strategy.RSIDivergence_5Sec.FastRSI.IsOversold)
                     return this;
 
-                if (!_strategy.Orders.Any())
-                {
-                    //double funds = _strategy.Trader.GetAvailableFunds();
-                    double funds = 5000;
-                    _strategy.Orders = BuildOrderChain(funds).Flatten();
-                }
+                if (!_isInitialized)
+                    InitializeOrders();
 
-                var buyOrder = _strategy.Orders.First();
-
-                if (!_strategy.HasBeenRequested(buyOrder))
+                if (!HasBeenRequested(_strategy.BuyOrder))
                 {
                     Logger.Info($"RSIDivergence > 0. Placing market BUY order.");
-                    PlaceOrder(buyOrder);
+                    PlaceOrder(_strategy.BuyOrder);
                 }
 
-                if (HasBeenOpened(buyOrder) && IsExecuted(buyOrder))
-                    return GetState<BoughtState>();
-                else if(IsCancelled(buyOrder))
-                    return GetState<MonitoringState>();
-                else
-                    return this;
+                if(EvaluateOrder(_strategy.BuyOrder, null, out OrderExecution orderExecution))
+                {
+                    if(orderExecution != null)
+                    {
+                        _strategy.Executions.Add(_strategy.BuyOrder.Id, orderExecution);
+                        return GetState<BoughtState>();
+                    }
+                    else
+                        return GetState<MonitoringState>();
+                }
+
+                return this;
             }
 
-            OrderChain BuildOrderChain(double funds)
+            protected override void InitializeOrders()
             {
+                //double funds = _strategy.Trader.GetAvailableFunds();
+                double funds = 5000;
                 var latestBar = _strategy.RSIDivergence_5Sec.LatestBar;
                 int qty = (int)(funds / latestBar.Close);
 
-                var m = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
+                _strategy.BuyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
 
-                // TODO : manage stop price better. Should be in relation to the bought price. Would need to uses states instead of chain.
-                var trl = new TrailingStopOrder { Action = OrderAction.SELL, TotalQuantity = qty, TrailingPercent = latestBar.Close * 0.003 };
-
-                var qtyLeft = qty - (qty / 2);
-                var mit = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
-
-
-                var mit2 = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qtyLeft, TouchPrice = _strategy.BollingerBands_1Min.UpperBB };
-                var stp = new StopOrder() { Action = OrderAction.SELL, TotalQuantity = qtyLeft, StopPrice = _strategy.BollingerBands_1Min.MovingAverage * 0.997 };
-
-                var innerChain = new OrderChain(mit, new List<OrderChain>() { mit2, stp });
-                var chain = new OrderChain(m, new List<OrderChain>() { innerChain, trl });
-
-                return chain;
+                _isInitialized = true;
             }
         }
 
         class BoughtState : State<RSIDivergenceStrategy>
         {
+            protected Bar _lastBar;
+
             public BoughtState(RSIDivergenceStrategy strategy) : base(strategy) { }
             public override IState Evaluate()
             {
-                // TODO : adjust opened orders? Don't use order chain and just make more states?
-                if(_strategy.Orders.All(o => IsExecuted(o) || IsCancelled(o)))
+                return Evaluate<ProfitState, MonitoringState>();
+            }
+
+            protected IState Evaluate<TNextState, TResetState>() where TNextState : IState where TResetState : IState
+            {
+                if (!_isInitialized)
+                    InitializeOrders();
+
+                if (!HasBeenRequested(_strategy.StopOrder))
+                    PlaceOrder(_strategy.StopOrder);
+
+                if (!HasBeenRequested(_strategy.MITOrder))
+                    PlaceOrder(_strategy.MITOrder);
+
+                if (EvaluateOrder(_strategy.StopOrder, _strategy.MITOrder, out _))
+                    return GetState<TResetState>();
+
+                if (EvaluateOrder(_strategy.MITOrder, _strategy.StopOrder, out OrderExecution orderExecution))
                 {
-                    _strategy.Orders.Clear();
+                    if (orderExecution != null)
+                    {
+                        _strategy.Executions.Add(_strategy.MITOrder.Id, orderExecution);
+                        return GetState<TNextState>();
+                    }
+                    else
+                        return GetState<TResetState>();
+                }
+
+                UpdateOrders();
+
+                return this;
+            }
+
+            protected virtual void UpdateOrders()
+            {
+                // TODO : modify orders? There are some fees associated to that apparently... need to be careful
+                // https://www.interactivebrokers.ca/en/accounts/fees/cancelModifyExamples.php
+
+                // Examples are not very clear. 0.01¢/order? If yes then it's not that bad...
+
+                if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
+                {
+                    if(_lastBar.Close > _strategy.BollingerBands_1Min.LowerBB)
+                    {
+                        var stop = _strategy.BollingerBands_1Min.LowerBB;
+                        (_strategy.StopOrder as StopOrder).StopPrice = stop;
+                        ModifyOrder(_strategy.StopOrder);
+                    }
+                
+                    (_strategy.MITOrder as MarketIfTouchedOrder).TouchPrice = _strategy.BollingerBands_1Min.MovingAverage;
+                    ModifyOrder(_strategy.MITOrder);
+                }
+
+                _lastBar = _strategy.BollingerBands_1Min.LatestBar;
+            }
+
+            protected override void InitializeOrders()
+            {
+                _strategy.Executions.TryGetValue(_strategy.BuyOrder.Id, out OrderExecution execution);
+                var qty = execution.Shares;
+
+                // TODO : to test
+                var stop = _strategy.BollingerBands_1Min.LowerBB - (_strategy.BollingerBands_1Min.LowerBB * 0.003);
+                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
+                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
+
+                _isInitialized = true;
+            }
+        }
+
+        class ProfitState : BoughtState
+        {
+            public ProfitState(RSIDivergenceStrategy strategy) : base(strategy) { }
+            public override IState Evaluate()
+            {
+                return Evaluate<LetItRideState, MonitoringState>();
+            }
+
+            protected override void InitializeOrders()
+            {
+                var previousMITOrder = _strategy.MITOrder;
+                _strategy.Executions.TryGetValue(previousMITOrder.Id, out OrderExecution execution);
+                var qty = execution.Shares;
+
+                var stop = _strategy.BollingerBands_1Min.LowerBB;
+
+                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop};
+                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.UpperBB};
+
+                _isInitialized = true;
+            }
+
+            protected override void UpdateOrders()
+            {
+                // TODO : modify orders? There are some fees associated to that apparently... need to be careful
+                // https://www.interactivebrokers.ca/en/accounts/fees/cancelModifyExamples.php
+                // Examples are not very clear. 0.01¢/order? If yes then it's not that bad...
+
+                if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
+                {
+                    var stop = _strategy.BollingerBands_1Min.LowerBB;
+                    (_strategy.StopOrder as StopOrder).StopPrice = stop;
+                    ModifyOrder(_strategy.StopOrder);
+
+                    (_strategy.MITOrder as MarketIfTouchedOrder).TouchPrice = _strategy.BollingerBands_1Min.UpperBB;
+                    ModifyOrder(_strategy.MITOrder);
+                }
+
+                _lastBar = _strategy.BollingerBands_1Min.LatestBar;
+            }
+        }
+
+        class LetItRideState : State<RSIDivergenceStrategy>
+        {
+            public LetItRideState(RSIDivergenceStrategy strategy) : base(strategy){}
+
+            public override IState Evaluate()
+            {
+                if (!_isInitialized)
+                    InitializeOrders();
+
+                if (!HasBeenRequested(_strategy.StopOrder))
+                    PlaceOrder(_strategy.StopOrder);
+
+                if (EvaluateOrder(_strategy.StopOrder, null, out _))
+                {
+                    _strategy.Executions.Clear();
                     return GetState<MonitoringState>();
                 }
-                else
-                    return this;
+
+                return this;
+            }
+
+            protected override void InitializeOrders()
+            {
+                var previousMITOrder = _strategy.MITOrder;
+                _strategy.Executions.TryGetValue(previousMITOrder.Id, out OrderExecution execution);
+                var qty = execution.Shares;
+
+                // TODO : to test
+                var trlAmount = _strategy.BollingerBands_1Min.UpperBB -  (_strategy.BollingerBands_1Min.UpperBB + _strategy.BollingerBands_1Min.MovingAverage) / 2.0;
+                _strategy.StopOrder = new TrailingStopOrder { Action = OrderAction.SELL, TotalQuantity = qty, TrailingAmount = trlAmount};
+
+                _isInitialized = true;
             }
         }
 
