@@ -71,18 +71,33 @@ namespace TradingBot.Broker.Orders
     {
         public MarketIfTouchedOrder() : base("MIT") { }
         public double TouchPrice { get; set; }
+
+        public override string ToString()
+        {
+            return $"{base.ToString()} Touch price : {TouchPrice}";
+        }
     }
 
     internal class LimitOrder : Order
     {
         public LimitOrder() : base("LMT") { }
         public double LmtPrice { get; set; }
+        
+        public override string ToString()
+        {
+            return $"{base.ToString()} Limit price : {LmtPrice}";
+        }
     }
 
     internal class StopOrder : Order
     {
         public StopOrder() : base("STP") { }
         public double StopPrice { get; set; }
+
+        public override string ToString()
+        {
+            return $"{base.ToString()} Stop price : {StopPrice}";
+        }
     }
 
     internal class TrailingStopOrder : Order
@@ -93,5 +108,15 @@ namespace TradingBot.Broker.Orders
         public double TrailingAmount{ get; set; } = double.MaxValue;
         // Takes priority over TrailingAmount if set
         public double TrailingPercent { get; set; } = double.MaxValue;
+
+        public override string ToString()
+        {
+            if (TrailingPercent != double.MaxValue)
+                return $"{base.ToString()} TrailingPercent : {TrailingPercent}";
+            else if (TrailingAmount != double.MaxValue)
+                return $"{base.ToString()} TrailingAmount : {TrailingAmount}";
+            else
+                return base.ToString();
+        }
     }
 }

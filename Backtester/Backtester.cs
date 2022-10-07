@@ -29,7 +29,7 @@ namespace Backtester
             _startTime = new DateTime(startDate.Ticks + DateTimeUtils.MarketStartTime.Ticks, DateTimeKind.Local);
             _endTime = new DateTime(endDate.Ticks + DateTimeUtils.MarketEndTime.Ticks, DateTimeKind.Local);
             
-            var broker = new IBBroker();
+            var broker = new IBBroker(1337);
             broker.Connect();
             _contract = broker.GetContract(ticker);
             broker.Disconnect();
@@ -48,7 +48,7 @@ namespace Backtester
                 var fakeClient = new FakeClient(_contract, day.Item1, day.Item2, bars, bidAsks);
                 var broker = new IBBroker(1337, fakeClient);
                 Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker, $"{nameof(Backtester)}-{_contract.Symbol}_{_startTime.ToShortDateString()}");
-                trader.AddStrategyForTicker<TestStrategy>();
+                trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 
                 trader.Start().Wait();
                 trader.Stop();
