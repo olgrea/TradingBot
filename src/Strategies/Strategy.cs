@@ -115,6 +115,16 @@ namespace TradingBot.Strategies
             Trader.Broker.PlaceOrder(Trader.Contract, o);
         }
 
+        internal void ModifyOrder(Order o)
+        {
+            Trader.Broker.ModifyOrder(Trader.Contract, o);
+        }
+
+        internal void CancelOrder(Order o)
+        {
+            Trader.Broker.CancelOrder(o);
+        }
+
         internal void PlaceOrder(OrderChain c)
         {
             Trader.Broker.PlaceOrder(Trader.Contract, c);
@@ -123,7 +133,7 @@ namespace TradingBot.Strategies
         internal bool HasBeenRequested(Order order) => Trader.Broker.HasBeenRequested(order);
         internal bool HasBeenOpened(Order order) => Trader.Broker.HasBeenOpened(order);
         internal bool IsCancelled(Order order) => Trader.Broker.IsCancelled(order);
-        internal bool IsExecuted(Order order) => Trader.Broker.IsExecuted(order);
+        internal bool IsExecuted(Order order, out OrderExecution orderExecution) => Trader.Broker.IsExecuted(order, out orderExecution);
 
         void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
         {

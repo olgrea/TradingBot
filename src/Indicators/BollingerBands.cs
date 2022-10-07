@@ -11,6 +11,7 @@ namespace TradingBot.Indicators
         public double MovingAverage { get; private set; }
         public double UpperBB { get; private set; }
         public double LowerBB { get; private set; }
+        public Bar LatestBar => Bars.Last.Value;
 
         public override void Compute()
         {
