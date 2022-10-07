@@ -20,7 +20,6 @@ namespace Backtester
         DateTime _startTime;
         DateTime _endTime;
 
-        ILogger _logger;
         Contract _contract;
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
@@ -29,8 +28,6 @@ namespace Backtester
         {
             _startTime = new DateTime(startDate.Ticks + DateTimeUtils.MarketStartTime.Ticks, DateTimeKind.Local);
             _endTime = new DateTime(endDate.Ticks + DateTimeUtils.MarketEndTime.Ticks, DateTimeKind.Local);
-
-            _logger = LogManager.GetLogger($"{nameof(Backtester)}");
             
             var broker = new IBBroker();
             broker.Connect();
@@ -50,7 +47,7 @@ namespace Backtester
 
                 var fakeClient = new FakeClient(_contract, day.Item1, day.Item2, bars, bidAsks);
                 var broker = new IBBroker(1337, fakeClient);
-                Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker);
+                Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker, $"{nameof(Backtester)}-{_contract.Symbol}_{_startTime.ToShortDateString()}");
                 trader.AddStrategyForTicker<TestStrategy>();
                 
                 trader.Start().Wait();

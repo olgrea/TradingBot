@@ -20,13 +20,13 @@ namespace Backtester
     internal class FakeClient : IIBClient
     {
         /// <summary>
-        /// For supposed market hours 7:00 to 16:00 : 9 hours = 32400s
+        /// For market hours 7:00 to 16:00 : 9 hours = 32400s
         /// - To have 1 day pass in 1 hour => TimeScale = 3600.0d/32400 ~ 111 ms/sec
         /// - To have 1 week (5 days) pass in 1 hour => TimeScale = 3600.0d/162000 ~ 22 ms/sec
         /// </summary>
         internal static class TimeDelays
         {
-            public static double TimeScale = 3600.0d / 32400;
+            public static double TimeScale = 0.001;
             public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
         }
         Stopwatch _st = new Stopwatch();

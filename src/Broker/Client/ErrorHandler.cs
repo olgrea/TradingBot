@@ -95,7 +95,7 @@ namespace TradingBot.Broker.Client
     internal class TraderErrorHandler : IBBrokerErrorHandler
     {
         Trader _trader;
-        public TraderErrorHandler(Trader trader, IBBroker broker, ILogger logger) : base(broker, logger)
+        public TraderErrorHandler(Trader trader) : base(trader.Broker as IBBroker, trader.Logger)
         {
             _trader = trader;
         }

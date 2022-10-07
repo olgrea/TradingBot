@@ -38,9 +38,10 @@ namespace TradingBot
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         bool _strategiesStarted = false;
 
-        public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) : this(ticker, startTime, endTime, new IBBroker(clientId)) {}
+        public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
+            : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
 
-        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBroker broker)
+        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBroker broker, string loggerName)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(broker != null);
@@ -53,10 +54,10 @@ namespace TradingBot
             _endTime = endTime.AddMinutes(-5);
 
             var now = DateTime.Now.ToShortTimeString();
-            _logger = LogManager.GetLogger($"{nameof(Trader)}-{ticker}").WithProperty("start", now);
-            _csvLogger = LogManager.GetLogger($"Report-{ticker}").WithProperty("start", now);
+            _logger = LogManager.GetLogger(loggerName).WithProperty("now", now);
+            _csvLogger = LogManager.GetLogger($"{loggerName}_Report").WithProperty("now", now);
 
-            _errorHandler = new TraderErrorHandler(this, _broker as IBBroker, _logger);
+            _errorHandler = new TraderErrorHandler(this);
             _broker.ErrorHandler = _errorHandler;
         }
 
