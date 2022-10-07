@@ -111,6 +111,18 @@ namespace TradingBot.Strategies
 
                 _isInitialized = true;
             }
+
+            protected override void InitializeOrders()
+            {
+                //double funds = _strategy.Trader.GetAvailableFunds();
+                double funds = 5000;
+                var latestBar = _strategy.RSIDivergence_5Sec.LatestBar;
+                int qty = (int)(funds / latestBar.Close);
+
+                _strategy.BuyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
+
+                _isInitialized = true;
+            }
         }
 
         class BoughtState : State<RSIDivergenceStrategy>
