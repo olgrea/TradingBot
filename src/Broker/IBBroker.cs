@@ -163,7 +163,7 @@ namespace TradingBot.Broker
         Task<int> GetNextValidOrderIdAsync()
         {
             var resolveResult = new TaskCompletionSource<int>();
-            var nextValidId = new Action<int>(id => resolveResult.SetResult(id));
+            var nextValidId = new Action<int>(id => resolveResult.TrySetResult(id));
 
             _client.Callbacks.NextValidId += nextValidId;
             resolveResult.Task.ContinueWith(t =>
@@ -186,6 +186,7 @@ namespace TradingBot.Broker
         {
             _client.Disconnect();
             ClientDisconnected?.Invoke();
+            _clientIds.Remove(_clientId);
         }
 
         public Account GetAccount()
@@ -269,7 +270,7 @@ namespace TradingBot.Broker
                 if(barLength == BarLength._5Sec)
                 {
                     Bar5SecReceived?.Invoke(contract, bar);
-                    return;
+                    continue;
                 }
 
                 int sec = (int)barLength;
