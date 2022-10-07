@@ -17,7 +17,7 @@ namespace TradingBot.Broker.Orders
         ConcurrentDictionary<int, Order> _ordersRequested = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
         ConcurrentDictionary<int, Order> _ordersOpened = new ConcurrentDictionary<int, Order>();
-        ConcurrentDictionary<int, Order> _ordersExecuted = new ConcurrentDictionary<int, Order>();
+        ConcurrentDictionary<int, OrderExecution> _ordersExecuted = new ConcurrentDictionary<int, OrderExecution>();
         ConcurrentDictionary<int, Order> _ordersCancelled = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<string, OrderExecution> _executions = new ConcurrentDictionary<string, OrderExecution>();
 
@@ -39,7 +39,17 @@ namespace TradingBot.Broker.Orders
         public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && _ordersRequested.ContainsKey(order.Id);
         public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
         public bool IsCancelled(Order order) => order != null && order.Id > 0 && _ordersCancelled.ContainsKey(order.Id);
-        public bool IsExecuted(Order order) => order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id);
+        public bool IsExecuted(Order order, out OrderExecution orderExecution)
+        {
+            orderExecution = null;
+            if(order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id))
+            {
+                orderExecution = _ordersExecuted[order.Id];
+                return true;
+            }
+
+            return false;
+        }
 
         public void PlaceOrder(Contract contract, Order order)
         {
@@ -156,7 +166,7 @@ namespace TradingBot.Broker.Orders
             }
 
             var order = _ordersOpened[execution.OrderId];
-            _ordersExecuted.TryAdd(execution.OrderId, order);
+            _ordersExecuted.TryAdd(execution.OrderId, execution);
             _executions.TryAdd(execution.ExecId, execution);
         }
 
@@ -199,7 +209,7 @@ namespace TradingBot.Broker.Orders
             Trace.Assert(order.Id > 0);
             if(!_ordersOpened.ContainsKey(order.Id))
             {
-                throw new ArgumentException($"The order {order} hasn't been placed yet and therefore cannot be cancelled");
+                throw new ArgumentException($"The order {order} hasn't been placed yet and therefore cannot be modified");
             }
 
             _logger.Debug($"Modifying order {order}.");
