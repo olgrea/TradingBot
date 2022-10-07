@@ -12,7 +12,7 @@ namespace TradingBot.Broker.MarketData
 
         public override string ToString()
         {
-            return $"{Time} : B={Bid:c} x{BidSize}, A={Ask:c} x{AskSize}";
+            return $"{Time} : Bid={Bid:c}, Ask={Ask:c}";
         }
     }
 }

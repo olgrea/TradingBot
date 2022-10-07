@@ -256,6 +256,8 @@ namespace Backtester
             }
             else //modify order
             {
+                //TODO : handle fees when modifying/cancelling order
+
                 _logger.Debug($"Order modified : {order}");
                 openOrder = order;
             }
@@ -336,14 +338,14 @@ namespace Backtester
 
         private void EvaluateMarketIfTouchedOrder(BidAsk bidAsk, MarketIfTouchedOrder o)
         {
-            if (o.Action == OrderAction.BUY && o.TouchPrice >= bidAsk.Ask)
+            if (o.Action == OrderAction.BUY && o.TouchPrice >= bidAsk.Bid)
             {
-                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. Ask : {bidAsk.Ask:c}");
+                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. {bidAsk}");
                 ExecuteOrder(o, bidAsk.Ask);
             }
-            else if (o.Action == OrderAction.SELL && o.TouchPrice <= bidAsk.Bid)
+            else if (o.Action == OrderAction.SELL && o.TouchPrice <= bidAsk.Ask)
             {
-                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. Bid : {bidAsk.Bid:c}");
+                _logger.Debug($"{o.OrderType} {o.Action} Order : touch price of {o.TouchPrice:c} reached. {bidAsk}");
                 ExecuteOrder(o, bidAsk.Bid);
             }
         }
@@ -427,12 +429,12 @@ namespace Backtester
         {
             if (o.Action == OrderAction.BUY && o.StopPrice <= bidAsk.Ask)
             {
-                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Ask : {bidAsk.Ask:c}");
+                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. {bidAsk}");
                 ExecuteOrder(o, bidAsk.Ask);
             }
             else if (o.Action == OrderAction.SELL && o.StopPrice >= bidAsk.Bid)
             {
-                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. Bid: {bidAsk.Bid:c}");
+                _logger.Debug($"{o} : stop price of {o.StopPrice:c} reached. {bidAsk}");
                 ExecuteOrder(o, bidAsk.Bid);
             }
         }
