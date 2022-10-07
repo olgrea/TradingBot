@@ -55,7 +55,7 @@ namespace TradingBot.Strategies
                     }
                 }
                 
-                return (HasBeenOpened(_order) && IsExecuted(_order)) ? GetState<BoughtState>() : this;
+                return (HasBeenOpened(_order) && IsExecuted(_order, out _)) ? GetState<BoughtState>() : this;
             }
         }
 
@@ -79,7 +79,7 @@ namespace TradingBot.Strategies
                     }
                 }
                 
-                return (HasBeenOpened(_order) && IsExecuted(_order)) ? GetState<MonitoringState>() : this;
+                return (HasBeenOpened(_order) && IsExecuted(_order, out _)) ? GetState<MonitoringState>() : this;
             }
         }
 
