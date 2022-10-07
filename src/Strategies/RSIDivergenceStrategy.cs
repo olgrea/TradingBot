@@ -15,6 +15,8 @@ namespace TradingBot.Strategies
             AddState<MonitoringState>();
             AddState<OversoldState>();
             AddState<BoughtState>();
+            AddState<ProfitState>();
+            AddState<LetItRideState>();
             
             SetStartState<InitState>();
 
@@ -67,6 +69,8 @@ namespace TradingBot.Strategies
 
         class OversoldState : State<RSIDivergenceStrategy>
         {
+            bool _buySignal = false;
+
             public OversoldState(RSIDivergenceStrategy strategy) : base(strategy) { }
 
             public override IState Evaluate()
@@ -74,8 +78,12 @@ namespace TradingBot.Strategies
                 // At this moment, we switch to a 5 secs resolution.
 
                 // TODO : to test
-                if (_strategy.RSIDivergence_5Sec.Value < 0 || _strategy.RSIDivergence_5Sec.FastRSI.IsOversold)
+                if (!_buySignal && (_strategy.RSIDivergence_5Sec.Value < 0 || _strategy.RSIDivergence_5Sec.SlowRSI.IsOversold))
                     return this;
+
+                _buySignal = true;
+
+                //TODO : for data 2022-10-05, non-determinism occurs. I presume it's because of the discrepancy between init bars and normal ones
 
                 if (!_isInitialized)
                     InitializeOrders();
@@ -98,18 +106,6 @@ namespace TradingBot.Strategies
                 }
 
                 return this;
-            }
-
-            protected override void InitializeOrders()
-            {
-                //double funds = _strategy.Trader.GetAvailableFunds();
-                double funds = 5000;
-                var latestBar = _strategy.RSIDivergence_5Sec.LatestBar;
-                int qty = (int)(funds / latestBar.Close);
-
-                _strategy.BuyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
-
-                _isInitialized = true;
             }
 
             protected override void InitializeOrders()
