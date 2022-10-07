@@ -2,14 +2,15 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using MathNet.Numerics;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
     internal class RSI : IndicatorBase
     {
-        const double _oversoldThreshold = 20.0;
-        const double _overboughtThreshold = 80.0;
+        const double _oversoldThreshold = 30.0;
+        const double _overboughtThreshold = 70.0;
 
         double _lastAvgU = double.MinValue;
         double _lastAvgD = double.MinValue;
@@ -45,11 +46,16 @@ namespace TradingBot.Indicators
             else
             {
                 // smoothed moving average (SMA)
-                var a = 1 / NbPeriods;
-                var avgU = a * _diffs.Last.Value + (1 - a) * _lastAvgU;
-                var avgD = a * _diffs.Last.Value + (1 - a) * _lastAvgD;
-                var RS = avgU / avgD;
-                Value = 100 - (100/(1+RS));
+                var a = 1.0 / NbPeriods;
+                var avgU = a * _diffs.Last.Value + (1.0 - a) * _lastAvgU;
+                var avgD = a * _diffs.Last.Value + (1.0 - a) * _lastAvgD;
+
+                if (avgD.AlmostEqual(0.0))
+                    Value = 100.0;
+                else if (avgU.AlmostEqual(0.0))
+                    Value = 100.0;
+                else
+                    Value = 100 - (100.0 / (1 + (avgU / avgD)));
 
                 _lastAvgD = avgD;
                 _lastAvgU = avgU;
