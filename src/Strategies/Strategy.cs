@@ -86,7 +86,7 @@ namespace TradingBot.Strategies
             }
 
             // TODO : this is getting spaghetti-ish... but it works. Need refactor.
-            Trader.InitIndicators(_indicators.Values.SelectMany(v => v));
+            //Trader.InitIndicators(_indicators.Values.SelectMany(v => v));
 
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
