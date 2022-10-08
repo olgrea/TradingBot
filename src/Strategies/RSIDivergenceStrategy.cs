@@ -57,7 +57,8 @@ namespace TradingBot.Strategies
             {
                 // We want to find a bar candle that goes below the lower BB
                 if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close < _strategy.BollingerBands_1Min.LowerBB
-                    && _strategy.RSIDivergence_1Min.Value < 0)
+                    && _strategy.RSIDivergence_1Min.Value < 0
+                    && _strategy.RSIDivergence_1Min.FastRSI.IsOversold)
                 {
                     Logger.Info($"Lower band reached. RSIDivergence < 0. Switching to 5 sec resolution.");
                     return GetState<OversoldState>();
@@ -77,11 +78,13 @@ namespace TradingBot.Strategies
             {
                 // At this moment, we switch to a 5 secs resolution.
 
-                // TODO : to test
-                if (!_buySignal && (_strategy.RSIDivergence_5Sec.Value < 0 || _strategy.RSIDivergence_5Sec.SlowRSI.IsOversold))
-                    return this;
-
-                _buySignal = true;
+                if (!_buySignal)
+                {
+                    if(_strategy.RSIDivergence_5Sec.Value > 0 && !_strategy.RSIDivergence_5Sec.FastRSI.IsOversold)
+                        _buySignal = true;
+                    else
+                        return this;
+                }
 
                 //TODO : for data 2022-10-05, non-determinism occurs. I presume it's because of the discrepancy between init bars and normal ones
 
@@ -206,7 +209,7 @@ namespace TradingBot.Strategies
                 var qty = execution.Shares;
 
                 // TODO : to test
-                var stop = _strategy.BollingerBands_1Min.LowerBB * (1-0.003);
+                var stop = execution.AvgPrice * (1-0.003);
                 _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
                 _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
 
