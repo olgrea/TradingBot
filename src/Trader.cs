@@ -11,6 +11,7 @@ using System.Globalization;
 using NLog;
 using System.Threading.Tasks;
 using System.Threading;
+using TradingBot.Indicators;
 
 namespace TradingBot
 {
@@ -195,6 +196,11 @@ namespace TradingBot
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
             _broker.CancelAccountUpdates(_account.Code);
+        }
+
+        public void InitIndicators(IEnumerable<IIndicator> indicators)
+        {
+            Broker.InitIndicators(Contract, indicators);
         }
 
         void OnAccountValueUpdated(string key, string value, string currency)

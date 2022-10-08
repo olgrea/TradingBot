@@ -79,12 +79,13 @@ namespace TradingBot.Strategies
 
         public virtual void Start()
         {
-            foreach(var kvp in _indicators)
+            foreach (var kvp in _indicators)
             {
-                InitIndicators(kvp.Key, kvp.Value);
                 Trader.Broker.SubscribeToBars(kvp.Key, OnBarReceived);
                 Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
             }
+
+            Trader.InitIndicators(_indicators.Values.SelectMany(v => v));
 
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
