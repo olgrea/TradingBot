@@ -74,7 +74,7 @@ namespace TradingBot.Broker.Orders
 
         public override string ToString()
         {
-            return $"{base.ToString()} Touch price : {TouchPrice}";
+            return $"{base.ToString()} Touch price : {TouchPrice:c}";
         }
     }
 
@@ -85,7 +85,7 @@ namespace TradingBot.Broker.Orders
         
         public override string ToString()
         {
-            return $"{base.ToString()} Limit price : {LmtPrice}";
+            return $"{base.ToString()} Limit price : {LmtPrice:c}";
         }
     }
 
@@ -96,7 +96,7 @@ namespace TradingBot.Broker.Orders
 
         public override string ToString()
         {
-            return $"{base.ToString()} Stop price : {StopPrice}";
+            return $"{base.ToString()} Stop price : {StopPrice:c}";
         }
     }
 
@@ -114,7 +114,7 @@ namespace TradingBot.Broker.Orders
             if (TrailingPercent != double.MaxValue)
                 return $"{base.ToString()} TrailingPercent : {TrailingPercent}";
             else if (TrailingAmount != double.MaxValue)
-                return $"{base.ToString()} TrailingAmount : {TrailingAmount}";
+                return $"{base.ToString()} TrailingAmount : {TrailingAmount:c}";
             else
                 return base.ToString();
         }
