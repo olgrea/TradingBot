@@ -142,7 +142,6 @@ namespace TradingBot.Strategies
 
             var longestPeriod = indicators.Max(i => i.NbPeriods);
 
-            // TODO : there is a discrepancy between bars received when initializing and bars received during normal trading. Need to investigate.
             var pastBars = Trader.Broker.GetPastBars(Trader.Contract, barLength, longestPeriod).ToList();
 
             foreach (var indicator in indicators)

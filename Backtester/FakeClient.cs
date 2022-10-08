@@ -114,7 +114,6 @@ namespace Backtester
         public Task<bool> ConnectAsync(string host, int port, int clientId)
         {
             var tcs = new TaskCompletionSource<bool>();
-            Start();
             tcs.SetResult(true);
             return tcs.Task;
         }
