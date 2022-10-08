@@ -26,8 +26,8 @@ namespace Backtester
 
         public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
-            _startTime = new DateTime(startDate.Ticks + DateTimeUtils.MarketStartTime.Ticks, DateTimeKind.Local);
-            _endTime = new DateTime(endDate.Ticks + DateTimeUtils.MarketEndTime.Ticks, DateTimeKind.Local);
+            _startTime = new DateTime(startDate.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
+            _endTime = new DateTime(endDate.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
             
             var broker = new IBBroker(1337);
             broker.Connect();
@@ -39,7 +39,7 @@ namespace Backtester
 
         public void Start()
         {
-            foreach (var day in DateTimeUtils.GetMarketDays(_startTime, _endTime))
+            foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(day.Item1);
                 var bars = marketData.Item1;

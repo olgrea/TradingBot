@@ -293,6 +293,7 @@ namespace Backtester
 
         void EvaluateOpenOrders(BidAsk bidAsk)
         {
+            // TODO : add readerWriter lock : this throws because the collection gets modified
             foreach(Order o in _openOrders)
             {
                 _logger.Debug($"Evaluating Order {o} at BidAsk : {bidAsk}");
