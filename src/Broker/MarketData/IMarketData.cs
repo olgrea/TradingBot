@@ -2,7 +2,7 @@
 
 namespace TradingBot.Broker.MarketData
 {
-    internal interface IMarketData
+    public interface IMarketData
     {
         DateTime Time { get; set; }
     }

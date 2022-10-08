@@ -30,12 +30,12 @@ namespace ConsoleApp
 
             string ticker = parsedArgs.Value.Ticker;
             TimeSpan startTime = TimeSpan.Parse(parsedArgs.Value.StartTime);
-            if (startTime < DateTimeUtils.MarketStartTime)
-                throw new ArgumentException($"The start time must be at least {DateTimeUtils.MarketStartTime}");
+            if (startTime < MarketDataUtils.MarketStartTime)
+                throw new ArgumentException($"The start time must be at least {MarketDataUtils.MarketStartTime}");
             
             TimeSpan endTime = TimeSpan.Parse(parsedArgs.Value.EndTime);
-            if (endTime > DateTimeUtils.MarketEndTime)
-                throw new ArgumentException($"The end time must be at most {DateTimeUtils.MarketEndTime}");
+            if (endTime > MarketDataUtils.MarketEndTime)
+                throw new ArgumentException($"The end time must be at most {MarketDataUtils.MarketEndTime}");
 
             var start = new DateTime(DateTime.Today.Ticks + startTime.Ticks, DateTimeKind.Local);
             var end = new DateTime(DateTime.Today.Ticks + endTime.Ticks, DateTimeKind.Local);

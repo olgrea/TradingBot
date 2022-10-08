@@ -93,8 +93,8 @@ namespace HistoricalDataFetcher
         {
             _ticker = ticker;
 
-            var marketStartTime = DateTimeUtils.MarketStartTime;
-            var marketEndTime = DateTimeUtils.MarketEndTime;
+            var marketStartTime = MarketDataUtils.MarketStartTime;
+            var marketEndTime = MarketDataUtils.MarketEndTime;
             _startDate = new DateTime(start.Year, start.Month, start.Day, 8, 0, 0);
             _endDate = new DateTime(end.Year, end.Month, end.Day, marketEndTime.Hours, marketEndTime.Minutes, marketEndTime.Seconds);
 
@@ -120,7 +120,7 @@ namespace HistoricalDataFetcher
 
             if(_startDate < _endDate)
             {
-                var marketDays = DateTimeUtils.GetMarketDays(_startDate, _endDate).ToList();
+                var marketDays = MarketDataUtils.GetMarketDays(_startDate, _endDate).ToList();
                 foreach ((DateTime, DateTime) pair in marketDays)
                     GetDataForDay<Bar>(pair.Item1, contract);
 
@@ -138,8 +138,8 @@ namespace HistoricalDataFetcher
 
         void GetDataForDay<TData>(DateTime date, Contract contract) where TData : IMarketData, new()
         {
-            var marketStart = DateTimeUtils.MarketStartTime;
-            var marketEnd = DateTimeUtils.MarketEndTime;
+            var marketStart = MarketDataUtils.MarketStartTime;
+            var marketEnd = MarketDataUtils.MarketEndTime;
 
             DateTime morning = new DateTime(date.Year, date.Month, date.Day, marketStart.Hours, marketStart.Minutes, marketStart.Seconds, DateTimeKind.Local);
             DateTime current = new DateTime(date.Year, date.Month, date.Day, marketEnd.Hours, marketEnd.Minutes, marketEnd.Seconds, DateTimeKind.Local);
