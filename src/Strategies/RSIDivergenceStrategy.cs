@@ -170,13 +170,29 @@ namespace TradingBot.Strategies
 
                 if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
                 {
-                    if(_lastBar.Close > _strategy.BollingerBands_1Min.LowerBB)
+                    double stop = double.MinValue;
+                    double lowerHalf = (_strategy.BollingerBands_1Min.LowerBB + _strategy.BollingerBands_1Min.MovingAverage) / 2;
+                    double lowerQuarter = (_strategy.BollingerBands_1Min.LowerBB + lowerHalf) / 2;
+
+                    if (_strategy.BollingerBands_1Min.LatestBar.Close > _strategy.BollingerBands_1Min.LowerBB)
                     {
-                        var stop = _strategy.BollingerBands_1Min.LowerBB;
+                        stop = _strategy.BollingerBands_1Min.LowerBB;
+                    }
+                    else if (_strategy.BollingerBands_1Min.LatestBar.Close > lowerQuarter)
+                    {
+                        stop = lowerQuarter;
+                    }
+                    else if (_strategy.BollingerBands_1Min.LatestBar.Close > lowerHalf)
+                    {
+                        stop = lowerHalf;
+                    }
+
+                    if(stop != double.MinValue)
+                    {
                         (_strategy.StopOrder as StopOrder).StopPrice = stop;
                         ModifyOrder(_strategy.StopOrder);
                     }
-                
+
                     (_strategy.MITOrder as MarketIfTouchedOrder).TouchPrice = _strategy.BollingerBands_1Min.MovingAverage;
                     ModifyOrder(_strategy.MITOrder);
                 }
@@ -190,7 +206,7 @@ namespace TradingBot.Strategies
                 var qty = execution.Shares;
 
                 // TODO : to test
-                var stop = _strategy.BollingerBands_1Min.LowerBB - (_strategy.BollingerBands_1Min.LowerBB * 0.003);
+                var stop = _strategy.BollingerBands_1Min.LowerBB * (1-0.003);
                 _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
                 _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
 
@@ -212,7 +228,7 @@ namespace TradingBot.Strategies
                 _strategy.Executions.TryGetValue(previousMITOrder.Id, out OrderExecution execution);
                 var qty = execution.Shares;
 
-                var stop = _strategy.BollingerBands_1Min.LowerBB;
+                var stop = (_strategy.BollingerBands_1Min.MovingAverage + _strategy.BollingerBands_1Min.LowerBB) / 2;
 
                 _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop};
                 _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.UpperBB};
@@ -228,7 +244,12 @@ namespace TradingBot.Strategies
 
                 if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
                 {
-                    var stop = _strategy.BollingerBands_1Min.LowerBB;
+                    double stop;
+                    if(_strategy.BollingerBands_1Min.LatestBar.Close > _strategy.BollingerBands_1Min.MovingAverage)
+                        stop = _strategy.BollingerBands_1Min.MovingAverage;
+                    else
+                        stop = (_strategy.BollingerBands_1Min.MovingAverage + _strategy.BollingerBands_1Min.LowerBB) / 2;
+
                     (_strategy.StopOrder as StopOrder).StopPrice = stop;
                     ModifyOrder(_strategy.StopOrder);
 

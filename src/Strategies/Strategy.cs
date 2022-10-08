@@ -85,6 +85,7 @@ namespace TradingBot.Strategies
                 Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
             }
 
+            // TODO : this is getting spaghetti-ish... but it works. Need refactor.
             Trader.InitIndicators(_indicators.Values.SelectMany(v => v));
 
             if (_currentState == null)
