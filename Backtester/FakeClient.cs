@@ -54,7 +54,6 @@ namespace Backtester
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
 
-        LinkedList<Bar> _5SecBars = new LinkedList<Bar>();
         LinkedList<Bar> _dailyBars;
         LinkedListNode<Bar> _currentBarNode;
 
@@ -616,52 +615,23 @@ namespace Backtester
             {
                 _logger.Debug($"(reqId={reqId}) : 5 sec bars requested.");
                 _reqId5SecBar = reqId;
-                ClockTick += OnClockTick_FiveSecondBar;
             }
         }
 
-        void OnClockTick_FiveSecondBar(DateTime newTime)
+        void OnClockTick_UpdateBarNode(DateTime newTime)
         {
-            if (newTime.Second % 5 == 0)
+            if (_currentBarNode?.Value.Time < newTime)
+                _currentBarNode = _currentBarNode.Next;
+
+            if (_reqId5SecBar > 0 && newTime.Second % 5 == 0)
             {
-                var b = MakeBar(_currentBarNode, BarLength._5Sec);
-                _messageQueue.Enqueue(() => 
+                var b = MarketDataUtils.MakeBar(_currentBarNode, 5);
+                _messageQueue.Enqueue(() =>
                 {
                     DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                     Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
                 });
             }
-        }
-
-        Bar MakeBar(LinkedListNode<Bar> node, BarLength barLength)
-        {
-            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
-
-            int nbBars = Convert.ToInt32(barLength);
-            LinkedListNode<Bar> currNode = node;
-            for (int i = 0; i < nbBars; i++)
-            {
-                Bar current = currNode.Value;
-                if (i == 0)
-                {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
-                }
-
-                bar.High = Math.Max(bar.High, current.High);
-                bar.Low = Math.Min(bar.Low, current.Low);
-                bar.Volume += current.Volume;
-                bar.TradeAmount += current.TradeAmount;
-
-                if (i == nbBars - 1)
-                {
-                    bar.Close = current.Close;
-                }
-
-                currNode = currNode.Next;
-            }
-
-            return bar;
         }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
@@ -670,7 +640,6 @@ namespace Backtester
             {
                 _logger.Debug($"(reqId={reqId}) : 5 sec bars cancelled.");
                 _reqId5SecBar = -1;
-                ClockTick -= OnClockTick_FiveSecondBar;
             }
         }
 
@@ -686,17 +655,6 @@ namespace Backtester
                     Callbacks.openOrder(o.Id, Contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
                 Callbacks.openOrderEnd();
             });
-        }
-
-        void OnClockTick_UpdateBarNode(DateTime newTime)
-        {
-            if(_currentBarNode?.Value.Time < newTime)
-            {
-                _5SecBars.AddFirst(_currentBarNode.Value);
-                if (_5SecBars.Count > 5)
-                    _5SecBars.RemoveLast();
-                _currentBarNode = _currentBarNode.Next;
-            }
         }
 
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
@@ -797,7 +755,7 @@ namespace Backtester
             {
                 if(i != 0 && i % (int)barLength == 0)
                 {
-                    list.AddFirst(MakeBar(current, barLength));
+                    list.AddFirst(MarketDataUtils.MakeBar(current, (int)barLength));
                 }
             }
 
