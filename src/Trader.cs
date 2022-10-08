@@ -65,6 +65,7 @@ namespace TradingBot
         internal IBroker Broker => _broker;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
+        internal bool StrategiesStarted => _strategiesStarted;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
@@ -126,9 +127,10 @@ namespace TradingBot
                         if(!_strategiesStarted && _currentTime >= _startTime)
                         {
                             _logger.Info($"Trading started!");
-                            _strategiesStarted = true;
                             foreach (var strat in _strategies)
                                 strat.Start();
+
+                            _strategiesStarted = true;
                         }
                     }
                 }

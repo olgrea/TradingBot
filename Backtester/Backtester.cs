@@ -50,7 +50,10 @@ namespace Backtester
                 Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker, $"{nameof(Backtester)}-{_contract.Symbol}_{_startTime.ToShortDateString()}");
                 trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 
-                trader.Start().Wait();
+                var task = trader.Start();
+                while (!trader.StrategiesStarted);
+                fakeClient.Start();
+                task.Wait();
                 trader.Stop();
             }
         }
