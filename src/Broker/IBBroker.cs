@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 using NLog;
 using System.Diagnostics;
+using TradingBot.Indicators;
+using TradingBot.Utils;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -244,39 +246,47 @@ namespace TradingBot.Broker
         void OnFiveSecondsBarReceived(int reqId, MarketData.Bar bar)
         {
             Trace.Assert(_subscriptions.FiveSecBars.ContainsValue(reqId));
-            
-            var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
-            
-            _logger.Debug($"FiveSecondsBarReceived for {contract}");
 
+            var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
+
+            _logger.Debug($"FiveSecondsBarReceived for {contract}");
+            
+            UpdateBarsAndInvoke(contract, bar);
+        }
+
+        void UpdateBarsAndInvoke(Contract contract, Bar bar)
+        {
             if (!_fiveSecBars.ContainsKey(contract))
             {
                 _fiveSecBars.Add(contract, new LinkedList<MarketData.Bar>());
             }
 
             var list = _fiveSecBars[contract];
-            list.AddFirst(bar);
+            list.AddLast(bar);
             // keeping 5 minutes of bars
             if (list.Count > 60)
-            {
-                list.RemoveLast();
-            }
+                list.RemoveFirst();
 
-            foreach(BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
+            foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
             {
                 if (!HasSubscribers(barLength))
                     continue;
 
-                if(barLength == BarLength._5Sec)
+                if (barLength == BarLength._5Sec)
                 {
                     Bar5SecReceived?.Invoke(contract, bar);
                     continue;
                 }
 
                 int sec = (int)barLength;
-                if (list.Count > (sec / 5) + 1 && (bar.Time.Second % sec) == 0)
+                int nbBars = (sec / 5);
+                if (list.Count > nbBars && (bar.Time.Second % sec) == 0)
                 {
-                    var newBar = MakeBar(list, barLength);
+                    LinkedListNode<Bar> current = list.Last;
+                    for (int i = 0; i < nbBars; ++i)
+                        current = current.Previous;
+
+                    var newBar = MarketDataUtils.MakeBar(current, nbBars);
                     InvokeCallbacks(contract, newBar);
                 }
             }
