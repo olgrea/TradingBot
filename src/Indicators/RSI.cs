@@ -47,8 +47,8 @@ namespace TradingBot.Indicators
             {
                 // smoothed moving average (SMA)
                 var a = 1.0 / NbPeriods;
-                var avgU = a * _diffs.Last.Value + (1.0 - a) * _lastAvgU;
-                var avgD = a * _diffs.Last.Value + (1.0 - a) * _lastAvgD;
+                var avgU = a * upMoves.Last() + (1.0 - a) * _lastAvgU;
+                var avgD = a * downMoves.Last() + (1.0 - a) * _lastAvgD;
 
                 if (avgD.AlmostEqual(0.0))
                     Value = 100.0;
