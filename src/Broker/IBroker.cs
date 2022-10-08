@@ -5,6 +5,7 @@ using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
+using TradingBot.Indicators;
 using TradingBot.Utils;
 
 [assembly: InternalsVisibleTo("Backtester")]
@@ -55,5 +56,6 @@ namespace TradingBot.Broker
         IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count);
         IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count);
         DateTime GetCurrentTime();
+        void InitIndicators(Contract contract, IEnumerable<IIndicator> indicators);
     }
 }

@@ -454,6 +454,21 @@ namespace TradingBot.Broker
             }
         }
 
+        public void InitIndicators(Contract contract, IEnumerable<IIndicator> indicators)
+        {
+            if (!indicators.Any())
+                return;
+
+            var longestTime = indicators.Max(i => i.NbPeriods * (int)i.BarLength);
+            var pastBars = GetPastBars(contract, BarLength._5Sec, longestTime/(int)BarLength._5Sec).ToList();
+
+            //TODO : remove bars from indicators? I don't know what I was thinking...
+            foreach(Bar bar in pastBars)
+            {
+                UpdateBarsAndInvoke(contract, bar);
+            }
+        }
+
         public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
             return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, default(DateTime), count).Result;   
