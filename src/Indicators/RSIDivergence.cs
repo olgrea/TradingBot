@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
@@ -7,6 +8,7 @@ namespace TradingBot.Indicators
     {
         RSI _slowRsi;
         RSI _fastRsi;
+        LinkedList<(DateTime, double)> _values = new LinkedList<(DateTime, double)>();
 
         public RSIDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5)
         {
@@ -23,11 +25,14 @@ namespace TradingBot.Indicators
         public RSI SlowRSI => _slowRsi;
         public RSI FastRSI => _fastRsi;
 
-
         public void Update(Bar bar)
         {
             _slowRsi.Update(bar);
             _fastRsi.Update(bar);
+
+            _values.AddLast((bar.Time, Value));
+            if (_values.Count > NbPeriods)
+                _values.RemoveFirst();
         }
     }
 }
