@@ -33,6 +33,7 @@ namespace TradingBot
         Account _account;
         Contract _contract;
         double _USDCashBalance;
+        double _totalCommission;
 
         Position _contractPosition;
         PnL _PnL;
@@ -336,6 +337,7 @@ namespace TradingBot
         void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
         {
             EvaluateStrategies();
+            _totalCommission += ci.Commission;
 
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
             Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares * oe.AvgPrice, ci.Commission, ci.RealizedPNL);

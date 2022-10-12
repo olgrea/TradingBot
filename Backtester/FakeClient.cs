@@ -430,8 +430,9 @@ namespace Backtester
 
             if(order.Action == OrderAction.BUY)
             {
+                Position.AverageCost = Position.PositionAmount != 0  ? (Position.AverageCost + price) / 2 : price;
                 Position.PositionAmount += order.TotalQuantity;
-                Position.AverageCost = Position.AverageCost > 0 ? (Position.AverageCost + price) / 2 : price;
+
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
                 UpdateUnrealizedPNL(price);
@@ -442,7 +443,7 @@ namespace Backtester
                 Position.PositionAmount -= order.TotalQuantity;
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
-                Position.RealizedPNL += order.TotalQuantity * (Position.MarketPrice - Position.AverageCost);
+                Position.RealizedPNL += order.TotalQuantity * (price - Position.AverageCost);
                 _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {Position.RealizedPNL:c}");
 
                 UpdateUnrealizedPNL(price);
@@ -698,8 +699,8 @@ namespace Backtester
 
         void OnClockTick_PnL(DateTime newTime)
         {
-            // TODO : doesn't seem to be working? need to debug
-            Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
+            // TODO : check to see if daily pnl include commission
+            Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL - _totalCommission, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
         }
 
         public void CancelPnL(int contractId)
