@@ -12,6 +12,7 @@ using NLog;
 using System.Threading.Tasks;
 using System.Threading;
 using TradingBot.Indicators;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot
 {
@@ -36,8 +37,12 @@ namespace TradingBot
         Position _contractPosition;
         PnL _PnL;
 
+        bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
-        bool _strategiesStarted = false;
+        AutoResetEvent _evaluationEvent = new AutoResetEvent(false);
+        
+        Task _evaluationTask;
+        CancellationTokenSource _evaluationTaskCancellation;
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
             : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
@@ -66,7 +71,7 @@ namespace TradingBot
         internal IBroker Broker => _broker;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
-        internal bool StrategiesStarted => _strategiesStarted;
+        internal bool TradingStarted => _tradingStarted;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
@@ -109,6 +114,7 @@ namespace TradingBot
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
+            StartEvaluationTask();
             return StartMonitoringTimeTask();
         }
 
@@ -125,13 +131,10 @@ namespace TradingBot
                     {
                         Task.Delay(1000).Wait();
                         _currentTime = _broker.GetCurrentTime();
-                        if(!_strategiesStarted && _currentTime >= _startTime)
+                        if(!_tradingStarted && _currentTime >= _startTime)
                         {
                             _logger.Info($"Trading started!");
-                            foreach (var strat in _strategies)
-                                strat.Start();
-
-                            _strategiesStarted = true;
+                            _tradingStarted = true;
                         }
                     }
                 }
@@ -168,7 +171,51 @@ namespace TradingBot
             _monitoringTimeCancellation?.Cancel();
             _monitoringTimeCancellation?.Dispose();
             _monitoringTimeCancellation = null;
-            _monitoringTimeCancellation = null;
+        }
+
+        Task StartEvaluationTask()
+        {
+            _evaluationTaskCancellation = new CancellationTokenSource();
+            var mainToken = _evaluationTaskCancellation.Token;
+            _logger.Debug($"Started evaluation task.");
+            _evaluationTask = Task.Factory.StartNew(() =>
+            {
+                try
+                {
+                    while (!mainToken.IsCancellationRequested)
+                    {
+                        _evaluationEvent.WaitOne();
+                        mainToken.ThrowIfCancellationRequested();
+                        foreach (IStrategy strategy in _strategies)
+                            strategy.Evaluate();
+                    }
+                }
+                catch (AggregateException e)
+                {
+                    //TODO : verify error handling
+                    if (e.InnerException is OperationCanceledException)
+                    {
+                        _logger.Trace($"Monitoring time task cancelled");
+                        return;
+                    }
+
+                    throw e;
+                }
+
+            }, mainToken);
+
+            return _evaluationTask;
+        }
+
+        void StopEvaluationTask()
+        {
+            _evaluationTaskCancellation?.Cancel();
+            _evaluationEvent?.Set();
+
+            _evaluationEvent?.Close();
+            _evaluationEvent?.Dispose();
+            _evaluationTaskCancellation?.Dispose();
+            _evaluationTaskCancellation = null;
         }
 
         void SubscribeToData()
@@ -176,6 +223,15 @@ namespace TradingBot
             _broker.AccountValueUpdated += OnAccountValueUpdated;
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
+
+            foreach (IStrategy strategy in _strategies)
+            {
+                foreach(BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
+                {
+                    Broker.SubscribeToBars(barLength, OnBarReceived);
+                    Broker.RequestBars(Contract, barLength);
+                }
+            }
 
             _broker.OrderUpdated += OnOrderUpdated;
             _broker.OrderExecuted += OnOrderExecuted;
@@ -192,6 +248,15 @@ namespace TradingBot
 
             _broker.OrderUpdated -= OnOrderUpdated;
             _broker.OrderExecuted -= OnOrderExecuted;
+
+            foreach (IStrategy strategy in _strategies)
+            {
+                foreach (BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
+                {
+                    Broker.UnsubscribeToBars(barLength, OnBarReceived);
+                    Broker.CancelBarsRequest(Contract, barLength);
+                }
+            }
 
             _broker.CancelPositionsSubscription();
             _broker.CancelPnLSubscription(_contract);
@@ -256,19 +321,53 @@ namespace TradingBot
             }
         }
 
+        void OnBarReceived(Contract contract, Bar bar)
+        {
+            UpdateStrategies(bar);
+            EvaluateStrategies();
+        }
+
         void OnOrderUpdated(Order o, OrderStatus os)
         {
-            if(os.Status == Status.Submitted || os.Status == Status.PreSubmitted)
+            EvaluateStrategies();
+            LogStatusChange(o, os);
+        }
+
+        void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
+        {
+            EvaluateStrategies();
+
+            _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
+            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares * oe.AvgPrice, ci.Commission, ci.RealizedPNL);
+        }
+
+        private void UpdateStrategies(Bar bar)
+        {
+            foreach (IStrategy strategy in _strategies)
+                strategy.Update(bar);
+        }
+
+        void EvaluateStrategies()
+        {
+            if (!_tradingStarted)
+                return;
+
+            _evaluationEvent.Set();
+        }
+
+        private void LogStatusChange(Order o, OrderStatus os)
+        {
+            if (os.Status == Status.Submitted || os.Status == Status.PreSubmitted)
             {
                 _logger.Info($"OrderOpened : {_contract} {o} status={os.Status}");
             }
-            else if(os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
+            else if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
             {
                 _logger.Info($"OrderCancelled : {_contract} {o} status={os.Status}");
             }
             else if (os.Status == Status.Filled)
             {
-                if(os.Remaining > 0)
+                if (os.Remaining > 0)
                 {
                     _logger.Info($"Order Partially filled : {_contract} {o} filled={os.Filled} remaining={os.Remaining}");
                 }
@@ -277,12 +376,6 @@ namespace TradingBot
                     _logger.Info($"Order filled : {_contract} {o}");
                 }
             }
-        }
-
-        void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
-        {
-            _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
-            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares*oe.AvgPrice, ci.Commission, ci.RealizedPNL);
         }
 
         void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission, double realizedPnL)
@@ -300,17 +393,15 @@ namespace TradingBot
 
         public double GetAvailableFunds()
         {
-            return _USDCashBalance;
+            return _USDCashBalance - 100;
         }
 
         public void Stop()
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
 
-            foreach (var strat in _strategies)
-                strat.Stop();
-
             StopMonitoringTimeTask();
+            StopEvaluationTask();
 
             _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
             _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");

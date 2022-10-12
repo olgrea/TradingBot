@@ -16,9 +16,6 @@ namespace TradingBot.Strategies
         Dictionary<string, IState> _states = new Dictionary<string, IState>();
         Dictionary<BarLength, List<IIndicator>> _indicators = new Dictionary<BarLength, List<IIndicator>>();
 
-        Task _evaluateTask;
-        CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-
         public Strategy(Trader trader)
         {
             Trader = trader;
@@ -35,15 +32,6 @@ namespace TradingBot.Strategies
             }
 
             _indicators[indicator.BarLength].Add(indicator);
-        }
-
-        void OnBarReceived(Contract contract, Bar bar)
-        {
-            if(_indicators.ContainsKey(bar.BarLength))
-            {
-                foreach (var indicator in _indicators[bar.BarLength])
-                    indicator.Update(bar);
-            }
         }
 
         protected TIndicator GetIndicator<TIndicator>(BarLength barLength) where TIndicator : IIndicator
@@ -77,39 +65,15 @@ namespace TradingBot.Strategies
             return _states[t.Name];
         }
 
-        public virtual void Start()
+        public void Evaluate()
         {
-            foreach (var kvp in _indicators)
-            {
-                Trader.Broker.SubscribeToBars(kvp.Key, OnBarReceived);
-                Trader.Broker.RequestBars(Trader.Contract, kvp.Key);
-            }
-
-            // TODO : this is getting spaghetti-ish... but it works. Need refactor.
-            //Trader.InitIndicators(_indicators.Values.SelectMany(v => v));
-
             if (_currentState == null)
                 throw new InvalidOperationException("No starting state has been set");
 
-            if (_evaluateTask != null && !_evaluateTask.IsCompleted)
-                return;
-
-            _cancellationTokenSource = new CancellationTokenSource();
-            var token = _cancellationTokenSource.Token;
-
-            _evaluateTask = Task.Factory.StartNew(() =>
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    var nextState = _currentState?.Evaluate();
-                    if (nextState != _currentState)
-                        Trader.Logger.Info($"Strategy {GetType().Name} state change : {_currentState.GetType().Name} -> {nextState.GetType().Name}");
-                    _currentState = nextState;
-                }
-            }
-            ,token
-            ,TaskCreationOptions.LongRunning
-            ,TaskScheduler.Default);
+            var nextState = _currentState?.Evaluate();
+            if (nextState != _currentState)
+                Trader.Logger.Info($"Strategy {GetType().Name} state change : {_currentState.GetType().Name} -> {nextState.GetType().Name}");
+            _currentState = nextState;
         }
 
         internal void PlaceOrder(Order o)
@@ -153,20 +117,11 @@ namespace TradingBot.Strategies
             }
         }
 
-        public virtual void Stop()
+        public void Update(Bar bar)
         {
-            _cancellationTokenSource.Cancel();
-            _cancellationTokenSource.Dispose();
-            _currentState = null;
-            _cancellationTokenSource = null;
-
-            foreach (var kvp in _indicators)
+            foreach (var indicator in _indicators[bar.BarLength])
             {
-                Trader.Broker.UnsubscribeToBars(kvp.Key, OnBarReceived);
-                Trader.Broker.CancelBarsRequest(Trader.Contract, kvp.Key);
-
-                foreach (var indicator in kvp.Value)
-                    indicator.Reset();
+                indicator.Update(bar);
             }
         }
     }

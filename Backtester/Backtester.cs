@@ -51,7 +51,7 @@ namespace Backtester
                 trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 
                 var task = trader.Start();
-                while (!trader.StrategiesStarted);
+                while (!trader.TradingStarted);
                 fakeClient.Start();
                 task.Wait();
                 trader.Stop();
