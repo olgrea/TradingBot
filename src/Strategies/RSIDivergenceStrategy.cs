@@ -21,8 +21,8 @@ namespace TradingBot.Strategies
             SetStartState<InitState>();
 
             AddIndicator(new BollingerBands(BarLength._1Min));
-            AddIndicator(new RSIDivergence(BarLength._1Min));
-            AddIndicator(new RSIDivergence(BarLength._5Sec));
+            AddIndicator(new RSIDivergence(BarLength._1Min, 14, 5));
+            AddIndicator(new RSIDivergence(BarLength._5Sec, 12*14, 12*5));
         }
 
         internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
@@ -113,8 +113,7 @@ namespace TradingBot.Strategies
 
             protected override void InitializeOrders()
             {
-                //double funds = _strategy.Trader.GetAvailableFunds();
-                double funds = 5000;
+                double funds = _strategy.Trader.GetAvailableFunds();
                 var latestBar = _strategy.RSIDivergence_5Sec.LatestBar;
                 int qty = (int)(funds / latestBar.Close);
 

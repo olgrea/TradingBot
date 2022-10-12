@@ -16,12 +16,17 @@ namespace TradingBot.Indicators
         double _lastAvgD = double.MinValue;
 
         LinkedList<double> _diffs = new LinkedList<double>();
+        LinkedList<(DateTime, double)> _values = new LinkedList<(DateTime, double)>();
+        LinkedList<(DateTime, double)> _valuesMA = new LinkedList<(DateTime, double)>();
 
         public RSI(BarLength barLength, int nbPeriods) : base(barLength, nbPeriods) { }
 
         public double Value { get; protected set; } = double.MinValue;
         public bool IsOverbought => Value > _overboughtThreshold;
         public bool IsOversold => Value < _oversoldThreshold;
+        public bool IsUnderRMA => _values.Any() && _valuesMA.Any() && _values.Last().Item2 < _valuesMA.Last().Item2;
+        public bool IsOverRMA => _values.Any() && _valuesMA.Any() && _values.Last().Item2 > _valuesMA.Last().Item2;
+
         public override bool IsReady => base.IsReady && Value != double.MinValue;
 
         public override void Compute()
@@ -45,10 +50,9 @@ namespace TradingBot.Indicators
             }
             else
             {
-                // smoothed moving average (SMA)
-                var a = 1.0 / NbPeriods;
-                var avgU = a * upMoves.Last() + (1.0 - a) * _lastAvgU;
-                var avgD = a * downMoves.Last() + (1.0 - a) * _lastAvgD;
+                // smoothed moving average (SMA or RMA)
+                var avgU = RMA(upMoves.Last(), _lastAvgU);
+                var avgD = RMA(downMoves.Last(), _lastAvgD);
 
                 if (avgD.AlmostEqual(0.0))
                     Value = 100.0;
@@ -57,9 +61,29 @@ namespace TradingBot.Indicators
                 else
                     Value = 100 - (100.0 / (1 + (avgU / avgD)));
 
+                AddValue(Bars.Last.Value.Time, Value);
+
                 _lastAvgD = avgD;
                 _lastAvgU = avgU;
             }
+        }
+
+        double RMA(double current, double previous)
+        {
+            var a = 1.0 / NbPeriods;
+            return a * current + (1.0 - a) * previous;
+        }
+
+        void AddValue(DateTime time, double value)
+        {
+            _values.AddLast((time, value));
+            if (_values.Count > NbPeriods)
+                _values.RemoveFirst();
+
+            var newVal = _valuesMA.Any() ? RMA(value, _valuesMA.Last().Item2) : value;
+            _valuesMA.AddLast((time, newVal));
+            if (_valuesMA.Count > NbPeriods)
+                _valuesMA.RemoveFirst();
         }
 
         void UpdateBarToBarChange()
