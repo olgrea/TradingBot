@@ -62,12 +62,6 @@ namespace TradingBot.Indicators
             }
         }
 
-        public override void Reset()
-        {
-            _diffs.Clear();
-            base.Reset();
-        }
-
         void UpdateBarToBarChange()
         {
             var latest = Bars.Last.Value.Close;
