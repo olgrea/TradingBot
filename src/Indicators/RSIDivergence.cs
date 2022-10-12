@@ -23,11 +23,6 @@ namespace TradingBot.Indicators
         public RSI SlowRSI => _slowRsi;
         public RSI FastRSI => _fastRsi;
 
-        public void Reset()
-        {
-            _slowRsi.Reset();
-            _fastRsi.Reset();
-        }
 
         public void Update(Bar bar)
         {
@@ -35,5 +30,4 @@ namespace TradingBot.Indicators
             _fastRsi.Update(bar);
         }
     }
-
 }
