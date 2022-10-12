@@ -31,9 +31,7 @@ namespace Backtester
         }
         Stopwatch _st = new Stopwatch();
 
-        ConcurrentQueue<Action> _messageQueue;
-        Task _consumerTask;
-        CancellationTokenSource _consumerTaskCancellation;
+        ConcurrentQueue<Action> _requestsQueue;
 
         DateTime _start;
         DateTime _end;
@@ -78,7 +76,7 @@ namespace Backtester
         {
             _logger = LogManager.GetLogger(nameof(FakeClient));
             Callbacks = new IBCallbacks(_logger);
-            _messageQueue = new ConcurrentQueue<Action>();
+            _requestsQueue = new ConcurrentQueue<Action>();
             
             _currentFakeTime = startTime;
             _start = startTime;
@@ -134,7 +132,6 @@ namespace Backtester
             ClockTick += OnClockTick_UpdateBarNode;
             ClockTick += OnClockTick_UpdateBidAskNode;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
-            StartConsumerTask();
             StartPassingTimeTask();
         }
 
@@ -146,30 +143,6 @@ namespace Backtester
             ClockTick -= OnClockTick_UpdateBidAskNode;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
             StopPassingTimeTask();
-            StopConsumerTask();
-        }
-
-        void StartConsumerTask()
-        {
-            _consumerTaskCancellation = new CancellationTokenSource();
-            var token = _consumerTaskCancellation.Token;
-            _consumerTask = Task.Factory.StartNew(() =>
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    if (_messageQueue.TryDequeue(out Action action))
-                        action.Invoke();
-                }
-
-            }, token);
-        }
-
-        void StopConsumerTask()
-        {
-            _consumerTaskCancellation?.Cancel();
-            _consumerTaskCancellation?.Dispose();
-            _consumerTaskCancellation = null;
-            _consumerTask = null;
         }
 
         void StartPassingTimeTask()
@@ -187,6 +160,9 @@ namespace Backtester
                 {
                     try
                     {
+                        while(_requestsQueue.TryDequeue(out Action action))
+                            action.Invoke();
+
                         // TODO : Possible slowdown when time scale is really low...
                         ClockTick?.Invoke(_currentFakeTime);
                         Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
@@ -239,32 +215,27 @@ namespace Backtester
             Debug.Assert(Position != null);
             Debug.Assert(order.Id > 0);
 
-            var openOrder = _openOrders.FirstOrDefault(o => o == order);
-            if (openOrder == null)
+            _requestsQueue.Enqueue(() =>
             {
-                //TODO validate order : enough cash to buy, enough shares to sell
-                _openOrders.Add(order);
-
-                _logger.Debug($"New order submitted : {order}");
-                _messageQueue.Enqueue(() =>
+                var openOrder = _openOrders.FirstOrDefault(o => o == order);
+                if (openOrder == null)
                 {
+                    //TODO validate order : enough cash to buy, enough shares to sell
+                    _openOrders.Add(order);
+
+                    _logger.Debug($"New order submitted : {order}");
                     var orderState = new IBApi.OrderState() { Status = "Submitted" };
                     Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
-                });
-            }
-            else //modify order
-            {
-                //TODO : handle fees when modifying/cancelling order
+                }
+                else //modify order
+                {
+                    //TODO : handle fees when modifying/cancelling order
 
-                _logger.Debug($"Order modified : {order}");
-                openOrder = order;
-            }
+                    _logger.Debug($"Order modified : {order}");
+                    openOrder = order;
+                }
 
-            _messageQueue.Enqueue(() =>
-            {
                 //TODO : validate callback order. It should reflect what TWS does
-
-                var orderState = new IBApi.OrderState() { Status = "Submitted" };
                 Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
             });
         }
@@ -490,55 +461,55 @@ namespace Backtester
             _logger.Debug($"Account {_fakeAccount.Code} :  New USD cash balance : {_fakeAccount.CashBalances["USD"]:c}");
 
             string execId = NextExecId.ToString();
-            _messageQueue.Enqueue(() =>
+            //TODO : verify that orderStatus() is called on order execution
+            Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0);
+
+            var exec = new IBApi.Execution()
             {
-                //TODO : verify that orderStatus() is called on order execution
-                Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0);
+                ExecId = execId,
+                OrderId = o.Id,
+                Time = _currentFakeTime.ToString("yyyyMMdd  HH:mm:ss"),
+                AcctNumber = _fakeAccount.Code,
+                Exchange = Contract.Exchange,
+                Side = o.Action == OrderAction.BUY ? "BOT" : "SLD",
+                Shares = o.TotalQuantity,
+                Price = total,
+                AvgPrice = price
+            };
+            Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec);
 
-                var exec = new IBApi.Execution()
-                {
-                    ExecId = execId,
-                    OrderId = o.Id,
-                    Time = _currentFakeTime.ToString("yyyyMMdd  HH:mm:ss"),
-                    AcctNumber = _fakeAccount.Code,
-                    Exchange = Contract.Exchange,
-                    Side = o.Action == OrderAction.BUY ? "BOT" : "SLD",
-                    Shares = o.TotalQuantity,
-                    Price = total,
-                    AvgPrice = price
-                };
-                Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec);
-
-                Callbacks.commissionReport(new IBApi.CommissionReport() 
-                {
-                     Commission = commission,
-                     Currency = "USD",
-                     ExecId = execId,
-                     RealizedPNL = Position.RealizedPNL,
-                });
+            Callbacks.commissionReport(new IBApi.CommissionReport() 
+            {
+                Commission = commission,
+                Currency = "USD",
+                ExecId = execId,
+                RealizedPNL = Position.RealizedPNL,
             });
         }
 
         public void CancelOrder(int orderId)
         {
-            var order = _openOrders.First(o => o.Id == orderId);
-            if(order != null)
+            _requestsQueue.Enqueue(() =>
             {
-                _logger.Debug($"Order {orderId} cancelled.");
-                _openOrders.Remove(order);
-                _messageQueue.Enqueue(() =>
+                var order = _openOrders.First(o => o.Id == orderId);
+                if(order != null)
                 {
+                    _logger.Debug($"Order {orderId} cancelled.");
+                    _openOrders.Remove(order);
                     Callbacks.orderStatus(order.Id, "Cancelled ", 0,0,0,0,0,0,0,"", 0);
-                });
-            }
-            else
-                _logger.Warn($"Cannot cancel order {orderId} (not found)");
+                }
+                else
+                    _logger.Warn($"Cannot cancel order {orderId} (not found)");
+            });
         }
 
         public void CancelAllOrders() 
         {
-            foreach (var o in _openOrders)
-                CancelOrder(o.Id);
+            _requestsQueue.Enqueue(() =>
+            {
+                foreach (var o in _openOrders)
+                    CancelOrder(o.Id);
+            });
         }
 
         public Task<Account> GetAccountAsync()
@@ -554,8 +525,8 @@ namespace Backtester
             if (accountCode != _fakeAccount.Code)
                 throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
-            _messageQueue.Enqueue(SendAccountUpdate);
-            ToggleAccountUpdates(receiveUpdates);
+            _requestsQueue.Enqueue(SendAccountUpdate);
+            _requestsQueue.Enqueue(() => ToggleAccountUpdates(receiveUpdates));
         }
 
         void ToggleAccountUpdates(bool receiveUpdates)
@@ -589,22 +560,18 @@ namespace Backtester
             _logger.Debug($"Sending account updates...");
             var currentTime = _currentFakeTime;
             _lastAccountUpdate = currentTime;
-            _messageQueue.Enqueue(() => 
-            {
-                Callbacks.updateAccountTime(currentTime.ToString()); //TODO : make sure format is correct
-                Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code);
-                Callbacks.accountDownloadEnd(_fakeAccount.Code);
-            });
+            Callbacks.updateAccountTime(currentTime.ToString()); //TODO : make sure format is correct
+            Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances.First().Value.ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code);
+            Callbacks.accountDownloadEnd(_fakeAccount.Code);
         }
 
         public void RequestContract(int reqId, Contract contract)
         {
-            var cd = new IBApi.ContractDetails();
-            cd.Contract = contract.ToIBApiContract();
             _logger.Debug($"(reqId={reqId}) : Contract {contract} requested.");
-
-            _messageQueue.Enqueue(() => 
+            _requestsQueue.Enqueue(() => 
             { 
+                var cd = new IBApi.ContractDetails();
+                cd.Contract = contract.ToIBApiContract();
                 Callbacks.contractDetails(reqId, cd);
                 Callbacks.contractDetailsEnd(reqId);
             });
@@ -612,11 +579,14 @@ namespace Backtester
 
         public void RequestFiveSecondsBars(int reqId, Contract contract)
         {
-            if(_reqId5SecBar < 0)
+            _requestsQueue.Enqueue(() =>
             {
-                _logger.Debug($"(reqId={reqId}) : 5 sec bars requested.");
-                _reqId5SecBar = reqId;
-            }
+                if (_reqId5SecBar < 0)
+                {
+                    _logger.Debug($"(reqId={reqId}) : 5 sec bars requested.");
+                    _reqId5SecBar = reqId;
+                }
+            });
         }
 
         void OnClockTick_UpdateBarNode(DateTime newTime)
@@ -627,31 +597,31 @@ namespace Backtester
             if (_reqId5SecBar > 0 && newTime.Second % 5 == 0)
             {
                 var b = MarketDataUtils.MakeBar(_currentBarNode, 5);
-                _messageQueue.Enqueue(() =>
-                {
-                    DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
-                    Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
-                });
+                DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
+                Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount);
             }
         }
 
         public void CancelFiveSecondsBarsRequest(int reqId)
         {
-            if(reqId == _reqId5SecBar)
+            _requestsQueue.Enqueue(() =>
             {
-                _logger.Debug($"(reqId={reqId}) : 5 sec bars cancelled.");
-                _reqId5SecBar = -1;
-            }
+                if (reqId == _reqId5SecBar)
+                {
+                    _logger.Debug($"(reqId={reqId}) : 5 sec bars cancelled.");
+                    _reqId5SecBar = -1;
+                }
+            });
         }
 
         public void RequestOpenOrders()
         {
-            if (!_openOrders.Any())
-                return;
-
-            var openOrders = _openOrders;
-            _messageQueue.Enqueue(() =>
+            _requestsQueue.Enqueue(() =>
             {
+                if (!_openOrders.Any())
+                    return;
+
+                var openOrders = _openOrders;
                 foreach (var o in openOrders)
                     Callbacks.openOrder(o.Id, Contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" });
                 Callbacks.openOrderEnd();
@@ -697,10 +667,10 @@ namespace Backtester
 
         public void RequestPositions()
         {
-            _positionRequested = true;
-            SendPosition();
-            _messageQueue.Enqueue(() =>
+            _requestsQueue.Enqueue(() =>
             {
+                _positionRequested = true;
+                SendPosition();
                 Callbacks.positionEnd();
             });
         }
@@ -708,36 +678,37 @@ namespace Backtester
         void SendPosition()
         {
             _logger.Debug($"Sending current position for {Position.Contract}");
-            _messageQueue.Enqueue(() =>
-            {
-                Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
-            });
+            Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
         }
 
         public void CancelPositions()
         {
-            _positionRequested = false;
+            _requestsQueue.Enqueue(() => _positionRequested = false);
         }
 
         public void RequestPnL(int reqId, int contractId)
         {
-            //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
-            _reqIdPnL = reqId;
-            ClockTick += OnClockTick_PnL;
+            _requestsQueue.Enqueue(() =>
+            {
+                //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
+                _reqIdPnL = reqId;
+                ClockTick += OnClockTick_PnL;
+            });
         }
 
         void OnClockTick_PnL(DateTime newTime)
         {
-            _messageQueue.Enqueue(() => 
-            {
-                Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
-            });
+            // TODO : doesn't seem to be working? need to debug
+            Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
         }
 
         public void CancelPnL(int contractId)
         {
-            ClockTick -= OnClockTick_PnL;
-            _reqIdPnL = -1;
+            _requestsQueue.Enqueue(() =>
+            {
+                ClockTick -= OnClockTick_PnL;
+                _reqIdPnL = -1;
+            });
         }
 
         public Task<LinkedList<Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count)
@@ -766,23 +737,23 @@ namespace Backtester
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
-            int nbBars = -1;
-            switch(barSizeStr)
-            {
-                case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
-                case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
-                    throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
-            }
-
             if(!string.IsNullOrEmpty(endDateTime))
                 throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
-
-            LinkedListNode<Bar> first = _currentBarNode;
-            LinkedListNode<Bar> current = first;
-
-            for (int i = 0; i < nbBars; i++, current = current.Previous)
+            
+            _requestsQueue.Enqueue(() => 
             {
-                _messageQueue.Enqueue(() => 
+                int nbBars = -1;
+                switch(barSizeStr)
+                {
+                    case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
+                    case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
+                        throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
+                }
+
+                LinkedListNode<Bar> first = _currentBarNode;
+                LinkedListNode<Bar> current = first;
+
+                for (int i = 0; i < nbBars; i++, current = current.Previous)
                 {
                     Callbacks.historicalData(reqId, new IBApi.Bar(
                         current.Value.Time.ToString(Bar.TWSTimeFormat), 
@@ -793,11 +764,8 @@ namespace Backtester
                         current.Value.Volume, 
                         current.Value.TradeAmount, 
                         0));
-                });
-            }
-
-            _messageQueue.Enqueue(() =>
-            {
+                }
+            
                 Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat));
             });
         }
@@ -812,28 +780,31 @@ namespace Backtester
             if (tickType != "BidAsk")
                 throw new NotImplementedException("Only \"BidAsk\" tick by tick data is implemented");
 
-            _reqIdBidAsk = reqId;
-            BidAskSubscription += SendBidAsk;
+            _requestsQueue.Enqueue(() =>
+            {
+                _reqIdBidAsk = reqId;
+                BidAskSubscription += SendBidAsk;
+            });
         }
 
         void SendBidAsk(BidAsk ba)
         {
-            _messageQueue.Enqueue(() =>
-            {
-                Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
-            });
+            Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk());
         }
 
         public void CancelTickByTickData(int reqId)
         {
-            BidAskSubscription -= SendBidAsk;
-            _reqIdBidAsk = -1;
+            _requestsQueue.Enqueue(() =>
+            {
+                BidAskSubscription -= SendBidAsk;
+                _reqIdBidAsk = -1;
+            });
         }
 
         public void RequestValidOrderIds()
         {
             int next = NextValidOrderId;
-            _messageQueue.Enqueue(() => Callbacks.nextValidId(next));
+            _requestsQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
 
         public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
@@ -845,8 +816,11 @@ namespace Backtester
 
         public void RequestAvailableFunds(int reqId)
         {
-            _messageQueue.Enqueue(() => Callbacks.AccountSummary(reqId, _fakeAccount.Code, "AvailableFunds", _fakeAccount.CashBalances["USD"].ToString(), "USD"));
-            _messageQueue.Enqueue(() => Callbacks.AccountSummaryEnd(reqId));
+            _requestsQueue.Enqueue(() =>
+            {
+                Callbacks.AccountSummary(reqId, _fakeAccount.Code, "AvailableFunds", _fakeAccount.CashBalances["USD"].ToString(), "USD");
+                Callbacks.AccountSummaryEnd(reqId);
+            });
         }
     }
 }
