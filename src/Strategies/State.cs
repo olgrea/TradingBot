@@ -34,12 +34,14 @@ namespace TradingBot.Strategies
 
         internal void ModifyOrder(Order o)
         {
-            _strategy.ModifyOrder(o);
+            if(!IsCancelled(o) && !IsExecuted(o, out _))
+                _strategy.ModifyOrder(o);
         }
 
         internal void CancelOrder(Order o)
         {
-            _strategy.CancelOrder(o);
+            if (!IsCancelled(o) && !IsExecuted(o, out _))
+                _strategy.CancelOrder(o);
         }
 
         internal void PlaceOrder(OrderChain c)
