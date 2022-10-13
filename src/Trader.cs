@@ -191,16 +191,10 @@ namespace TradingBot
                             strategy.Evaluate();
                     }
                 }
-                catch (AggregateException e)
+                catch (OperationCanceledException)
                 {
                     //TODO : verify error handling
-                    if (e.InnerException is OperationCanceledException)
-                    {
-                        _logger.Trace($"Monitoring time task cancelled");
-                        return;
-                    }
-
-                    throw e;
+                    _logger.Trace($"Evaluation task cancelled");
                 }
 
             }, mainToken);
