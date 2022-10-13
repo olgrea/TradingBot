@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
+using MathNet.Numerics;
 
 namespace TradingBot.Strategies
 {
@@ -163,6 +164,21 @@ namespace TradingBot.Strategies
                 return this;
             }
 
+            protected override void InitializeOrders()
+            {
+                _strategy.Executions.TryGetValue(_strategy.BuyOrder.Id, out OrderExecution execution);
+                var qty = execution.Shares;
+
+                // TODO : to test
+                double halfDiff = (_strategy.BollingerBands_1Min.MovingAverage - _strategy.BollingerBands_1Min.LowerBB) / 2;
+                var stop = _strategy.BollingerBands_1Min.LowerBB - halfDiff;
+
+                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
+                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
+
+                _isInitialized = true;
+            }
+
             protected virtual void UpdateOrders()
             {
                 // TODO : modify orders? There are some fees associated to that apparently... need to be careful
@@ -172,47 +188,46 @@ namespace TradingBot.Strategies
 
                 if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
                 {
-                    double stop = double.MinValue;
+                    StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
+
+                    double halfDiff = (_strategy.BollingerBands_1Min.MovingAverage - _strategy.BollingerBands_1Min.LowerBB) / 2;
                     double lowerHalf = (_strategy.BollingerBands_1Min.LowerBB + _strategy.BollingerBands_1Min.MovingAverage) / 2;
                     double lowerQuarter = (_strategy.BollingerBands_1Min.LowerBB + lowerHalf) / 2;
 
-                    if (_strategy.BollingerBands_1Min.LatestBar.Close > _strategy.BollingerBands_1Min.LowerBB)
+                    var stop = _strategy.BollingerBands_1Min.LowerBB - halfDiff;
+                    if (_strategy.BollingerBands_1Min.LatestBar.Close > lowerHalf)
                     {
-                        stop = _strategy.BollingerBands_1Min.LowerBB;
+                        stop = lowerHalf;
                     }
                     else if (_strategy.BollingerBands_1Min.LatestBar.Close > lowerQuarter)
                     {
                         stop = lowerQuarter;
                     }
-                    else if (_strategy.BollingerBands_1Min.LatestBar.Close > lowerHalf)
+                    else if (_strategy.BollingerBands_1Min.LatestBar.Close > _strategy.BollingerBands_1Min.LowerBB)
                     {
-                        stop = lowerHalf;
+                        stop = _strategy.BollingerBands_1Min.LowerBB;
                     }
 
-                    if(stop != double.MinValue)
+                    var previousStop = stopOrder.StopPrice;
+                    var nextStop = Math.Max(previousStop, stop);
+                    if (!nextStop.AlmostEqual(previousStop, 2) && !IsCancelled(stopOrder) && !IsExecuted(stopOrder, out _))
                     {
-                        (_strategy.StopOrder as StopOrder).StopPrice = stop;
+                        stopOrder.StopPrice = nextStop;
                         ModifyOrder(_strategy.StopOrder);
                     }
 
-                    (_strategy.MITOrder as MarketIfTouchedOrder).TouchPrice = _strategy.BollingerBands_1Min.MovingAverage;
-                    ModifyOrder(_strategy.MITOrder);
+                    MarketIfTouchedOrder marketIfTouchedOrder = (_strategy.MITOrder as MarketIfTouchedOrder);
+                    var previousTouch = marketIfTouchedOrder.TouchPrice;
+                    var nextTouch = _strategy.BollingerBands_1Min.MovingAverage;
+
+                    if (!nextTouch.AlmostEqual(previousTouch, 2))
+                    {
+                        marketIfTouchedOrder.TouchPrice = nextTouch;
+                        ModifyOrder(_strategy.MITOrder);
+                    }
                 }
 
                 _lastBar = _strategy.BollingerBands_1Min.LatestBar;
-            }
-
-            protected override void InitializeOrders()
-            {
-                _strategy.Executions.TryGetValue(_strategy.BuyOrder.Id, out OrderExecution execution);
-                var qty = execution.Shares;
-
-                // TODO : to test
-                var stop = execution.AvgPrice * (1-0.003);
-                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
-                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.MovingAverage };
-
-                _isInitialized = true;
             }
         }
 
@@ -246,17 +261,30 @@ namespace TradingBot.Strategies
 
                 if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
                 {
-                    double stop;
+                    StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
+
+                    double stop = (_strategy.BollingerBands_1Min.MovingAverage + _strategy.BollingerBands_1Min.LowerBB) / 2; 
                     if(_strategy.BollingerBands_1Min.LatestBar.Close > _strategy.BollingerBands_1Min.MovingAverage)
+                    {
                         stop = _strategy.BollingerBands_1Min.MovingAverage;
-                    else
-                        stop = (_strategy.BollingerBands_1Min.MovingAverage + _strategy.BollingerBands_1Min.LowerBB) / 2;
+                    }
 
-                    (_strategy.StopOrder as StopOrder).StopPrice = stop;
-                    ModifyOrder(_strategy.StopOrder);
+                    var previousStop = stopOrder.StopPrice;
+                    var nextStop = Math.Max(stop, previousStop);
+                    if (!nextStop.AlmostEqual(previousStop, 2))
+                    {
+                        stopOrder.StopPrice = nextStop;
+                        ModifyOrder(_strategy.StopOrder);
+                    }
 
-                    (_strategy.MITOrder as MarketIfTouchedOrder).TouchPrice = _strategy.BollingerBands_1Min.UpperBB;
-                    ModifyOrder(_strategy.MITOrder);
+                    MarketIfTouchedOrder marketIfTouchedOrder = (_strategy.MITOrder as MarketIfTouchedOrder);
+                    var previousTouch = marketIfTouchedOrder.TouchPrice;
+                    var nextTouch = _strategy.BollingerBands_1Min.UpperBB;
+                    if (!nextTouch.AlmostEqual(previousTouch, 2))
+                    {
+                        marketIfTouchedOrder.TouchPrice = nextTouch;
+                        ModifyOrder(_strategy.MITOrder);
+                    }
                 }
 
                 _lastBar = _strategy.BollingerBands_1Min.LatestBar;
@@ -265,6 +293,8 @@ namespace TradingBot.Strategies
 
         class LetItRideState : State<RSIDivergenceStrategy>
         {
+            protected Bar _lastBar;
+
             public LetItRideState(RSIDivergenceStrategy strategy) : base(strategy){}
 
             public override IState Evaluate()
@@ -281,6 +311,8 @@ namespace TradingBot.Strategies
                     return GetState<MonitoringState>();
                 }
 
+                UpdateOrders();
+
                 return this;
             }
 
@@ -291,10 +323,37 @@ namespace TradingBot.Strategies
                 var qty = execution.Shares;
 
                 // TODO : to test
-                var trlAmount = _strategy.BollingerBands_1Min.UpperBB -  (_strategy.BollingerBands_1Min.UpperBB + _strategy.BollingerBands_1Min.MovingAverage) / 2.0;
-                _strategy.StopOrder = new TrailingStopOrder { Action = OrderAction.SELL, TotalQuantity = qty, TrailingAmount = trlAmount};
-
+                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = _strategy.BollingerBands_1Min.MovingAverage };
                 _isInitialized = true;
+            }
+
+            protected void UpdateOrders()
+            {
+                // TODO : modify orders? There are some fees associated to that apparently... need to be careful
+                // https://www.interactivebrokers.ca/en/accounts/fees/cancelModifyExamples.php
+                // Examples are not very clear. 0.01¢/order? If yes then it's not that bad...
+
+                if (_lastBar != null && _lastBar != _strategy.BollingerBands_1Min.LatestBar)
+                {
+                    StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
+
+                    double stop = _strategy.BollingerBands_1Min.MovingAverage;
+                    //double upperHalf = (_strategy.BollingerBands_1Min.UpperBB + _strategy.BollingerBands_1Min.MovingAverage) / 2;
+                    //if (_strategy.BollingerBands_1Min.LatestBar.Close > upperHalf)
+                    //{
+                    //    stop = upperHalf;
+                    //}
+
+                    var previousStop = stopOrder.StopPrice;
+                    var nextStop = Math.Max(stop, previousStop);
+                    if (!nextStop.AlmostEqual(previousStop, 2))
+                    {
+                        stopOrder.StopPrice = nextStop;
+                        ModifyOrder(_strategy.StopOrder);
+                    }
+                }
+
+                _lastBar = _strategy.BollingerBands_1Min.LatestBar;
             }
         }
 

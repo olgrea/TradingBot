@@ -214,6 +214,7 @@ namespace Backtester
         {
             Debug.Assert(Position != null);
             Debug.Assert(order.Id > 0);
+            Debug.Assert(!_executedOrders.Contains(order));
 
             _requestsQueue.Enqueue(() =>
             {
@@ -265,7 +266,7 @@ namespace Backtester
         void EvaluateOpenOrders(BidAsk bidAsk)
         {
             // TODO : add readerWriter lock : this throws because the collection gets modified
-            foreach(Order o in _openOrders)
+            foreach(Order o in _openOrders.ToList())
             {
                 _logger.Debug($"Evaluating Order {o} at BidAsk : {bidAsk}");
 
@@ -290,8 +291,6 @@ namespace Backtester
                     EvaluateMarketIfTouchedOrder(bidAsk, mito);
                 }
             }
-
-            _openOrders.RemoveAll(o => _executedOrders.Contains(o));
         }
 
         private void EvaluateMarketOrder(BidAsk bidAsk, MarketOrder o)
@@ -428,8 +427,17 @@ namespace Backtester
             _logger.Info($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
+            Debug.Assert(!_executedOrders.Contains(order));
+
             if(order.Action == OrderAction.BUY)
             {
+                if(total > _fakeAccount.CashBalances["USD"])
+                {
+                    _logger.Error($"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {_fakeAccount.CashBalances["USD"]}");
+                    CancelOrder(order.Id);
+                    return;
+                }
+
                 Position.AverageCost = Position.PositionAmount != 0  ? (Position.AverageCost + price) / 2 : price;
                 Position.PositionAmount += order.TotalQuantity;
 
@@ -440,6 +448,13 @@ namespace Backtester
             }
             else if (order.Action == OrderAction.SELL)
             {
+                if (Position.PositionAmount < order.TotalQuantity)
+                {
+                    _logger.Error($"{order} Cannot execute SELL order! Not enough position (required : {order.TotalQuantity}, actual : {Position.PositionAmount}");
+                    CancelOrder(order.Id);
+                    return;
+                }
+
                 Position.PositionAmount -= order.TotalQuantity;
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
@@ -452,6 +467,7 @@ namespace Backtester
 
             var o = _openOrders.First(o => o == order);
             _executedOrders.Add(o);
+            _openOrders.Remove(o);
 
             double commission = GetCommission(Contract, order, price);
             _logger.Debug($"{order} : commission : {commission:c}");
