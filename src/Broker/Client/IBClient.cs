@@ -51,7 +51,7 @@ namespace TradingBot.Broker.Client
 
         public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId)
         {
-            return ConnectAsync(host, port, clientId, CancellationToken.None);
+            return ConnectAsync(host, port, clientId, new CancellationTokenSource(2000).Token);
         }
 
         public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token)
@@ -60,12 +60,18 @@ namespace TradingBot.Broker.Client
             var msg = new ConnectMessage();
             
             var tcsConnect = new TaskCompletionSource<ConnectMessage>();
+            token.ThrowIfCancellationRequested();
+
             var tcsValidId = new TaskCompletionSource<int>();
             var tcsAccount = new TaskCompletionSource<string>();
-
             var nextValidId = new Action<int>(id =>
             {
-                token.ThrowIfCancellationRequested();
+                if(token.IsCancellationRequested)
+                {
+                    tcsValidId.TrySetCanceled();
+                    return;
+                }
+
                 _logger.Trace($"ConnectAsync : next valid id {id}");
                 msg.NextValidOrderId = id;
                 tcsValidId.SetResult(id);
@@ -73,7 +79,12 @@ namespace TradingBot.Broker.Client
 
             var managedAccounts = new Action<string>(acc =>
             {
-                token.ThrowIfCancellationRequested();
+                if (token.IsCancellationRequested)
+                {
+                    tcsAccount.TrySetCanceled();
+                    return;
+                }
+
                 _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
 
                 _accountCode = acc;
@@ -95,7 +106,10 @@ namespace TradingBot.Broker.Client
                 _callbacks.ManagedAccounts -= managedAccounts;
                 _callbacks.Error -= error;
 
-                tcsConnect.SetResult(msg);
+                if (token.IsCancellationRequested)
+                    tcsConnect.TrySetCanceled();
+                else
+                    tcsConnect.SetResult(msg);
             }); ;
 
             return tcsConnect.Task;
