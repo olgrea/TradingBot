@@ -11,6 +11,7 @@ using NLog;
 using System.Diagnostics;
 using TradingBot.Indicators;
 using TradingBot.Utils;
+using TradingBot.Broker.Client.Messages;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -27,7 +28,7 @@ namespace TradingBot.Broker
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
     }
 
-    internal class IBBroker : IBroker
+    internal class IBBroker
     {
         public const int DefaultPort = 7496;
         public const string DefaultIP = "127.0.0.1";
@@ -100,9 +101,6 @@ namespace TradingBot.Broker
 
         internal DataSubscriptions Subscriptions => _subscriptions;
 
-        public event Action ClientConnected;
-        public event Action ClientDisconnected;
-
         // TODO : revert back to dictionary of Action<> ?
         public event Action<Contract, Bar> Bar5SecReceived;
         public event Action<Contract, Bar> Bar1MinReceived;
@@ -157,37 +155,19 @@ namespace TradingBot.Broker
             return DateTimeOffset.FromUnixTimeSeconds(_client.GetCurrentTime().Result).DateTime.ToLocalTime();
         }
 
-        public int GetNextValidOrderId()
+        public async Task<int> GetNextValidOrderId()
         {
-            return GetNextValidOrderIdAsync().Result;
+            return await _client.GetNextValidOrderIdAsync();
         }
 
-        Task<int> GetNextValidOrderIdAsync()
+        public async Task<ConnectMessage> Connect()
         {
-            var resolveResult = new TaskCompletionSource<int>();
-            var nextValidId = new Action<int>(id => resolveResult.TrySetResult(id));
-
-            _client.Callbacks.NextValidId += nextValidId;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _client.Callbacks.NextValidId -= nextValidId;
-            });
-
-            _client.RequestValidOrderIds();
-
-            return resolveResult.Task;
-        }
-
-        public void Connect()
-        {
-            _client.ConnectAsync(DefaultIP, DefaultPort, _clientId).Wait();
-            ClientConnected?.Invoke();
+            return await _client.ConnectAsync(DefaultIP, DefaultPort, _clientId);
         }
                 
-        public void Disconnect()
+        public async void Disconnect()
         {
-            _client.Disconnect();
-            ClientDisconnected?.Invoke();
+            await _client.DisconnectAsync();
             _clientIds.Remove(_clientId);
         }
 

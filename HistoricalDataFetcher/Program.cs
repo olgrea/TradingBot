@@ -10,6 +10,7 @@ using System.Runtime.CompilerServices;
 using NLog;
 using TradingBot.Broker.Client;
 using CommandLine;
+using TradingBot.Broker.Client.Messages;
 
 [assembly: InternalsVisibleToAttribute("Tests")]
 namespace HistoricalDataFetcher
@@ -76,15 +77,14 @@ namespace HistoricalDataFetcher
                 _fetcher = fetcher;
             }
 
-            public override void OnError(ErrorMessage msg)
+            public override bool IsHandled(ErrorMessage msg)
             {
                 switch (msg.ErrorCode)
                 {
                     // TODO : handle pacing violation for when the program has been started and restarted a lot
                     default:
                         //_fetcher.Wait10Minutes();
-                        base.OnError(msg);
-                        break;
+                        return base.IsHandled(msg);
                 }
             }
         }
@@ -106,9 +106,9 @@ namespace HistoricalDataFetcher
 
         }
 
-        public void Start()
+        public async void Start()
         {
-            _broker.Connect();
+            await _broker.Connect();
 
             var contract = _broker.GetContract(_ticker);
             if (contract == null)

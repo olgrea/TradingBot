@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using TradingBot.Broker.Client;
+using TradingBot.Broker.Client.Messages;
 
 namespace TradingBot.Utils
 {
@@ -23,6 +24,12 @@ namespace TradingBot.Utils
             }
 
             return tcs.Task.IsCompletedSuccessfully ? tcs.Task.Result : default(TResult);
+        }
+
+        public static void TaskError<T>(ErrorMessage msg, TaskCompletionSource<T> resolveResult, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            resolveResult.TrySetException(msg);
         }
     }
 }

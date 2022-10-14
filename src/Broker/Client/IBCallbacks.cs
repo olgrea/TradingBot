@@ -5,6 +5,7 @@ using System.Linq;
 using IBApi;
 using NLog;
 using TradingBot.Broker.Accounts;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
@@ -339,19 +340,26 @@ namespace TradingBot.Broker.Client
         }
 
         public IErrorHandler ErrorHandler;
+        public Action<ErrorMessage> Error;
         public void error(Exception e)
         {
-            ErrorHandler?.OnError(new APIError(e));
+            var msg = new ErrorMessage(e);
+            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
+                Error?.Invoke(msg);
         }
 
         public void error(string str)
         {
-            ErrorHandler?.OnError(new ErrorMessage(str));
+            ErrorMessage msg = new ErrorMessage(str);
+            if(ErrorHandler == null || !ErrorHandler.IsHandled(msg)) 
+                Error?.Invoke(msg);
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            ErrorHandler?.OnError(new ErrorMessage(id, errorCode, errorMsg));
+            ErrorMessage msg = new ErrorMessage(id, errorCode, errorMsg);
+            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
+                Error?.Invoke(msg);
         }
 
         #region Not Implemented

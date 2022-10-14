@@ -21,7 +21,7 @@ namespace TradingBot
         ILogger _logger;
         ILogger _csvLogger;
         TraderErrorHandler _errorHandler;
-        IBroker _broker;
+        IBBroker _broker;
 
         DateTime _startTime;
         DateTime _endTime;
@@ -48,7 +48,7 @@ namespace TradingBot
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
             : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
 
-        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBroker broker, string loggerName)
+        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBBroker broker, string loggerName)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(broker != null);
@@ -69,7 +69,7 @@ namespace TradingBot
         }
 
         internal ILogger Logger => _logger;
-        internal IBroker Broker => _broker;
+        internal IBBroker Broker => _broker;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
         internal bool TradingStarted => _tradingStarted;
@@ -79,12 +79,12 @@ namespace TradingBot
             _strategies.Add((IStrategy)Activator.CreateInstance(typeof(TStrategy), this));
         }
 
-        public Task Start()
+        public async Task Start()
         {
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
             
-            _broker.Connect();
+            await _broker.Connect();
 
             _account = _broker.GetAccount();
 
@@ -115,8 +115,9 @@ namespace TradingBot
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
-            StartEvaluationTask();
-            return StartMonitoringTimeTask();
+            var et = StartEvaluationTask();
+            var mt = StartMonitoringTimeTask();
+            await Task.WhenAll(et, mt);
         }
 
         Task StartMonitoringTimeTask()

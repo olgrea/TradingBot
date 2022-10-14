@@ -5,6 +5,7 @@ using System.Diagnostics;
 using TradingBot.Broker.Client;
 using NLog;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 
 namespace TradingBot.Broker.Orders
 {
@@ -51,12 +52,12 @@ namespace TradingBot.Broker.Orders
             return false;
         }
 
-        public void PlaceOrder(Contract contract, Order order)
+        public async void PlaceOrder(Contract contract, Order order)
         {
             if (contract == null || order == null)
                 return;
 
-            order.Id = _broker.GetNextValidOrderId();
+            order.Id = await _broker.GetNextValidOrderId();
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
@@ -95,10 +96,10 @@ namespace TradingBot.Broker.Orders
             _chainOrdersRequested[chain.Order.Id] = chain;
         }
 
-        void PlaceTWSOrderChain(Contract contract, OrderChain chain)
+        async void PlaceTWSOrderChain(Contract contract, OrderChain chain)
         {
             _logger.Debug("Placing order chain using TWS mechanism.");
-            var list = AssignOrderIdsAndFlatten(chain);
+            var list = await AssignOrderIdsAndFlatten(chain);
 
             for (int i = 0; i < list.Count; i++)
             {
@@ -233,14 +234,14 @@ namespace TradingBot.Broker.Orders
             _client.CancelAllOrders();
         }
 
-        List<Order> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)
+        async Task<List<Order>> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)
         {
             if (chain == null || chain.Order == null)
                 return null;
 
             list ??= new List<Order>();
 
-            chain.Order.Id = _broker.GetNextValidOrderId();
+            chain.Order.Id = await _broker.GetNextValidOrderId();
             list.Add(chain.Order);
 
             if (chain.AttachedOrders.Any())
@@ -252,7 +253,7 @@ namespace TradingBot.Broker.Orders
                 {
                     var child = chain.AttachedOrders[i].Order;
                     child.Info.ParentId = parentId;
-                    AssignOrderIdsAndFlatten(chain.AttachedOrders[i], list);
+                    await AssignOrderIdsAndFlatten(chain.AttachedOrders[i], list);
                 }
             }
 
