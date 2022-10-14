@@ -52,7 +52,7 @@ namespace TradingBot.Broker.Client
 
         public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId)
         {
-            return ConnectAsync(host, port, clientId, new CancellationTokenSource(2000).Token);
+            return ConnectAsync(host, port, clientId, CancellationToken.None);
         }
 
         public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token)
