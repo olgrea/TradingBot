@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -22,6 +23,8 @@ namespace Tests.Client
 
         IBClient _client;
         ILogger _logger;
+        ConnectMessage _connectMessage;
+        
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
@@ -33,8 +36,8 @@ namespace Tests.Client
         [SetUp]
         public async Task SetUp()
         {
-            var msg = await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId);
-            Assert.IsTrue(msg.AccountCode == "DU5962304");
+            _connectMessage = await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId);
+            Assert.IsTrue(_connectMessage.AccountCode == "DU5962304");
         }
 
         [TearDown]
@@ -85,6 +88,31 @@ namespace Tests.Client
         }
 
         [Test]
+        public async Task RequestAccountUpdates_ReceivesAccount()
+        {
+            // Setup
+            string accountReceived = null;
+            var tcs = new TaskCompletionSource<string>();
+            var callback = new Action<string>(acc => tcs.SetResult(acc));
+            _client.Callbacks.AccountDownloadEnd += callback;
+
+            // Test
+            try
+            {
+                _client.RequestAccountUpdates(_connectMessage.AccountCode);
+                accountReceived = await tcs.Task;
+            }
+            finally
+            {
+                _client.CancelAccountUpdates(_connectMessage.AccountCode);
+                _client.Callbacks.AccountDownloadEnd -= callback;
+            }
+
+            // Assert
+            Assert.AreEqual(_connectMessage.AccountCode, accountReceived);
+        }
+
+        [Test]
         public async Task GetNextValidIdAsync_ReturnsId()
         {
             // Test
@@ -127,11 +155,15 @@ namespace Tests.Client
         public async Task PlaceOrder()
         {
             // Setup
-            //var order = new Order()
+            var contract = await GetContract("GME");
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
-            var id = await _client.GetNextValidOrderIdAsync();
-            Assert.IsTrue(id > 0);
+            var msg = await _client.PlaceOrderAsync(contract, order);
+
+            // Assert
+        }
 
         Contract MakeDummyContract(string symbol)
         {
@@ -143,6 +175,12 @@ namespace Tests.Client
                 SecType = "STK"
             };
         }
+
+        async Task<Contract> GetContract(string symbol)
+        {
+            var dummy = MakeDummyContract(symbol);
+            var details = await _client.GetContractDetailsAsync(1, dummy);
+            return details.First().Contract;
         }
     }
 }
