@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Linq;
@@ -292,15 +293,13 @@ namespace TradingBot.Broker.Client
             _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
         }
 
-        public Task<PlaceOrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order)
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order)
         {
             if (order?.Id <= 0)
-            {
-                throw new ArgumentException("Order id not set;");
-            }
+                throw new ArgumentException("Order id not set");
 
-            var msg = new PlaceOrderMessage();
-            var tcsMain = new TaskCompletionSource<PlaceOrderMessage>();
+            var msg = new OrderMessage();
+            var tcsMain = new TaskCompletionSource<OrderMessage>();
 
             var tcsOpenOrder = new TaskCompletionSource<bool>();
             var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>( (c, o, oState) =>
@@ -335,8 +334,14 @@ namespace TradingBot.Broker.Client
             var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
             {
                 if (order.Id == oe.OrderId)
-                {
                     msg.OrderExecution = oe;
+            });
+
+            var commissionReport = new Action<CommissionInfo>(ci =>
+            {
+                if (msg.OrderExecution.ExecId == ci.ExecId)
+                {
+                    msg.CommissionInfo = ci;
                     tcsEnd.TrySetResult(true);
                 }
             });
@@ -347,6 +352,7 @@ namespace TradingBot.Broker.Client
             _callbacks.OpenOrderEnd += openOrderEnd;
             _callbacks.OrderStatus += orderStatus;
             _callbacks.ExecDetails += execDetails;
+            _callbacks.CommissionReport += commissionReport;
             _callbacks.Error += error;
 
             _clientSocket.placeOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder());
@@ -356,11 +362,14 @@ namespace TradingBot.Broker.Client
                 _callbacks.OpenOrder -= openOrder;
                 _callbacks.OpenOrderEnd -= openOrderEnd;
                 _callbacks.OrderStatus -= orderStatus;
+                _callbacks.CommissionReport -= commissionReport;
                 _callbacks.ExecDetails -= execDetails;
                 _callbacks.Error -= error;
 
                 if (t.IsCompletedSuccessfully)
                     tcsMain.TrySetResult(msg);
+                else if (t.IsCanceled)
+                    tcsMain.SetCanceled();
                 else
                     tcsMain.TrySetException(new ErrorMessage("An error occured during order placement"));
             });
@@ -372,6 +381,38 @@ namespace TradingBot.Broker.Client
         {
             _logger.Debug($"Requesting order cancellation for order id : {orderId}");
             _clientSocket.cancelOrder(orderId);
+        }
+
+        //TODO : to test
+        public Task<OrderStatus> CancelOrderAsync(int orderId)
+        {
+            if (orderId <= 0)
+                throw new ArgumentException("Invalid order id");
+
+            var tcs = new TaskCompletionSource<OrderStatus>();
+            var orderStatus = new Action<OrderStatus>(oStatus =>
+            {
+                if (orderId == oStatus.Info.OrderId)
+                {
+                    if (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled)
+                        tcs.TrySetResult(oStatus);
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcs, CancellationToken.None));
+
+            _callbacks.OrderStatus += orderStatus;
+            _callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _callbacks.OrderStatus -= orderStatus;
+                _callbacks.Error -= error;
+            });
+
+            _logger.Debug($"Requesting order cancellation for order id : {orderId}");
+            _clientSocket.cancelOrder(orderId);
+
+            return tcs.Task;
         }
 
         public void CancelAllOrders()

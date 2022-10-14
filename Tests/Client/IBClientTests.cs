@@ -11,6 +11,7 @@ using TradingBot.Broker;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.Orders;
+using TradingBot.Utils;
 
 namespace Tests.Client
 {
@@ -43,6 +44,8 @@ namespace Tests.Client
         [TearDown]
         public async Task TearDown()
         {
+            _client.CancelAllOrders();
+            await Task.Delay(50);
             await _client.DisconnectAsync();
             await Task.Delay(50);
         }
@@ -152,15 +155,42 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task PlaceOrder()
+        public async Task PlaceOrder_WithOrderIdNotSet_Throws()
         {
+            // Setup
+            var contract = await GetContract("GME");
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
+
+            // Test
+            Assert.ThrowsAsync<ArgumentException>(async () => await _client.PlaceOrderAsync(contract, order));
+        }
+
+        [Test]
+        public async Task PlaceOrder_WithOrderIdSet_ShouldWork()
+        {
+            if (!IsMarketOpen())
+                Assert.Ignore("Market is not opened");
+
             // Setup
             var contract = await GetContract("GME");
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
             order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
-            var msg = await _client.PlaceOrderAsync(contract, order);
+            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+
+            // Assert
+            Assert.NotNull(orderMessage);
+            Assert.NotNull(orderMessage.OrderStatus);
+            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.PreSubmitted || orderMessage.OrderStatus.Status == Status.Submitted);
+        }
+
+        [Test]
+        public async Task CancelOrder_ShouldWork()
+        {
+            // Setup
+
+            // Test
 
             // Assert
         }
@@ -181,6 +211,13 @@ namespace Tests.Client
             var dummy = MakeDummyContract(symbol);
             var details = await _client.GetContractDetailsAsync(1, dummy);
             return details.First().Contract;
+        }
+
+        bool IsMarketOpen()
+        {
+            var now = DateTime.Now;
+            var timeOfday = now.TimeOfDay;
+            return !now.IsWeekend() && timeOfday > MarketDataUtils.MarketStartTime && timeOfday < MarketDataUtils.MarketEndTime;
         }
     }
 }
