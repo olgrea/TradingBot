@@ -3,12 +3,17 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using IBApi;
 using NLog;
 using TradingBot.Broker.Accounts;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils;
 
+[assembly: InternalsVisibleTo("Tests")]
 namespace TradingBot.Broker.Client
 {
     //TODO : convert all of this to async/await
@@ -21,8 +26,7 @@ namespace TradingBot.Broker.Client
         IBCallbacks _callbacks;
         ILogger _logger;
         Task _processMsgTask;
-        int _nextValidOrderId = -1;
-        string _accountCode;
+        string _accountCode = null;
 
         public IBClient(ILogger logger)
         {
@@ -40,9 +44,64 @@ namespace TradingBot.Broker.Client
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
 
+        public IBCallbacks Callbacks => _callbacks;
+
+
         // TODO : really need to handle market data connection losses. It seems to happen everyday at around 8pm
 
-        public void Connect(string host, int port, int clientId)
+        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId)
+        {
+            return ConnectAsync(host, port, clientId, CancellationToken.None);
+        }
+
+        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token)
+        {
+            //TODO: Handle IB server resets
+            var msg = new ConnectMessage();
+            
+            var tcsConnect = new TaskCompletionSource<ConnectMessage>();
+            var tcsValidId = new TaskCompletionSource<int>();
+            var tcsAccount = new TaskCompletionSource<string>();
+
+            var nextValidId = new Action<int>(id =>
+            {
+                token.ThrowIfCancellationRequested();
+                _logger.Trace($"ConnectAsync : next valid id {id}");
+                msg.NextValidOrderId = id;
+                tcsValidId.SetResult(id);
+            });
+
+            var managedAccounts = new Action<string>(acc =>
+            {
+                token.ThrowIfCancellationRequested();
+                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
+
+                _accountCode = acc;
+                msg.AccountCode = acc;
+                tcsAccount.SetResult(acc);
+            });
+
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcsConnect, token));
+
+            _callbacks.NextValidId += nextValidId;
+            _callbacks.ManagedAccounts += managedAccounts;
+            _callbacks.Error += error;
+
+            Connect(host, port, clientId);
+            
+            Task.WhenAll(tcsValidId.Task, tcsAccount.Task).ContinueWith(t =>
+            {
+                _callbacks.NextValidId -= nextValidId;
+                _callbacks.ManagedAccounts -= managedAccounts;
+                _callbacks.Error -= error;
+
+                tcsConnect.SetResult(msg);
+            }); ;
+
+            return tcsConnect.Task;
+        }
+
+        void Connect(string host, int port, int clientId)
         {
             _clientSocket.eConnect(host, port, clientId);
             _reader = new EReader(_clientSocket, _signal);
@@ -50,44 +109,6 @@ namespace TradingBot.Broker.Client
             _processMsgTask = Task.Run(ProcessMsg);
             _logger.Debug($"Reader started and is listening to messages from TWS");
         }
-
-        public Task<bool> ConnectAsync(string host, int port, int clientId)
-        {
-            //TODO: Handle IB server resets
-
-            var resolveResult = new TaskCompletionSource<bool>();
-            var nextValidId = new Action<int>(id =>
-            {
-                _logger.Trace($"ConnectAsync : next valid id {id}");
-                _nextValidOrderId = id;
-            });
-
-            var managedAccounts = new Action<string>(acc =>
-            {
-                _accountCode = acc;
-                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-                resolveResult.SetResult(_nextValidOrderId > 0 && !string.IsNullOrEmpty(_accountCode));
-            });
-
-            _callbacks.NextValidId += nextValidId;
-            _callbacks.ManagedAccounts += managedAccounts;
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _callbacks.NextValidId -= nextValidId;
-                _callbacks.ManagedAccounts -= managedAccounts;
-
-                if (_nextValidOrderId > 0)
-                {
-                    _logger.Info($"Client {clientId} Connected");
-                }
-            });
-
-            Connect(host, port, clientId);
-
-            return resolveResult.Task;
-        }
-
-        public IBCallbacks Callbacks => _callbacks;
 
         void ProcessMsg()
         {
@@ -98,16 +119,48 @@ namespace TradingBot.Broker.Client
             }
         }
 
-        public void Disconnect()
+        public Task<bool> DisconnectAsync()
         {
+            var tcs = new TaskCompletionSource<bool>();
             _logger.Debug($"Disconnecting from TWS");
+
+            var disconnect = new Action(() => tcs.SetResult(true));
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<bool>.TaskError(msg, tcs, CancellationToken.None));
+
+            _callbacks.ConnectionClosed += disconnect;
+            _callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _callbacks.ConnectionClosed -= disconnect;
+                _callbacks.Error -= error;
+            });
+
             _clientSocket.eDisconnect();
+
+            return tcs.Task;
         }
 
-        public void RequestValidOrderIds()
+        public Task<int> GetNextValidOrderIdAsync()
         {
+            var tcs = new TaskCompletionSource<int>();
+
+            var nextValidId = new Action<int>(id =>
+            {
+                tcs.SetResult(id);
+            });
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<int>.TaskError(msg, tcs, CancellationToken.None));
+
+            _callbacks.NextValidId += nextValidId;
+            _callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _callbacks.NextValidId -= nextValidId;
+                _callbacks.Error -= error;
+            });
+
             _logger.Debug($"Requesting next valid order ids");
             _clientSocket.reqIds(-1); // param is deprecated
+            return tcs.Task;
         }
 
         public Task<Account> GetAccountAsync()

@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using TradingBot.Broker.Accounts;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 
@@ -10,10 +12,10 @@ namespace TradingBot.Broker.Client
     internal interface IIBClient
     {
         IBCallbacks Callbacks { get; }
-        Task<bool> ConnectAsync(string host, int port, int clientId);
-        void Connect(string host, int port, int clientId);
-        void Disconnect();
-        void RequestValidOrderIds();
+        Task<ConnectMessage> ConnectAsync(string host, int port, int clientId);
+        Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token);
+        Task<bool> DisconnectAsync();
+        Task<int> GetNextValidOrderIdAsync();
         Task<Account> GetAccountAsync();
         void RequestAccount(string accountCode, bool receiveUpdates = true);
         void RequestAvailableFunds(int reqId);

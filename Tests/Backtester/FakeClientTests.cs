@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Backtester;
 using HistoricalDataFetcher;
 using NUnit.Framework;
@@ -41,7 +42,7 @@ namespace Tests.Backtester
         Contract _contract;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp()
+        public async Task OneTimeSetUp()
         {
             _downwardBidAsks = Deserialize<BidAsk>(_downwardFileTime, _downwardStart);
             _downwardBars = Deserialize<Bar>(_downwardFileTime, _downwardStart);
@@ -53,7 +54,7 @@ namespace Tests.Backtester
             _upThenDownBars = Deserialize<Bar>(_upThenDownFileTime, _upThenDownStart);
 
             var broker = new IBBroker();
-            broker.Connect();
+            await broker.Connect();
             _contract = broker.GetContract(Ticker);
             broker.Disconnect();
 
@@ -67,9 +68,9 @@ namespace Tests.Backtester
         }
 
         [TearDown]
-        public void TearDown()
+        public async Task TearDown()
         {
-            _fakeClient.Disconnect();
+            await _fakeClient.DisconnectAsync();
         }
 
         /*

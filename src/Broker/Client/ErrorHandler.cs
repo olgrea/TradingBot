@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
 using NLog;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Utils;
 using ILogger = NLog.ILogger;
 
@@ -7,7 +8,7 @@ namespace TradingBot.Broker.Client
 {
     internal interface IErrorHandler
     {
-        void OnError(ErrorMessage msg);
+        bool IsHandled(ErrorMessage msg);
     }
 
     internal class DefaultErrorHandler : IErrorHandler
@@ -19,26 +20,24 @@ namespace TradingBot.Broker.Client
             _logger = logger;
         }
 
-        public virtual void OnError(ErrorMessage msg)
+        public virtual bool IsHandled(ErrorMessage msg)
         {
-            var e = new ClientException(msg.Id, msg.ErrorCode, msg.Message);
-
             if (IsWarningMessage(msg.ErrorCode))
             {
                 _logger.Warn($"{msg.Message} ({msg.ErrorCode})");
-                return;
+                return true;
             }
 
             switch (msg.ErrorCode)
             {
-                case 501: // Already Connected
-                    _logger.Debug(msg.Message);
-                    break;
+                //case 501: // Already Connected
+                //    _logger.Debug(msg.Message);
+                //    return true;
 
                 default:
-                    _logger.Error(e);
+                    _logger.Error(msg);
                     // TODO : recover or kill remaining tasks so the program can exit
-                    throw e;
+                    return false;
             }
         }
 
@@ -71,7 +70,7 @@ namespace TradingBot.Broker.Client
             _broker = broker;
         }
 
-        public override void OnError(ErrorMessage msg)
+        public override bool IsHandled(ErrorMessage msg)
         {
             switch (msg.ErrorCode)
             {
@@ -80,8 +79,7 @@ namespace TradingBot.Broker.Client
                 //    break;
 
                 default:
-                    base.OnError(msg);
-                    break;
+                    return base.IsHandled(msg);
             }
         }
 
@@ -100,7 +98,7 @@ namespace TradingBot.Broker.Client
             _trader = trader;
         }
 
-        public override void OnError(ErrorMessage msg)
+        public override bool IsHandled(ErrorMessage msg)
         {
             switch (msg.ErrorCode)
             {
@@ -108,8 +106,7 @@ namespace TradingBot.Broker.Client
 
 
                 default:
-                    base.OnError(msg);
-                    break;
+                    return base.IsHandled(msg); ;
             }
         }
     }

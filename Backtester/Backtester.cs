@@ -19,26 +19,25 @@ namespace Backtester
 
         DateTime _startTime;
         DateTime _endTime;
-
+        string _ticker;
         Contract _contract;
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
 
         public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
+            _ticker = ticker;
             _startTime = new DateTime(startDate.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
             _endTime = new DateTime(endDate.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
-            
-            var broker = new IBBroker(1337);
-            broker.Connect();
-            _contract = broker.GetContract(ticker);
-            broker.Disconnect();
-
-            FakeClient.TimeDelays.TimeScale = 0.001;
         }
 
-        public void Start()
+        public async void Start()
         {
+            var broker = new IBBroker(1337);
+            await broker.Connect();
+            _contract = broker.GetContract(_ticker);
+            broker.Disconnect();
+
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(day.Item1);
@@ -46,7 +45,7 @@ namespace Backtester
                 var bidAsks = marketData.Item2;
 
                 var fakeClient = new FakeClient(_contract, day.Item1, day.Item2, bars, bidAsks);
-                var broker = new IBBroker(1337, fakeClient);
+                broker = new IBBroker(1337, fakeClient);
                 Trader trader = new Trader(_contract.Symbol, day.Item1, day.Item2, broker, $"{nameof(Backtester)}-{_contract.Symbol}_{_startTime.ToShortDateString()}");
                 trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 

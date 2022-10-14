@@ -11,6 +11,7 @@ using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
@@ -108,21 +109,28 @@ namespace Backtester
             return current;
         }
 
-        public Task<bool> ConnectAsync(string host, int port, int clientId)
+        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            tcs.SetResult(true);
+            var tcs = new TaskCompletionSource<ConnectMessage>();
+            tcs.SetResult(new ConnectMessage() 
+            { 
+                AccountCode = _fakeAccount.Code,
+                NextValidOrderId = NextValidOrderId,
+            });
             return tcs.Task;
         }
 
-        public void Connect(string host, int port, int clientId)
+        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId)
         {
-            ConnectAsync(host, port, clientId).Wait();  
+            return ConnectAsync(host, port, clientId, CancellationToken.None);
         }
 
-        public void Disconnect()
+        public Task<bool> DisconnectAsync()
         {
             Stop();
+            var tcs = new TaskCompletionSource<bool>();
+            tcs.SetResult(true);
+            return tcs.Task;
         }
 
         internal void Start()
@@ -822,6 +830,13 @@ namespace Backtester
         {
             int next = NextValidOrderId;
             _requestsQueue.Enqueue(() => Callbacks.nextValidId(next));
+        }
+
+        public Task<int> GetNextValidOrderIdAsync()
+        {
+            var tcs = new TaskCompletionSource<int>();
+            tcs.SetResult(NextValidOrderId);
+            return tcs.Task;
         }
 
         public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
