@@ -214,57 +214,59 @@ namespace TradingBot.Broker.Client
                 _callbacks.UpdateAccountValue -= updateAccountValue;
                 _callbacks.UpdatePortfolio -= updatePortfolio;
                 _callbacks.AccountDownloadEnd -= accountDownloadEnd;
+
+                _clientSocket.reqAccountUpdates(false, _accountCode);
             });
 
-            RequestAccount(_accountCode, true);
+            _clientSocket.reqAccountUpdates(true, _accountCode);
 
             return resolveResult.Task;
         }
 
-        public void RequestAccount(string accountCode, bool receiveUpdates = true)
+        public void RequestAccountUpdates(string accountCode)
         {
-            _logger.Debug($"Requesting values from account {accountCode}");
-            _clientSocket.reqAccountUpdates(receiveUpdates, accountCode);
+            _logger.Debug($"Requesting account updates for {accountCode}");
+            _clientSocket.reqAccountUpdates(true, accountCode);
         }
 
-        public void RequestAvailableFunds(int reqId)
+        public void CancelAccountUpdates(string accountCode)
         {
-            _logger.Debug($"Requesting available funds");
-            _clientSocket.reqAccountSummary(reqId, "All", "AvailableFunds");
+            _logger.Debug($"Cancelling acount updates from account {accountCode}");
+            _clientSocket.reqAccountUpdates(false, accountCode);
         }
 
-        public void RequestPositions()
+        public void RequestPositionsUpdates()
         {
             _logger.Debug($"Requesting current positions");
             _clientSocket.reqPositions();
         }
 
-        public void CancelPositions()
+        public void CancelPositionsUpdates()
         {
             _logger.Debug($"Cancelling positions updates");
             _clientSocket.cancelPositions();
         }
 
-        public void RequestPnL(int reqId, int contractId)
+        public void RequestPnLUpdates(int reqId, int contractId)
         {
             _logger.Debug($"Requesting PnL for contract id : {contractId}");
             _clientSocket.reqPnLSingle(reqId, _accountCode, "", contractId);
         }
 
-        public void CancelPnL(int reqId)
+        public void CancelPnLUpdates(int reqId)
         {
             _logger.Debug($"Cancelling PnL subscription (reqId={reqId})");
             _clientSocket.cancelPnLSingle(reqId);
         }
 
-        public void RequestFiveSecondsBars(int reqId, Contract contract)
+        public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
             _logger.Debug($"Requesting 5 sec bars for {contract} (reqId={reqId})");
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
             _clientSocket.reqRealTimeBars(reqId, contract.ToIBApiContract(), 5, "TRADES", true, null);
         }
 
-        public void CancelFiveSecondsBarsRequest(int reqId)
+        public void CancelFiveSecondsBarsUpdates(int reqId)
         {
             _logger.Debug($"Cancelling 5 sec bars for reqId={reqId}");
             _clientSocket.cancelRealTimeBars(reqId);
@@ -485,7 +487,7 @@ namespace TradingBot.Broker.Client
             _clientSocket.reqHistoricalTicks(reqId, contract.ToIBApiContract(), startDateTime, endDateTime, nbOfTicks, whatToShow, Convert.ToInt32(onlyRTH), ignoreSize, null);
         }
 
-        public Task<long> GetCurrentTime()
+        public Task<long> GetCurrentTimeAsync()
         {
             var tcs = new TaskCompletionSource<long>();
             

@@ -17,14 +17,14 @@ namespace TradingBot.Broker.Client
         Task<bool> DisconnectAsync();
         Task<int> GetNextValidOrderIdAsync();
         Task<Account> GetAccountAsync();
-        void RequestAccount(string accountCode, bool receiveUpdates = true);
-        void RequestAvailableFunds(int reqId);
-        void RequestPositions();
-        void CancelPositions();
-        void RequestPnL(int reqId, int contractId);
-        void CancelPnL(int contractId);
-        void RequestFiveSecondsBars(int reqId, Contract contract);
-        void CancelFiveSecondsBarsRequest(int reqId);
+        void RequestAccountUpdates(string accountCode);
+        void CancelAccountUpdates(string accountCode);
+        void RequestPositionsUpdates();
+        void CancelPositionsUpdates();
+        void RequestPnLUpdates(int reqId, int contractId);
+        void CancelPnLUpdates(int contractId);
+        void RequestFiveSecondsBarUpdates(int reqId, Contract contract);
+        void CancelFiveSecondsBarsUpdates(int reqId);
         Task<List<Contract>> GetContractsAsync(int reqId, Contract contract);
         void RequestContract(int reqId, Contract contract);
         void RequestOpenOrders();
@@ -36,6 +36,6 @@ namespace TradingBot.Broker.Client
         Task<IEnumerable<BidAsk>> RequestHistoricalTicks(int reqId, Contract contract, DateTime time, int count);
         void RequestTickByTickData(int reqId, Contract contract, string tickType);
         void CancelTickByTickData(int reqId);
-        Task<long> GetCurrentTime();
+        Task<long> GetCurrentTimeAsync();
     }
 }

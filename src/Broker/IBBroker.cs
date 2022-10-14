@@ -152,7 +152,7 @@ namespace TradingBot.Broker
 
         public DateTime GetCurrentTime()
         {
-            return DateTimeOffset.FromUnixTimeSeconds(_client.GetCurrentTime().Result).DateTime.ToLocalTime();
+            return DateTimeOffset.FromUnixTimeSeconds(_client.GetCurrentTimeAsync().Result).DateTime.ToLocalTime();
         }
 
         public async Task<int> GetNextValidOrderId()
@@ -173,7 +173,6 @@ namespace TradingBot.Broker
 
         public Account GetAccount()
         {
-            _subscriptions.AccountUpdates = true;
             return _client.GetAccountAsync().Result;
         }
 
@@ -190,7 +189,7 @@ namespace TradingBot.Broker
             return _client.GetContractsAsync(NextRequestId, sampleContract).Result?.FirstOrDefault();
         }
 
-        public void RequestBidAsk(Contract contract)
+        public void RequestBidAskUpdates(Contract contract)
         {
             if (_subscriptions.BidAsk.ContainsKey(contract))
                 return;
@@ -201,7 +200,7 @@ namespace TradingBot.Broker
             _client.RequestTickByTickData(reqId, contract, "BidAsk");
         }
 
-        public void CancelBidAskRequest(Contract contract)
+        public void CancelBidAskUpdates(Contract contract)
         {
             if (_subscriptions.BidAsk.ContainsKey(contract))
             {
@@ -210,7 +209,7 @@ namespace TradingBot.Broker
             }
         }
 
-        public void RequestBars(Contract contract, BarLength barLength)
+        public void RequestBarsUpdates(Contract contract, BarLength barLength)
         {
             if (_subscriptions.FiveSecBars.ContainsKey(contract))
                 return;
@@ -220,7 +219,7 @@ namespace TradingBot.Broker
             _subscriptions.FiveSecBars[contract] = reqId;
 
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-            _client.RequestFiveSecondsBars(reqId, contract);
+            _client.RequestFiveSecondsBarUpdates(reqId, contract);
         }
 
         void OnFiveSecondsBarReceived(int reqId, MarketData.Bar bar)
@@ -324,7 +323,7 @@ namespace TradingBot.Broker
             }
         }
 
-        public void SubscribeToBars(BarLength barLength, Action<Contract, Bar> callback)
+        public void SubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback)
         {
             switch (barLength)
             {
@@ -334,7 +333,7 @@ namespace TradingBot.Broker
             }
         }
 
-        public void UnsubscribeToBars(BarLength barLength, Action<Contract, Bar> callback)
+        public void UnsubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback)
         {
             switch (barLength)
             {
@@ -354,7 +353,7 @@ namespace TradingBot.Broker
             }
         }
 
-        public void CancelBarsRequest(Contract contract, BarLength barLength)
+        public void CancelBarsUpdates(Contract contract, BarLength barLength)
         {
             if (!HasSubscribers(barLength))
                 return;
@@ -363,7 +362,7 @@ namespace TradingBot.Broker
             if (allBarLengths.All(b => !HasSubscribers(b)))
             {
                 var reqId = _subscriptions.FiveSecBars.First(kvp => kvp.Key == contract).Value;
-                _client.CancelFiveSecondsBarsRequest(reqId);
+                _client.CancelFiveSecondsBarsUpdates(reqId);
                 _fiveSecBars.Remove(contract);
             }
         }
@@ -395,42 +394,48 @@ namespace TradingBot.Broker
 
         public void CancelAllOrders() => _orderManager.CancelAllOrders();
 
-        public void RequestPositions()
+        public void RequestPositionsUpdates()
         {
-            _client.RequestPositions();
+            _client.RequestPositionsUpdates();
             _subscriptions.Positions = true;
         }
 
-        public void CancelPositionsSubscription()
+        public void CancelPositionsUpdates()
         {
             _subscriptions.Positions = false;
-            _client.CancelPositions();
+            _client.CancelPositionsUpdates();
         }
 
-        public void RequestPnL(Contract contract)
+        public void RequestPnLUpdates(Contract contract)
         {
             if (_subscriptions.Pnl.ContainsKey(contract))
                 return;
 
             int reqId = NextRequestId;
             _subscriptions.Pnl[contract] = reqId;
-            _client.RequestPnL(reqId, contract.Id);
+            _client.RequestPnLUpdates(reqId, contract.Id);
         }
 
-        public void CancelPnLSubscription(Contract contract)
+        public void CancelPnLUpdates(Contract contract)
         {
             if (_subscriptions.Pnl.ContainsKey(contract))
             {
-                _client.CancelPnL(_subscriptions.Pnl[contract]);
+                _client.CancelPnLUpdates(_subscriptions.Pnl[contract]);
                 _subscriptions.Pnl.Remove(contract);
             }
+        }
+
+        public void RequestAccountUpdates(string account)
+        {
+            _subscriptions.AccountUpdates = true;
+            _client.RequestAccountUpdates(account);
         }
 
         public void CancelAccountUpdates(string account)
         {
             if (_subscriptions.AccountUpdates)
             {
-                _client.RequestAccount(account, false);
+                _client.CancelAccountUpdates(account);
             }
         }
 

@@ -224,16 +224,17 @@ namespace TradingBot
             {
                 foreach(BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
                 {
-                    Broker.SubscribeToBars(barLength, OnBarReceived);
-                    Broker.RequestBars(Contract, barLength);
+                    Broker.SubscribeToBarUpdateEvent(barLength, OnBarReceived);
+                    Broker.RequestBarsUpdates(Contract, barLength);
                 }
             }
 
             _broker.OrderUpdated += OnOrderUpdated;
             _broker.OrderExecuted += OnOrderExecuted;
 
-            _broker.RequestPositions();
-            _broker.RequestPnL(_contract);
+            _broker.RequestAccountUpdates(_account.Code);
+            _broker.RequestPositionsUpdates();
+            _broker.RequestPnLUpdates(_contract);
         }
 
         void UnsubscribeToData()
@@ -249,13 +250,13 @@ namespace TradingBot
             {
                 foreach (BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
                 {
-                    Broker.UnsubscribeToBars(barLength, OnBarReceived);
-                    Broker.CancelBarsRequest(Contract, barLength);
+                    Broker.UnsubscribeToBarUpdateEvent(barLength, OnBarReceived);
+                    Broker.CancelBarsUpdates(Contract, barLength);
                 }
             }
 
-            _broker.CancelPositionsSubscription();
-            _broker.CancelPnLSubscription(_contract);
+            _broker.CancelPositionsUpdates();
+            _broker.CancelPnLUpdates(_contract);
             _broker.CancelAccountUpdates(_account.Code);
         }
 
