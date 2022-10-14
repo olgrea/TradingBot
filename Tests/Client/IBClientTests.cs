@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +9,7 @@ using NUnit.Framework;
 using TradingBot.Broker;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.Client.Messages;
+using TradingBot.Broker.Orders;
 
 namespace Tests.Client
 {
@@ -43,7 +45,7 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task Connect_OnSuccess_ReturnsRelevantConnectionInfo()
+        public async Task ConnectAsync_OnSuccess_ReturnsRelevantConnectionInfo()
         {
             // Setup
             await _client.DisconnectAsync();
@@ -59,7 +61,7 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task Connect_AlreadyConnected_ThrowsError()
+        public async Task ConnectAsync_AlreadyConnected_ThrowsError()
         {
             // Setup
             await _client.DisconnectAsync();
@@ -71,7 +73,7 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task Connect_CanBeCancelled()
+        public async Task ConnectAsync_CanBeCancelled()
         {
             // Setup
             await _client.DisconnectAsync();
@@ -83,8 +85,57 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task GetNextValidId_ReturnsId()
+        public async Task GetNextValidIdAsync_ReturnsId()
         {
+            // Test
+            var id = await _client.GetNextValidOrderIdAsync();
+            Assert.IsTrue(id > 0);
+        }
+
+        [Test]
+        public async Task GetContractsAsync_ReturnsContract()
+        {
+            // Setup
+            var dummy = new Stock()
+            {
+                Currency = "USD",
+                Exchange = "SMART",
+                Symbol = "GME",
+                SecType = "STK"
+            };
+
+            // Test
+            var contracts = await _client.GetContractsAsync(1, dummy);
+
+            // Assert
+            Assert.NotNull(contracts);
+            Assert.IsNotEmpty(contracts);
+            Assert.IsTrue(contracts.First().Id > 0);
+        }
+
+        [Test]
+        public Task GetContractsAsync_WithInvalidData_Throws()
+        {
+            // Setup
+            var dummy = new Stock()
+            {
+                Currency = "USD",
+                Exchange = "SMART",
+                Symbol = "GMEdasdafafsafaf",
+                SecType = "STK"
+            };
+
+            // Test
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.GetContractsAsync(1, dummy));
+            return Task.CompletedTask;
+        }
+
+        [Test]
+        public async Task PlaceOrder()
+        {
+            // Setup
+            //var order = new Order()
+
             // Test
             var id = await _client.GetNextValidOrderIdAsync();
             Assert.IsTrue(id > 0);
