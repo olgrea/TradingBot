@@ -24,9 +24,9 @@ namespace TradingBot.Broker.Client.Messages
                 {
                     baseMsg += " (";
                     if (ErrorCode >= 0)
-                        baseMsg += $"code={ErrorCode}";
+                        baseMsg += $" code={ErrorCode} ";
                     if (Id >= 0)
-                        baseMsg += $"rId={Id}";
+                        baseMsg += $" rId={Id} ";
                     baseMsg += ")";
                 }
 
