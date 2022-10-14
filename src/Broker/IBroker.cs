@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.MarketData;
@@ -15,7 +16,7 @@ namespace TradingBot.Broker
     {
         void Connect();
         void Disconnect();
-        Accounts.Account GetAccount();
+        public Task<Account> GetAccountAsync(string accountCode);
         void CancelAccountUpdates(string account);
         Contract GetContract(string ticker);
 

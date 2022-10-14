@@ -30,6 +30,7 @@ namespace TradingBot
         CancellationTokenSource _monitoringTimeCancellation;
 
         string _ticker;
+        string _accountCode;
         Account _account;
         Contract _contract;
         double _USDCashBalance;
@@ -84,9 +85,10 @@ namespace TradingBot
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
             
-            await _broker.Connect();
+            var res = await _broker.Connect();
+            _accountCode = res.AccountCode;
 
-            _account = _broker.GetAccount();
+            _account = await _broker.GetAccountAsync(_accountCode);
 
 #if DEBUG
             if (_account.Code != "DU5962304" && _account.Code != "FAKEACCOUNT123")

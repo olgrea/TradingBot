@@ -16,7 +16,6 @@ namespace TradingBot.Broker.Client
         Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token);
         Task<bool> DisconnectAsync();
         Task<int> GetNextValidOrderIdAsync();
-        Task<Account> GetAccountAsync();
         void RequestAccountUpdates(string accountCode);
         void CancelAccountUpdates(string accountCode);
         void RequestPositionsUpdates();

@@ -12,6 +12,7 @@ using System.Diagnostics;
 using TradingBot.Indicators;
 using TradingBot.Utils;
 using TradingBot.Broker.Client.Messages;
+using System.Globalization;
 
 [assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
 [assembly: InternalsVisibleToAttribute("Tests")]
@@ -171,9 +172,64 @@ namespace TradingBot.Broker
             _clientIds.Remove(_clientId);
         }
 
-        public Account GetAccount()
+        public async Task<Account> GetAccountAsync(string accountCode)
         {
-            return _client.GetAccountAsync().Result;
+            var account = new Account() { Code = accountCode };
+
+            var tcs = new TaskCompletionSource<bool>();
+
+            var updateAccountTime = new Action<string>(time =>
+            {
+                _logger.Trace($"GetAccountAsync updateAccountTime : {time}");
+                account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture);
+            });
+            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
+            {
+                _logger.Trace($"GetAccountAsync updateAccountValue : key={key}, value={value}");
+                switch (key)
+                {
+                    case "CashBalance":
+                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "RealizedPnL":
+                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "UnrealizedPnL":
+                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        break;
+                }
+            });
+            var updatePortfolio = new Action<Position>(pos =>
+            {
+                _logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
+                account.Positions.Add(pos);
+            });
+            var accountDownloadEnd = new Action<string>(accountCode =>
+            {
+                _logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
+                tcs.SetResult(true);
+            });
+
+            _client.Callbacks.UpdateAccountTime += updateAccountTime;
+            _client.Callbacks.UpdateAccountValue += updateAccountValue;
+            _client.Callbacks.UpdatePortfolio += updatePortfolio;
+            _client.Callbacks.AccountDownloadEnd += accountDownloadEnd;
+
+            _client.RequestAccountUpdates(accountCode);
+            
+            await tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.UpdateAccountTime -= updateAccountTime;
+                _client.Callbacks.UpdateAccountValue -= updateAccountValue;
+                _client.Callbacks.UpdatePortfolio -= updatePortfolio;
+                _client.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
+
+                _client.CancelAccountUpdates(accountCode);
+            });
+
+            return account;
         }
 
         public async Task<Contract> GetContract(string ticker)
