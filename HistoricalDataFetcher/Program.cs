@@ -110,7 +110,7 @@ namespace HistoricalDataFetcher
         {
             await _broker.Connect();
 
-            var contract = _broker.GetContract(_ticker);
+            var contract = await _broker.GetContract(_ticker);
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {_ticker}");
 

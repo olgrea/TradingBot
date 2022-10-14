@@ -35,7 +35,7 @@ namespace Backtester
         {
             var broker = new IBBroker(1337);
             await broker.Connect();
-            _contract = broker.GetContract(_ticker);
+            _contract = await broker.GetContract(_ticker);
             broker.Disconnect();
 
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))

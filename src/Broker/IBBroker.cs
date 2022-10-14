@@ -176,7 +176,7 @@ namespace TradingBot.Broker
             return _client.GetAccountAsync().Result;
         }
 
-        public Contract GetContract(string ticker)
+        public async Task<Contract> GetContract(string ticker)
         {
             var sampleContract = new Stock()
             {
@@ -186,7 +186,8 @@ namespace TradingBot.Broker
                 SecType = "STK"
             };
 
-            return _client.GetContractsAsync(NextRequestId, sampleContract).Result?.FirstOrDefault();
+            var contractDetails = await _client.GetContractDetailsAsync(NextRequestId, sampleContract);
+            return contractDetails?.FirstOrDefault().Contract;
         }
 
         public void RequestBidAskUpdates(Contract contract)

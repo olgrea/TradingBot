@@ -187,11 +187,11 @@ namespace TradingBot.Broker.Client
             TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
-        public Action<int, Contract> ContractDetails;
-        public void contractDetails(int reqId, ContractDetails contractDetails)
+        public Action<int, ContractDetails> ContractDetails;
+        public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
         {
             _logger.Trace($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
-            ContractDetails?.Invoke(reqId, contractDetails.Contract.ToTBContract());
+            ContractDetails?.Invoke(reqId, contractDetails.ToTBContractDetails());
         }
 
         public Action<int> ContractDetailsEnd;
@@ -374,7 +374,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void bondContractDetails(int reqId, ContractDetails contract)
+        public void bondContractDetails(int reqId, IBApi.ContractDetails contract)
         {
             throw new NotImplementedException();
         }
@@ -504,7 +504,7 @@ namespace TradingBot.Broker.Client
             throw new NotImplementedException();
         }
 
-        public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
+        public void scannerData(int reqId, int rank, IBApi.ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
             throw new NotImplementedException();
         }
