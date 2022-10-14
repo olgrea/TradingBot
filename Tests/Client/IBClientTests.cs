@@ -81,5 +81,13 @@ namespace Tests.Client
             var source = new CancellationTokenSource(5);
             Assert.ThrowsAsync<TaskCanceledException>(async () => await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId, source.Token));
         }
+
+        [Test]
+        public async Task GetNextValidId_ReturnsId()
+        {
+            // Test
+            var id = await _client.GetNextValidOrderIdAsync();
+            Assert.IsTrue(id > 0);
+        }
     }
 }
