@@ -598,18 +598,6 @@ namespace Backtester
             Callbacks.accountDownloadEnd(_fakeAccount.Code);
         }
 
-        public void RequestContract(int reqId, Contract contract)
-        {
-            _logger.Debug($"(reqId={reqId}) : Contract {contract} requested.");
-            _requestsQueue.Enqueue(() => 
-            { 
-                var cd = new IBApi.ContractDetails();
-                cd.Contract = contract.ToIBApiContract();
-                Callbacks.contractDetails(reqId, cd);
-                Callbacks.contractDetailsEnd(reqId);
-            });
-        }
-
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
             _requestsQueue.Enqueue(() =>

@@ -11,6 +11,7 @@ using NLog;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
+using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
 [assembly: InternalsVisibleTo("Tests")]
@@ -177,6 +178,7 @@ namespace TradingBot.Broker.Client
             return tcs.Task;
         }
 
+        // TODO : move to IBroker
         public Task<Account> GetAccountAsync()
         {
             var account = new Account() { Code = _accountCode };
@@ -301,7 +303,7 @@ namespace TradingBot.Broker.Client
 
         public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
         {
-            var resolveResult = new TaskCompletionSource<List<Contract>>();
+            var tcs = new TaskCompletionSource<List<Contract>>();
             var tmpContracts = new List<Contract>();
             var contractDetails = new Action<int, Contract>((rId, c) =>
             {
@@ -316,28 +318,26 @@ namespace TradingBot.Broker.Client
                 if (rId == reqId)
                 {
                     _logger.Trace($"GetContractsAsync end step : set result");
-                    resolveResult.SetResult(tmpContracts);
+                    tcs.SetResult(tmpContracts);
                 }
             });
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ErrorMessage>.TaskError(msg, tcs, CancellationToken.None));
 
             _callbacks.ContractDetails += contractDetails;
             _callbacks.ContractDetailsEnd += contractDetailsEnd;
+            _callbacks.Error += error;
 
-            resolveResult.Task.ContinueWith(t =>
+            tcs.Task.ContinueWith(t =>
             {
                 _callbacks.ContractDetails -= contractDetails;
                 _callbacks.ContractDetailsEnd -= contractDetailsEnd;
+                _callbacks.Error -= error;
             });
 
-            RequestContract(reqId, contract);
-
-            return resolveResult.Task;
-        }
-
-        public void RequestContract(int reqId, Contract contract)
-        {
-            _logger.Debug($"Requesting contract {contract} (reqId={reqId})");
+            _logger.Debug($"Requesting contract details for {contract} (reqId={reqId})");
             _clientSocket.reqContractDetails(reqId, contract.ToIBApiContract());
+
+            return tcs.Task;
         }
 
         public void RequestOpenOrders()
