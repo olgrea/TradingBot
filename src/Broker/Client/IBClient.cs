@@ -301,16 +301,16 @@ namespace TradingBot.Broker.Client
             _clientSocket.cancelTickByTickData(reqId);
         }
 
-        public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
+        public Task<List<ContractDetails>> GetContractDetailsAsync(int reqId, Contract contract)
         {
-            var tcs = new TaskCompletionSource<List<Contract>>();
-            var tmpContracts = new List<Contract>();
-            var contractDetails = new Action<int, Contract>((rId, c) =>
+            var tcs = new TaskCompletionSource<List<ContractDetails>>();
+            var tmpDetails = new List<ContractDetails>();
+            var contractDetails = new Action<int, ContractDetails>((rId, c) =>
             {
                 if (rId == reqId)
                 {
                     _logger.Trace($"GetContractsAsync temp step : adding {c}");
-                    tmpContracts.Add(c);
+                    tmpDetails.Add(c);
                 }
             });
             var contractDetailsEnd = new Action<int>(rId =>
@@ -318,7 +318,7 @@ namespace TradingBot.Broker.Client
                 if (rId == reqId)
                 {
                     _logger.Trace($"GetContractsAsync end step : set result");
-                    tcs.SetResult(tmpContracts);
+                    tcs.SetResult(tmpDetails);
                 }
             });
             var error = new Action<ErrorMessage>(msg => AsyncHelper<ErrorMessage>.TaskError(msg, tcs, CancellationToken.None));

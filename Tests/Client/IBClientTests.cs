@@ -93,40 +93,33 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task GetContractsAsync_ReturnsContract()
+        public async Task GetContractDetailsAsync_WithValidInput_ReturnsContractDetails()
         {
             // Setup
-            var dummy = new Stock()
-            {
-                Currency = "USD",
-                Exchange = "SMART",
-                Symbol = "GME",
-                SecType = "STK"
-            };
+            var dummy = MakeDummyContract("GME");
 
             // Test
-            var contracts = await _client.GetContractsAsync(1, dummy);
+            var details = await _client.GetContractDetailsAsync(1, dummy);
 
             // Assert
-            Assert.NotNull(contracts);
-            Assert.IsNotEmpty(contracts);
-            Assert.IsTrue(contracts.First().Id > 0);
+            Assert.NotNull(details);
+            Assert.IsNotEmpty(details);
+
+            var contract = details.First().Contract;
+            Assert.NotNull(contract);
+            Assert.IsTrue(contract.Id > 0);
+            Assert.AreEqual(dummy.Symbol, contract.Symbol);
+            Assert.AreEqual(dummy.SecType, contract.SecType);
         }
 
         [Test]
-        public Task GetContractsAsync_WithInvalidData_Throws()
+        public Task GetContractDetailsAsync_WithInvalidInput_Throws()
         {
             // Setup
-            var dummy = new Stock()
-            {
-                Currency = "USD",
-                Exchange = "SMART",
-                Symbol = "GMEdasdafafsafaf",
-                SecType = "STK"
-            };
+            var dummy = MakeDummyContract("GMEdasdafafsafaf");
 
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.GetContractsAsync(1, dummy));
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.GetContractDetailsAsync(1, dummy));
             return Task.CompletedTask;
         }
 
@@ -139,6 +132,17 @@ namespace Tests.Client
             // Test
             var id = await _client.GetNextValidOrderIdAsync();
             Assert.IsTrue(id > 0);
+
+        Contract MakeDummyContract(string symbol)
+        {
+            return new Stock()
+            {
+                Currency = "USD",
+                Exchange = "SMART",
+                Symbol = symbol,
+                SecType = "STK"
+            };
+        }
         }
     }
 }

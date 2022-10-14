@@ -57,6 +57,40 @@ namespace TradingBot.Broker.Client
             };
         }
 
+        internal static ContractDetails ToTBContractDetails(this IBApi.ContractDetails details)
+        {
+            return new ContractDetails()
+            {
+                Contract = details.Contract.ToTBContract(),
+                Industry = details.Industry,
+                LongName = details.LongName,
+                MarketName = details.MarketName,
+                MinTick = details.MinTick,
+                OrderTypes = details.OrderTypes,
+                StockType = details.StockType,
+                TimeZoneId = details.TimeZoneId,
+                ValidExchanges = details.ValidExchanges,
+                RegularTradingHours = details.LiquidHours,
+            };
+        }
+
+        internal static IBApi.ContractDetails ToIBApiContractDetails(this ContractDetails details)
+        {
+            return new IBApi.ContractDetails()
+            {
+                Contract = details.Contract.ToIBApiContract(),
+                Industry = details.Industry,
+                LongName = details.LongName,
+                MarketName = details.MarketName,
+                MinTick = details.MinTick,
+                OrderTypes = details.OrderTypes,
+                StockType = details.StockType,
+                TimeZoneId = details.TimeZoneId,
+                ValidExchanges = details.ValidExchanges,
+                LiquidHours = details.RegularTradingHours,
+            };
+        }
+
         internal static IBApi.Order ToIBApiOrder(this Order order)
         {
             var ibo = new IBApi.Order()

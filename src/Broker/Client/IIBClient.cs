@@ -25,7 +25,7 @@ namespace TradingBot.Broker.Client
         void CancelPnLUpdates(int contractId);
         void RequestFiveSecondsBarUpdates(int reqId, Contract contract);
         void CancelFiveSecondsBarsUpdates(int reqId);
-        Task<List<Contract>> GetContractsAsync(int reqId, Contract contract);
+        Task<List<ContractDetails>> GetContractDetailsAsync(int reqId, Contract contract);
         void RequestOpenOrders();
         void PlaceOrder(Contract contract, Order order);
         void CancelOrder(int orderId);

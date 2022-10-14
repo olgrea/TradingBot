@@ -97,7 +97,7 @@ namespace TradingBot
                 throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
             _USDCashBalance = _account.CashBalances["USD"];
 
-            _contract = _broker.GetContract(_ticker);
+            _contract = await _broker.GetContract(_ticker);
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 

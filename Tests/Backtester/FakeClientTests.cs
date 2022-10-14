@@ -55,7 +55,7 @@ namespace Tests.Backtester
 
             var broker = new IBBroker();
             await broker.Connect();
-            _contract = broker.GetContract(Ticker);
+            _contract = await broker.GetContract(Ticker);
             broker.Disconnect();
 
             FakeClient.TimeDelays.TimeScale = 0.001;

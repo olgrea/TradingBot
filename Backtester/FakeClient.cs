@@ -835,10 +835,16 @@ namespace Backtester
             return tcs.Task;
         }
 
-        public Task<List<Contract>> GetContractsAsync(int reqId, Contract contract)
+        public Task<List<ContractDetails>> GetContractDetailsAsync(int reqId, Contract contract)
         {
-            var tcs = new TaskCompletionSource<List<Contract>>();
-            tcs.SetResult(new List<Contract>() { Contract });
+            var tcs = new TaskCompletionSource<List<ContractDetails>>();
+            tcs.SetResult(new List<ContractDetails>() 
+            { 
+                new ContractDetails()
+                {
+                    Contract = Contract,
+                }
+            });
             return tcs.Task;
         }
 
