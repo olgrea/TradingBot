@@ -210,7 +210,7 @@ namespace Backtester
             _passingTimeTask = null;
         }
 
-        public Task<long> GetCurrentTime()
+        public Task<long> GetCurrentTimeAsync()
         {
             var tcs = new TaskCompletionSource<long>();
             DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
@@ -545,13 +545,21 @@ namespace Backtester
             return tcs.Task;
         }
 
-        public void RequestAccount(string accountCode, bool receiveUpdates = true)
+        public void RequestAccountUpdates(string accountCode)
         {
             if (accountCode != _fakeAccount.Code)
                 throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
             _requestsQueue.Enqueue(SendAccountUpdate);
-            _requestsQueue.Enqueue(() => ToggleAccountUpdates(receiveUpdates));
+            _requestsQueue.Enqueue(() => ToggleAccountUpdates(true));
+        }
+
+        public void CancelAccountUpdates(string accountCode)
+        {
+            if (accountCode != _fakeAccount.Code)
+                throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
+
+            _requestsQueue.Enqueue(() => ToggleAccountUpdates(false));
         }
 
         void ToggleAccountUpdates(bool receiveUpdates)
@@ -602,7 +610,7 @@ namespace Backtester
             });
         }
 
-        public void RequestFiveSecondsBars(int reqId, Contract contract)
+        public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
             _requestsQueue.Enqueue(() =>
             {
@@ -627,7 +635,7 @@ namespace Backtester
             }
         }
 
-        public void CancelFiveSecondsBarsRequest(int reqId)
+        public void CancelFiveSecondsBarsUpdates(int reqId)
         {
             _requestsQueue.Enqueue(() =>
             {
@@ -690,7 +698,7 @@ namespace Backtester
             //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
 
-        public void RequestPositions()
+        public void RequestPositionsUpdates()
         {
             _requestsQueue.Enqueue(() =>
             {
@@ -706,12 +714,12 @@ namespace Backtester
             Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost);
         }
 
-        public void CancelPositions()
+        public void CancelPositionsUpdates()
         {
             _requestsQueue.Enqueue(() => _positionRequested = false);
         }
 
-        public void RequestPnL(int reqId, int contractId)
+        public void RequestPnLUpdates(int reqId, int contractId)
         {
             _requestsQueue.Enqueue(() =>
             {
@@ -727,7 +735,7 @@ namespace Backtester
             Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL - _totalCommission, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue);
         }
 
-        public void CancelPnL(int contractId)
+        public void CancelPnLUpdates(int contractId)
         {
             _requestsQueue.Enqueue(() =>
             {
