@@ -537,14 +537,6 @@ namespace Backtester
             });
         }
 
-        public Task<Account> GetAccountAsync()
-        {
-            var tcs = new TaskCompletionSource<Account>();
-            ToggleAccountUpdates(true);
-            tcs.SetResult(_fakeAccount);
-            return tcs.Task;
-        }
-
         public void RequestAccountUpdates(string accountCode)
         {
             if (accountCode != _fakeAccount.Code)

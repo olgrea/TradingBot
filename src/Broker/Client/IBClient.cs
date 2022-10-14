@@ -176,68 +176,7 @@ namespace TradingBot.Broker.Client
             _logger.Debug($"Requesting next valid order ids");
             _clientSocket.reqIds(-1); // param is deprecated
             return tcs.Task;
-        }
-
-        // TODO : move to IBroker
-        public Task<Account> GetAccountAsync()
-        {
-            var account = new Account() { Code = _accountCode };
-
-            var resolveResult = new TaskCompletionSource<Account>();
-
-            var updateAccountTime = new Action<string>(time =>
-            {
-                _logger.Trace($"GetAccountAsync updateAccountTime : {time}");
-                account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture);
-            });
-            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
-            {
-                _logger.Trace($"GetAccountAsync updateAccountValue : key={key}, value={value}");
-                switch (key)
-                {
-                    case "CashBalance":
-                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "RealizedPnL":
-                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "UnrealizedPnL":
-                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
-                        break;
-                }
-            });
-            var updatePortfolio = new Action<Position>(pos =>
-            {
-                _logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
-                account.Positions.Add(pos);
-            });
-            var accountDownloadEnd = new Action<string>(accountCode =>
-            {
-                _logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
-                resolveResult.SetResult(account);
-            });
-
-            _callbacks.UpdateAccountTime += updateAccountTime;
-            _callbacks.UpdateAccountValue += updateAccountValue;
-            _callbacks.UpdatePortfolio += updatePortfolio;
-            _callbacks.AccountDownloadEnd += accountDownloadEnd;
-
-            resolveResult.Task.ContinueWith(t =>
-            {
-                _callbacks.UpdateAccountTime -= updateAccountTime;
-                _callbacks.UpdateAccountValue -= updateAccountValue;
-                _callbacks.UpdatePortfolio -= updatePortfolio;
-                _callbacks.AccountDownloadEnd -= accountDownloadEnd;
-
-                _clientSocket.reqAccountUpdates(false, _accountCode);
-            });
-
-            _clientSocket.reqAccountUpdates(true, _accountCode);
-
-            return resolveResult.Task;
-        }
+        }      
 
         public void RequestAccountUpdates(string accountCode)
         {
@@ -353,12 +292,80 @@ namespace TradingBot.Broker.Client
             _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
         }
 
-        internal void PlaceOrder(Contract contract, Orders.Order order, bool whatIf)
+        public Task<PlaceOrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order)
         {
-            _logger.Debug($"Requesting order placement for {contract} : {order}");
-            var ibo = order.ToIBApiOrder();
-            ibo.WhatIf = whatIf;
-            _clientSocket.placeOrder(ibo.OrderId, contract.ToIBApiContract(), ibo);
+            if (order?.Id <= 0)
+            {
+                throw new ArgumentException("Order id not set;");
+            }
+
+            var msg = new PlaceOrderMessage();
+            var tcsMain = new TaskCompletionSource<PlaceOrderMessage>();
+
+            var tcsOpenOrder = new TaskCompletionSource<bool>();
+            var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>( (c, o, oState) =>
+            {
+                if (order.Id == o.Id)
+                {
+                    msg.Contract = c;
+                    msg.Order = o;
+                    msg.OrderState = oState;
+                    tcsOpenOrder.TrySetResult(true);
+                }
+            });
+
+            var tcsOpenOrderEnd = new TaskCompletionSource<bool>();
+            var openOrderEnd = new Action(() => tcsOpenOrderEnd.SetResult(true));
+
+            // With market orders, when the order is accepted and executes immediately, there commonly will not be any
+            // corresponding orderStatus callbacks. For that reason it is recommended to also monitor the IBApi.EWrapper.execDetails .
+            var tcsEnd = new TaskCompletionSource<bool>();
+            var orderStatus = new Action<OrderStatus>(oStatus =>
+            {
+                if(order.Id == oStatus.Info.OrderId)
+                {
+                    if(oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted)
+                    {
+                        msg.OrderStatus = oStatus;
+                        tcsEnd.TrySetResult(true);
+                    }
+                }
+            });
+
+            var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
+            {
+                if (order.Id == oe.OrderId)
+                {
+                    msg.OrderExecution = oe;
+                    tcsEnd.TrySetResult(true);
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcsMain, CancellationToken.None));
+
+            _callbacks.OpenOrder += openOrder;
+            _callbacks.OpenOrderEnd += openOrderEnd;
+            _callbacks.OrderStatus += orderStatus;
+            _callbacks.ExecDetails += execDetails;
+            _callbacks.Error += error;
+
+            _clientSocket.placeOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder());
+            
+            Task.WhenAll(tcsOpenOrder.Task, tcsOpenOrderEnd.Task, tcsEnd.Task).ContinueWith(t =>
+            {
+                _callbacks.OpenOrder -= openOrder;
+                _callbacks.OpenOrderEnd -= openOrderEnd;
+                _callbacks.OrderStatus -= orderStatus;
+                _callbacks.ExecDetails -= execDetails;
+                _callbacks.Error -= error;
+
+                if (t.IsCompletedSuccessfully)
+                    tcsMain.TrySetResult(msg);
+                else
+                    tcsMain.TrySetException(new ErrorMessage("An error occured during order placement"));
+            });
+
+            return tcsMain.Task;
         }
 
         public void CancelOrder(int orderId)
