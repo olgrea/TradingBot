@@ -15,6 +15,14 @@ namespace TradingBot.Utils
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
+        // Doesn't take holidays into account
+        public static bool IsMarketOpen()
+        {
+            var now = DateTime.Now;
+            var timeOfday = now.TimeOfDay;
+            return !now.IsWeekend() && timeOfday > MarketStartTime && timeOfday < MarketEndTime;
+        }
+
         public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
         {
             if (end <= start)

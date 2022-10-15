@@ -168,12 +168,9 @@ namespace Tests.Client
         [Test]
         public async Task PlaceOrder_WithOrderIdSet_ShouldWork()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore("Market is not opened");
-
             // Setup
             var contract = await GetContract("GME");
-            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
             order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
@@ -211,13 +208,6 @@ namespace Tests.Client
             var dummy = MakeDummyContract(symbol);
             var details = await _client.GetContractDetailsAsync(1, dummy);
             return details.First().Contract;
-        }
-
-        bool IsMarketOpen()
-        {
-            var now = DateTime.Now;
-            var timeOfday = now.TimeOfDay;
-            return !now.IsWeekend() && timeOfday > MarketDataUtils.MarketStartTime && timeOfday < MarketDataUtils.MarketEndTime;
         }
     }
 }

@@ -304,7 +304,7 @@ namespace TradingBot.Broker.Client
             var tcsOpenOrder = new TaskCompletionSource<bool>();
             var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>( (c, o, oState) =>
             {
-                if (order.Id == o.Id)
+                if (order.Id == o.Id && !tcsOpenOrder.Task.IsCompleted)
                 {
                     msg.Contract = c;
                     msg.Order = o;
@@ -313,15 +313,12 @@ namespace TradingBot.Broker.Client
                 }
             });
 
-            var tcsOpenOrderEnd = new TaskCompletionSource<bool>();
-            var openOrderEnd = new Action(() => tcsOpenOrderEnd.SetResult(true));
-
             // With market orders, when the order is accepted and executes immediately, there commonly will not be any
             // corresponding orderStatus callbacks. For that reason it is recommended to also monitor the IBApi.EWrapper.execDetails .
             var tcsEnd = new TaskCompletionSource<bool>();
             var orderStatus = new Action<OrderStatus>(oStatus =>
             {
-                if(order.Id == oStatus.Info.OrderId)
+                if(order.Id == oStatus.Info.OrderId && !tcsEnd.Task.IsCompleted)
                 {
                     if(oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted)
                     {
@@ -333,23 +330,34 @@ namespace TradingBot.Broker.Client
 
             var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
             {
-                if (order.Id == oe.OrderId)
+                if (order.Id == oe.OrderId && !tcsEnd.Task.IsCompleted)
                     msg.OrderExecution = oe;
             });
 
             var commissionReport = new Action<CommissionInfo>(ci =>
             {
-                if (msg.OrderExecution.ExecId == ci.ExecId)
+                if (msg.OrderExecution.ExecId == ci.ExecId && !tcsEnd.Task.IsCompleted)
                 {
                     msg.CommissionInfo = ci;
                     tcsEnd.TrySetResult(true);
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcsMain, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if(!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                {
+                    return;
+                }
+
+                if(tcsMain.TrySetException(msg))
+                {
+                    tcsOpenOrder.TrySetCanceled();
+                    tcsEnd.TrySetCanceled();
+                }
+            });
 
             _callbacks.OpenOrder += openOrder;
-            _callbacks.OpenOrderEnd += openOrderEnd;
             _callbacks.OrderStatus += orderStatus;
             _callbacks.ExecDetails += execDetails;
             _callbacks.CommissionReport += commissionReport;
@@ -357,10 +365,9 @@ namespace TradingBot.Broker.Client
 
             _clientSocket.placeOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder());
             
-            Task.WhenAll(tcsOpenOrder.Task, tcsOpenOrderEnd.Task, tcsEnd.Task).ContinueWith(t =>
+            Task.WhenAll(tcsOpenOrder.Task, tcsEnd.Task).ContinueWith(t =>
             {
                 _callbacks.OpenOrder -= openOrder;
-                _callbacks.OpenOrderEnd -= openOrderEnd;
                 _callbacks.OrderStatus -= orderStatus;
                 _callbacks.CommissionReport -= commissionReport;
                 _callbacks.ExecDetails -= execDetails;

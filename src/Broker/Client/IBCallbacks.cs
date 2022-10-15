@@ -217,6 +217,9 @@ namespace TradingBot.Broker.Client
         }
 
         public Action OpenOrderEnd;
+        // TODO : use this when disconnection occurs?
+        // This seems to be called along with "openOrder" ONLY when the client connects and there are opened orders.
+        // This is not called when placing an order.
         public void openOrderEnd()
         {
             _logger.Trace($"openOrderEnd");
