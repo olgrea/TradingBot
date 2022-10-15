@@ -18,8 +18,6 @@ namespace TradingBot.Broker
     {
         event Action<Contract, BidAsk> BidAskReceived;
         event Action<string, string, string, string> AccountValueUpdated;
-        event Action<Contract, Bar> Bar5SecReceived;
-        event Action<Contract, Bar> Bar1MinReceived;
         event Action<Order, OrderStatus> OrderUpdated;
         event Action<OrderExecution, CommissionInfo> OrderExecuted;
         event Action<Position> PositionReceived;
@@ -58,10 +56,7 @@ namespace TradingBot.Broker
         void RequestPositionsUpdates();
         void CancelPositionsUpdates();
 
-        IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count);
         Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count);
-
-        IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count);
         Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count);
 
         Task<int> GetNextValidOrderIdAsync();

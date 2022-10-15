@@ -32,82 +32,29 @@ namespace TradingBot.Broker
 
     internal class IBBroker : IBroker
     {
+        static HashSet<int> _clientIds = new HashSet<int>();
+        static Random rand = new Random();
+
         public const int DefaultPort = 7496;
         public const string DefaultIP = "127.0.0.1";
 
-        static HashSet<int> _clientIds = new HashSet<int>();
-        static Random rand = new Random();
-        
         int _clientId = 1337;
         int _reqId = 0;
         string _accountCode = null;
-
-        DataSubscriptions _subscriptions;
+        DataSubscriptions _subscriptions = new DataSubscriptions();
         IIBClient _client;
         ILogger _logger;
         OrderManager _orderManager;
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
         int NextRequestId => _reqId++;
-
-        public IBBroker()
-        {
-            var clientId = rand.Next();
-            if (!IsValid(clientId))
-                throw new ArgumentException($"The client id {clientId} is already assigned.");
-
-            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
-            _client = new IBClient(_logger);
-            Init(_client, _logger);
-        }
-
-        public IBBroker(int clientId)
-        {
-            if (!IsValid(clientId))
-                throw new ArgumentException($"The client id {clientId} is already assigned.");
-            
-            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
-            _client = new IBClient(_logger);
-            Init(_client, _logger);
-        }
-
-        internal IBBroker(int clientId, IIBClient client)
-        {
-            if (!IsValid(clientId))
-                throw new ArgumentException($"The client id {clientId} is already assigned.");
-
-            _logger = LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}");
-            _client = client;
-            Init(_client, _logger);
-        }
-
-        bool IsValid(int clientId)
-        {
-            if (_clientIds.Contains(clientId))
-                return false;
-
-            _clientId = clientId;
-            _clientIds.Add(clientId);
-            return true;
-        }
-
-        void Init(IIBClient client, ILogger logger)
-        {
-            _subscriptions = new DataSubscriptions();
-
-            _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
-            _client.Callbacks.PnlSingle += PnlSingle;
-            _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
-
-            _orderManager = new OrderManager(this, _client, _logger);
-        }
-
         internal DataSubscriptions Subscriptions => _subscriptions;
 
-        // TODO : revert back to dictionary of Action<> ?
-        public event Action<Contract, Bar> Bar5SecReceived;
-        public event Action<Contract, Bar> Bar1MinReceived;
+        #region Events
 
+        // TODO : revert back to dictionary of Action<> ?
+        event Action<Contract, Bar> Bar5SecReceived;
+        event Action<Contract, Bar> Bar1MinReceived;
         public event Action<Contract, BidAsk> BidAskReceived;
 
         public event Action<string, string, string, string> AccountValueUpdated
@@ -123,12 +70,6 @@ namespace TradingBot.Broker
         }
 
         public event Action<PnL> PnLReceived;
-
-        public IErrorHandler ErrorHandler
-        {
-            get => _client.Callbacks.ErrorHandler;
-            set => _client.Callbacks.ErrorHandler = value;
-        }
         
         public event Action<Order, OrderStatus> OrderUpdated
         {
@@ -146,6 +87,57 @@ namespace TradingBot.Broker
         {
             add => _client.Callbacks.CurrentTime += value;
             remove => _client.Callbacks.CurrentTime -= value;
+        }
+
+        public IErrorHandler ErrorHandler
+        {
+            get => _client.Callbacks.ErrorHandler;
+            set => _client.Callbacks.ErrorHandler = value;
+        }
+
+        #endregion Events
+
+        public IBBroker()
+        {
+            Init(rand.Next(), null, null);
+        }
+
+        public IBBroker(int clientId)
+        {
+            Init(clientId, null, null);
+        }
+
+        internal IBBroker(int clientId, IIBClient client)
+        {
+            Init(clientId, client, null);
+        }
+
+        void Init(int clientId, IIBClient client, ILogger logger)
+        {
+            if (!IsValidClientId(clientId))
+                throw new ArgumentException($"The client id {clientId} is already assigned.");
+
+            logger ??= LogManager.GetLogger($"{nameof(IBBroker)}-{clientId}");
+            client ??= new IBClient(logger);
+
+            _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
+            _client.Callbacks.PnlSingle += PnlSingle;
+            _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
+
+            _clientId = clientId;
+            _client = client;
+            _logger = logger;
+            _orderManager = new OrderManager(this, _client, _logger);
+        }
+
+        bool IsValidClientId(int clientId)
+        {
+            if (_clientIds.Contains(clientId))
+                return false;
+
+            _clientId = clientId;
+            _clientIds.Add(clientId);
+            return true;
         }
 
         public Task<ConnectMessage> ConnectAsync()
@@ -749,13 +741,13 @@ namespace TradingBot.Broker
             }
         }
 
-        public void InitIndicators(Contract contract, IEnumerable<IIndicator> indicators)
+        public async void InitIndicators(Contract contract, IEnumerable<IIndicator> indicators)
         {
             if (!indicators.Any())
                 return;
 
             var longestTime = indicators.Max(i => i.NbPeriods * (int)i.BarLength);
-            var pastBars = GetPastBars(contract, BarLength._5Sec, longestTime/(int)BarLength._5Sec).ToList();
+            var pastBars = await GetPastBars(contract, BarLength._5Sec, longestTime/(int)BarLength._5Sec);
 
             //TODO : remove bars from indicators? I don't know what I was thinking...
             foreach(Bar bar in pastBars)
@@ -764,9 +756,9 @@ namespace TradingBot.Broker
             }
         }
 
-        public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
+        async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return GetHistoricalDataAsync(contract, barLength, default(DateTime), count).Result;   
+            return await GetHistoricalDataAsync(contract, barLength, default(DateTime), count);   
         }
    
         internal IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, DateTime endDateTime, int count)
