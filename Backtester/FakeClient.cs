@@ -6,7 +6,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
 using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
@@ -220,33 +219,48 @@ namespace Backtester
 
         public void PlaceOrder(Contract contract, Order order)
         {
+            if (order?.Id <= 0)
+                throw new ArgumentException("Order id not set");
+            
             Debug.Assert(Position != null);
-            Debug.Assert(order.Id > 0);
             Debug.Assert(!_executedOrders.Contains(order));
 
             _requestsQueue.Enqueue(() =>
             {
-                var openOrder = _openOrders.FirstOrDefault(o => o == order);
-                if (openOrder == null)
-                {
-                    //TODO validate order : enough cash to buy, enough shares to sell
-                    _openOrders.Add(order);
-
-                    _logger.Debug($"New order submitted : {order}");
-                    var orderState = new IBApi.OrderState() { Status = "Submitted" };
-                    Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
-                }
-                else //modify order
-                {
-                    //TODO : handle fees when modifying/cancelling order
-
-                    _logger.Debug($"Order modified : {order}");
-                    openOrder = order;
-                }
-
-                //TODO : validate callback order. It should reflect what TWS does
-                Callbacks.orderStatus(order.Id, "Submitted", 0,0,0,0,0,0,0, "", 0);
+                PlaceOrderInternal(contract, order);
             });
+        }
+
+        private void PlaceOrderInternal(Contract contract, Order order)
+        {
+            var openOrder = _openOrders.FirstOrDefault(o => o == order);
+            if (openOrder == null)
+            {
+                //TODO validate order : enough cash to buy, enough shares to sell
+                _openOrders.Add(order);
+
+                _logger.Debug($"New order submitted : {order}");
+                var orderState = new IBApi.OrderState() { Status = "Submitted" };
+                Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
+            }
+            else //modify order
+            {
+                //TODO : handle fees when modifying/cancelling order
+
+                _logger.Debug($"Order modified : {order}");
+                openOrder = order;
+            }
+
+            //TODO : validate callback order. It should reflect what TWS does
+            Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0);
+        }
+
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order)
+        {
+            var tcs = new TaskCompletionSource<OrderMessage>();
+
+
+            return tcs.Task;
         }
 
         double GetCommission(Contract contract, Order order, double price)
