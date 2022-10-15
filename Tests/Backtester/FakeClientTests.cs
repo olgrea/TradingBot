@@ -54,9 +54,9 @@ namespace Tests.Backtester
             _upThenDownBars = Deserialize<Bar>(_upThenDownFileTime, _upThenDownStart);
 
             var broker = new IBBroker();
-            await broker.Connect();
-            _contract = await broker.GetContract(Ticker);
-            broker.Disconnect();
+            await broker.ConnectAsync();
+            _contract = await broker.GetContractAsync(Ticker);
+            await broker.DisconnectAsync();
 
             FakeClient.TimeDelays.TimeScale = 0.001;
         }

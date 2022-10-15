@@ -108,20 +108,15 @@ namespace Backtester
             return current;
         }
 
-        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId, CancellationToken token)
+        public void Connect(string host, int port, int clientId)
         {
-            var tcs = new TaskCompletionSource<ConnectMessage>();
-            tcs.SetResult(new ConnectMessage() 
-            { 
-                AccountCode = _fakeAccount.Code,
-                NextValidOrderId = NextValidOrderId,
-            });
-            return tcs.Task;
+            _requestsQueue.Enqueue(() => Callbacks.nextValidId(NextValidOrderId));
+            _requestsQueue.Enqueue(() => Callbacks.managedAccounts(_fakeAccount.Code));
         }
 
-        public Task<ConnectMessage> ConnectAsync(string host, int port, int clientId)
+        public void Disconnect()
         {
-            return ConnectAsync(host, port, clientId, CancellationToken.None);
+            _requestsQueue.Enqueue(() => Callbacks.connectionClosed());
         }
 
         public Task<bool> DisconnectAsync()
@@ -209,12 +204,13 @@ namespace Backtester
             _passingTimeTask = null;
         }
 
-        public Task<long> GetCurrentTimeAsync()
+        public void RequestCurrentTime()
         {
-            var tcs = new TaskCompletionSource<long>();
-            DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
-            tcs.SetResult(dto.ToUnixTimeSeconds());
-            return tcs.Task;
+            _requestsQueue.Enqueue(() =>
+            {
+                DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
+                Callbacks.currentTime(dto.ToUnixTimeSeconds());
+            });
         }
 
         public void PlaceOrder(Contract contract, Order order)
@@ -227,40 +223,27 @@ namespace Backtester
 
             _requestsQueue.Enqueue(() =>
             {
-                PlaceOrderInternal(contract, order);
+                var openOrder = _openOrders.FirstOrDefault(o => o == order);
+                if (openOrder == null)
+                {
+                    //TODO validate order : enough cash to buy, enough shares to sell
+                    _openOrders.Add(order);
+
+                    _logger.Debug($"New order submitted : {order}");
+                    var orderState = new IBApi.OrderState() { Status = "Submitted" };
+                    Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
+                }
+                else //modify order
+                {
+                    //TODO : handle fees when modifying/cancelling order
+
+                    _logger.Debug($"Order modified : {order}");
+                    openOrder = order;
+                }
+
+                //TODO : validate callback order. It should reflect what TWS does
+                Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0);
             });
-        }
-
-        private void PlaceOrderInternal(Contract contract, Order order)
-        {
-            var openOrder = _openOrders.FirstOrDefault(o => o == order);
-            if (openOrder == null)
-            {
-                //TODO validate order : enough cash to buy, enough shares to sell
-                _openOrders.Add(order);
-
-                _logger.Debug($"New order submitted : {order}");
-                var orderState = new IBApi.OrderState() { Status = "Submitted" };
-                Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState);
-            }
-            else //modify order
-            {
-                //TODO : handle fees when modifying/cancelling order
-
-                _logger.Debug($"Order modified : {order}");
-                openOrder = order;
-            }
-
-            //TODO : validate callback order. It should reflect what TWS does
-            Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0);
-        }
-
-        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order)
-        {
-            var tcs = new TaskCompletionSource<OrderMessage>();
-
-
-            return tcs.Task;
         }
 
         double GetCommission(Contract contract, Order order, double price)
@@ -745,30 +728,6 @@ namespace Backtester
             });
         }
 
-        public Task<LinkedList<Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count)
-        {
-            var tcs = new TaskCompletionSource<LinkedList<Bar>>();
-
-            if(endDateTime != default(DateTime))
-                throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
-
-            LinkedList<Bar> list = new LinkedList<Bar>();
-            LinkedListNode<Bar> first = _currentBarNode;
-            LinkedListNode<Bar> current = first;
-
-            int nbBars = count * (int)barLength;
-            for (int i = 0; i <= nbBars; i++, current = current.Previous)
-            {
-                if(i != 0 && i % (int)barLength == 0)
-                {
-                    list.AddFirst(MarketDataUtils.MakeBar(current, (int)barLength));
-                }
-            }
-
-            tcs.SetResult(list);
-            return tcs.Task;
-        }
-
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
             if(!string.IsNullOrEmpty(endDateTime))
@@ -804,7 +763,7 @@ namespace Backtester
             });
         }
 
-        public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(int reqId, Contract contract, DateTime time, int count)
+        public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
             throw new NotImplementedException();
         }
@@ -841,33 +800,15 @@ namespace Backtester
             _requestsQueue.Enqueue(() => Callbacks.nextValidId(next));
         }
 
-        public Task<int> GetNextValidOrderIdAsync()
+        public void RequestContractDetails(int reqId, Contract contract)
         {
-            var tcs = new TaskCompletionSource<int>();
-            tcs.SetResult(NextValidOrderId);
-            return tcs.Task;
-        }
-
-        public Task<List<ContractDetails>> GetContractDetailsAsync(int reqId, Contract contract)
-        {
-            var tcs = new TaskCompletionSource<List<ContractDetails>>();
-            tcs.SetResult(new List<ContractDetails>() 
-            { 
-                new ContractDetails()
-                {
-                    Contract = Contract,
-                }
-            });
-            return tcs.Task;
-        }
-
-        public void RequestAvailableFunds(int reqId)
-        {
-            _requestsQueue.Enqueue(() =>
+            var details = new IBApi.ContractDetails()
             {
-                Callbacks.AccountSummary(reqId, _fakeAccount.Code, "AvailableFunds", _fakeAccount.CashBalances["USD"].ToString(), "USD");
-                Callbacks.AccountSummaryEnd(reqId);
-            });
+                Contract = contract.ToIBApiContract(),
+            };
+
+            _requestsQueue.Enqueue(() => Callbacks.contractDetails(reqId, details));
+            _requestsQueue.Enqueue(() => Callbacks.contractDetailsEnd(reqId));
         }
     }
 }
