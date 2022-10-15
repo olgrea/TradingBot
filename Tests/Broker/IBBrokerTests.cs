@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using NLog;
 using NUnit.Framework;
 using TradingBot.Broker;
@@ -10,40 +11,33 @@ using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
-namespace Tests.Client
+namespace Tests.Broker
 {
     [TestFixture]
-    internal class IBClientTests
+    internal class IBBrokerTests
     {
-        const int DefaultPort = 7496;
-        const string DefaultIP = "127.0.0.1";
-        const int DefaultClientId = 191919;
-
-        IBClient _client;
-        ILogger _logger;
+        IBBroker _broker;
         ConnectMessage _connectMessage;
-        
 
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            _logger = LogManager.GetLogger($"{nameof(IBClientTests)}");
-            _client = new IBClient(_logger);
+            _broker = new IBBroker(191919);
         }
 
         [SetUp]
         public async Task SetUp()
         {
-            _connectMessage = await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId);
+            _connectMessage = await _broker.ConnectAsync();
             Assert.IsTrue(_connectMessage.AccountCode == "DU5962304");
         }
 
         [TearDown]
         public async Task TearDown()
         {
-            _client.CancelAllOrders();
+            _broker.CancelAllOrders();
             await Task.Delay(50);
-            await _client.DisconnectAsync();
+            await _broker.DisconnectAsync();
             await Task.Delay(50);
         }
 
@@ -51,11 +45,11 @@ namespace Tests.Client
         public async Task ConnectAsync_OnSuccess_ReturnsRelevantConnectionInfo()
         {
             // Setup
-            await _client.DisconnectAsync();
+            await _broker.DisconnectAsync();
             await Task.Delay(50);
 
             // Test
-            var msg = await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId);
+            var msg = await _broker.ConnectAsync();
 
             // Assert
             Assert.IsNotNull(msg);
@@ -67,24 +61,24 @@ namespace Tests.Client
         public async Task ConnectAsync_AlreadyConnected_ThrowsError()
         {
             // Setup
-            await _client.DisconnectAsync();
+            await _broker.DisconnectAsync();
             await Task.Delay(50);
-            await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId);
+            await _broker.ConnectAsync();
             
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId)); 
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.ConnectAsync()); 
         }
 
         [Test]
         public async Task ConnectAsync_CanBeCancelled()
         {
             // Setup
-            await _client.DisconnectAsync();
+            await _broker.DisconnectAsync();
             await Task.Delay(50);
 
             // Test
             var source = new CancellationTokenSource(5);
-            Assert.ThrowsAsync<TaskCanceledException>(async () => await _client.ConnectAsync(DefaultIP, DefaultPort, DefaultClientId, source.Token));
+            Assert.ThrowsAsync<TaskCanceledException>(async () => await _broker.ConnectAsync(source.Token));
         }
 
         [Test]
@@ -93,19 +87,19 @@ namespace Tests.Client
             // Setup
             string accountReceived = null;
             var tcs = new TaskCompletionSource<string>();
-            var callback = new Action<string>(acc => tcs.SetResult(acc));
-            _client.Callbacks.AccountDownloadEnd += callback;
+            var callback = new Action<string, string, string, string>( (key, value, currency, acc) => tcs.SetResult(acc));
+            _broker.AccountValueUpdated += callback;
 
             // Test
             try
             {
-                _client.RequestAccountUpdates(_connectMessage.AccountCode);
+                _broker.RequestAccountUpdates(_connectMessage.AccountCode);
                 accountReceived = await tcs.Task;
             }
             finally
             {
-                _client.CancelAccountUpdates(_connectMessage.AccountCode);
-                _client.Callbacks.AccountDownloadEnd -= callback;
+                _broker.CancelAccountUpdates(_connectMessage.AccountCode);
+                _broker.AccountValueUpdated -= callback;
             }
 
             // Assert
@@ -116,7 +110,7 @@ namespace Tests.Client
         public async Task GetNextValidIdAsync_ReturnsId()
         {
             // Test
-            var id = await _client.GetNextValidOrderIdAsync();
+            var id = await _broker.GetNextValidOrderIdAsync();
             Assert.IsTrue(id > 0);
         }
 
@@ -127,7 +121,7 @@ namespace Tests.Client
             var dummy = MakeDummyContract("GME");
 
             // Test
-            var details = await _client.GetContractDetailsAsync(1, dummy);
+            var details = await _broker.GetContractDetailsAsync(dummy);
 
             // Assert
             Assert.NotNull(details);
@@ -147,7 +141,7 @@ namespace Tests.Client
             var dummy = MakeDummyContract("GMEdasdafafsafaf");
 
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.GetContractDetailsAsync(1, dummy));
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.GetContractDetailsAsync(dummy));
             await Task.CompletedTask;
         }
 
@@ -159,7 +153,7 @@ namespace Tests.Client
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
 
             // Test
-            Assert.ThrowsAsync<ArgumentException>(async () => await _client.PlaceOrderAsync(contract, order));
+            Assert.ThrowsAsync<ArgumentException>(async () => await _broker.PlaceOrderAsync(contract, order));
         }
 
         [Test]
@@ -171,14 +165,14 @@ namespace Tests.Client
 
             // Setup
             var dummy = MakeDummyContract("GME");
-            var details = await _client.GetContractDetailsAsync(1, dummy);
+            var details = await _broker.GetContractDetailsAsync(dummy);
             var contract = details.First().Contract;
 
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-            order.Id = await _client.GetNextValidOrderIdAsync();
+            order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
             Assert.NotNull(orderMessage);
@@ -198,10 +192,10 @@ namespace Tests.Client
             // Setup
             var contract = await GetContract("GME");
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-            order.Id = await _client.GetNextValidOrderIdAsync();
+            order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
             Assert.NotNull(orderMessage);
@@ -220,10 +214,10 @@ namespace Tests.Client
             // Setup
             var contract = await GetContract("GME");
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-            order.Id = await _client.GetNextValidOrderIdAsync();
+            order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
             Assert.NotNull(orderMessage);
@@ -241,10 +235,10 @@ namespace Tests.Client
             // Setup
             var contract = await GetContract("GME");
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 500000000000};
-            order.Id = await _client.GetNextValidOrderIdAsync();
+            order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.PlaceOrderAsync(contract, order));
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.PlaceOrderAsync(contract, order));
         }
 
         [Test]
@@ -257,7 +251,7 @@ namespace Tests.Client
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            OrderStatus orderStatus = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
+            OrderStatus orderStatus = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
 
             // Assert
             Assert.NotNull(orderStatus);
@@ -279,14 +273,14 @@ namespace Tests.Client
         {
             var contract = await GetContract("GME");
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-            order.Id = await _client.GetNextValidOrderIdAsync();
-            return await _client.PlaceOrderAsync(contract, order);
+            order.Id = await _broker.GetNextValidOrderIdAsync();
+            return await _broker.PlaceOrderAsync(contract, order);
         }
 
         async Task<Contract> GetContract(string symbol)
         {
             var dummy = MakeDummyContract(symbol);
-            var details = await _client.GetContractDetailsAsync(1, dummy);
+            var details = await _broker.GetContractDetailsAsync(dummy);
             return details.First().Contract;
         }
     }

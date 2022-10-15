@@ -58,11 +58,11 @@ namespace TradingBot.Broker.Client
             UpdateAccountTime?.Invoke(timestamp);
         }
 
-        public Action<string, string, string> UpdateAccountValue;
+        public Action<string, string, string, string> UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
             _logger.Trace($"account value : {key} {value} {currency}");
-            UpdateAccountValue?.Invoke(key, value, currency);
+            UpdateAccountValue?.Invoke(key, value, currency, accountName);
 
             //TODO : handle "AccountReady"
             //case "AccountReady":
