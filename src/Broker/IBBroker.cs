@@ -110,7 +110,7 @@ namespace TradingBot.Broker
 
         public event Action<Contract, BidAsk> BidAskReceived;
 
-        public event Action<string, string, string> AccountValueUpdated
+        public event Action<string, string, string, string> AccountValueUpdated
         {
             add => _client.Callbacks.UpdateAccountValue += value;
             remove => _client.Callbacks.UpdateAccountValue -= value;
@@ -269,7 +269,7 @@ namespace TradingBot.Broker
                 _logger.Trace($"GetAccountAsync updateAccountTime : {time}");
                 account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture);
             });
-            var updateAccountValue = new Action<string, string, string>((key, value, currency) =>
+            var updateAccountValue = new Action<string, string, string, string>((key, value, currency, acc) =>
             {
                 _logger.Trace($"GetAccountAsync updateAccountValue : key={key}, value={value}");
                 switch (key)

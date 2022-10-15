@@ -57,7 +57,7 @@ namespace TradingBot.Broker.Orders
             if (contract == null || order == null)
                 return;
 
-            order.Id = await _broker.GetNextValidOrderId();
+            order.Id = await _broker.GetNextValidOrderIdAsync();
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
@@ -241,7 +241,7 @@ namespace TradingBot.Broker.Orders
 
             list ??= new List<Order>();
 
-            chain.Order.Id = await _broker.GetNextValidOrderId();
+            chain.Order.Id = await _broker.GetNextValidOrderIdAsync();
             list.Add(chain.Order);
 
             if (chain.AttachedOrders.Any())

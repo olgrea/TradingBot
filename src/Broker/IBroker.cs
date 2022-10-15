@@ -17,7 +17,7 @@ namespace TradingBot.Broker
     internal interface IBroker
     {
         event Action<Contract, BidAsk> BidAskReceived;
-        event Action<string, string, string> AccountValueUpdated;
+        event Action<string, string, string, string> AccountValueUpdated;
         event Action<Contract, Bar> Bar5SecReceived;
         event Action<Contract, Bar> Bar1MinReceived;
         event Action<Order, OrderStatus> OrderUpdated;

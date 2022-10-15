@@ -85,7 +85,7 @@ namespace TradingBot
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
             
-            var res = await _broker.Connect();
+            var res = await _broker.ConnectAsync();
             _accountCode = res.AccountCode;
 
             _account = await _broker.GetAccountAsync(_accountCode);
@@ -99,7 +99,7 @@ namespace TradingBot
                 throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
             _USDCashBalance = _account.CashBalances["USD"];
 
-            _contract = await _broker.GetContract(_ticker);
+            _contract = await _broker.GetContractAsync(_ticker);
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
@@ -112,7 +112,7 @@ namespace TradingBot
 
             SubscribeToData();
 
-            _currentTime = _broker.GetCurrentTime();
+            _currentTime = await _broker.GetCurrentTimeAsync();
 
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
@@ -127,14 +127,14 @@ namespace TradingBot
             _monitoringTimeCancellation = new CancellationTokenSource();
             var mainToken = _monitoringTimeCancellation.Token;
             _logger.Debug($"Started monitoring current time");
-            _monitoringTimeTask = Task.Factory.StartNew(() =>
+            _monitoringTimeTask = Task.Factory.StartNew(async () =>
             {
                 try
                 {
                     while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                     {
                         Task.Delay(1000).Wait();
-                        _currentTime = _broker.GetCurrentTime();
+                        _currentTime = await _broker.GetCurrentTimeAsync();
                         if(!_tradingStarted && _currentTime >= _startTime)
                         {
                             _logger.Info($"Trading started!");
@@ -267,7 +267,7 @@ namespace TradingBot
             Broker.InitIndicators(Contract, indicators);
         }
 
-        void OnAccountValueUpdated(string key, string value, string currency)
+        void OnAccountValueUpdated(string key, string value, string currency, string account)
         {
             switch (key)
             {
@@ -396,7 +396,7 @@ namespace TradingBot
             return _USDCashBalance - 100;
         }
 
-        public void Stop()
+        public async void Stop()
         {
             // TODO : error handling? try/catch all? Separate process that monitors the main one?
 
@@ -407,7 +407,7 @@ namespace TradingBot
             _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");
 
             UnsubscribeToData();
-            _broker.Disconnect();
+            await _broker.DisconnectAsync();
         }
 
         private void SellAllPositions()
