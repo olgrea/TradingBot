@@ -29,6 +29,7 @@ namespace TradingBot.Broker.Client
         void PlaceOrder(Contract contract, Order order);
         Task<OrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order);
         void CancelOrder(int orderId);
+        Task<OrderStatus> CancelOrderAsync(int orderId);
         void CancelAllOrders();
         Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(int reqId, Contract contract, BarLength barLength, DateTime endDateTime, int count);
         void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH);

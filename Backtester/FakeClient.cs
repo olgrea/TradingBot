@@ -542,6 +542,13 @@ namespace Backtester
             });
         }
 
+        public Task<OrderStatus> CancelOrderAsync(int orderId)
+        {
+            var tcs = new TaskCompletionSource<OrderStatus>();
+
+            return tcs.Task;
+        }
+
         public void CancelAllOrders() 
         {
             _requestsQueue.Enqueue(() =>
