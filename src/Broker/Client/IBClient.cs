@@ -401,7 +401,7 @@ namespace TradingBot.Broker.Client
             {
                 if (orderId == oStatus.Info.OrderId)
                 {
-                    if (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled)
+                    if (!tcs.Task.IsCompleted && (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled))
                         tcs.TrySetResult(oStatus);
                 }
             });

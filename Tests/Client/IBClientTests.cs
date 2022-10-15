@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -144,14 +141,14 @@ namespace Tests.Client
         }
 
         [Test]
-        public Task GetContractDetailsAsync_WithInvalidInput_Throws()
+        public async Task GetContractDetailsAsync_WithInvalidInput_Throws()
         {
             // Setup
             var dummy = MakeDummyContract("GMEdasdafafsafaf");
 
             // Test
             Assert.ThrowsAsync<ErrorMessage>(async () => await _client.GetContractDetailsAsync(1, dummy));
-            return Task.CompletedTask;
+            await Task.CompletedTask;
         }
 
         [Test]
@@ -166,8 +163,60 @@ namespace Tests.Client
         }
 
         [Test]
-        public async Task PlaceOrder_WithOrderIdSet_ShouldWork()
+        public async Task PlaceOrder_WithValidOrderParams_ShouldSucceed()
         {
+            //TODO : test when market is open
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            var dummy = MakeDummyContract("GME");
+            var details = await _client.GetContractDetailsAsync(1, dummy);
+            var contract = details.First().Contract;
+
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            order.Id = await _client.GetNextValidOrderIdAsync();
+
+            // Test
+            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+
+            // Assert
+            Assert.NotNull(orderMessage);
+            Assert.NotNull(orderMessage.OrderStatus);
+
+            // TODO : verify this again
+            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.PreSubmitted || orderMessage.OrderStatus.Status == Status.Submitted);
+        }
+
+        [Test]
+        public async Task PlaceOrder_WithMarketOrderFilledInstantly_ShouldSucceed()
+        {
+            //TODO : test when market is open
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            var contract = await GetContract("GME");
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            order.Id = await _client.GetNextValidOrderIdAsync();
+
+            // Test
+            var orderMessage = await _client.PlaceOrderAsync(contract, order);
+
+            // Assert
+            Assert.NotNull(orderMessage);
+            Assert.Null(orderMessage.OrderStatus);
+            Assert.NotNull(orderMessage.OrderExecution);
+            Assert.NotNull(orderMessage.CommissionInfo);
+        }
+
+        [Test]
+        public async Task PlaceOrder_WithLimitPriceTooFarFromCurrentPrice_ShouldBeCancelled()
+        {
+            //TODO : test when market is open
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
             // Setup
             var contract = await GetContract("GME");
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
@@ -179,17 +228,40 @@ namespace Tests.Client
             // Assert
             Assert.NotNull(orderMessage);
             Assert.NotNull(orderMessage.OrderStatus);
-            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.PreSubmitted || orderMessage.OrderStatus.Status == Status.Submitted);
+            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.Cancelled);
         }
 
         [Test]
-        public async Task CancelOrder_ShouldWork()
+        public async Task PlaceOrder_WithQuantityTooLarge_ShouldFail()
         {
+            //TODO : test when market is open
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
             // Setup
+            var contract = await GetContract("GME");
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 500000000000};
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _client.PlaceOrderAsync(contract, order));
+        }
+
+        [Test]
+        public async Task CancelOrder_ShouldSucceed()
+        {
+            // Setup
+            var openOrderMsg = await PlaceDummyOrder();
+            Assert.NotNull(openOrderMsg);
+            Assert.NotNull(openOrderMsg.OrderStatus);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
+
+            // Test
+            OrderStatus orderStatus = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
 
             // Assert
+            Assert.NotNull(orderStatus);
+            Assert.IsTrue(orderStatus.Status == Status.Cancelled);
         }
 
         Contract MakeDummyContract(string symbol)
@@ -201,6 +273,14 @@ namespace Tests.Client
                 Symbol = symbol,
                 SecType = "STK"
             };
+        }
+
+        async Task<OrderMessage> PlaceDummyOrder()
+        {
+            var contract = await GetContract("GME");
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            order.Id = await _client.GetNextValidOrderIdAsync();
+            return await _client.PlaceOrderAsync(contract, order);
         }
 
         async Task<Contract> GetContract(string symbol)
