@@ -13,9 +13,10 @@ using TradingBot.Indicators;
 using TradingBot.Utils;
 using TradingBot.Broker.Client.Messages;
 using System.Globalization;
+using System.Threading;
 
-[assembly: InternalsVisibleToAttribute("HistoricalDataFetcher")]
-[assembly: InternalsVisibleToAttribute("Tests")]
+[assembly: InternalsVisibleTo("HistoricalDataFetcher")]
+[assembly: InternalsVisibleTo("Tests")]
 namespace TradingBot.Broker
 {
     internal class DataSubscriptions
@@ -29,7 +30,7 @@ namespace TradingBot.Broker
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
     }
 
-    internal class IBBroker
+    internal class IBBroker : IBroker
     {
         public const int DefaultPort = 7496;
         public const string DefaultIP = "127.0.0.1";
@@ -39,7 +40,8 @@ namespace TradingBot.Broker
         
         int _clientId = 1337;
         int _reqId = 0;
-        
+        string _accountCode = null;
+
         DataSubscriptions _subscriptions;
         IIBClient _client;
         ILogger _logger;
@@ -146,30 +148,114 @@ namespace TradingBot.Broker
             remove => _client.Callbacks.CurrentTime -= value;
         }
 
-        public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
-        public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
-        public bool IsCancelled(Order order) => _orderManager.IsCancelled(order);
-        public bool IsExecuted(Order order, out OrderExecution orderExecution) => _orderManager.IsExecuted(order, out orderExecution); 
-
-        public DateTime GetCurrentTime()
+        public Task<ConnectMessage> ConnectAsync()
         {
-            return DateTimeOffset.FromUnixTimeSeconds(_client.GetCurrentTimeAsync().Result).DateTime.ToLocalTime();
+            return ConnectAsync(CancellationToken.None);
         }
 
-        public async Task<int> GetNextValidOrderId()
+        public Task<ConnectMessage> ConnectAsync(CancellationToken token)
         {
-            return await _client.GetNextValidOrderIdAsync();
+            //TODO: Handle IB server resets
+            var msg = new ConnectMessage();
+
+            var tcsConnect = new TaskCompletionSource<ConnectMessage>();
+            token.ThrowIfCancellationRequested();
+
+            var tcsValidId = new TaskCompletionSource<int>();
+            var tcsAccount = new TaskCompletionSource<string>();
+            var nextValidId = new Action<int>(id =>
+            {
+                if (token.IsCancellationRequested)
+                {
+                    tcsValidId.TrySetCanceled();
+                    return;
+                }
+
+                _logger.Trace($"ConnectAsync : next valid id {id}");
+                msg.NextValidOrderId = id;
+                tcsValidId.SetResult(id);
+            });
+
+            var managedAccounts = new Action<string>(acc =>
+            {
+                if (token.IsCancellationRequested)
+                {
+                    tcsAccount.TrySetCanceled();
+                    return;
+                }
+
+                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
+
+                _accountCode = acc;
+                msg.AccountCode = acc;
+                tcsAccount.SetResult(acc);
+            });
+
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcsConnect, token));
+
+            _client.Callbacks.NextValidId += nextValidId;
+            _client.Callbacks.ManagedAccounts += managedAccounts;
+            _client.Callbacks.Error += error;
+
+            _client.Connect(DefaultIP, DefaultPort, _clientId);
+
+            Task.WhenAll(tcsValidId.Task, tcsAccount.Task).ContinueWith(t =>
+            {
+                _client.Callbacks.NextValidId -= nextValidId;
+                _client.Callbacks.ManagedAccounts -= managedAccounts;
+                _client.Callbacks.Error -= error;
+
+                if (token.IsCancellationRequested)
+                    tcsConnect.TrySetCanceled();
+                else
+                    tcsConnect.SetResult(msg);
+            }); ;
+
+            return tcsConnect.Task;
         }
 
-        public async Task<ConnectMessage> Connect()
+        public Task<bool> DisconnectAsync()
         {
-            return await _client.ConnectAsync(DefaultIP, DefaultPort, _clientId);
+            var tcs = new TaskCompletionSource<bool>();
+            _logger.Debug($"Disconnecting from TWS");
+
+            var disconnect = new Action(() => tcs.SetResult(true));
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<bool>.TaskError(msg, tcs, CancellationToken.None));
+
+            _client.Callbacks.ConnectionClosed += disconnect;
+            _client.Callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.ConnectionClosed -= disconnect;
+                _client.Callbacks.Error -= error;
+            });
+
+            _client.Disconnect();
+
+            return tcs.Task;
         }
-                
-        public async void Disconnect()
+
+        public Task<int> GetNextValidOrderIdAsync()
         {
-            await _client.DisconnectAsync();
-            _clientIds.Remove(_clientId);
+            var tcs = new TaskCompletionSource<int>();
+
+            var nextValidId = new Action<int>(id =>
+            {
+                tcs.SetResult(id);
+            });
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<int>.TaskError(msg, tcs, CancellationToken.None));
+
+            _client.Callbacks.NextValidId += nextValidId;
+            _client.Callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.NextValidId -= nextValidId;
+                _client.Callbacks.Error -= error;
+            });
+
+            _logger.Debug($"Requesting next valid order ids");
+            _client.RequestValidOrderIds();
+            return tcs.Task;
         }
 
         public async Task<Account> GetAccountAsync(string accountCode)
@@ -232,18 +318,59 @@ namespace TradingBot.Broker
             return account;
         }
 
-        public async Task<Contract> GetContract(string ticker)
+        public async Task<Contract> GetContractAsync(string symbol)
         {
             var sampleContract = new Stock()
             {
                 Currency = "USD",
                 Exchange = "SMART",
-                Symbol = ticker,
+                Symbol = symbol,
                 SecType = "STK"
             };
 
-            var contractDetails = await _client.GetContractDetailsAsync(NextRequestId, sampleContract);
+            var contractDetails = await GetContractDetailsAsync(sampleContract);
             return contractDetails?.FirstOrDefault().Contract;
+        }
+
+        public Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract)
+        {
+            var reqId = NextRequestId;
+
+            var tcs = new TaskCompletionSource<List<ContractDetails>>();
+            var tmpDetails = new List<ContractDetails>();
+            var contractDetails = new Action<int, ContractDetails>((rId, c) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync temp step : adding {c}");
+                    tmpDetails.Add(c);
+                }
+            });
+            var contractDetailsEnd = new Action<int>(rId =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetContractsAsync end step : set result");
+                    tcs.SetResult(tmpDetails);
+                }
+            });
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ErrorMessage>.TaskError(msg, tcs, CancellationToken.None));
+
+            _client.Callbacks.ContractDetails += contractDetails;
+            _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
+            _client.Callbacks.Error += error;
+
+            tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.ContractDetails -= contractDetails;
+                _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
+                _client.Callbacks.Error -= error;
+            });
+
+            _logger.Debug($"Requesting contract details for {contract} (reqId={reqId})");
+            _client.RequestContractDetails(reqId, contract);
+
+            return tcs.Task;
         }
 
         public void RequestBidAskUpdates(Contract contract)
@@ -424,6 +551,97 @@ namespace TradingBot.Broker
             }
         }
 
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order)
+        {
+            if (order?.Id <= 0)
+                throw new ArgumentException("Order id not set");
+
+            var msg = new OrderMessage();
+            var tcsMain = new TaskCompletionSource<OrderMessage>();
+
+            var tcsOpenOrder = new TaskCompletionSource<bool>();
+            var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>((c, o, oState) =>
+            {
+                if (order.Id == o.Id && !tcsOpenOrder.Task.IsCompleted)
+                {
+                    msg.Contract = c;
+                    msg.Order = o;
+                    msg.OrderState = oState;
+                    tcsOpenOrder.TrySetResult(true);
+                }
+            });
+
+            // With market orders, when the order is accepted and executes immediately, there commonly will not be any
+            // corresponding orderStatus callbacks. For that reason it is recommended to also monitor the IBApi.EWrapper.execDetails .
+            var tcsEnd = new TaskCompletionSource<bool>();
+            var orderStatus = new Action<OrderStatus>(oStatus =>
+            {
+                if (order.Id == oStatus.Info.OrderId && !tcsEnd.Task.IsCompleted)
+                {
+                    if (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted)
+                    {
+                        msg.OrderStatus = oStatus;
+                        tcsEnd.TrySetResult(true);
+                    }
+                }
+            });
+
+            var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
+            {
+                if (order.Id == oe.OrderId && !tcsEnd.Task.IsCompleted)
+                    msg.OrderExecution = oe;
+            });
+
+            var commissionReport = new Action<CommissionInfo>(ci =>
+            {
+                if (msg.OrderExecution.ExecId == ci.ExecId && !tcsEnd.Task.IsCompleted)
+                {
+                    msg.CommissionInfo = ci;
+                    tcsEnd.TrySetResult(true);
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                {
+                    return;
+                }
+
+                if (tcsMain.TrySetException(msg))
+                {
+                    tcsOpenOrder.TrySetCanceled();
+                    tcsEnd.TrySetCanceled();
+                }
+            });
+
+            _client.Callbacks.OpenOrder += openOrder;
+            _client.Callbacks.OrderStatus += orderStatus;
+            _client.Callbacks.ExecDetails += execDetails;
+            _client.Callbacks.CommissionReport += commissionReport;
+            _client.Callbacks.Error += error;
+
+            _client.PlaceOrder(contract, order);
+
+            Task.WhenAll(tcsOpenOrder.Task, tcsEnd.Task).ContinueWith(t =>
+            {
+                _client.Callbacks.OpenOrder -= openOrder;
+                _client.Callbacks.OrderStatus -= orderStatus;
+                _client.Callbacks.CommissionReport -= commissionReport;
+                _client.Callbacks.ExecDetails -= execDetails;
+                _client.Callbacks.Error -= error;
+
+                if (t.IsCompletedSuccessfully)
+                    tcsMain.TrySetResult(msg);
+                else if (t.IsCanceled)
+                    tcsMain.SetCanceled();
+                else
+                    tcsMain.TrySetException(new ErrorMessage("An error occured during order placement"));
+            });
+
+            return tcsMain.Task;
+        }
+
         public void PlaceOrder(Contract contract, Order order)
         {
             _orderManager.PlaceOrder(contract, order);
@@ -444,12 +662,47 @@ namespace TradingBot.Broker
             _orderManager.ModifyOrder(contract, order);
         }
 
+        public Task<OrderStatus> CancelOrderAsync(int orderId)
+        {
+            if (orderId <= 0)
+                throw new ArgumentException("Invalid order id");
+
+            var tcs = new TaskCompletionSource<OrderStatus>();
+            var orderStatus = new Action<OrderStatus>(oStatus =>
+            {
+                if (orderId == oStatus.Info.OrderId)
+                {
+                    if (!tcs.Task.IsCompleted && (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled))
+                        tcs.TrySetResult(oStatus);
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcs, CancellationToken.None));
+
+            _client.Callbacks.OrderStatus += orderStatus;
+            _client.Callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.OrderStatus -= orderStatus;
+                _client.Callbacks.Error -= error;
+            });
+
+            _logger.Debug($"Requesting order cancellation for order id : {orderId}");
+            _client.CancelOrder(orderId);
+
+            return tcs.Task;
+        }
+
         public void CancelOrder(Order order)
         {
             _orderManager.CancelOrder(order);
         }
 
         public void CancelAllOrders() => _orderManager.CancelAllOrders();
+        public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
+        public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
+        public bool IsCancelled(Order order) => _orderManager.IsCancelled(order);
+        public bool IsExecuted(Order order, out OrderExecution orderExecution) => _orderManager.IsExecuted(order, out orderExecution);
 
         public void RequestPositionsUpdates()
         {
@@ -513,13 +766,98 @@ namespace TradingBot.Broker
 
         public IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, default(DateTime), count).Result;   
+            return GetHistoricalDataAsync(contract, barLength, default(DateTime), count).Result;   
         }
    
         internal IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
-            return _client.GetHistoricalDataAsync(NextRequestId, contract, barLength, endDateTime, count).Result;
+            return GetHistoricalDataAsync(contract, barLength, endDateTime, count).Result;
         }
+
+        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        {
+            var reqId = NextRequestId;
+            var tmpList = new LinkedList<MarketData.Bar>();
+
+            var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
+            SetupHistoricalBarCallbacks(tmpList, reqId, barLength, resolveResult);
+
+            //string timeFormat = "yyyyMMdd-HH:mm:ss";
+
+            // Duration         : Allowed Bar Sizes
+            // 60 S             : 1 sec - 1 mins
+            // 120 S            : 1 sec - 2 mins
+            // 1800 S (30 mins) : 1 sec - 30 mins
+            // 3600 S (1 hr)    : 5 secs - 1 hr
+            // 14400 S (4hr)	: 10 secs - 3 hrs
+            // 28800 S (8 hrs)  : 30 secs - 8 hrs
+            // 1 D              : 1 min - 1 day
+            // 2 D              : 2 mins - 1 day
+            // 1 W              : 3 mins - 1 week
+            // 1 M              : 30 mins - 1 month
+            // 1 Y              : 1 day - 1 month
+
+            string durationStr = null;
+            string barSizeStr = null;
+            switch (barLength)
+            {
+                case BarLength._1Sec:
+                    durationStr = $"{count} S";
+                    barSizeStr = "1 secs";
+                    break;
+
+                case BarLength._5Sec:
+                    durationStr = $"{5 * count} S";
+                    barSizeStr = "5 secs";
+                    break;
+
+                case BarLength._1Min:
+                    durationStr = $"{60 * count} S";
+                    barSizeStr = "1 min";
+                    break;
+
+                default:
+                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
+            }
+
+            string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
+
+            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, false);
+
+            return resolveResult.Task;
+        }
+
+        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
+        {
+            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
+                    bar.BarLength = barLength;
+                    tmpList.AddLast(bar);
+                }
+            });
+
+            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
+                    resolveResult.SetResult(tmpList);
+                }
+            });
+
+            _client.Callbacks.HistoricalData += historicalData;
+            _client.Callbacks.HistoricalDataEnd += historicalDataEnd;
+
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.HistoricalData -= historicalData;
+                _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
+            });
+        }
+
 
         void TickByTickBidAsk(int reqId, BidAsk bidAsk)
         {
@@ -532,10 +870,60 @@ namespace TradingBot.Broker
             pnl.Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key;
             PnLReceived?.Invoke(pnl);
         }
-
         public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count)
         {
-            return _client.RequestHistoricalTicks(NextRequestId, contract, time, count).Result;
+            return RequestHistoricalTicks(contract, time, count).Result;
+        }
+
+        public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count)
+        {
+            var reqId = NextRequestId;
+            var tmpList = new LinkedList<BidAsk>();
+
+            var resolveResult = new TaskCompletionSource<IEnumerable<BidAsk>>();
+            var historicalTicksBidAsk = new Action<int, IEnumerable<BidAsk>, bool>((rId, bas, isDone) =>
+            {
+                if (rId == reqId)
+                {
+                    _logger.Trace($"RequestHistoricalTicks - adding {bas.Count()} bidasks");
+
+                    foreach (var ba in bas)
+                        tmpList.AddLast(ba);
+
+                    if (isDone)
+                    {
+                        _logger.Trace($"RequestHistoricalTicks - SetResult");
+                        resolveResult.SetResult(tmpList);
+                    }
+                }
+            });
+
+            _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
+            resolveResult.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
+            });
+
+            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+
+            return resolveResult.Task;
+        }
+
+        public Task<DateTime> GetCurrentTimeAsync()
+        {
+            var tcs = new TaskCompletionSource<DateTime>();
+
+            var currentTime = new Action<long>(time =>
+            {
+                tcs.SetResult(DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime());
+            });
+            
+            _client.Callbacks.CurrentTime += currentTime;
+            tcs.Task.ContinueWith(task => _client.Callbacks.CurrentTime -= currentTime);
+
+            _logger.Debug("Requesting current time");
+            _client.RequestCurrentTime();
+            return tcs.Task;
         }
     }
 }
