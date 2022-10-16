@@ -116,17 +116,15 @@ namespace TradingBot.Broker
         {
             if (!IsValidClientId(clientId))
                 throw new ArgumentException($"The client id {clientId} is already assigned.");
-
-            logger ??= LogManager.GetLogger($"{nameof(IBBroker)}-{clientId}");
-            client ??= new IBClient(logger);
+            
+            _clientId = clientId;
+            _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
+            _client = client ?? new IBClient(_logger);
 
             _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
             _client.Callbacks.PnlSingle += PnlSingle;
             _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
-            _clientId = clientId;
-            _client = client;
-            _logger = logger;
             _orderManager = new OrderManager(this, _client, _logger);
         }
 
@@ -183,7 +181,7 @@ namespace TradingBot.Broker
                 tcsAccount.SetResult(acc);
             });
 
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcsConnect, token));
+            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcsConnect, token));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.ManagedAccounts += managedAccounts;
@@ -212,7 +210,7 @@ namespace TradingBot.Broker
             _logger.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.SetResult(true));
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<bool>.TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
 
             _client.Callbacks.ConnectionClosed += disconnect;
             _client.Callbacks.Error += error;
@@ -235,7 +233,7 @@ namespace TradingBot.Broker
             {
                 tcs.SetResult(id);
             });
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<int>.TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.Error += error;
@@ -346,7 +344,7 @@ namespace TradingBot.Broker
                     tcs.SetResult(tmpDetails);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<ErrorMessage>.TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
 
             _client.Callbacks.ContractDetails += contractDetails;
             _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
@@ -669,7 +667,7 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => AsyncHelper<ConnectMessage>.TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
 
             _client.Callbacks.OrderStatus += orderStatus;
             _client.Callbacks.Error += error;
@@ -756,7 +754,7 @@ namespace TradingBot.Broker
             }
         }
 
-        async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
+        internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
         {
             return await GetHistoricalDataAsync(contract, barLength, default(DateTime), count);   
         }
@@ -916,6 +914,12 @@ namespace TradingBot.Broker
             _logger.Debug("Requesting current time");
             _client.RequestCurrentTime();
             return tcs.Task;
+        }
+
+        void TaskError<T>(ErrorMessage msg, TaskCompletionSource<T> resolveResult, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            resolveResult.TrySetException(msg);
         }
     }
 }

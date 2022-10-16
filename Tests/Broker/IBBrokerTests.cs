@@ -16,17 +16,18 @@ namespace Tests.Broker
     [TestFixture]
     internal class IBBrokerTests
     {
-        IBBroker _broker;
-        ConnectMessage _connectMessage;
+        protected IBBroker _broker;
+        protected ConnectMessage _connectMessage;
 
         [OneTimeSetUp]
-        public void OneTimeSetUp()
+        public virtual async Task OneTimeSetUp()
         {
             _broker = new IBBroker(191919);
+            await Task.CompletedTask;
         }
 
         [SetUp]
-        public async Task SetUp()
+        public virtual async Task SetUp()
         {
             _connectMessage = await _broker.ConnectAsync();
             Assert.IsTrue(_connectMessage.AccountCode == "DU5962304");

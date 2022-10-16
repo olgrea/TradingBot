@@ -101,14 +101,14 @@ namespace TradingBot.Strategies
         internal bool IsCancelled(Order order) => Trader.Broker.IsCancelled(order);
         internal bool IsExecuted(Order order, out OrderExecution orderExecution) => Trader.Broker.IsExecuted(order, out orderExecution);
 
-        void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
+        async void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
         {
             if (!indicators.Any())
                 return;
 
             var longestPeriod = indicators.Max(i => i.NbPeriods);
 
-            var pastBars = Trader.Broker.GetPastBars(Trader.Contract, barLength, longestPeriod).ToList();
+            var pastBars = await Trader.Broker.GetPastBars(Trader.Contract, barLength, longestPeriod);
 
             foreach (var indicator in indicators)
             {
