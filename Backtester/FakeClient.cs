@@ -31,8 +31,10 @@ namespace Backtester
             {
                 var broker = new IBBroker();
                 await broker.ConnectAsync();
+                await Task.Delay(50);
                 var contract = await broker.GetContractAsync(symbol);
                 await broker.DisconnectAsync();
+                await Task.Delay(50);
                 return contract;
             }
         }
@@ -145,6 +147,7 @@ namespace Backtester
 
         public void Connect(string host, int port, int clientId)
         {
+            Start();
             _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.nextValidId(NextValidOrderId)));
             _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.managedAccounts(_fakeAccount.Code)));
         }
@@ -276,18 +279,19 @@ namespace Backtester
                     _openOrders.Add(order);
 
                     _logger.Debug($"New order submitted : {order}");
-                    var orderState = new IBApi.OrderState() { Status = "Submitted" };
-                    _responsesQueue.Enqueue(() => Callbacks.openOrder(order.Id, contract.ToIBApiContract(), order.ToIBApiOrder(), orderState));
+                    var c = contract.ToIBApiContract();
+                    var o = order.ToIBApiOrder();
+                    _responsesQueue.Enqueue(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "PreSubmitted" }));
+                    _responsesQueue.Enqueue(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "Submitted" }));
                 }
                 else //modify order
                 {
-                    //TODO : handle fees when modifying/cancelling order
-
+                    //TODO : handle fees when modifying/cancelling order?
                     _logger.Debug($"Order modified : {order}");
                     openOrder = order;
                 }
 
-                //TODO : validate callback order. It should reflect what TWS does
+                _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "PreSubmitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
                 _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
             });
         }
@@ -566,14 +570,16 @@ namespace Backtester
         private void CancelOrderInternal(int orderId)
         {
             var order = _openOrders.First(o => o.Id == orderId);
-            if (order != null)
+            if (order == null)
             {
-                _logger.Debug($"Order {orderId} cancelled.");
-                _openOrders.Remove(order);
-                _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Cancelled ", 0, 0, 0, 0, 0, 0, 0, "", 0));
-            }
-            else
                 _logger.Warn($"Cannot cancel order {orderId} (not found)");
+                return;
+            }
+            
+            _logger.Debug($"Order {orderId} cancelled.");
+            _openOrders.Remove(order);
+            _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Cancelled ", 0, 0, 0, 0, 0, 0, 0, "", 0));
+            _responsesQueue.Enqueue(() => Callbacks.error(orderId, 202, "Order Canceled - reason:"));
         }
 
         public void CancelAllOrders() 
