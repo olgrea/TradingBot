@@ -8,6 +8,7 @@ using NUnit.Framework;
 using TradingBot.Broker;
 using TradingBot.Broker.Client;
 using TradingBot.Broker.Client.Messages;
+using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
@@ -18,12 +19,10 @@ namespace Tests.Broker
     {
         protected IBBroker _broker;
         protected ConnectMessage _connectMessage;
-        Random _random;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _random = new Random();
             _broker = new IBBroker(191919);
             await Task.CompletedTask;
         }
@@ -152,7 +151,7 @@ namespace Tests.Broker
         public async Task PlaceOrder_WithOrderIdNotSet_Throws()
         {
             // Setup
-            var contract = await GetContract("GME");
+            var contract = await GetContractAsync("GME");
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
 
             // Test
@@ -194,7 +193,7 @@ namespace Tests.Broker
                 Assert.Ignore();
 
             // Setup
-            var contract = await GetContract("GME");
+            var contract = await GetContractAsync("GME");
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty };
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
@@ -222,7 +221,8 @@ namespace Tests.Broker
         public async Task CancelOrder_ShouldSucceed()
         {
             // Setup
-            var openOrderMsg = await PlaceDummyOrder();
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
+            var openOrderMsg = await PlaceDummyOrderAsync(order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -246,18 +246,17 @@ namespace Tests.Broker
             };
         }
 
-        async Task<OrderPlacedMessage> PlaceDummyOrder()
+        async Task<OrderPlacedMessage> PlaceDummyOrderAsync(Order order)
         {
-            var contract = await GetContract("GME");
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
+            var contract = await GetContractAsync("GME");
             order.Id = await _broker.GetNextValidOrderIdAsync();
             var msg = await _broker.PlaceOrderAsync(contract, order);
             return msg as OrderPlacedMessage;
         }
 
-        int RandomQty => _random.Next(3, 10);
+        int RandomQty => new Random().Next(3, 10);
 
-        async Task<Contract> GetContract(string symbol)
+        async Task<Contract> GetContractAsync(string symbol)
         {
             var dummy = MakeDummyContract(symbol);
             var details = await _broker.GetContractDetailsAsync(dummy);
