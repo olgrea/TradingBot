@@ -70,7 +70,7 @@ namespace Tests.Broker
             await _broker.ConnectAsync();
             
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.ConnectAsync()); 
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.ConnectAsync()); 
         }
 
         [Test]
@@ -144,7 +144,7 @@ namespace Tests.Broker
             var dummy = MakeDummyContract("GMEdasdafafsafaf");
 
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.GetContractDetailsAsync(dummy));
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.GetContractDetailsAsync(dummy));
             await Task.CompletedTask;
         }
 

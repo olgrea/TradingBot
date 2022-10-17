@@ -619,7 +619,7 @@ namespace Tests.Backtester
                     tcs.TrySetResult(oe);
             });
 
-            var error = new Action<ErrorMessage>(msg =>
+            var error = new Action<ErrorMessageException>(msg =>
             {
                 if (source.Token.IsCancellationRequested)
                     tcs.TrySetException(new TimeoutException());

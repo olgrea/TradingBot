@@ -2,11 +2,11 @@
 
 namespace TradingBot.Broker.Client.Messages
 {
-    internal class ErrorMessage : Exception
+    internal class ErrorMessageException : Exception
     {
-        public ErrorMessage(Exception innerException) : base(innerException.Message, innerException) { }
-        public ErrorMessage(string msg, Exception innerException = null) : base(msg, innerException) { }
-        public ErrorMessage(int id, int errorCode, string msg, Exception innerException = null) : base(msg, innerException)
+        public ErrorMessageException(Exception innerException) : base(innerException.Message, innerException) { }
+        public ErrorMessageException(string msg, Exception innerException = null) : base(msg, innerException) { }
+        public ErrorMessageException(int id, int errorCode, string msg, Exception innerException = null) : base(msg, innerException)
         {
             Id = id;
             ErrorCode = errorCode;

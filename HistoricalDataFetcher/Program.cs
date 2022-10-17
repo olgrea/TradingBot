@@ -77,7 +77,7 @@ namespace HistoricalDataFetcher
                 _fetcher = fetcher;
             }
 
-            public override bool IsHandled(ErrorMessage msg)
+            public override bool IsHandled(ErrorMessageException msg)
             {
                 switch (msg.ErrorCode)
                 {

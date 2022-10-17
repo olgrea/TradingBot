@@ -343,24 +343,24 @@ namespace TradingBot.Broker.Client
         }
 
         public IErrorHandler ErrorHandler;
-        public Action<ErrorMessage> Error;
+        public Action<ErrorMessageException> Error;
         public void error(Exception e)
         {
-            var msg = new ErrorMessage(e);
+            var msg = new ErrorMessageException(e);
             if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
                 Error?.Invoke(msg);
         }
 
         public void error(string str)
         {
-            ErrorMessage msg = new ErrorMessage(str);
+            ErrorMessageException msg = new ErrorMessageException(str);
             if(ErrorHandler == null || !ErrorHandler.IsHandled(msg)) 
                 Error?.Invoke(msg);
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            ErrorMessage msg = new ErrorMessage(id, errorCode, errorMsg);
+            ErrorMessageException msg = new ErrorMessageException(id, errorCode, errorMsg);
             if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
                 Error?.Invoke(msg);
         }

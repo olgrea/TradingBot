@@ -8,7 +8,7 @@ namespace TradingBot.Broker.Client
 {
     internal interface IErrorHandler
     {
-        bool IsHandled(ErrorMessage msg);
+        bool IsHandled(ErrorMessageException msg);
     }
 
     internal class DefaultErrorHandler : IErrorHandler
@@ -20,7 +20,7 @@ namespace TradingBot.Broker.Client
             _logger = logger;
         }
 
-        public virtual bool IsHandled(ErrorMessage msg)
+        public virtual bool IsHandled(ErrorMessageException msg)
         {
             if (IsWarningMessage(msg.ErrorCode))
             {
@@ -70,7 +70,7 @@ namespace TradingBot.Broker.Client
             _broker = broker;
         }
 
-        public override bool IsHandled(ErrorMessage msg)
+        public override bool IsHandled(ErrorMessageException msg)
         {
             switch (msg.ErrorCode)
             {
@@ -98,7 +98,7 @@ namespace TradingBot.Broker.Client
             _trader = trader;
         }
 
-        public override bool IsHandled(ErrorMessage msg)
+        public override bool IsHandled(ErrorMessageException msg)
         {
             switch (msg.ErrorCode)
             {
