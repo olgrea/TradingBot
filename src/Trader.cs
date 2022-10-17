@@ -222,14 +222,9 @@ namespace TradingBot
             _broker.PositionReceived += OnPositionReceived;
             _broker.PnLReceived += OnPnLReceived;
 
-            foreach (IStrategy strategy in _strategies)
-            {
-                foreach(BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
-                {
-                    Broker.SubscribeToBarUpdateEvent(barLength, OnBarReceived);
-                    Broker.RequestBarsUpdates(Contract, barLength);
-                }
-            }
+            Broker.RequestBarsUpdates(Contract);
+            foreach(BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+                Broker.SubscribeToBarUpdateEvent(barLength, OnBarReceived);
 
             _broker.OrderUpdated += OnOrderUpdated;
             _broker.OrderExecuted += OnOrderExecuted;
@@ -248,14 +243,9 @@ namespace TradingBot
             _broker.OrderUpdated -= OnOrderUpdated;
             _broker.OrderExecuted -= OnOrderExecuted;
 
-            foreach (IStrategy strategy in _strategies)
-            {
-                foreach (BarLength barLength in strategy.Indicators.Select(i => i.BarLength).Distinct())
-                {
-                    Broker.UnsubscribeToBarUpdateEvent(barLength, OnBarReceived);
-                    Broker.CancelBarsUpdates(Contract, barLength);
-                }
-            }
+            Broker.CancelBarsUpdates(Contract);
+            foreach (BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+                Broker.UnsubscribeToBarUpdateEvent(barLength, OnBarReceived);
 
             _broker.CancelPositionsUpdates();
             _broker.CancelPnLUpdates(_contract);

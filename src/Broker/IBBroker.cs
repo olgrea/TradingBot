@@ -32,12 +32,13 @@ namespace TradingBot.Broker
 
     internal class IBBroker : IBroker
     {
-        static HashSet<int> _clientIds = new HashSet<int>();
         static Random rand = new Random();
 
-        public const int DefaultPort = 7496;
-        public const string DefaultIP = "127.0.0.1";
+        const int DefaultTWSPort = 7496;
+        const int DefaultIBGatewayPort = 4002;
+        const string DefaultIP = "127.0.0.1";
 
+        int _port;
         int _clientId = 1337;
         int _reqId = 0;
         DataSubscriptions _subscriptions = new DataSubscriptions();
@@ -113,28 +114,24 @@ namespace TradingBot.Broker
 
         void Init(int clientId, IIBClient client, ILogger logger)
         {
-            if (!IsValidClientId(clientId))
-                throw new ArgumentException($"The client id {clientId} is already assigned.");
-            
+            _port = GetPort();
             _clientId = clientId;
             _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
-            _client = client ?? new IBClient(_logger);
-
-            _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
-            _client.Callbacks.PnlSingle += PnlSingle;
-            _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
-
+            _client = client ?? new IBClient(_logger);            
             _orderManager = new OrderManager(this, _client, _logger);
         }
 
-        bool IsValidClientId(int clientId)
+        int GetPort()
         {
-            if (_clientIds.Contains(clientId))
-                return false;
+            var ibGatewayProc = Process.GetProcessesByName("ibgateway").FirstOrDefault();
+            if(ibGatewayProc != null)
+                return DefaultIBGatewayPort;
 
-            _clientId = clientId;
-            _clientIds.Add(clientId);
-            return true;
+            var twsProc = Process.GetProcessesByName("tws").FirstOrDefault();
+            if (twsProc != null)
+                return DefaultTWSPort;
+
+            throw new ArgumentException("Neither TWS Workstation or IB Gateway is running.");
         }
 
         public Task<ConnectMessage> ConnectAsync()
@@ -148,7 +145,7 @@ namespace TradingBot.Broker
             var msg = new ConnectMessage();
             var tcs = new TaskCompletionSource<ConnectMessage>();
             CancellationTokenSource source = new CancellationTokenSource();
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException()));
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
 
             var nextValidId = new Action<int>(id =>
             {
@@ -175,7 +172,7 @@ namespace TradingBot.Broker
             _client.Callbacks.Error += error;
 
             source.CancelAfter(timeoutInMs);
-            _client.Connect(DefaultIP, DefaultPort, _clientId);
+            _client.Connect(DefaultIP, _port, _clientId);
 
             tcs.Task.ContinueWith(t =>
             {
@@ -353,27 +350,41 @@ namespace TradingBot.Broker
 
             int reqId = NextRequestId;
             _subscriptions.BidAsk[contract] = reqId;
+            if(_subscriptions.BidAsk.Count == 1)
+                _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
 
             _client.RequestTickByTickData(reqId, contract, "BidAsk");
         }
 
-        public void CancelBidAskUpdates(Contract contract)
+        void TickByTickBidAsk(int reqId, BidAsk bidAsk)
         {
-            if (_subscriptions.BidAsk.ContainsKey(contract))
-            {
-                _client.CancelTickByTickData(_subscriptions.BidAsk[contract]);
-                _subscriptions.BidAsk.Remove(contract);
-            }
+            var contract = _subscriptions.BidAsk.First(c => c.Value == reqId).Key;
+            BidAskReceived?.Invoke(contract, bidAsk);
         }
 
-        public void RequestBarsUpdates(Contract contract, BarLength barLength)
+        public void CancelBidAskUpdates(Contract contract)
+        {
+            if (!_subscriptions.BidAsk.ContainsKey(contract))
+                return;
+
+            var reqId = _subscriptions.BidAsk[contract];
+            _subscriptions.BidAsk.Remove(contract);
+            if (_subscriptions.BidAsk.Count == 0)
+                _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
+
+            _client.CancelTickByTickData(reqId);
+        }
+
+        public void RequestBarsUpdates(Contract contract)
         {
             if (_subscriptions.FiveSecBars.ContainsKey(contract))
                 return;
 
-            _logger.Debug($"Requesting bar of length {barLength}");
             int reqId = NextRequestId;
             _subscriptions.FiveSecBars[contract] = reqId;
+            _fiveSecBars[contract] = new LinkedList<Bar>();
+            if (_subscriptions.FiveSecBars.Count == 1)
+                _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
             _client.RequestFiveSecondsBarUpdates(reqId, contract);
@@ -392,11 +403,6 @@ namespace TradingBot.Broker
 
         void UpdateBarsAndInvoke(Contract contract, Bar bar)
         {
-            if (!_fiveSecBars.ContainsKey(contract))
-            {
-                _fiveSecBars.Add(contract, new LinkedList<MarketData.Bar>());
-            }
-
             var list = _fiveSecBars[contract];
             list.AddLast(bar);
             // keeping 5 minutes of bars
@@ -510,21 +516,27 @@ namespace TradingBot.Broker
             }
         }
 
-        public void CancelBarsUpdates(Contract contract, BarLength barLength)
+        public void CancelBarsUpdates(Contract contract)
         {
-            if (!HasSubscribers(barLength))
+            if (!_subscriptions.FiveSecBars.ContainsKey(contract))
                 return;
 
-            var allBarLengths = Enum.GetValues(typeof(BarLength)).OfType<BarLength>();
-            if (allBarLengths.All(b => !HasSubscribers(b)))
-            {
-                var reqId = _subscriptions.FiveSecBars.First(kvp => kvp.Key == contract).Value;
-                _client.CancelFiveSecondsBarsUpdates(reqId);
-                _fiveSecBars.Remove(contract);
-            }
+            var reqId = _subscriptions.FiveSecBars[contract];
+            _subscriptions.FiveSecBars.Remove(contract);
+            _fiveSecBars.Remove(contract);
+            
+            if(_subscriptions.FiveSecBars.Count == 0)
+                _client.Callbacks.RealtimeBar -= OnFiveSecondsBarReceived;
+
+            _client.CancelFiveSecondsBarsUpdates(reqId);
         }
 
-        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order)
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order)
+        {
+            return PlaceOrderAsync(contract, order, Debugger.IsAttached ? -1 : 5000);
+        }
+
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, int timeoutInMs)
         {
             if (order?.Id <= 0)
                 throw new ArgumentException("Order id not set");
@@ -534,9 +546,8 @@ namespace TradingBot.Broker
 
             var tcs = new TaskCompletionSource<OrderMessage>();
             var source = new CancellationTokenSource();
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException()));
-            int timeoutInMs = Debugger.IsAttached ? -1 : 5000;
-
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
+            
             var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>((c, o, oState) =>
             {
                 if (order.Id == o.Id)
@@ -630,6 +641,10 @@ namespace TradingBot.Broker
                 throw new ArgumentException("Invalid order id");
 
             var tcs = new TaskCompletionSource<OrderStatus>();
+            var source = new CancellationTokenSource();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(CancelOrderAsync)}")));
+            int timeoutInMs = Debugger.IsAttached ? -1 : 5000;
+
             var orderStatus = new Action<OrderStatus>(oStatus =>
             {
                 if (orderId == oStatus.Info.OrderId)
@@ -650,6 +665,8 @@ namespace TradingBot.Broker
             });
 
             _logger.Debug($"Requesting order cancellation for order id : {orderId}");
+
+            source.CancelAfter(timeoutInMs);
             _client.CancelOrder(orderId);
 
             return tcs.Task;
@@ -685,16 +702,28 @@ namespace TradingBot.Broker
 
             int reqId = NextRequestId;
             _subscriptions.Pnl[contract] = reqId;
+            if(_subscriptions.Pnl.Count == 1)
+                _client.Callbacks.PnlSingle += PnlSingle;
+
             _client.RequestPnLUpdates(reqId, contract.Id);
+        }
+
+        void PnlSingle(int reqId, PnL pnl)
+        {
+            pnl.Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key;
+            PnLReceived?.Invoke(pnl);
         }
 
         public void CancelPnLUpdates(Contract contract)
         {
-            if (_subscriptions.Pnl.ContainsKey(contract))
-            {
-                _client.CancelPnLUpdates(_subscriptions.Pnl[contract]);
-                _subscriptions.Pnl.Remove(contract);
-            }
+            if (!_subscriptions.Pnl.ContainsKey(contract))
+                return;
+            
+            _subscriptions.Pnl.Remove(contract);
+            if (_subscriptions.Pnl.Count == 0)
+                _client.Callbacks.PnlSingle -= PnlSingle;
+
+            _client.CancelPnLUpdates(_subscriptions.Pnl[contract]);
         }
 
         public void RequestAccountUpdates(string account)
@@ -820,18 +849,6 @@ namespace TradingBot.Broker
             });
         }
 
-
-        void TickByTickBidAsk(int reqId, BidAsk bidAsk)
-        {
-            var contract = _subscriptions.BidAsk.First(c => c.Value == reqId).Key;
-            BidAskReceived?.Invoke(contract, bidAsk);
-        }
-
-        void PnlSingle(int reqId, PnL pnl)
-        {
-            pnl.Contract = _subscriptions.Pnl.First(s => s.Value == reqId).Key;
-            PnLReceived?.Invoke(pnl);
-        }
         public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count)
         {
             return RequestHistoricalTicks(contract, time, count).Result;
