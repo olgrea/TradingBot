@@ -168,7 +168,7 @@ namespace TradingBot.Broker
                     tcs.TrySetResult(msg);
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.ManagedAccounts += managedAccounts;
@@ -182,7 +182,7 @@ namespace TradingBot.Broker
                 _client.Callbacks.NextValidId -= nextValidId;
                 _client.Callbacks.ManagedAccounts -= managedAccounts;
                 _client.Callbacks.Error -= error;
-            }); ;
+            });
 
             return tcs.Task;
         }
@@ -193,7 +193,7 @@ namespace TradingBot.Broker
             _logger.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.SetResult(true));
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.ConnectionClosed += disconnect;
             _client.Callbacks.Error += error;
@@ -216,7 +216,7 @@ namespace TradingBot.Broker
             {
                 tcs.SetResult(id);
             });
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.Error += error;
@@ -327,7 +327,7 @@ namespace TradingBot.Broker
                     tcs.SetResult(tmpDetails);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.ContractDetails += contractDetails;
             _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
@@ -573,7 +573,7 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg =>
+            var error = new Action<ErrorMessageException>(msg =>
             {
                 if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
                 {
@@ -639,7 +639,7 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.OrderStatus += orderStatus;
             _client.Callbacks.Error += error;
