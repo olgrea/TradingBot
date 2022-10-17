@@ -92,7 +92,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -119,7 +119,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -143,7 +143,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -167,7 +167,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -195,7 +195,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -223,7 +223,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -247,7 +247,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -271,7 +271,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -299,7 +299,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -327,7 +327,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -351,7 +351,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -375,7 +375,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -403,7 +403,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -431,7 +431,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -456,7 +456,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrder(order));
+            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
             var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask + order.TrailingAmount);
@@ -482,7 +482,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrder(order));
+            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
             var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask * order.TrailingPercent + ba.Ask);
@@ -512,7 +512,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrder(order));
+            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
             var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - order.TrailingAmount);
@@ -542,7 +542,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrder(order));
+            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
             var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - ba.Bid * order.TrailingPercent);
@@ -568,7 +568,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -597,7 +597,7 @@ namespace Tests.Backtester
 
             // Test
             _fakeClient.Start();
-            var orderExecution = await PlaceOrder(order);
+            var orderExecution = await PlaceOrderAsync(order);
 
             // Assert
             Assert.NotNull(orderExecution);
@@ -606,26 +606,19 @@ namespace Tests.Backtester
             Assert.AreEqual(expectedPrice, actualPrice, 0.01);
         }
 
-        async Task<OrderExecution> PlaceOrder(Order order, int timeoutInMs = -1)
+        async Task<OrderExecution> PlaceOrderAsync(Order order, int timeoutInMs = -1)
         {
-            var source = new CancellationTokenSource();
             var tcs = new TaskCompletionSource<OrderExecution>();
+            var source = new CancellationTokenSource();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)} : {order}")));
             
             var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
             {
-                if (source.Token.IsCancellationRequested)
-                    tcs.TrySetException(new TimeoutException());
-                else
+                if(order.Id == oe.OrderId)
                     tcs.TrySetResult(oe);
             });
 
-            var error = new Action<ErrorMessageException>(msg =>
-            {
-                if (source.Token.IsCancellationRequested)
-                    tcs.TrySetException(new TimeoutException());
-                else
-                    tcs.TrySetException(msg);
-            });
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _fakeClient.Callbacks.ExecDetails += execDetails;
             _fakeClient.Callbacks.Error += error;
