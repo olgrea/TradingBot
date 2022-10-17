@@ -40,7 +40,6 @@ namespace TradingBot.Broker
 
         int _clientId = 1337;
         int _reqId = 0;
-        string _accountCode = null;
         DataSubscriptions _subscriptions = new DataSubscriptions();
         IIBClient _client;
         ILogger _logger;
@@ -140,68 +139,52 @@ namespace TradingBot.Broker
 
         public Task<ConnectMessage> ConnectAsync()
         {
-            return ConnectAsync(CancellationToken.None);
+            return ConnectAsync(Debugger.IsAttached ? -1 : 5000);
         }
 
-        public Task<ConnectMessage> ConnectAsync(CancellationToken token)
+        public Task<ConnectMessage> ConnectAsync(int timeoutInMs)
         {
             //TODO: Handle IB server resets
             var msg = new ConnectMessage();
+            var tcs = new TaskCompletionSource<ConnectMessage>();
+            CancellationTokenSource source = new CancellationTokenSource();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException()));
 
-            var tcsConnect = new TaskCompletionSource<ConnectMessage>();
-            token.ThrowIfCancellationRequested();
-
-            var tcsValidId = new TaskCompletionSource<int>();
-            var tcsAccount = new TaskCompletionSource<string>();
             var nextValidId = new Action<int>(id =>
             {
-                if (token.IsCancellationRequested)
-                {
-                    tcsValidId.TrySetCanceled();
-                    return;
-                }
-
                 _logger.Trace($"ConnectAsync : next valid id {id}");
                 msg.NextValidOrderId = id;
-                tcsValidId.SetResult(id);
+                
+                if(msg.IsSet())
+                    tcs.TrySetResult(msg);
             });
 
             var managedAccounts = new Action<string>(acc =>
             {
-                if (token.IsCancellationRequested)
-                {
-                    tcsAccount.TrySetCanceled();
-                    return;
-                }
-
                 _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-
-                _accountCode = acc;
                 msg.AccountCode = acc;
-                tcsAccount.SetResult(acc);
+                
+                if (msg.IsSet())
+                    tcs.TrySetResult(msg);
             });
 
-            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcsConnect, token));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.ManagedAccounts += managedAccounts;
             _client.Callbacks.Error += error;
 
+            source.CancelAfter(timeoutInMs);
             _client.Connect(DefaultIP, DefaultPort, _clientId);
 
-            Task.WhenAll(tcsValidId.Task, tcsAccount.Task).ContinueWith(t =>
+            tcs.Task.ContinueWith(t =>
             {
                 _client.Callbacks.NextValidId -= nextValidId;
                 _client.Callbacks.ManagedAccounts -= managedAccounts;
                 _client.Callbacks.Error -= error;
-
-                if (token.IsCancellationRequested)
-                    tcsConnect.TrySetCanceled();
-                else
-                    tcsConnect.SetResult(msg);
             }); ;
 
-            return tcsConnect.Task;
+            return tcs.Task;
         }
 
         public Task<bool> DisconnectAsync()
@@ -210,7 +193,7 @@ namespace TradingBot.Broker
             _logger.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.SetResult(true));
-            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.ConnectionClosed += disconnect;
             _client.Callbacks.Error += error;
@@ -233,7 +216,7 @@ namespace TradingBot.Broker
             {
                 tcs.SetResult(id);
             });
-            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.NextValidId += nextValidId;
             _client.Callbacks.Error += error;
@@ -344,7 +327,7 @@ namespace TradingBot.Broker
                     tcs.SetResult(tmpDetails);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.ContractDetails += contractDetails;
             _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
@@ -546,48 +529,47 @@ namespace TradingBot.Broker
             if (order?.Id <= 0)
                 throw new ArgumentException("Order id not set");
 
-            var msg = new OrderMessage();
-            var tcsMain = new TaskCompletionSource<OrderMessage>();
+            var orderPlacedMsg = new OrderPlacedMessage();
+            var orderExecutedMsg = new OrderExecutedMessage();
 
-            var tcsOpenOrder = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<OrderMessage>();
+            var source = new CancellationTokenSource();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException()));
+            int timeoutInMs = Debugger.IsAttached ? -1 : 5000;
+
             var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>((c, o, oState) =>
             {
-                if (order.Id == o.Id && !tcsOpenOrder.Task.IsCompleted)
+                if (order.Id == o.Id)
                 {
-                    msg.Contract = c;
-                    msg.Order = o;
-                    msg.OrderState = oState;
-                    tcsOpenOrder.TrySetResult(true);
+                    orderPlacedMsg.Contract = orderExecutedMsg.Contract = c;
+                    orderPlacedMsg.Order = orderExecutedMsg.Order = o;
+                    orderPlacedMsg.OrderState = oState;
                 }
             });
 
             // With market orders, when the order is accepted and executes immediately, there commonly will not be any
             // corresponding orderStatus callbacks. For that reason it is recommended to also monitor the IBApi.EWrapper.execDetails .
-            var tcsEnd = new TaskCompletionSource<bool>();
             var orderStatus = new Action<OrderStatus>(oStatus =>
             {
-                if (order.Id == oStatus.Info.OrderId && !tcsEnd.Task.IsCompleted)
+                if (order.Id == oStatus.Info.OrderId && (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted))
                 {
-                    if (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted)
-                    {
-                        msg.OrderStatus = oStatus;
-                        tcsEnd.TrySetResult(true);
-                    }
+                    orderPlacedMsg.OrderStatus = oStatus;
+                    tcs.TrySetResult(orderPlacedMsg);
                 }
             });
 
             var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
             {
-                if (order.Id == oe.OrderId && !tcsEnd.Task.IsCompleted)
-                    msg.OrderExecution = oe;
+                if (order.Id == oe.OrderId)
+                    orderExecutedMsg.OrderExecution = oe;
             });
 
             var commissionReport = new Action<CommissionInfo>(ci =>
             {
-                if (msg.OrderExecution.ExecId == ci.ExecId && !tcsEnd.Task.IsCompleted)
+                if (orderExecutedMsg.OrderExecution.ExecId == ci.ExecId)
                 {
-                    msg.CommissionInfo = ci;
-                    tcsEnd.TrySetResult(true);
+                    orderExecutedMsg.CommissionInfo = ci;
+                    tcs.TrySetResult(orderExecutedMsg);
                 }
             });
 
@@ -598,11 +580,7 @@ namespace TradingBot.Broker
                     return;
                 }
 
-                if (tcsMain.TrySetException(msg))
-                {
-                    tcsOpenOrder.TrySetCanceled();
-                    tcsEnd.TrySetCanceled();
-                }
+                tcs.TrySetException(msg);
             });
 
             _client.Callbacks.OpenOrder += openOrder;
@@ -611,25 +589,19 @@ namespace TradingBot.Broker
             _client.Callbacks.CommissionReport += commissionReport;
             _client.Callbacks.Error += error;
 
+            source.CancelAfter(timeoutInMs);
             _client.PlaceOrder(contract, order);
 
-            Task.WhenAll(tcsOpenOrder.Task, tcsEnd.Task).ContinueWith(t =>
+            tcs.Task.ContinueWith(t =>
             {
                 _client.Callbacks.OpenOrder -= openOrder;
                 _client.Callbacks.OrderStatus -= orderStatus;
                 _client.Callbacks.CommissionReport -= commissionReport;
                 _client.Callbacks.ExecDetails -= execDetails;
                 _client.Callbacks.Error -= error;
-
-                if (t.IsCompletedSuccessfully)
-                    tcsMain.TrySetResult(msg);
-                else if (t.IsCanceled)
-                    tcsMain.SetCanceled();
-                else
-                    tcsMain.TrySetException(new ErrorMessage("An error occured during order placement"));
             });
 
-            return tcsMain.Task;
+            return tcs.Task;
         }
 
         public void PlaceOrder(Contract contract, Order order)
@@ -667,7 +639,7 @@ namespace TradingBot.Broker
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => TaskError(msg, tcs, CancellationToken.None));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.OrderStatus += orderStatus;
             _client.Callbacks.Error += error;
@@ -914,12 +886,6 @@ namespace TradingBot.Broker
             _logger.Debug("Requesting current time");
             _client.RequestCurrentTime();
             return tcs.Task;
-        }
-
-        void TaskError<T>(ErrorMessage msg, TaskCompletionSource<T> resolveResult, CancellationToken token)
-        {
-            token.ThrowIfCancellationRequested();
-            resolveResult.TrySetException(msg);
         }
     }
 }

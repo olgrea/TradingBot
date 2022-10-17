@@ -18,10 +18,12 @@ namespace Tests.Broker
     {
         protected IBBroker _broker;
         protected ConnectMessage _connectMessage;
+        Random _random;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
+            _random = new Random();
             _broker = new IBBroker(191919);
             await Task.CompletedTask;
         }
@@ -30,6 +32,7 @@ namespace Tests.Broker
         public virtual async Task SetUp()
         {
             _connectMessage = await _broker.ConnectAsync();
+            await Task.Delay(50);
             Assert.IsTrue(_connectMessage.AccountCode == "DU5962304");
         }
 
@@ -78,8 +81,7 @@ namespace Tests.Broker
             await Task.Delay(50);
 
             // Test
-            var source = new CancellationTokenSource(5);
-            Assert.ThrowsAsync<TaskCanceledException>(async () => await _broker.ConnectAsync(source.Token));
+            Assert.ThrowsAsync<TimeoutException>(async () => await _broker.ConnectAsync(5));
         }
 
         [Test]
@@ -169,18 +171,19 @@ namespace Tests.Broker
             var details = await _broker.GetContractDetailsAsync(dummy);
             var contract = details.First().Contract;
 
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
+            OrderMessage orderMessage = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
-            Assert.NotNull(orderMessage);
-            Assert.NotNull(orderMessage.OrderStatus);
+            var orderPlacedMessage = orderMessage as OrderPlacedMessage;
+            Assert.NotNull(orderPlacedMessage);
+            Assert.NotNull(orderPlacedMessage.OrderStatus);
 
             // TODO : verify this again
-            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.PreSubmitted || orderMessage.OrderStatus.Status == Status.Submitted);
+            Assert.IsTrue(orderPlacedMessage.OrderStatus.Status == Status.PreSubmitted || orderPlacedMessage.OrderStatus.Status == Status.Submitted);
         }
 
         [Test]
@@ -192,54 +195,27 @@ namespace Tests.Broker
 
             // Setup
             var contract = await GetContract("GME");
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty };
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
             var orderMessage = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
-            Assert.NotNull(orderMessage);
-            Assert.Null(orderMessage.OrderStatus);
-            Assert.NotNull(orderMessage.OrderExecution);
-            Assert.NotNull(orderMessage.CommissionInfo);
-        }
-
-        [Test]
-        public async Task PlaceOrder_WithLimitPriceTooFarFromCurrentPrice_ShouldBeCancelled()
-        {
-            //TODO : test when market is open
-            if (!MarketDataUtils.IsMarketOpen())
-                Assert.Ignore();
-
-            // Setup
-            var contract = await GetContract("GME");
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-            order.Id = await _broker.GetNextValidOrderIdAsync();
-
-            // Test
-            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
-
-            // Assert
-            Assert.NotNull(orderMessage);
-            Assert.NotNull(orderMessage.OrderStatus);
-            Assert.IsTrue(orderMessage.OrderStatus.Status == Status.Cancelled);
-        }
-
-        [Test]
-        public async Task PlaceOrder_WithQuantityTooLarge_ShouldFail()
-        {
-            //TODO : test when market is open
-            if (!MarketDataUtils.IsMarketOpen())
-                Assert.Ignore();
-
-            // Setup
-            var contract = await GetContract("GME");
-            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 500000000000};
-            order.Id = await _broker.GetNextValidOrderIdAsync();
-
-            // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.PlaceOrderAsync(contract, order));
+            if(orderMessage is OrderPlacedMessage orderPlacedMessage)
+            {
+                Assert.NotNull(orderPlacedMessage);
+                Assert.NotNull(orderPlacedMessage.OrderState);
+                Assert.NotNull(orderPlacedMessage.OrderStatus);
+            }
+            else if(orderMessage is OrderExecutedMessage orderExecutedMessage)
+            {
+                Assert.NotNull(orderExecutedMessage);
+                Assert.NotNull(orderExecutedMessage.OrderExecution);
+                Assert.NotNull(orderExecutedMessage.CommissionInfo);
+            }
+            else
+                Assert.Fail();
         }
 
         [Test]
@@ -270,13 +246,16 @@ namespace Tests.Broker
             };
         }
 
-        async Task<OrderMessage> PlaceDummyOrder()
+        async Task<OrderPlacedMessage> PlaceDummyOrder()
         {
             var contract = await GetContract("GME");
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
             order.Id = await _broker.GetNextValidOrderIdAsync();
-            return await _broker.PlaceOrderAsync(contract, order);
+            var msg = await _broker.PlaceOrderAsync(contract, order);
+            return msg as OrderPlacedMessage;
         }
+
+        int RandomQty => _random.Next(3, 10);
 
         async Task<Contract> GetContract(string symbol)
         {

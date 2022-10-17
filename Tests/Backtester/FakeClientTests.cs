@@ -13,6 +13,7 @@ using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
+[assembly: LevelOfParallelism(3)]
 namespace Tests.Backtester
 {
     [TestFixture]
@@ -605,7 +606,7 @@ namespace Tests.Backtester
             Assert.AreEqual(expectedPrice, actualPrice, 0.01);
         }
 
-        async Task<OrderExecution> PlaceOrder(Order order, int timeoutInSec = 45)
+        async Task<OrderExecution> PlaceOrder(Order order, int timeoutInMs = -1)
         {
             var source = new CancellationTokenSource();
             var tcs = new TaskCompletionSource<OrderExecution>();
@@ -629,7 +630,7 @@ namespace Tests.Backtester
             _fakeClient.Callbacks.ExecDetails += execDetails;
             _fakeClient.Callbacks.Error += error;
 
-            source.CancelAfter(timeoutInSec * 1000);
+            source.CancelAfter(timeoutInMs);
             _fakeClient.PlaceOrder(_fakeClient.Contract, order);
 
             var passingTimeTaskId = _fakeClient.PassingTimeTask.Id;
