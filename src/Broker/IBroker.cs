@@ -34,12 +34,14 @@ namespace TradingBot.Broker
         Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract);
         void RequestBidAskUpdates(Contract contract);
         void CancelBidAskUpdates(Contract contract);
-        void RequestBarsUpdates(Contract contract, BarLength barLength);
-        void CancelBarsUpdates(Contract contract, BarLength barLength);
+        void RequestBarsUpdates(Contract contract);
+        void CancelBarsUpdates(Contract contract);
         void SubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback);
         void UnsubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback);
-        
-        Task<OrderMessage> PlaceOrderAsync(Contract contract, Orders.Order order);
+
+        //Task<OrderExecutedMessage> WaitForExecution(Contract contract, Orders.Order order);
+        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order);
+        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, int timeoutInMs);
         void PlaceOrder(Contract contract, Order order);
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);
