@@ -218,6 +218,43 @@ namespace Tests.Broker
         }
 
         [Test]
+        public async Task PlaceOrder_WhenNotEnoughFunds_ShouldFail()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            var contract = await GetContractAsync("GME");
+            var account = await _broker.GetAccountAsync(_connectMessage.AccountCode);
+            var bidAsk = await _broker.GetLatestBidAskAsync(contract);
+            var qty = (int)Math.Round(account.CashBalances["BASE"] / bidAsk.Ask + 500);
+
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty};
+            order.Id = await _broker.GetNextValidOrderIdAsync();
+
+            // Test
+            // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync()... related to ConfigureAwait() maybe ?
+            //Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.PlaceOrderAsync(contract, order));
+            Exception ex = null;
+            OrderMessage msg = null;
+            try
+            {
+                msg = await _broker.PlaceOrderAsync(contract, order);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+            finally
+            {
+                var opm = msg as OrderPlacedMessage;
+                Assert.IsNotNull(opm);
+                Assert.IsTrue(opm.OrderStatus.Status == Status.Inactive);
+                Assert.IsInstanceOf<ErrorMessageException>(ex);
+            }
+        }
+
+        [Test]
         public async Task CancelOrder_ShouldSucceed()
         {
             // Setup
@@ -233,6 +270,40 @@ namespace Tests.Broker
             // Assert
             Assert.NotNull(orderStatus);
             Assert.IsTrue(orderStatus.Status == Status.Cancelled);
+        }
+
+        [Test]
+        public async Task CancelOrder_AlreadyCanceled_Throws()
+        {
+            // Setup
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
+            var openOrderMsg = await PlaceDummyOrderAsync(order);
+            Assert.NotNull(openOrderMsg);
+            Assert.NotNull(openOrderMsg.OrderStatus);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
+
+            // Test
+            OrderStatus orderStatus = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
+            Assert.NotNull(orderStatus);
+            Assert.IsTrue(orderStatus.Status == Status.Cancelled);
+
+            // Assert
+            //Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.CancelOrderAsync(openOrderMsg.Order.Id));
+
+            Exception ex = null;
+            OrderStatus os2 = null;
+            try
+            {
+                os2 = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+            finally
+            {
+                Assert.IsInstanceOf<ErrorMessageException>(ex);
+            }
         }
 
         Contract MakeDummyContract(string symbol)

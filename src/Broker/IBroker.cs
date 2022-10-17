@@ -32,6 +32,7 @@ namespace TradingBot.Broker
         void CancelAccountUpdates(string accountCode);
         Task<Contract> GetContractAsync(string symbol);
         Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract);
+        Task<BidAsk> GetLatestBidAskAsync(Contract contract);
         void RequestBidAskUpdates(Contract contract);
         void CancelBidAskUpdates(Contract contract);
         void RequestBarsUpdates(Contract contract);

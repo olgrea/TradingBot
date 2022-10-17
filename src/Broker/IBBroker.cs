@@ -343,6 +343,37 @@ namespace TradingBot.Broker
             return tcs.Task;
         }
 
+        public Task<BidAsk> GetLatestBidAskAsync(Contract contract)
+        {
+            var tcs = new TaskCompletionSource<BidAsk>();
+            CancellationTokenSource source = new CancellationTokenSource();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(GetLatestBidAskAsync)}")));
+            int timeoutInMs = Debugger.IsAttached ? -1 : 5000;
+
+            var reqId = NextRequestId;
+
+            var tickByTickBidAsk = new Action<int, BidAsk>((rId, ba) =>
+            {
+                if (reqId == rId)
+                    tcs.TrySetResult(ba);
+            });
+
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
+
+            _client.Callbacks.TickByTickBidAsk += tickByTickBidAsk;
+            _client.Callbacks.Error += error;
+            tcs.Task.ContinueWith(t =>
+            {
+                _client.Callbacks.TickByTickBidAsk -= tickByTickBidAsk;
+                _client.Callbacks.Error -= error;
+            });
+
+            source.CancelAfter(timeoutInMs);
+            _client.RequestTickByTickData(reqId, contract, "BidAsk");
+
+            return tcs.Task;
+        }
+
         public void RequestBidAskUpdates(Contract contract)
         {
             if (_subscriptions.BidAsk.ContainsKey(contract))
