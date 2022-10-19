@@ -12,7 +12,8 @@ namespace TradingBot.Broker.MarketData
         _10Sec = 10,
         _15Sec = 15,
         _30Sec = 30,
-        _1Min = 60
+        _1Min = 60,
+        _1Day = 3600 * 24,
     }
 
     public class Bar : IMarketData

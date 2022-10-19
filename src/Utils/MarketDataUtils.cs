@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Xml.Linq;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Utils
@@ -75,6 +76,11 @@ namespace TradingBot.Utils
         {
             var json = File.ReadAllText(path);
             return (IEnumerable<TData>)JsonSerializer.Deserialize(json, typeof(IEnumerable<TData>));
+        }
+
+        public static IEnumerable<TData> DeserializeData<TData>(string rootDir, string symbol, DateTime date) where TData : IMarketData, new()
+        {
+            return DeserializeData<TData>(Path.Combine(rootDir, MakeDailyDataPath<TData>(symbol, date)));
         }
 
         public static void SerializeData<TData>(string path, IEnumerable<TData> data) where TData : IMarketData, new()
