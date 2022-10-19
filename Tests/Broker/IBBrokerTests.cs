@@ -188,7 +188,6 @@ namespace Tests.Broker
         [Test]
         public async Task PlaceOrder_WithMarketOrderFilledInstantly_ShouldSucceed()
         {
-            //TODO : test when market is open
             if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 
@@ -248,8 +247,7 @@ namespace Tests.Broker
             finally
             {
                 var opm = msg as OrderPlacedMessage;
-                Assert.IsNotNull(opm);
-                Assert.IsTrue(opm.OrderStatus.Status == Status.Inactive);
+                Assert.IsNull(opm);
                 Assert.IsInstanceOf<ErrorMessageException>(ex);
             }
         }
