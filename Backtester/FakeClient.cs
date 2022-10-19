@@ -569,7 +569,7 @@ namespace Backtester
 
         private void CancelOrderInternal(int orderId)
         {
-            var order = _openOrders.First(o => o.Id == orderId);
+            var order = _openOrders.FirstOrDefault(o => o.Id == orderId);
             if (order == null)
             {
                 _logger.Warn($"Cannot cancel order {orderId} (not found)");
