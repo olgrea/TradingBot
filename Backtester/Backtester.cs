@@ -34,7 +34,7 @@ namespace Backtester
         {
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
-                var marketData = LoadHistoricalData(_ticker, day.Item1);
+                var marketData = DeserializeHistoricalData(RootDir, _ticker, day.Item1);
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
@@ -50,10 +50,10 @@ namespace Backtester
             }
         }
 
-        public (IEnumerable<Bar>, IEnumerable<BidAsk>) LoadHistoricalData(string symbol, DateTime date)
+        public static (IEnumerable<Bar>, IEnumerable<BidAsk>) DeserializeHistoricalData(string rootDir, string symbol, DateTime date)
         {
-            var barList = MarketDataUtils.DeserializeData<Bar>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<Bar>(symbol, date)));
-            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(Path.Combine(RootDir, MarketDataUtils.MakeDailyDataPath<BidAsk>(symbol, date)));
+            var barList = MarketDataUtils.DeserializeData<Bar>(rootDir, symbol, date);
+            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(rootDir, symbol, date);
             return (barList, bidAskList);
         }
     }
