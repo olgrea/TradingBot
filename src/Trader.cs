@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using TradingBot.Indicators;
 using TradingBot.Broker.MarketData;
+[assembly: Fody.ConfigureAwait(false)]
 
 namespace TradingBot
 {

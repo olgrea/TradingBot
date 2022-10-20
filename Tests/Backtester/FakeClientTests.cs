@@ -12,8 +12,8 @@ using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
-
 [assembly: LevelOfParallelism(3)]
+
 namespace Tests.Backtester
 {
     [TestFixture]
