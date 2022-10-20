@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
-using NLog;
 using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;

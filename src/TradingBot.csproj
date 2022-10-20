@@ -27,6 +27,7 @@
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
     <PackageReference Include="NLog" Version="5.0.4" />
     <PackageReference Include="NLog.Schema" Version="5.0.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.10" />
   </ItemGroup>
 
   <ItemGroup>
