@@ -130,7 +130,21 @@ namespace Backtester
             _fakeAccount = new Account()
             {
                 Code = "FAKEACCOUNT123",
-                CashBalances = new Dictionary<string, double>() { { "USD", 5000.00 } },
+                CashBalances = new Dictionary<string, double>() 
+                { 
+                    { "BASE", 5000.00 },
+                    { "USD", 5000.00 },
+                },
+                UnrealizedPnL = new Dictionary<string, double>()
+                {
+                    { "BASE", 0.00},
+                    { "USD", 0.00 },
+                },
+                RealizedPnL= new Dictionary<string, double>()
+                {
+                    { "BASE", 0.00 },
+                    { "USD", 0.00 },
+                },
                 Positions = new List<Position>() { new Position() { Contract = _contract } }
             };
         }
@@ -477,22 +491,22 @@ namespace Backtester
 
             Debug.Assert(!_executedOrders.Contains(order));
 
-            if(order.Action == OrderAction.BUY)
+            if (order.Action == OrderAction.BUY)
             {
-                if(total > _fakeAccount.CashBalances["USD"])
+                if (total > _fakeAccount.CashBalances["USD"])
                 {
                     _logger.Error($"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {_fakeAccount.CashBalances["USD"]}");
                     CancelOrder(order.Id);
                     return;
                 }
 
-                Position.AverageCost = Position.PositionAmount != 0  ? (Position.AverageCost + price) / 2 : price;
+                Position.AverageCost = Position.PositionAmount != 0 ? (Position.AverageCost + price) / 2 : price;
                 Position.PositionAmount += order.TotalQuantity;
 
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
                 UpdateUnrealizedPNL(price);
-                _fakeAccount.CashBalances["USD"] -= total;
+                UpdateCashBalance(-total);
             }
             else if (order.Action == OrderAction.SELL)
             {
@@ -506,22 +520,16 @@ namespace Backtester
                 Position.PositionAmount -= order.TotalQuantity;
                 _logger.Debug($"Account {_fakeAccount.Code} :  New position {Position.PositionAmount} at {Position.AverageCost:c}/shares");
 
-                Position.RealizedPNL += order.TotalQuantity * (price - Position.AverageCost);
-                _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {Position.RealizedPNL:c}");
-
+                UpdateRealizedPNL(order.TotalQuantity, price);
                 UpdateUnrealizedPNL(price);
-                _fakeAccount.CashBalances["USD"] += total;
+                UpdateCashBalance(total);
             }
 
             var o = _openOrders.First(o => o == order);
             _executedOrders.Add(o);
             _openOrders.Remove(o);
 
-            double commission = GetCommission(Contract, order, price);
-            _logger.Debug($"{order} : commission : {commission:c}");
-
-            _fakeAccount.CashBalances["USD"] -= commission;
-            _totalCommission += commission;
+            double commission = UpdateCommissions(order, price);
 
             _logger.Debug($"Account {_fakeAccount.Code} :  New USD cash balance : {_fakeAccount.CashBalances["USD"]:c}");
 
@@ -543,13 +551,40 @@ namespace Backtester
             };
             _responsesQueue.Add(() => Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec));
 
-            _responsesQueue.Add(() => Callbacks.commissionReport(new IBApi.CommissionReport() 
+            _responsesQueue.Add(() => Callbacks.commissionReport(new IBApi.CommissionReport()
             {
                 Commission = commission,
                 Currency = "USD",
                 ExecId = execId,
                 RealizedPNL = Position.RealizedPNL,
             }));
+        }
+
+        private double UpdateCommissions(Order order, double price)
+        {
+            double commission = GetCommission(Contract, order, price);
+            _logger.Debug($"{order} : commission : {commission:c}");
+
+            UpdateCashBalance(-commission);
+            _totalCommission += commission;
+            return commission;
+        }
+
+        private void UpdateCashBalance(double total)
+        {
+            _fakeAccount.CashBalances["BASE"] += total;
+            _fakeAccount.CashBalances["USD"] += total;
+        }
+
+        private void UpdateRealizedPNL(double totalQty, double price)
+        {
+            var realized = totalQty * (price - Position.AverageCost);
+
+            Position.RealizedPNL += realized;
+            _fakeAccount.RealizedPnL["BASE"] += realized;
+            _fakeAccount.RealizedPnL["USD"] += realized;
+
+            _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {Position.RealizedPNL:c}");
         }
 
         public void CancelOrder(int orderId)
@@ -630,12 +665,32 @@ namespace Backtester
         void SendAccountUpdate()
         {
             _logger.Debug($"Sending account updates...");
-            var currentTime = _currentFakeTime;
-            _lastAccountUpdate = currentTime;
+            _lastAccountUpdate = _currentFakeTime;
 
-            _responsesQueue.Add(() => Callbacks.updateAccountTime(currentTime.ToString())); //TODO : make sure format is correct
-            _responsesQueue.Add(() => Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances["USD"].ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code));
-            _responsesQueue.Add(() => Callbacks.accountDownloadEnd(_fakeAccount.Code));
+            foreach(var balance in _fakeAccount.CashBalances)
+                _responsesQueue.Add(() => Callbacks.updateAccountValue("CashBalance", balance.Value.ToString(CultureInfo.InvariantCulture), balance.Key, _fakeAccount.Code));
+
+            foreach (var pnl in _fakeAccount.RealizedPnL)
+                _responsesQueue.Add(() => Callbacks.updateAccountValue("RealizedPnL", pnl.Value.ToString(CultureInfo.InvariantCulture), pnl.Key, _fakeAccount.Code));
+
+            foreach (var pnl in _fakeAccount.UnrealizedPnL)
+                _responsesQueue.Add(() => Callbacks.updateAccountValue("UnrealizedPnL", pnl.Value.ToString(CultureInfo.InvariantCulture), pnl.Key, _fakeAccount.Code));
+
+
+            foreach (var p in _fakeAccount.Positions)
+            {
+                _responsesQueue.Add(() =>
+                {
+                    Callbacks.updatePortfolio(Contract.ToIBApiContract(), p.PositionAmount, p.MarketPrice, p.MarketValue, p.AverageCost, p.UnrealizedPNL, p.RealizedPNL, _fakeAccount.Code);
+                    Callbacks.updateAccountTime(_currentFakeTime.ToShortTimeString());
+                });
+            }
+
+            _responsesQueue.Add(() =>
+            {
+                Callbacks.updateAccountTime(_currentFakeTime.ToShortTimeString());
+                Callbacks.accountDownloadEnd(_fakeAccount.Code);
+            });
         }
 
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
@@ -729,7 +784,11 @@ namespace Backtester
             Position.MarketValue = currentPrice * Position.PositionAmount;
 
             var positionValue = Position.PositionAmount * Position.AverageCost;
-            Position.UnrealizedPNL = Position.MarketValue - positionValue;
+            var unrealizedPnL = Position.MarketValue - positionValue;
+
+            Position.UnrealizedPNL = unrealizedPnL;
+            _fakeAccount.UnrealizedPnL["USD"] = unrealizedPnL;
+            _fakeAccount.UnrealizedPnL["BASE"] = unrealizedPnL;
 
             //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
@@ -850,9 +909,15 @@ namespace Backtester
         {
             _requestsQueue.Enqueue(() =>
             {
+                if(contract.Symbol != Contract.Symbol)
+                {
+                    _responsesQueue.Add(() => Callbacks.error(reqId, 200, "No security definition has been found for the request"));
+                    return;
+                }
+
                 var details = new IBApi.ContractDetails()
                 {
-                    Contract = contract.ToIBApiContract(),
+                    Contract = Contract.ToIBApiContract(),
                 };
 
                 _responsesQueue.Add(() => Callbacks.contractDetails(reqId, details));

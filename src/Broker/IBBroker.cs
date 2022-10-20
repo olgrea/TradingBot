@@ -227,11 +227,11 @@ namespace TradingBot.Broker
             return tcs.Task;
         }
 
-        public async Task<Account> GetAccountAsync(string accountCode)
+        public Task<Account> GetAccountAsync(string accountCode)
         {
-            var account = new Account() { Code = accountCode };
+            var account = new Account();
 
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<Account>();
 
             var updateAccountTime = new Action<string>(time =>
             {
@@ -264,7 +264,8 @@ namespace TradingBot.Broker
             var accountDownloadEnd = new Action<string>(accountCode =>
             {
                 _logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
-                tcs.SetResult(true);
+                account.Code = accountCode;
+                tcs.SetResult(account);
             });
 
             _client.Callbacks.UpdateAccountTime += updateAccountTime;
@@ -274,7 +275,7 @@ namespace TradingBot.Broker
 
             _client.RequestAccountUpdates(accountCode);
             
-            await tcs.Task.ContinueWith(t =>
+            tcs.Task.ContinueWith(t =>
             {
                 _client.Callbacks.UpdateAccountTime -= updateAccountTime;
                 _client.Callbacks.UpdateAccountValue -= updateAccountValue;
@@ -284,7 +285,7 @@ namespace TradingBot.Broker
                 _client.CancelAccountUpdates(accountCode);
             });
 
-            return account;
+            return tcs.Task;
         }
 
         public async Task<Contract> GetContractAsync(string symbol)
