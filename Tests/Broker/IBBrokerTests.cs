@@ -217,7 +217,7 @@ namespace Tests.Broker
         }
 
         [Test]
-        public async Task PlaceOrder_WhenNotEnoughFunds_ShouldFail()
+        public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
             if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
@@ -247,6 +247,43 @@ namespace Tests.Broker
             finally
             {
                 var opm = msg as OrderPlacedMessage;
+                Assert.IsNull(opm);
+                Assert.IsInstanceOf<ErrorMessageException>(ex);
+            }
+        }
+
+        [Test]
+        public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            var contract = await GetContractAsync("GME");
+            var account = await _broker.GetAccountAsync(_connectMessage.AccountCode);
+            
+            var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
+            var buyOrderResult = await PlaceDummyOrderAsync(buyOrder);
+            Assert.IsTrue(buyOrderResult?.OrderState.Status == Status.PreSubmitted || buyOrderResult?.OrderState.Status == Status.Submitted);
+
+            var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 10 };
+            sellOrder.Id = await _broker.GetNextValidOrderIdAsync();
+
+            // Test
+            // TODO : to test during market hours
+            Exception ex = null;
+            OrderMessage sellOrderResult = null;
+            try
+            {
+                sellOrderResult = await _broker.PlaceOrderAsync(contract, sellOrder);
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+            finally
+            {
+                var opm = sellOrderResult as OrderPlacedMessage;
                 Assert.IsNull(opm);
                 Assert.IsInstanceOf<ErrorMessageException>(ex);
             }
