@@ -10,6 +10,7 @@ using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
@@ -60,7 +61,7 @@ namespace Backtester
         Stopwatch _st = new Stopwatch();
 
         ConcurrentQueue<Action> _requestsQueue;
-        ConcurrentQueue<Action> _responsesQueue;
+        BlockingCollection<Action> _responsesQueue;
 
         Task _responsesTask;
         Task _passingTimeTask;
@@ -110,7 +111,7 @@ namespace Backtester
             _logger = LogManager.GetLogger(nameof(FakeClient));
             Callbacks = new IBCallbacks(_logger);
             _requestsQueue = new ConcurrentQueue<Action>();
-            _responsesQueue = new ConcurrentQueue<Action>();
+            _responsesQueue = new BlockingCollection<Action>();
 
             _symbol = symbol;
             _currentFakeTime = startTime;
@@ -185,63 +186,40 @@ namespace Backtester
             var mainToken = _cancellationTokenSource.Token;
             var task = Task.Run(() =>
             {
-                while(!mainToken.IsCancellationRequested)
+                try
                 {
-                    while (_responsesQueue.TryDequeue(out Action action))
+                    while(true)
+                    {
+                        Action action = _responsesQueue.Take(mainToken);
                         action();    
+                    }
                 }
+                catch (OperationCanceledException) {}
             }, mainToken);
 
             return task;
         }
 
-        Task StartPassingTimeTask()
+        async Task StartPassingTimeTask()
         {
             var mainToken = _cancellationTokenSource.Token;
             _st.Start();
             _logger.Trace($"Passing time task started");
-            var task = Task.Factory.StartNew(() =>
+            while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
             {
-                var delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
-                var delayToken = delayCancellation.Token;
-
-                while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
+                try
                 {
-                    try
-                    {
-                        while(_requestsQueue.TryDequeue(out Action action))
-                            action.Invoke();
+                    while(_requestsQueue.TryDequeue(out Action action))
+                        action.Invoke();
 
-                        // TODO : Possible slowdown when time scale is really low...
-                        ClockTick?.Invoke(_currentFakeTime);
-                        Task.Delay(TimeDelays.OneSecond, delayToken).Wait();
-                        _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                        //_logger.Info($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
-                    }
-                    catch (AggregateException e)
-                    {
-                        //TODO : verify error handling
-                        if(e.InnerException is OperationCanceledException)
-                        {
-                            delayCancellation.Dispose();
-                            if (!mainToken.IsCancellationRequested)
-                            {
-                                delayCancellation = CancellationTokenSource.CreateLinkedTokenSource(mainToken, CancellationToken.None);
-                                delayToken = delayCancellation.Token;
-                            }
-                            else
-                                _logger.Trace($"Passing time task cancelled");
-
-                            return;
-                        }
-                        
-                        throw e;
-                    }
+                    // TODO : Possible slowdown when time scale is really low...
+                    ClockTick?.Invoke(_currentFakeTime);
+                    await Task.Delay(TimeDelays.OneSecond, mainToken);
+                    _currentFakeTime = _currentFakeTime.AddSeconds(1);
+                    //_logger.Info($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
                 }
-
-            }, mainToken);
-
-            return task;
+                catch (OperationCanceledException) {}
+            }
         }
 
         void StopPassingTimeTask()
@@ -258,7 +236,7 @@ namespace Backtester
             _requestsQueue.Enqueue(() =>
             {
                 DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
-                _responsesQueue.Enqueue(() => Callbacks.currentTime(dto.ToUnixTimeSeconds()));
+                _responsesQueue.Add(() => Callbacks.currentTime(dto.ToUnixTimeSeconds()));
             });
         }
 
@@ -281,8 +259,8 @@ namespace Backtester
                     _logger.Debug($"New order submitted : {order}");
                     var c = contract.ToIBApiContract();
                     var o = order.ToIBApiOrder();
-                    _responsesQueue.Enqueue(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "PreSubmitted" }));
-                    _responsesQueue.Enqueue(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "Submitted" }));
+                    _responsesQueue.Add(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "PreSubmitted" }));
+                    _responsesQueue.Add(() => Callbacks.openOrder(order.Id, c, o, new IBApi.OrderState() { Status = "Submitted" }));
                 }
                 else //modify order
                 {
@@ -291,8 +269,8 @@ namespace Backtester
                     openOrder = order;
                 }
 
-                _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "PreSubmitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
-                _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
+                _responsesQueue.Add(() => Callbacks.orderStatus(order.Id, "PreSubmitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
+                _responsesQueue.Add(() => Callbacks.orderStatus(order.Id, "Submitted", 0, 0, 0, 0, 0, 0, 0, "", 0));
             });
         }
 
@@ -534,7 +512,7 @@ namespace Backtester
 
             string execId = NextExecId.ToString();
             //TODO : verify that orderStatus() is called on order execution
-            _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0));
+            _responsesQueue.Add(() => Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0));
 
             var exec = new IBApi.Execution()
             {
@@ -548,9 +526,9 @@ namespace Backtester
                 Price = total,
                 AvgPrice = price
             };
-            _responsesQueue.Enqueue(() => Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec));
+            _responsesQueue.Add(() => Callbacks.execDetails(o.Id, Contract.ToIBApiContract(), exec));
 
-            _responsesQueue.Enqueue(() => Callbacks.commissionReport(new IBApi.CommissionReport() 
+            _responsesQueue.Add(() => Callbacks.commissionReport(new IBApi.CommissionReport() 
             {
                 Commission = commission,
                 Currency = "USD",
@@ -578,8 +556,8 @@ namespace Backtester
             
             _logger.Debug($"Order {orderId} cancelled.");
             _openOrders.Remove(order);
-            _responsesQueue.Enqueue(() => Callbacks.orderStatus(order.Id, "Cancelled ", 0, 0, 0, 0, 0, 0, 0, "", 0));
-            _responsesQueue.Enqueue(() => Callbacks.error(orderId, 202, "Order Canceled - reason:"));
+            _responsesQueue.Add(() => Callbacks.orderStatus(order.Id, "Cancelled ", 0, 0, 0, 0, 0, 0, 0, "", 0));
+            _responsesQueue.Add(() => Callbacks.error(orderId, 202, "Order Canceled - reason:"));
         }
 
         public void CancelAllOrders() 
@@ -640,9 +618,9 @@ namespace Backtester
             var currentTime = _currentFakeTime;
             _lastAccountUpdate = currentTime;
 
-            _responsesQueue.Enqueue(() => Callbacks.updateAccountTime(currentTime.ToString())); //TODO : make sure format is correct
-            _responsesQueue.Enqueue(() => Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances["USD"].ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code));
-            _responsesQueue.Enqueue(() => Callbacks.accountDownloadEnd(_fakeAccount.Code));
+            _responsesQueue.Add(() => Callbacks.updateAccountTime(currentTime.ToString())); //TODO : make sure format is correct
+            _responsesQueue.Add(() => Callbacks.updateAccountValue("CashBalance", _fakeAccount.CashBalances["USD"].ToString(CultureInfo.InvariantCulture), "USD", _fakeAccount.Code));
+            _responsesQueue.Add(() => Callbacks.accountDownloadEnd(_fakeAccount.Code));
         }
 
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
@@ -666,7 +644,7 @@ namespace Backtester
             {
                 var b = MarketDataUtils.MakeBar(_currentBarNode, 5);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
-                _responsesQueue.Enqueue(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
+                _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }
         }
 
@@ -698,10 +676,10 @@ namespace Backtester
             var openOrders = _openOrders;
             foreach (var o in openOrders)
             {
-                _responsesQueue.Enqueue(() => Callbacks.openOrder(o.Id, Contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" }));
+                _responsesQueue.Add(() => Callbacks.openOrder(o.Id, Contract.ToIBApiContract(), o.ToIBApiOrder(), new IBApi.OrderState() { Status = "Submitted" }));
             }
 
-            _responsesQueue.Enqueue(() => Callbacks.openOrderEnd());
+            _responsesQueue.Add(() => Callbacks.openOrderEnd());
         }
 
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
@@ -746,8 +724,8 @@ namespace Backtester
             _requestsQueue.Enqueue(() =>
             {
                 _positionRequested = true;
-                _responsesQueue.Enqueue(() => Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost));
-                _responsesQueue.Enqueue(() => Callbacks.positionEnd());
+                _responsesQueue.Add(() => Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost));
+                _responsesQueue.Add(() => Callbacks.positionEnd());
             });
         }
 
@@ -769,7 +747,7 @@ namespace Backtester
         void OnClockTick_PnL(DateTime newTime)
         {
             // TODO : check to see if daily pnl include commission
-            _responsesQueue.Enqueue(() => Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL - _totalCommission, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue));
+            _responsesQueue.Add(() => Callbacks.pnlSingle(_reqIdPnL, Convert.ToInt32(Position.PositionAmount), Position.RealizedPNL - _totalCommission, Position.UnrealizedPNL, Position.RealizedPNL, Position.MarketValue));
         }
 
         public void CancelPnLUpdates(int contractId)
@@ -801,7 +779,7 @@ namespace Backtester
 
                 for (int i = 0; i < nbBars; i++, current = current.Previous)
                 {
-                    _responsesQueue.Enqueue(() => Callbacks.historicalData(reqId, new IBApi.Bar(
+                    _responsesQueue.Add(() => Callbacks.historicalData(reqId, new IBApi.Bar(
                         current.Value.Time.ToString(Bar.TWSTimeFormat), 
                         current.Value.Open, 
                         current.Value.High, 
@@ -812,7 +790,7 @@ namespace Backtester
                         0)));
                 }
 
-                _responsesQueue.Enqueue(() => Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat)));
+                _responsesQueue.Add(() => Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat)));
             });
         }
 
@@ -835,7 +813,7 @@ namespace Backtester
 
         void SendBidAsk(BidAsk ba)
         {
-            _responsesQueue.Enqueue(() => Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk()));
+            _responsesQueue.Add(() => Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk()));
         }
 
         public void CancelTickByTickData(int reqId)
@@ -850,7 +828,7 @@ namespace Backtester
         public void RequestValidOrderIds()
         {
             int next = NextValidOrderId;
-            _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.nextValidId(next)));
+            _requestsQueue.Enqueue(() => _responsesQueue.Add(() => Callbacks.nextValidId(next)));
         }
 
         public void RequestContractDetails(int reqId, Contract contract)
@@ -862,8 +840,8 @@ namespace Backtester
                     Contract = contract.ToIBApiContract(),
                 };
 
-                _responsesQueue.Enqueue(() => Callbacks.contractDetails(reqId, details));
-                _responsesQueue.Enqueue(() => Callbacks.contractDetailsEnd(reqId));
+                _responsesQueue.Add(() => Callbacks.contractDetails(reqId, details));
+                _responsesQueue.Add(() => Callbacks.contractDetailsEnd(reqId));
             });
         }
     }
