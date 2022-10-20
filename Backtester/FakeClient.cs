@@ -279,10 +279,24 @@ namespace Backtester
 
             _requestsQueue.Enqueue(() =>
             {
+                var price = order.TotalQuantity * _currentBidAskNode.Value.Ask;
+                if(order.Action == OrderAction.BUY && _fakeAccount.CashBalances["BASE"] < price)
+                {
+                    // TODO : add reason string during market hours
+                    _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
+                    return;
+                }
+
+                if (order.Action == OrderAction.SELL && Position.PositionAmount < order.TotalQuantity)
+                {
+                    // TODO : no idea what TWS is supposed to return
+                    //_responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
+                    return;
+                }
+
                 var openOrder = _openOrders.FirstOrDefault(o => o == order);
                 if (openOrder == null)
                 {
-                    //TODO validate order : enough cash to buy, enough shares to sell
                     _openOrders.Add(order);
 
                     _logger.Debug($"New order submitted : {order}");
