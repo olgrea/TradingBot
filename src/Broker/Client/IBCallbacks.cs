@@ -204,7 +204,6 @@ namespace TradingBot.Broker.Client
         public Action<Contract, Orders.Order, Orders.OrderState> OpenOrder;
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            // TODO : orderState only used then IBApi.Order.WhatIf = true ?? 
             Contract c = contract.ToTBContract();
             Orders.Order o = order.ToTBOrder();
             Orders.OrderState os = orderState.ToTBOrderState();
@@ -217,8 +216,7 @@ namespace TradingBot.Broker.Client
         }
 
         public Action OpenOrderEnd;
-        // TODO : use this when disconnection occurs?
-        // This seems to be called along with "openOrder" ONLY when the client connects and there are opened orders.
+        
         // This is not called when placing an order.
         public void openOrderEnd()
         {

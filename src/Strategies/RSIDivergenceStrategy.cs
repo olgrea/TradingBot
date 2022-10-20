@@ -87,7 +87,6 @@ namespace TradingBot.Strategies
                         return this;
                 }
 
-                //TODO : for data 2022-10-05, non-determinism occurs. I presume it's because of the discrepancy between init bars and normal ones
 
                 if (!_isInitialized)
                     InitializeOrders();

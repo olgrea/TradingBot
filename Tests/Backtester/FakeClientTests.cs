@@ -72,12 +72,6 @@ namespace Tests.Backtester
             await Task.Delay(50);
         }
 
-        /*
-         * TODO : tests to write
-         Place order : order not opened if not enough cash
-         */
-
-
         [Test]
         public async Task MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {

@@ -36,7 +36,6 @@ namespace TradingBot.Broker.Client
 
                 default:
                     _logger.Error(msg);
-                    // TODO : recover or kill remaining tasks so the program can exit
                     return false;
             }
         }
@@ -102,8 +101,6 @@ namespace TradingBot.Broker.Client
         {
             switch (msg.ErrorCode)
             {
-                //TODO : handle disconnections
-
 
                 default:
                     return base.IsHandled(msg); ;

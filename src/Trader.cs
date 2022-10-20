@@ -409,7 +409,6 @@ namespace TradingBot
                 TotalQuantity = _contractPosition.PositionAmount,
             };
 
-            // TODO : really need to implement async/await...
             var tcs = new TaskCompletionSource<bool>();
             var orderExecuted = new Action<OrderExecution, CommissionInfo>((oe, ci) =>
             {

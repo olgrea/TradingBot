@@ -1,25 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.Contracts;
-using System.Globalization;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using System.Threading.Tasks;
 using IBApi;
 using NLog;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Utils;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace TradingBot.Broker.Client
 {
-    //TODO : convert all of this to async/await
-
     internal class IBClient : IIBClient
     {
         EClientSocket _clientSocket;
@@ -49,7 +36,7 @@ namespace TradingBot.Broker.Client
         public IBCallbacks Callbacks => _callbacks;
 
 
-        // TODO : really need to handle market data connection losses. It seems to happen everyday at around 8pm
+        // TODO : need to handle market data connection losses if the bot trades for multiple days. It seems to happen everyday at around 8pm
         public void Connect(string host, int port, int clientId)
         {
             _clientSocket.eConnect(host, port, clientId);
