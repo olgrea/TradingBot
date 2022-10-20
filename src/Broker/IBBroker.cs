@@ -136,33 +136,33 @@ namespace TradingBot.Broker
 
         public Task<ConnectMessage> ConnectAsync()
         {
-            return ConnectAsync(Debugger.IsAttached ? -1 : 5000);
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return ConnectAsync(source.Token);
         }
 
-        public Task<ConnectMessage> ConnectAsync(int timeoutInMs)
+        public Task<ConnectMessage> ConnectAsync(CancellationToken token)
         {
             //TODO: Handle IB server resets
-            var msg = new ConnectMessage();
+            var connectMessage = new ConnectMessage();
             var tcs = new TaskCompletionSource<ConnectMessage>();
-            CancellationTokenSource source = new CancellationTokenSource();
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
-
+            token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
+            
             var nextValidId = new Action<int>(id =>
             {
                 _logger.Trace($"ConnectAsync : next valid id {id}");
-                msg.NextValidOrderId = id;
+                connectMessage.NextValidOrderId = id;
                 
-                if(msg.IsSet())
-                    tcs.TrySetResult(msg);
+                if(connectMessage.IsSet())
+                    tcs.TrySetResult(connectMessage);
             });
 
             var managedAccounts = new Action<string>(acc =>
             {
                 _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-                msg.AccountCode = acc;
+                connectMessage.AccountCode = acc;
                 
-                if (msg.IsSet())
-                    tcs.TrySetResult(msg);
+                if (connectMessage.IsSet())
+                    tcs.TrySetResult(connectMessage);
             });
 
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
@@ -171,15 +171,14 @@ namespace TradingBot.Broker
             _client.Callbacks.ManagedAccounts += managedAccounts;
             _client.Callbacks.Error += error;
 
-            source.CancelAfter(timeoutInMs);
-            _client.Connect(DefaultIP, _port, _clientId);
-
             tcs.Task.ContinueWith(t =>
             {
                 _client.Callbacks.NextValidId -= nextValidId;
                 _client.Callbacks.ManagedAccounts -= managedAccounts;
                 _client.Callbacks.Error -= error;
             });
+
+            _client.Connect(DefaultIP, _port, _clientId);
 
             return tcs.Task;
         }
@@ -189,7 +188,7 @@ namespace TradingBot.Broker
             var tcs = new TaskCompletionSource<bool>();
             _logger.Debug($"Disconnecting from TWS");
 
-            var disconnect = new Action(() => tcs.SetResult(true));
+            var disconnect = new Action(() => tcs.TrySetResult(true));
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Callbacks.ConnectionClosed += disconnect;

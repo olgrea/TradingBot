@@ -77,6 +77,7 @@ namespace Backtester
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
         
+        bool isConnected = false;
         int _nextValidOrderId = 1;
         int _nextExecId = 0;
         double _totalCommission = 0;
@@ -149,13 +150,27 @@ namespace Backtester
         public void Connect(string host, int port, int clientId)
         {
             Start();
-            _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.nextValidId(NextValidOrderId)));
-            _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.managedAccounts(_fakeAccount.Code)));
+            _requestsQueue.Enqueue(() =>
+            {
+                if (isConnected)
+                {
+                    _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(501, "Already Connected.")));
+                    return;
+                }
+
+                isConnected = true;
+                _responsesQueue.Add(() => Callbacks.nextValidId(NextValidOrderId));
+                _responsesQueue.Add(() => Callbacks.managedAccounts(_fakeAccount.Code));
+            });
         }
 
         public void Disconnect()
         {
-            _requestsQueue.Enqueue(() => _responsesQueue.Enqueue(() => Callbacks.connectionClosed()));
+            _requestsQueue.Enqueue(() =>
+            {
+                isConnected = false;
+                _responsesQueue.Add(() => Callbacks.connectionClosed());
+            });
         }
 
         internal void Start()
