@@ -627,7 +627,7 @@ namespace Backtester
         {
             _requestsQueue.Enqueue(() =>
             {
-                foreach (var o in _openOrders)
+                foreach (var o in _openOrders.ToList())
                     CancelOrderInternal(o.Id);
             });
         }
