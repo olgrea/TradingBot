@@ -6,6 +6,7 @@ namespace TradingBot.Broker.Client.Messages
     {
         public ErrorMessageException(Exception innerException) : base(innerException.Message, innerException) { }
         public ErrorMessageException(string msg, Exception innerException = null) : base(msg, innerException) { }
+        public ErrorMessageException(int errorCode, string msg, Exception innerException = null) : this(-1, errorCode, msg, innerException) { }
         public ErrorMessageException(int id, int errorCode, string msg, Exception innerException = null) : base(msg, innerException)
         {
             Id = id;

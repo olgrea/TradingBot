@@ -25,7 +25,7 @@ namespace TradingBot.Broker
         IErrorHandler ErrorHandler { get; set; }
 
         Task<ConnectMessage> ConnectAsync();
-        Task<ConnectMessage> ConnectAsync(int timeoutInMs);
+        Task<ConnectMessage> ConnectAsync(CancellationToken token);
         Task<bool> DisconnectAsync();
         Task<Account> GetAccountAsync(string accountCode);
         void RequestAccountUpdates(string accountCode);

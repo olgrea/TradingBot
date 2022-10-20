@@ -80,7 +80,7 @@ namespace Tests.Broker
             await Task.Delay(50);
 
             // Test
-            Assert.ThrowsAsync<TimeoutException>(async () => await _broker.ConnectAsync(5));
+            Assert.ThrowsAsync<TimeoutException>(async () => await _broker.ConnectAsync(new CancellationToken(true)));
         }
 
         [Test]
@@ -232,7 +232,7 @@ namespace Tests.Broker
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync()... related to ConfigureAwait() maybe ?
+            // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync() ?? related to ConfigureAwait() maybe ?
             //Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.PlaceOrderAsync(contract, order));
             Exception ex = null;
             OrderMessage msg = null;
