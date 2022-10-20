@@ -42,7 +42,7 @@ namespace TradingBot.Broker
 
         //Task<OrderExecutedMessage> WaitForExecution(Contract contract, Orders.Order order);
         Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order);
-        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, int timeoutInMs);
+        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, CancellationToken token);
         void PlaceOrder(Contract contract, Order order);
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);
