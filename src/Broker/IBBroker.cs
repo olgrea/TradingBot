@@ -564,10 +564,11 @@ namespace TradingBot.Broker
 
         public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order)
         {
-            return PlaceOrderAsync(contract, order, Debugger.IsAttached ? -1 : 5000);
+            var source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return PlaceOrderAsync(contract, order, source.Token);
         }
 
-        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, int timeoutInMs)
+        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, CancellationToken token)
         {
             if (order?.Id <= 0)
                 throw new ArgumentException("Order id not set");
@@ -576,10 +577,9 @@ namespace TradingBot.Broker
             var orderExecutedMsg = new OrderExecutedMessage();
 
             var tcs = new TaskCompletionSource<OrderMessage>();
-            var source = new CancellationTokenSource();
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
+            token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
             
-            var openOrder = new Action<Contract, Orders.Order, Orders.OrderState>((c, o, oState) =>
+            var openOrder = new Action<Contract, Order, OrderState>((c, o, oState) =>
             {
                 if (order.Id == o.Id)
                 {
@@ -631,7 +631,6 @@ namespace TradingBot.Broker
             _client.Callbacks.CommissionReport += commissionReport;
             _client.Callbacks.Error += error;
 
-            source.CancelAfter(timeoutInMs);
             _client.PlaceOrder(contract, order);
 
             tcs.Task.ContinueWith(t =>
