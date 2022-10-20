@@ -2,19 +2,19 @@
 
 namespace TradingBot.Broker.Client.Messages
 {
-    internal abstract class OrderMessage
+    internal abstract class OrderResult
     {
         public Contract Contract { get; set; }
         public Order Order { get; set; }
     }
 
-    internal class OrderPlacedMessage : OrderMessage
+    internal class OrderPlacedResult : OrderResult
     {
         public OrderStatus OrderStatus { get; set; }
         public OrderState OrderState { get; set; }
     }
 
-    internal class OrderExecutedMessage : OrderMessage
+    internal class OrderExecutedResult : OrderResult
     {
         public OrderExecution OrderExecution { get; set; }
         public CommissionInfo CommissionInfo { get; set; }

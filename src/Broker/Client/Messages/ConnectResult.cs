@@ -5,7 +5,7 @@ using System.Text;
 
 namespace TradingBot.Broker.Client.Messages
 {
-    internal class ConnectMessage
+    internal class ConnectResult
     {
         public int NextValidOrderId { get; set; }
         public string AccountCode { get; set; }

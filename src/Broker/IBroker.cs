@@ -24,8 +24,8 @@ namespace TradingBot.Broker
         event Action<PnL> PnLReceived;
         IErrorHandler ErrorHandler { get; set; }
 
-        Task<ConnectMessage> ConnectAsync();
-        Task<ConnectMessage> ConnectAsync(CancellationToken token);
+        Task<ConnectResult> ConnectAsync();
+        Task<ConnectResult> ConnectAsync(CancellationToken token);
         Task<bool> DisconnectAsync();
         Task<Account> GetAccountAsync(string accountCode);
         void RequestAccountUpdates(string accountCode);
@@ -41,8 +41,8 @@ namespace TradingBot.Broker
         void UnsubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback);
 
         //Task<OrderExecutedMessage> WaitForExecution(Contract contract, Orders.Order order);
-        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order);
-        Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, CancellationToken token);
+        Task<OrderResult> PlaceOrderAsync(Contract contract, Order order);
+        Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token);
         void PlaceOrder(Contract contract, Order order);
         void PlaceOrder(Contract contract, OrderChain chain);
         void ModifyOrder(Contract contract, Order order);

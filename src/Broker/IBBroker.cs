@@ -134,35 +134,35 @@ namespace TradingBot.Broker
             throw new ArgumentException("Neither TWS Workstation or IB Gateway is running.");
         }
 
-        public Task<ConnectMessage> ConnectAsync()
+        public Task<ConnectResult> ConnectAsync()
         {
             CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
             return ConnectAsync(source.Token);
         }
 
-        public Task<ConnectMessage> ConnectAsync(CancellationToken token)
+        public Task<ConnectResult> ConnectAsync(CancellationToken token)
         {
             //TODO: Handle IB server resets
-            var connectMessage = new ConnectMessage();
-            var tcs = new TaskCompletionSource<ConnectMessage>();
+            var result = new ConnectResult();
+            var tcs = new TaskCompletionSource<ConnectResult>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
             
             var nextValidId = new Action<int>(id =>
             {
                 _logger.Trace($"ConnectAsync : next valid id {id}");
-                connectMessage.NextValidOrderId = id;
+                result.NextValidOrderId = id;
                 
-                if(connectMessage.IsSet())
-                    tcs.TrySetResult(connectMessage);
+                if(result.IsSet())
+                    tcs.TrySetResult(result);
             });
 
             var managedAccounts = new Action<string>(acc =>
             {
                 _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-                connectMessage.AccountCode = acc;
+                result.AccountCode = acc;
                 
-                if (connectMessage.IsSet())
-                    tcs.TrySetResult(connectMessage);
+                if (result.IsSet())
+                    tcs.TrySetResult(result);
             });
 
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
@@ -562,30 +562,30 @@ namespace TradingBot.Broker
             _client.CancelFiveSecondsBarsUpdates(reqId);
         }
 
-        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order)
+        public Task<OrderResult> PlaceOrderAsync(Contract contract, Order order)
         {
             var source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
             return PlaceOrderAsync(contract, order, source.Token);
         }
 
-        public Task<OrderMessage> PlaceOrderAsync(Contract contract, Order order, CancellationToken token)
+        public Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token)
         {
             if (order?.Id <= 0)
                 throw new ArgumentException("Order id not set");
 
-            var orderPlacedMsg = new OrderPlacedMessage();
-            var orderExecutedMsg = new OrderExecutedMessage();
+            var orderPlacedResult = new OrderPlacedResult();
+            var orderExecutedResult = new OrderExecutedResult();
 
-            var tcs = new TaskCompletionSource<OrderMessage>();
+            var tcs = new TaskCompletionSource<OrderResult>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
             
             var openOrder = new Action<Contract, Order, OrderState>((c, o, oState) =>
             {
                 if (order.Id == o.Id)
                 {
-                    orderPlacedMsg.Contract = orderExecutedMsg.Contract = c;
-                    orderPlacedMsg.Order = orderExecutedMsg.Order = o;
-                    orderPlacedMsg.OrderState = oState;
+                    orderPlacedResult.Contract = orderExecutedResult.Contract = c;
+                    orderPlacedResult.Order = orderExecutedResult.Order = o;
+                    orderPlacedResult.OrderState = oState;
                 }
             });
 
@@ -595,23 +595,23 @@ namespace TradingBot.Broker
             {
                 if (order.Id == oStatus.Info.OrderId && (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted))
                 {
-                    orderPlacedMsg.OrderStatus = oStatus;
-                    tcs.TrySetResult(orderPlacedMsg);
+                    orderPlacedResult.OrderStatus = oStatus;
+                    tcs.TrySetResult(orderPlacedResult);
                 }
             });
 
             var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
             {
                 if (order.Id == oe.OrderId)
-                    orderExecutedMsg.OrderExecution = oe;
+                    orderExecutedResult.OrderExecution = oe;
             });
 
             var commissionReport = new Action<CommissionInfo>(ci =>
             {
-                if (orderExecutedMsg.OrderExecution.ExecId == ci.ExecId)
+                if (orderExecutedResult.OrderExecution.ExecId == ci.ExecId)
                 {
-                    orderExecutedMsg.CommissionInfo = ci;
-                    tcs.TrySetResult(orderExecutedMsg);
+                    orderExecutedResult.CommissionInfo = ci;
+                    tcs.TrySetResult(orderExecutedResult);
                 }
             });
 
