@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
-using System.Xml.Linq;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Utils
@@ -11,6 +9,7 @@ namespace TradingBot.Utils
     public static class MarketDataUtils
     {
         public const string RootDir = @"C:\tradingbot\oldHistoricalData";
+
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);
 
