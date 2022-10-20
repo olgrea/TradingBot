@@ -18,7 +18,7 @@ namespace Tests.Broker
     internal class IBBrokerTests
     {
         protected IBBroker _broker;
-        protected ConnectMessage _connectMessage;
+        protected ConnectResult _connectMessage;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
@@ -174,15 +174,15 @@ namespace Tests.Broker
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            OrderMessage orderMessage = await _broker.PlaceOrderAsync(contract, order);
+            OrderResult result = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
-            var orderPlacedMessage = orderMessage as OrderPlacedMessage;
-            Assert.NotNull(orderPlacedMessage);
-            Assert.NotNull(orderPlacedMessage.OrderStatus);
+            var orderPlacedResult = result as OrderPlacedResult;
+            Assert.NotNull(orderPlacedResult);
+            Assert.NotNull(orderPlacedResult.OrderStatus);
 
             // TODO : verify this again
-            Assert.IsTrue(orderPlacedMessage.OrderStatus.Status == Status.PreSubmitted || orderPlacedMessage.OrderStatus.Status == Status.Submitted);
+            Assert.IsTrue(orderPlacedResult.OrderStatus.Status == Status.PreSubmitted || orderPlacedResult.OrderStatus.Status == Status.Submitted);
         }
 
         [Test]
@@ -197,20 +197,20 @@ namespace Tests.Broker
             order.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            var orderMessage = await _broker.PlaceOrderAsync(contract, order);
+            var result = await _broker.PlaceOrderAsync(contract, order);
 
             // Assert
-            if(orderMessage is OrderPlacedMessage orderPlacedMessage)
+            if(result is OrderPlacedResult opr)
             {
-                Assert.NotNull(orderPlacedMessage);
-                Assert.NotNull(orderPlacedMessage.OrderState);
-                Assert.NotNull(orderPlacedMessage.OrderStatus);
+                Assert.NotNull(opr);
+                Assert.NotNull(opr.OrderState);
+                Assert.NotNull(opr.OrderStatus);
             }
-            else if(orderMessage is OrderExecutedMessage orderExecutedMessage)
+            else if(result is OrderExecutedResult oer)
             {
-                Assert.NotNull(orderExecutedMessage);
-                Assert.NotNull(orderExecutedMessage.OrderExecution);
-                Assert.NotNull(orderExecutedMessage.CommissionInfo);
+                Assert.NotNull(oer);
+                Assert.NotNull(oer.OrderExecution);
+                Assert.NotNull(oer.CommissionInfo);
             }
             else
                 Assert.Fail();
@@ -235,10 +235,10 @@ namespace Tests.Broker
             // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync() ?? related to ConfigureAwait() maybe ?
             //Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.PlaceOrderAsync(contract, order));
             Exception ex = null;
-            OrderMessage msg = null;
+            OrderResult result = null;
             try
             {
-                msg = await _broker.PlaceOrderAsync(contract, order);
+                result = await _broker.PlaceOrderAsync(contract, order);
             }
             catch (Exception e)
             {
@@ -246,8 +246,8 @@ namespace Tests.Broker
             }
             finally
             {
-                var opm = msg as OrderPlacedMessage;
-                Assert.IsNull(opm);
+                var r = result as OrderPlacedResult;
+                Assert.IsNull(r);
                 Assert.IsInstanceOf<ErrorMessageException>(ex);
             }
         }
@@ -272,7 +272,7 @@ namespace Tests.Broker
             // Test
             // TODO : to test during market hours
             Exception ex = null;
-            OrderMessage sellOrderResult = null;
+            OrderResult sellOrderResult = null;
             try
             {
                 sellOrderResult = await _broker.PlaceOrderAsync(contract, sellOrder);
@@ -283,8 +283,8 @@ namespace Tests.Broker
             }
             finally
             {
-                var opm = sellOrderResult as OrderPlacedMessage;
-                Assert.IsNull(opm);
+                var r = sellOrderResult as OrderPlacedResult;
+                Assert.IsNull(r);
                 Assert.IsInstanceOf<ErrorMessageException>(ex);
             }
         }
@@ -352,12 +352,12 @@ namespace Tests.Broker
             };
         }
 
-        async Task<OrderPlacedMessage> PlaceDummyOrderAsync(Order order)
+        async Task<OrderPlacedResult> PlaceDummyOrderAsync(Order order)
         {
             var contract = await GetContractAsync("GME");
             order.Id = await _broker.GetNextValidOrderIdAsync();
-            var msg = await _broker.PlaceOrderAsync(contract, order);
-            return msg as OrderPlacedMessage;
+            var result = await _broker.PlaceOrderAsync(contract, order);
+            return result as OrderPlacedResult;
         }
 
         int RandomQty => new Random().Next(3, 10);
