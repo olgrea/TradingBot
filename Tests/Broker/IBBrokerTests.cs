@@ -2,13 +2,9 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
-using NLog;
 using NUnit.Framework;
 using TradingBot.Broker;
-using TradingBot.Broker.Client;
 using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils;
 
@@ -181,7 +177,6 @@ namespace Tests.Broker
             Assert.NotNull(orderPlacedResult);
             Assert.NotNull(orderPlacedResult.OrderStatus);
 
-            // TODO : verify this again
             Assert.IsTrue(orderPlacedResult.OrderStatus.Status == Status.PreSubmitted || orderPlacedResult.OrderStatus.Status == Status.Submitted);
         }
 
@@ -255,6 +250,7 @@ namespace Tests.Broker
         [Test]
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
+            // TODO : test during market hours
             if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 

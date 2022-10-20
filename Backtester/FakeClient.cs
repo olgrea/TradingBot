@@ -217,10 +217,10 @@ namespace Backtester
             {
                 try
                 {
-                    while(true)
+                    while (true)
                     {
                         Action action = _responsesQueue.Take(mainToken);
-                        action();    
+                        action();
                     }
                 }
                 catch (OperationCanceledException) {}
@@ -341,7 +341,6 @@ namespace Backtester
 
         void EvaluateOpenOrders(BidAsk bidAsk)
         {
-            // TODO : add readerWriter lock : this throws because the collection gets modified
             foreach(Order o in _openOrders.ToList())
             {
                 _logger.Debug($"Evaluating Order {o} at BidAsk : {bidAsk}");
