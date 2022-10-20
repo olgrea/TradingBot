@@ -1,5 +1,6 @@
 ﻿using System;
 using CommandLine;
+[assembly: Fody.ConfigureAwait(false)]
 
 namespace Backtester
 {
