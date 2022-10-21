@@ -790,11 +790,6 @@ namespace TradingBot.Broker
             return await GetHistoricalDataAsync(contract, barLength, default(DateTime), count);   
         }
    
-        internal IEnumerable<Bar> GetPastBars(Contract contract, BarLength barLength, DateTime endDateTime, int count)
-        {
-            return GetHistoricalDataAsync(contract, barLength, endDateTime, count).Result;
-        }
-
         public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;
@@ -877,11 +872,6 @@ namespace TradingBot.Broker
                 _client.Callbacks.HistoricalData -= historicalData;
                 _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
             });
-        }
-
-        public IEnumerable<BidAsk> GetPastBidAsks(Contract contract, DateTime time, int count)
-        {
-            return RequestHistoricalTicks(contract, time, count).Result;
         }
 
         public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count)

@@ -18,6 +18,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataFetcher", "Hi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HistoricalDataDbMigrator", "HistoricalDataDbMigrator\HistoricalDataDbMigrator.csproj", "{6E027B63-727C-4B32-8719-9D4125A382B8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +50,10 @@ Global
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6E027B63-727C-4B32-8719-9D4125A382B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E027B63-727C-4B32-8719-9D4125A382B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E027B63-727C-4B32-8719-9D4125A382B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E027B63-727C-4B32-8719-9D4125A382B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

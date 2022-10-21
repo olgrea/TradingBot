@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using CommandLine;
 [assembly: Fody.ConfigureAwait(false)]
 
@@ -18,7 +19,7 @@ namespace Backtester
             public string EndDate { get; set; } = "";
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             var parsedArgs = Parser.Default.ParseArguments<Options>(args);
 
@@ -29,7 +30,7 @@ namespace Backtester
                 endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
             var bt = new Backtester(ticker, startDate, endDate);
-            bt.Start();
+            await bt.Start();
         }
     }
 }
