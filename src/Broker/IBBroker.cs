@@ -44,7 +44,6 @@ namespace TradingBot.Broker
         DataSubscriptions _subscriptions = new DataSubscriptions();
         IIBClient _client;
         ILogger _logger;
-        OrderManager _orderManager;
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
         int NextRequestId => _reqId++;
@@ -75,16 +74,28 @@ namespace TradingBot.Broker
 
         public event Action<PnL> PnLReceived;
         
-        public event Action<Order, OrderStatus> OrderUpdated
+        public event Action<Contract, Order, OrderState> OrderOpened
         {
-            add => _orderManager.OrderUpdated += value;
-            remove => _orderManager.OrderUpdated -= value;
+            add => _client.Callbacks.OpenOrder += value;
+            remove => _client.Callbacks.OpenOrder -= value;
         }
 
-        public event Action<OrderExecution, CommissionInfo> OrderExecuted
+        public event Action<OrderStatus> OrderStatusChanged
         {
-            add => _orderManager.OrderExecuted += value;
-            remove => _orderManager.OrderExecuted -= value;
+            add => _client.Callbacks.OrderStatus += value;
+            remove => _client.Callbacks.OrderStatus -= value;
+        }
+
+        public event Action<Contract, OrderExecution> OrderExecuted
+        {
+            add => _client.Callbacks.ExecDetails += value;
+            remove => _client.Callbacks.ExecDetails -= value;
+        }
+
+        public event Action<CommissionInfo> CommissionInfoReceived
+        {
+            add => _client.Callbacks.CommissionReport += value;
+            remove => _client.Callbacks.CommissionReport -= value;
         }
 
         public event Action<long> CurrentTimeReceived
@@ -122,7 +133,6 @@ namespace TradingBot.Broker
             _clientId = clientId;
             _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
             _client = client ?? new IBClient(_logger);            
-            _orderManager = new OrderManager(this, _client, _logger);
 
             foreach (BarLength val in Enum.GetValues(typeof(BarLength)))
                 BarReceived.Add(val, null);
@@ -582,22 +592,13 @@ namespace TradingBot.Broker
 
         public void PlaceOrder(Contract contract, Order order)
         {
-            _orderManager.PlaceOrder(contract, order);
-        }
+            if (order?.Id <= 0)
+                throw new ArgumentException("Order id not set");
 
-        public void PlaceOrder(Contract contract, OrderChain chain)
-        {
-            PlaceOrder(contract, chain, false);
-        }
+            if (!order.Info.Transmit)
+                _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.Info.Transmit)}\" is set to false.");
 
-        public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
-        {
-            _orderManager.PlaceOrder(contract, chain, useTWSAttachedOrderFeature);
-        }
-
-        public void ModifyOrder(Contract contract, Order order)
-        {
-            _orderManager.ModifyOrder(contract, order);
+            _client.PlaceOrder(contract, order);
         }
 
         public Task<OrderStatus> CancelOrderAsync(int orderId)
@@ -639,14 +640,14 @@ namespace TradingBot.Broker
 
         public void CancelOrder(Order order)
         {
-            _orderManager.CancelOrder(order);
+            Trace.Assert(order.Id > 0);
+            _client.CancelOrder(order.Id);
         }
 
-        public void CancelAllOrders() => _orderManager.CancelAllOrders();
-        public bool HasBeenRequested(Order order) => _orderManager.HasBeenRequested(order);
-        public bool HasBeenOpened(Order order) => _orderManager.HasBeenOpened(order);
-        public bool IsCancelled(Order order) => _orderManager.IsCancelled(order);
-        public bool IsExecuted(Order order, out OrderExecution orderExecution) => _orderManager.IsExecuted(order, out orderExecution);
+        public void CancelAllOrders()
+        {
+            _client.CancelAllOrders();
+        }
 
         public void RequestPositionsUpdates()
         {
