@@ -247,7 +247,7 @@ namespace Tests.Broker
         }
 
         [Test]
-        [Ignore("You can short stocks with a paper trading account but apparently it's not possible with a cash account like the one I have.")]
+        [Ignore("Keeping this until I move it in Trader tests.")]
         // TODO : enforce disallowing of stock shorting in Trader
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {

@@ -241,11 +241,10 @@ namespace Backtester
                     while(_requestsQueue.TryDequeue(out Action action))
                         action.Invoke();
 
-                    // TODO : Possible slowdown when time scale is really low...
                     ClockTick?.Invoke(_currentFakeTime);
-                    await Task.Delay(TimeDelays.OneSecond, mainToken);
+                    if(TimeDelays.OneSecond > 0)
+                        await Task.Delay(TimeDelays.OneSecond, mainToken);
                     _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                    //_logger.Info($"{_currentFakeTime}\t{_st.ElapsedMilliseconds}");
                 }
                 catch (OperationCanceledException) {}
             }
@@ -282,15 +281,7 @@ namespace Backtester
                 var price = order.TotalQuantity * _currentBidAskNode.Value.Ask;
                 if(order.Action == OrderAction.BUY && _fakeAccount.CashBalances["BASE"] < price)
                 {
-                    // TODO : add reason string during market hours
                     _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
-                    return;
-                }
-
-                if (order.Action == OrderAction.SELL && Position.PositionAmount < order.TotalQuantity)
-                {
-                    // TODO : no idea what TWS is supposed to return
-                    //_responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
                     return;
                 }
 
@@ -396,7 +387,6 @@ namespace Backtester
 
         private void EvaluateTrailingStopOrder(BidAsk bidAsk, TrailingStopOrder o)
         {
-            //TODO : validate computations
             if (o.Action == OrderAction.BUY)
             {
                 if (o.StopPrice == double.MaxValue)
@@ -547,7 +537,6 @@ namespace Backtester
             _logger.Debug($"Account {_fakeAccount.Code} :  New USD cash balance : {_fakeAccount.CashBalances["USD"]:c}");
 
             string execId = NextExecId.ToString();
-            //TODO : verify that orderStatus() is called on order execution
             _responsesQueue.Add(() => Callbacks.orderStatus(order.Id, "Filled", o.TotalQuantity, 0, total, order.Id, order.Info.ParentId, price, 0, "", 0));
 
             var exec = new IBApi.Execution()
