@@ -44,7 +44,6 @@ namespace TradingBot.Utils
                 AND_Time = $"AND Time >= '{timeRange.Item1}' AND Time < '{timeRange.Item2}'";
             }
 
-
             command.CommandText =
             $@"
                 SELECT EXISTS (
@@ -99,19 +98,45 @@ namespace TradingBot.Utils
                 AND Date = '{date.ToShortDateString()}';
             ";
 
-            var data = new LinkedList<TMarketData>();
-            using (var reader = command.ExecuteReader())
-            {
-                while (reader.Read())
-                {
-                    var name = reader.GetString(0);
-                }
-            }
+            using SqliteDataReader reader = command.ExecuteReader();
+
+            IEnumerable<TMarketData> data = null;
+            if (typeof(TMarketData) == typeof(Bar))
+                data = new LinkedList<TMarketData>(reader.Cast<IDataRecord>().Select(dr => MakeBarFromResult(dr)).Cast<TMarketData>());
+            else if (typeof(TMarketData) == typeof(BidAsk))
+                data = new LinkedList<TMarketData>(reader.Cast<IDataRecord>().Select(dr => MakeBidAskFromResult(dr)).Cast<TMarketData>());
 
             return data;
         }
 
-        //IMarketData ConvertResultToPopulate
+        private static Bar MakeBarFromResult(IDataRecord dr)
+        {
+            DateTime dateTime = DateTime.Parse(dr.GetString(1));
+            var bar = new Bar()
+            {
+                Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
+                BarLength = (BarLength)dr.GetInt64(3),
+                Open = dr.GetDouble(4),
+                Close = dr.GetDouble(5),
+                High = dr.GetDouble(6),
+                Low = dr.GetDouble(7),
+            };
+            return bar;
+        }
+
+        private static BidAsk MakeBidAskFromResult(IDataRecord dr)
+        {
+            DateTime dateTime = DateTime.Parse(dr.GetString(1));
+            var ba = new BidAsk()
+            {
+                Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
+                Bid = dr.GetDouble(3),
+                BidSize = Convert.ToInt32(dr.GetInt64(4)),
+                Ask = dr.GetDouble(5),
+                AskSize = Convert.ToInt32(dr.GetInt64(6)),
+            };
+            return ba;
+        }
 
         static SqliteCommand CreateInsertCommand<TMarketData>(SqliteConnection connection) where TMarketData : IMarketData, new()
         {

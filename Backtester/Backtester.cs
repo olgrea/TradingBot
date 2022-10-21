@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using TradingBot;
@@ -33,7 +34,7 @@ namespace Backtester
         {
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
-                var marketData = DeserializeHistoricalData(_ticker, day.Item1);
+                var marketData = LoadHistoricalData(_ticker, day.Item1);
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
@@ -43,7 +44,6 @@ namespace Backtester
 
                 trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 
-                fakeClient.Start();
                 await trader.Start();
                 trader.Stop();
             }
