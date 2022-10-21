@@ -16,6 +16,7 @@ namespace TradingBot.Broker
 {
     internal interface IBroker
     {
+        Dictionary<BarLength, Action<Contract, Bar>> BarReceived { get; set; }
         event Action<Contract, BidAsk> BidAskReceived;
         event Action<string, string, string, string> AccountValueUpdated;
         event Action<Order, OrderStatus> OrderUpdated;
@@ -37,10 +38,7 @@ namespace TradingBot.Broker
         void CancelBidAskUpdates(Contract contract);
         void RequestBarsUpdates(Contract contract);
         void CancelBarsUpdates(Contract contract);
-        void SubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback);
-        void UnsubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback);
-
-        //Task<OrderExecutedMessage> WaitForExecution(Contract contract, Orders.Order order);
+        
         Task<OrderResult> PlaceOrderAsync(Contract contract, Order order);
         Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token);
         void PlaceOrder(Contract contract, Order order);
