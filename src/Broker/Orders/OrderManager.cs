@@ -2,18 +2,17 @@
 using System.Linq;
 using System.Collections.Generic;
 using System.Diagnostics;
-using TradingBot.Broker.Client;
 using NLog;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
 
 namespace TradingBot.Broker.Orders
 {
+    // TODO : not sure what I'll do with this class but I know I'll rework it
     internal class OrderManager
     {
         ILogger _logger;
         IBBroker _broker;
-        IIBClient _client;
 
         ConcurrentDictionary<int, Order> _ordersRequested = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
@@ -22,16 +21,15 @@ namespace TradingBot.Broker.Orders
         ConcurrentDictionary<int, Order> _ordersCancelled = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<string, OrderExecution> _executions = new ConcurrentDictionary<string, OrderExecution>();
 
-        public OrderManager(IBBroker broker, IIBClient client, ILogger logger)
+        public OrderManager(IBBroker broker, ILogger logger)
         {
             _logger = logger;
             _broker = broker;
-            _client = client;
 
-            _client.Callbacks.OpenOrder += OnOrderOpened;
-            _client.Callbacks.OrderStatus += OnOrderStatus;
-            _client.Callbacks.ExecDetails += OnOrderExecuted;
-            _client.Callbacks.CommissionReport += OnCommissionInfo;
+            _broker.OrderOpened += OnOrderOpened;
+            _broker.OrderStatusChanged += OnOrderStatus;
+            _broker.OrderExecuted += OnOrderExecuted;
+            _broker.CommissionInfoReceived += OnCommissionInfo;
         }
 
         public event Action<Order, OrderStatus> OrderUpdated;
@@ -65,7 +63,8 @@ namespace TradingBot.Broker.Orders
                 _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.Info.Transmit)}\" is set to false.");
 
             _ordersRequested[order.Id] = order;
-            _client.PlaceOrder(contract, order);
+
+            _broker.PlaceOrder(contract, order);
         }
 
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
@@ -112,7 +111,7 @@ namespace TradingBot.Broker.Orders
                 Trace.Assert(o.Id > 0 && !_ordersRequested.ContainsKey(o.Id));
 
                 _ordersRequested[o.Id] = o;
-                _client.PlaceOrder(contract, o);
+                _broker.PlaceOrder(contract, o);
             }
         }
 
@@ -214,7 +213,7 @@ namespace TradingBot.Broker.Orders
             }
 
             _logger.Debug($"Modifying order {order}.");
-            _client.PlaceOrder(contract, order);
+            _broker.PlaceOrder(contract, order);
         }
 
         public void CancelOrder(Order order)
@@ -225,13 +224,13 @@ namespace TradingBot.Broker.Orders
                 throw new ArgumentException($"The order {order} hasn't been placed and therefore cannot be cancelled");
             }
 
-            _client.CancelOrder(order.Id);
+            _broker.CancelOrder(order);
         }
 
         public void CancelAllOrders()
         {
             _chainOrdersRequested.Clear();
-            _client.CancelAllOrders();
+            _broker.CancelAllOrders();
         }
 
         async Task<List<Order>> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)

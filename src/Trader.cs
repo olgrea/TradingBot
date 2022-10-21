@@ -23,6 +23,7 @@ namespace TradingBot
         ILogger _csvLogger;
         TraderErrorHandler _errorHandler;
         IBBroker _broker;
+        OrderManager _orderManager;
 
         DateTime _startTime;
         DateTime _endTime;
@@ -57,6 +58,7 @@ namespace TradingBot
             _ticker = ticker;
             _startTime = startTime;
             _broker = broker;
+            _orderManager = new OrderManager(_broker, _logger);
 
             // We remove 5 minutes to have the time to sell remaining positions, if any, at the end of the day.
             _endTime = endTime.AddMinutes(-5);
@@ -71,6 +73,7 @@ namespace TradingBot
 
         internal ILogger Logger => _logger;
         internal IBBroker Broker => _broker;
+        internal OrderManager OrderManager => _orderManager;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
         internal bool TradingStarted => _tradingStarted;
@@ -197,8 +200,8 @@ namespace TradingBot
             foreach(BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
                 _broker.BarReceived[barLength] += OnBarReceived;
 
-            _broker.OrderUpdated += OnOrderUpdated;
-            _broker.OrderExecuted += OnOrderExecuted;
+            _orderManager.OrderUpdated += OnOrderUpdated;
+            _orderManager.OrderExecuted += OnOrderExecuted;
 
             _broker.RequestAccountUpdates(_account.Code);
             _broker.RequestPositionsUpdates();
@@ -211,8 +214,8 @@ namespace TradingBot
             _broker.PositionReceived -= OnPositionReceived;
             _broker.PnLReceived -= OnPnLReceived;
 
-            _broker.OrderUpdated -= OnOrderUpdated;
-            _broker.OrderExecuted -= OnOrderExecuted;
+            _orderManager.OrderUpdated -= OnOrderUpdated;
+            _orderManager.OrderExecuted -= OnOrderExecuted;
 
             Broker.CancelBarsUpdates(Contract);
             foreach (BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
@@ -383,10 +386,11 @@ namespace TradingBot
                 if (oe.OrderId == mo.Id)
                     tcs.SetResult(true);
             });
-            _broker.OrderExecuted += orderExecuted;
+
+            _orderManager.OrderExecuted += orderExecuted;
             tcs.Task.ContinueWith(t =>
             {
-                _broker.OrderExecuted -= orderExecuted;
+                _orderManager.OrderExecuted -= orderExecuted;
                 if (!t.IsCompletedSuccessfully)
                     throw new Exception("The trader ended with unclosed positions!");
             });

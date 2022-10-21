@@ -19,8 +19,10 @@ namespace TradingBot.Broker
         Dictionary<BarLength, Action<Contract, Bar>> BarReceived { get; set; }
         event Action<Contract, BidAsk> BidAskReceived;
         event Action<string, string, string, string> AccountValueUpdated;
-        event Action<Order, OrderStatus> OrderUpdated;
-        event Action<OrderExecution, CommissionInfo> OrderExecuted;
+        event Action<Contract, Order, OrderState> OrderOpened;
+        event Action<OrderStatus> OrderStatusChanged;
+        event Action<Contract, OrderExecution> OrderExecuted;
+        event Action<CommissionInfo> CommissionInfoReceived;
         event Action<Position> PositionReceived;
         event Action<PnL> PnLReceived;
         IErrorHandler ErrorHandler { get; set; }
@@ -42,15 +44,9 @@ namespace TradingBot.Broker
         Task<OrderResult> PlaceOrderAsync(Contract contract, Order order);
         Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token);
         void PlaceOrder(Contract contract, Order order);
-        void PlaceOrder(Contract contract, OrderChain chain);
-        void ModifyOrder(Contract contract, Order order);
         Task<OrderStatus> CancelOrderAsync(int orderId);
         void CancelOrder(Order order);
         void CancelAllOrders();
-        bool HasBeenRequested(Order order);
-        bool HasBeenOpened(Order order);
-        bool IsCancelled(Order order);
-        bool IsExecuted(Order order, out OrderExecution orderExecution);
 
         void RequestPnLUpdates(Contract contract);
         void CancelPnLUpdates(Contract contract);
