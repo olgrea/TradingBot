@@ -27,8 +27,11 @@ namespace TradingBot
         DateTime _startTime;
         DateTime _endTime;
         DateTime _currentTime;
+        
+        CancellationTokenSource _cancellation;
         Task _monitoringTimeTask;
-        CancellationTokenSource _monitoringTimeCancellation;
+        Task _evaluationTask;
+        AutoResetEvent _evaluationEvent = new AutoResetEvent(false);
 
         string _ticker;
         string _accountCode;
@@ -42,10 +45,6 @@ namespace TradingBot
 
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
-        AutoResetEvent _evaluationEvent = new AutoResetEvent(false);
-        
-        Task _evaluationTask;
-        CancellationTokenSource _evaluationTaskCancellation;
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
             : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
@@ -88,13 +87,10 @@ namespace TradingBot
             
             var res = await _broker.ConnectAsync();
             _accountCode = res.AccountCode;
-
             _account = await _broker.GetAccountAsync(_accountCode);
 
-#if DEBUG
             if (_account.Code != "DU5962304" && _account.Code != "FAKEACCOUNT123")
-                throw new Exception($"In debug mode only the paper trading acount \"DU5962304\" is allowed");
-#endif
+                throw new Exception($"Only paper trading and tests are allowed for now");
 
             if (!_account.CashBalances.ContainsKey("USD"))
                 throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
@@ -118,70 +114,52 @@ namespace TradingBot
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
+            _cancellation = new CancellationTokenSource();
             var et = StartEvaluationTask();
-            var mt = StartMonitoringTimeTask();
-            await Task.WhenAll(et, mt);
+            _monitoringTimeTask = StartMonitoringTimeTask();
+            await Task.WhenAll(et, _monitoringTimeTask);
         }
 
-        Task StartMonitoringTimeTask()
+        async Task StartMonitoringTimeTask()
         {
-            _monitoringTimeCancellation = new CancellationTokenSource();
-            var mainToken = _monitoringTimeCancellation.Token;
+            var mainToken = _cancellation.Token;
             _logger.Debug($"Started monitoring current time");
-            _monitoringTimeTask = Task.Factory.StartNew(async () =>
+            try
             {
-                try
+                while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                 {
-                    while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
+                    await Task.Delay(500);
+                    _currentTime = await _broker.GetCurrentTimeAsync();
+                    if(!_tradingStarted && _currentTime >= _startTime)
                     {
-                        Task.Delay(1000).Wait();
-                        _currentTime = await _broker.GetCurrentTimeAsync();
-                        if(!_tradingStarted && _currentTime >= _startTime)
-                        {
-                            _logger.Info($"Trading started!");
-                            _tradingStarted = true;
-                        }
+                        _logger.Info($"Trading started!");
+                        _tradingStarted = true;
                     }
                 }
-                catch (AggregateException e)
+            }
+            finally
+            {
+                _broker.CancelAllOrders();
+                if (_contractPosition?.PositionAmount > 0)
                 {
-                    //TODO : verify error handling
-                    if (e.InnerException is OperationCanceledException)
-                    {
-                        _logger.Trace($"Monitoring time task cancelled");
-                        return;
-                    }
-
-                    throw e;
-                }
-                finally
-                {
-                    _broker.CancelAllOrders();
-                    if (_contractPosition?.PositionAmount > 0)
-                    {
-                        _logger.Info($"Selling all remaining positions.");
-                        SellAllPositions();
-                    }
+                    _logger.Info($"Selling all remaining positions.");
+                    SellAllPositions();
                 }
 
                 _logger.Info($"Trading ended!");
-
-            }, mainToken);
-
-            return _monitoringTimeTask;
+            }
         }
 
         void StopMonitoringTimeTask()
         {
-            _monitoringTimeCancellation?.Cancel();
-            _monitoringTimeCancellation?.Dispose();
-            _monitoringTimeCancellation = null;
+            _cancellation?.Cancel();
+            _cancellation?.Dispose();
+            _cancellation = null;
         }
 
         Task StartEvaluationTask()
         {
-            _evaluationTaskCancellation = new CancellationTokenSource();
-            var mainToken = _evaluationTaskCancellation.Token;
+            var mainToken = _cancellation.Token;
             _logger.Debug($"Started evaluation task.");
             _evaluationTask = Task.Factory.StartNew(() =>
             {
@@ -195,11 +173,7 @@ namespace TradingBot
                             strategy.Evaluate();
                     }
                 }
-                catch (OperationCanceledException)
-                {
-                    //TODO : verify error handling
-                    _logger.Trace($"Evaluation task cancelled");
-                }
+                catch (OperationCanceledException) {}
 
             }, mainToken);
 
@@ -208,13 +182,9 @@ namespace TradingBot
 
         void StopEvaluationTask()
         {
-            _evaluationTaskCancellation?.Cancel();
             _evaluationEvent?.Set();
-
             _evaluationEvent?.Close();
             _evaluationEvent?.Dispose();
-            _evaluationTaskCancellation?.Dispose();
-            _evaluationTaskCancellation = null;
         }
 
         void SubscribeToData()
@@ -389,8 +359,6 @@ namespace TradingBot
 
         public async void Stop()
         {
-            // TODO : error handling? try/catch all? Separate process that monitors the main one?
-
             StopMonitoringTimeTask();
             StopEvaluationTask();
 
