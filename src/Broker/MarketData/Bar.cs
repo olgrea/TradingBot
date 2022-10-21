@@ -9,10 +9,8 @@ namespace TradingBot.Broker.MarketData
     {
         _1Sec = 1,
         _5Sec = 5,
-        _10Sec = 10,
-        _15Sec = 15,
-        _30Sec = 30,
         _1Min = 60,
+        _1Hour = 3600,
         _1Day = 3600 * 24,
     }
 

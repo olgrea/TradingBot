@@ -52,9 +52,13 @@ namespace TradingBot.Broker
 
         #region Events
 
-        // TODO : revert back to dictionary of Action<> ?
-        event Action<Contract, Bar> Bar5SecReceived;
-        event Action<Contract, Bar> Bar1MinReceived;
+        public Dictionary<BarLength, Action<Contract, Bar>> BarReceived { get; set; } = new Dictionary<BarLength, Action<Contract, Bar>>(
+            Enum.GetValues(typeof(BarLength))
+            .Cast<BarLength>()
+            .Where(bl => bl != BarLength._1Sec) // Disable 1 sec event for now as TWS minimum resolution for realtime bars is 5 sec
+            .Select(bl => new KeyValuePair<BarLength, Action<Contract, Bar>>(bl, null))
+        );
+
         public event Action<Contract, BidAsk> BidAskReceived;
 
         public event Action<string, string, string, string> AccountValueUpdated
@@ -119,6 +123,9 @@ namespace TradingBot.Broker
             _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
             _client = client ?? new IBClient(_logger);            
             _orderManager = new OrderManager(this, _client, _logger);
+
+            foreach (BarLength val in Enum.GetValues(typeof(BarLength)))
+                BarReceived.Add(val, null);
         }
 
         int GetPort()
@@ -445,106 +452,34 @@ namespace TradingBot.Broker
                 if (!HasSubscribers(barLength))
                     continue;
 
-                if (barLength == BarLength._5Sec)
-                {
-                    Bar5SecReceived?.Invoke(contract, bar);
-                    continue;
-                }
-
                 int sec = (int)barLength;
                 int nbBars = (sec / 5);
                 if (list.Count > nbBars && (bar.Time.Second % sec) == 0)
                 {
-                    LinkedListNode<Bar> current = list.Last;
-                    for (int i = 0; i < nbBars; ++i)
-                        current = current.Previous;
+                    Bar barToUse = bar;
+                    if(barLength > BarLength._5Sec)
+                    {
+                        LinkedListNode<Bar> current = list.Last;
+                        for (int i = 0; i < nbBars; ++i)
+                            current = current.Previous;
 
-                    var newBar = MarketDataUtils.MakeBar(current, nbBars);
-                    InvokeCallbacks(contract, newBar);
+                        bar = MarketDataUtils.MakeBar(current, nbBars);
+                    }
+
+                    InvokeCallbacks(contract, bar);
                 }
             }
         }
 
-        Bar MakeBar(LinkedList<Bar> list, BarLength barLength)
+        void InvokeCallbacks(Contract contract, Bar bar)
         {
-            _logger.Trace($"Making a {barLength}s bar using {list.Count} 5s bars");
-            int seconds = (int)barLength;
-
-            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
-            var e = list.GetEnumerator();
-            e.MoveNext();
-
-            // The 1st bar shouldn't be included... don't remember why
-            e.MoveNext();
-
-            int nbBars = seconds / 5;
-            for (int i = 0; i < nbBars; i++, e.MoveNext())
-            {
-                Bar current = e.Current;
-                if (i == 0)
-                {
-                    bar.Close = current.Close;
-                }
-
-                bar.High = Math.Max(bar.High, current.High);
-                bar.Low = Math.Min(bar.Low, current.Low);
-                bar.Volume += current.Volume;
-                bar.TradeAmount += current.TradeAmount;
-
-                if (i == nbBars - 1)
-                {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
-                }
-            }
-
-            return bar;
-        }
-
-        void InvokeCallbacks(Contract contract, MarketData.Bar bar)
-        {
-            switch (bar.BarLength)
-            {
-                case BarLength._5Sec:
-                    _logger.Trace($"Invoking Bar5SecReceived for {contract}");
-                    Bar5SecReceived?.Invoke(contract, bar); 
-                    break;
-                
-                case BarLength._1Min:
-                    _logger.Trace($"Invoking Bar1MinReceived for {contract}");
-                    Bar1MinReceived?.Invoke(contract, bar); 
-                    break;
-            }
-        }
-
-        public void SubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback)
-        {
-            switch (barLength)
-            {
-                case BarLength._5Sec: Bar5SecReceived += callback; break;
-                case BarLength._1Min: Bar1MinReceived += callback; break;
-                default: throw new NotImplementedException();
-            }
-        }
-
-        public void UnsubscribeToBarUpdateEvent(BarLength barLength, Action<Contract, Bar> callback)
-        {
-            switch (barLength)
-            {
-                case BarLength._5Sec: Bar5SecReceived -= callback; break;
-                case BarLength._1Min: Bar1MinReceived -= callback; break;
-                default: throw new NotImplementedException();
-            }
+            _logger.Trace($"Invoking {bar.BarLength} callback for {contract}");
+            BarReceived[bar.BarLength]?.Invoke(contract, bar);
         }
 
         bool HasSubscribers(BarLength barLength)
         {
-            switch(barLength)
-            {
-                case BarLength._5Sec: return Bar5SecReceived != null;
-                case BarLength._1Min: return Bar1MinReceived != null;
-                default: return false;
-            }
+            return BarReceived.ContainsKey(barLength) && BarReceived[barLength] != null;
         }
 
         public void CancelBarsUpdates(Contract contract)
