@@ -85,6 +85,34 @@ namespace TradingBot.Utils
             transaction.Commit();
         }
 
+        public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date) where TMarketData : IMarketData, new()
+        {
+            using var connection = new SqliteConnection($"Data Source={DbPath}");
+            connection.Open();
+
+            string tableName = typeof(TMarketData).Name;
+            SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+            $@"
+                SELECT * FROM {tableName}
+                WHERE Ticker = '{symbol}'
+                AND Date = '{date.ToShortDateString()}';
+            ";
+
+            var data = new LinkedList<TMarketData>();
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var name = reader.GetString(0);
+                }
+            }
+
+            return data;
+        }
+
+        //IMarketData ConvertResultToPopulate
+
         static SqliteCommand CreateInsertCommand<TMarketData>(SqliteConnection connection) where TMarketData : IMarketData, new()
         {
             string tableName = typeof(TMarketData).Name;
