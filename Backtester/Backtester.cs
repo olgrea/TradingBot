@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using TradingBot;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
@@ -8,7 +9,7 @@ using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
 using TradingBot.Utils;
 
-[assembly: InternalsVisibleToAttribute("Tests")]
+[assembly: InternalsVisibleTo("Tests")]
 namespace Backtester
 {
     internal class Backtester
@@ -28,11 +29,11 @@ namespace Backtester
             _endTime = new DateTime(endDate.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
         }
 
-        public async void Start()
+        public async Task Start()
         {
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
-                var marketData = DeserializeHistoricalData(RootDir, _ticker, day.Item1);
+                var marketData = DeserializeHistoricalData(_ticker, day.Item1);
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
@@ -48,10 +49,17 @@ namespace Backtester
             }
         }
 
-        public static (IEnumerable<Bar>, IEnumerable<BidAsk>) DeserializeHistoricalData(string rootDir, string symbol, DateTime date)
+        static (IEnumerable<Bar>, IEnumerable<BidAsk>) LoadHistoricalData(string symbol, DateTime date)
         {
-            var barList = MarketDataUtils.DeserializeData<Bar>(rootDir, symbol, date);
-            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(rootDir, symbol, date);
+            var barList = DbUtils.SelectData<Bar>(symbol, date);
+            var bidAskList = DbUtils.SelectData<BidAsk>(symbol, date);
+            return (barList, bidAskList);
+        }
+
+        static (IEnumerable<Bar>, IEnumerable<BidAsk>) DeserializeHistoricalData(string symbol, DateTime date)
+        {
+            var barList = MarketDataUtils.DeserializeData<Bar>(RootDir, symbol, date);
+            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(RootDir, symbol, date);
             return (barList, bidAskList);
         }
     }
