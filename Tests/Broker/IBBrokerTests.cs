@@ -157,7 +157,6 @@ namespace Tests.Broker
         [Test]
         public async Task PlaceOrder_WithValidOrderParams_ShouldSucceed()
         {
-            //TODO : test when market is open
             if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 
@@ -248,15 +247,15 @@ namespace Tests.Broker
         }
 
         [Test]
+        [Ignore("You can short stocks with a paper trading account but apparently it's not possible with a cash account like the one I have.")]
+        // TODO : enforce disallowing of stock shorting in Trader
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
-            // TODO : test during market hours
             if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
             var contract = await GetContractAsync("GME");
-            var account = await _broker.GetAccountAsync(_connectMessage.AccountCode);
             
             var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
             var buyOrderResult = await PlaceDummyOrderAsync(buyOrder);
@@ -266,7 +265,6 @@ namespace Tests.Broker
             sellOrder.Id = await _broker.GetNextValidOrderIdAsync();
 
             // Test
-            // TODO : to test during market hours
             Exception ex = null;
             OrderResult sellOrderResult = null;
             try
