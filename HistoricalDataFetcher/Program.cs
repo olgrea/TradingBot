@@ -113,20 +113,12 @@ namespace HistoricalDataFetcher
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {_ticker}");
 
-            if(_startDate < _endDate)
-            {
-                var marketDays = MarketDataUtils.GetMarketDays(_startDate, _endDate).ToList();
-                foreach ((DateTime, DateTime) pair in marketDays)
-                    await GetDataForDay<Bar>(pair.Item1, contract);
+            var marketDays = MarketDataUtils.GetMarketDays(_startDate, _endDate).ToList();
+            foreach ((DateTime, DateTime) pair in marketDays)
+                await GetDataForDay<Bar>(pair.Item1, contract);
 
-                foreach ((DateTime, DateTime) pair in marketDays)
-                    await GetDataForDay<BidAsk>(pair.Item1, contract);
-            }
-            else
-            {
-                await GetDataForDay<Bar>(_startDate, contract);
-                await GetDataForDay<BidAsk>(_startDate, contract);
-            }
+            foreach ((DateTime, DateTime) pair in marketDays)
+                await GetDataForDay<BidAsk>(pair.Item1, contract);
 
             _logger.Info($"\nComplete!\n");
         }

@@ -30,8 +30,8 @@ namespace Tests.Backtester
         [SetUp]
         public override async Task SetUp()
         {
-            _bars = MarketDataUtils.DeserializeData<Bar>(Path.Combine(MarketDataUtils.RootDir, MarketDataUtils.MakeDailyDataPath<Bar>(Symbol, _fileTime.Date)));
-            _bidAsks = MarketDataUtils.DeserializeData<BidAsk>(Path.Combine(MarketDataUtils.RootDir, MarketDataUtils.MakeDailyDataPath<BidAsk>(Symbol, _fileTime.Date)));
+            _bars = DbUtils.SelectData<Bar>(Symbol, _fileTime.Date);
+            _bidAsks = DbUtils.SelectData<BidAsk>(Symbol, _fileTime.Date);
 
             var startTime = new DateTime(_fileTime.Date.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
             var endTime = new DateTime(_fileTime.Date.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);

@@ -261,7 +261,8 @@ namespace TradingBot.Utils
             $@"
                 SELECT * FROM Historical{tableName}View
                 WHERE Ticker = '{symbol}'
-                AND Date = '{date.ToShortDateString()}';
+                AND Date = '{date.ToShortDateString()}'
+                ORDER BY Time;
             ";
 
             using SqliteDataReader reader = command.ExecuteReader();

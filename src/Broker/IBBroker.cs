@@ -133,9 +133,6 @@ namespace TradingBot.Broker
             _clientId = clientId;
             _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
             _client = client ?? new IBClient(_logger);            
-
-            foreach (BarLength val in Enum.GetValues(typeof(BarLength)))
-                BarReceived.Add(val, null);
         }
 
         int GetPort()
