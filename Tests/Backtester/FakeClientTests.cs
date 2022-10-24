@@ -46,23 +46,22 @@ namespace Tests.Backtester
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _downwardBidAsks = Deserialize<BidAsk>(_downwardFileTime, _downwardStart);
-            _downwardBars = Deserialize<Bar>(_downwardFileTime, _downwardStart);
-            _upwardBidAsks = Deserialize<BidAsk>(_upwardFileTime, _upwardStart);
-            _upwardBars = Deserialize<Bar>(_upwardFileTime, _upwardStart);
-            _downThenUpBidAsks = Deserialize<BidAsk>(_downThenUpFileTime, _downThenUpStart);
-            _downThenUpBars = Deserialize<Bar>(_downThenUpFileTime, _downThenUpStart);
-            _upThenDownBidAsks = Deserialize<BidAsk>(_upThenDownFileTime, _upThenDownStart);
-            _upThenDownBars = Deserialize<Bar>(_upThenDownFileTime, _upThenDownStart);
+            _downwardBidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart);
+            _downwardBars = LoadData<Bar>(_downwardFileTime, _downwardStart);
+            _upwardBidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart);
+            _upwardBars = LoadData<Bar>(_upwardFileTime, _upwardStart);
+            _downThenUpBidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart);
+            _downThenUpBars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart);
+            _upThenDownBidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart);
+            _upThenDownBars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart);
 
             FakeClient.TimeDelays.TimeScale = 0.001;
             await Task.CompletedTask;
         }
 
-        IEnumerable<T> Deserialize<T>(DateTime fileTime, DateTime start) where T : IMarketData, new()
+        IEnumerable<T> LoadData<T>(DateTime fileTime, DateTime start) where T : IMarketData, new()
         {
-            var path = Path.Combine(DataFetcher.RootDir, MarketDataUtils.MakeDataPath<T>(Symbol, fileTime));
-            return MarketDataUtils.DeserializeData<T>(path).SkipWhile(i => i.Time < start);
+            return DbUtils.SelectData<T>(Symbol, fileTime.Date).SkipWhile(i => i.Time < start);
         }
 
         [TearDown]
