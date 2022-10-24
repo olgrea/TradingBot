@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
@@ -47,7 +49,7 @@ namespace TradingBot.Utils
             command.CommandText =
             $@"
                 SELECT EXISTS (
-                    SELECT 1 FROM {tableName}
+                    SELECT 1 FROM Historical{tableName}View
                         WHERE Ticker = '{symbol}'
                         AND Date = '{date.Date.ToShortDateString()}'
                         {AND_Time}
@@ -68,20 +70,184 @@ namespace TradingBot.Utils
             InsertData(symbol, data, connection);
         }
 
-        public static void InsertData<TMarketData>(string symbol, IEnumerable<TMarketData> data, SqliteConnection connection) where TMarketData : IMarketData, new()
+        public static void InsertData<TMarketData>(string symbol, IEnumerable<TMarketData> dataCollection, SqliteConnection connection) where TMarketData : IMarketData, new()
         {
             using var transaction = connection.BeginTransaction();
 
-            SqliteCommand command = CreateInsertCommand<TMarketData>(connection);
+            SqliteCommand tickerCmd = connection.CreateCommand();
+            SqliteCommand dateCmd = connection.CreateCommand();
+            SqliteCommand timeCmd = connection.CreateCommand();
+            SqliteCommand marketDataCmd = connection.CreateCommand();
+            SqliteCommand finalCmd = connection.CreateCommand();
 
-            command.Parameters["$Ticker"].Value = symbol;
-            foreach (TMarketData d in data)
+            InsertFromValue(tickerCmd, "Stock", "Symbol", symbol);
+
+            foreach (TMarketData data in dataCollection)
             {
-                PopulateCommandParams(command.Parameters, d);
-                command.ExecuteNonQuery();
+                InsertFromValue(dateCmd, "Date", "Date", data.Time.Date.ToShortDateString());
+                InsertFromValue(timeCmd, "Time", "Time", data.Time.TimeOfDay.ToString());
+
+                object[] values = null;
+                if (data is Bar bar)
+                    values = new object[] { bar.Open, bar.Close, bar.High, bar.Low, bar.Volume };
+                else if (data is BidAsk ba)
+                    values = new object[] { ba.Bid, ba.BidSize, ba.Ask, ba.AskSize};
+
+                string tableName = data.GetType().Name;
+                InsertFromValues(marketDataCmd, tableName, GetColumns(connection, tableName).ToArray(), values);
+
+                tableName = $"Historical{data.GetType().Name}";
+                InsertFromSelect(finalCmd, tableName, GetColumns(connection, tableName).ToArray(), MakeSelectForInsert(symbol, data));
             }
 
             transaction.Commit();
+        }
+
+        static void InsertFromValue(SqliteCommand command, string tableName, string column, object value)
+        {
+            InsertFromValues(command, tableName, new[] { column }, new[] { value });
+        }
+
+        static void InsertFromValues(SqliteCommand command, string tableName, string[] columns, object[] values)
+        {
+            command.CommandText =
+            $@"
+                INSERT OR IGNORE INTO {tableName} ({string.Join(',', columns)})
+                VALUES ({string.Join(',', values.Select(v =>
+                {
+                    if (v is string)
+                        return $"'{v}'";
+                    else if (v is double d)
+                        return d.ToString(CultureInfo.InvariantCulture);
+                    else
+                        return v.ToString();
+                }))})
+            ";
+
+            command.ExecuteNonQuery();
+        }
+
+        static void InsertFromSelect(SqliteCommand command, string tableName, string[] columns, string select)
+        {
+            command.CommandText =
+            $@"
+                INSERT OR IGNORE INTO {tableName} ({string.Join(',', columns)})
+                {select}
+            ";
+
+            command.ExecuteNonQuery();
+        }
+
+        static IEnumerable<string> GetColumns(SqliteConnection connection, string tableName)
+        {
+            SqliteCommand command = connection.CreateCommand();
+            command.CommandText =
+            $@"
+                PRAGMA table_info({tableName});
+            ";
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            return reader.Cast<IDataRecord>().Select(dr => dr.GetString(1)).Where(c => c != "Id").ToList();
+        }
+
+        static string MakeSelectForInsert(string symbol, IMarketData data)
+        {
+            //return MakeSelectForInsert_SubSelect(symbol, data);
+            return MakeSelectForInsert_LeftJoin(symbol, data);
+        }
+
+        static string MakeSelectForInsert_SubSelect(string symbol, IMarketData data)
+        {
+            string selectPart = null;
+            if (data is Bar bar)
+            {
+                selectPart =
+                $@"
+                    {(int)bar.BarLength} AS BarLength,
+                    (select Id from Bar 
+                        where Open = {bar.Open.ToString(CultureInfo.InvariantCulture)} 
+                        and Close = {bar.Close.ToString(CultureInfo.InvariantCulture)}
+                        and High = {bar.High.ToString(CultureInfo.InvariantCulture)}
+                        and Low = {bar.Low.ToString(CultureInfo.InvariantCulture)}
+                        and Volume = {bar.Volume}
+                     ) as BarId
+                ";
+            }
+            else if (data is BidAsk ba)
+            {
+                selectPart =
+                $@"
+                    (select Id from BidAsk 
+                        where Bid = {ba.Bid.ToString(CultureInfo.InvariantCulture)} 
+                        and BidSize = {ba.BidSize}
+                        and Ask = {ba.Ask.ToString(CultureInfo.InvariantCulture)}
+                        and AskSize = {ba.AskSize}
+                     ) as BidAskId
+                ";
+            }
+
+            return
+            $@"
+                SELECT
+                (select Id from Stock where Symbol = '{symbol}') as StockId,
+                (select Id from Date where Date = '{data.Time.Date.ToShortDateString()}') as DateId,
+                (select Id from Time where Time = '{data.Time.TimeOfDay}') as TimeId,
+                {selectPart}
+            ";
+        }
+
+        static string MakeSelectForInsert_LeftJoin(string symbol, IMarketData data)
+        {
+            string selectPart = null;
+            string leftJoinPart = null;
+            if (data is Bar bar)
+            {
+                selectPart =
+                $@"
+                    {(int)bar.BarLength} AS BarLength,
+                    Bar.Id AS BarId   
+                ";
+
+                leftJoinPart =
+                $@"
+                    LEFT JOIN Bar 
+                        ON Open = {bar.Open.ToString(CultureInfo.InvariantCulture)}
+                        AND Close = {bar.Close.ToString(CultureInfo.InvariantCulture)}
+                        AND High = {bar.High.ToString(CultureInfo.InvariantCulture)}
+                        AND Low = {bar.Low.ToString(CultureInfo.InvariantCulture)}
+                        AND Volume = {bar.Volume}
+                ";
+            }
+            else if (data is BidAsk ba)
+            {
+                selectPart =
+                $@"
+                    BidAsk.Id AS BidAskId   
+                ";
+
+                leftJoinPart =
+                $@"
+                    LEFT JOIN BidAsk 
+                        ON Bid = {ba.Bid.ToString(CultureInfo.InvariantCulture)}
+                        AND BidSize = {ba.BidSize}
+                        AND Ask = {ba.Ask.ToString(CultureInfo.InvariantCulture)}
+                        AND AskSize = {ba.AskSize}
+                ";
+            }
+
+            return
+            $@"
+                SELECT 
+                    Stock.Id AS StockId,
+                    Date.Id AS DateId,
+                    Time.Id AS TimeId,
+                    {selectPart}
+                FROM Stock
+                LEFT JOIN Date ON Date.Date = '{data.Time.Date.ToShortDateString()}'
+                LEFT JOIN Time ON Time.Time = '{data.Time.TimeOfDay}'          
+                {leftJoinPart}
+                WHERE Symbol = '{symbol}'
+            ";
         }
 
         public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date) where TMarketData : IMarketData, new()
@@ -93,7 +259,7 @@ namespace TradingBot.Utils
             SqliteCommand command = connection.CreateCommand();
             command.CommandText =
             $@"
-                SELECT * FROM {tableName}
+                SELECT * FROM Historical{tableName}View
                 WHERE Ticker = '{symbol}'
                 AND Date = '{date.ToShortDateString()}';
             ";
@@ -136,64 +302,6 @@ namespace TradingBot.Utils
                 AskSize = Convert.ToInt32(dr.GetInt64(6)),
             };
             return ba;
-        }
-
-        static SqliteCommand CreateInsertCommand<TMarketData>(SqliteConnection connection) where TMarketData : IMarketData, new()
-        {
-            string tableName = typeof(TMarketData).Name;
-            IEnumerable<string> columns = GetColumns<TMarketData>(connection);
-            IEnumerable<string> values = columns.Select(s => "$" + s);
-
-            SqliteCommand readerCommand = connection.CreateCommand();
-
-            readerCommand.CommandText =
-            $@"
-                INSERT INTO {tableName} ({string.Join(',', columns)})
-                VALUES ({string.Join(',', values)})
-            ";
-
-            foreach (string val in values)
-            {
-                var parameter = readerCommand.CreateParameter();
-                parameter.ParameterName = val;
-                readerCommand.Parameters.Add(parameter);
-            }
-
-            return readerCommand;
-        }
-
-        static IEnumerable<string> GetColumns<TMarketData>(SqliteConnection connection)
-        {
-            SqliteCommand command = connection.CreateCommand();
-            command.CommandText =
-            $@"
-                PRAGMA table_info({typeof(TMarketData).Name});
-            ";
-
-            using SqliteDataReader reader = command.ExecuteReader();
-            return reader.Cast<IDataRecord>().Select(dr => dr.GetString(1)).ToList();
-        }
-
-        static void PopulateCommandParams<TMarketData>(SqliteParameterCollection parameters, TMarketData data) where TMarketData : IMarketData, new()
-        {
-            parameters["$Date"].Value = data.Time.Date.ToShortDateString();
-            parameters["$Time"].Value = data.Time.TimeOfDay;
-
-            if (data is Bar bar)
-            {
-                parameters["$BarLength"].Value = (int)bar.BarLength;
-                parameters["$Open"].Value = bar.Open;
-                parameters["$Close"].Value = bar.Close;
-                parameters["$High"].Value = bar.High;
-                parameters["$Low"].Value = bar.Low;
-            }
-            else if (data is BidAsk ba)
-            {
-                parameters["$Bid"].Value = ba.Bid;
-                parameters["$BidSize"].Value = ba.BidSize;
-                parameters["$Ask"].Value = ba.Ask;
-                parameters["$AskSize"].Value = ba.AskSize;
-            }
-        }
+        }       
     }
 }
