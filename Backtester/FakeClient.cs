@@ -60,9 +60,10 @@ namespace Backtester
 
         Stopwatch _st = new Stopwatch();
 
-        ConcurrentQueue<Action> _requestsQueue;
+        BlockingCollection<Action> _requestsQueue;
         BlockingCollection<Action> _responsesQueue;
 
+        Task _requestsTask;
         Task _responsesTask;
         Task _passingTimeTask;
         CancellationTokenSource _cancellationTokenSource;
@@ -111,7 +112,7 @@ namespace Backtester
         {
             _logger = LogManager.GetLogger(nameof(FakeClient));
             Callbacks = new IBCallbacks(_logger);
-            _requestsQueue = new ConcurrentQueue<Action>();
+            _requestsQueue = new BlockingCollection<Action>();
             _responsesQueue = new BlockingCollection<Action>();
 
             _symbol = symbol;
@@ -164,7 +165,7 @@ namespace Backtester
         public void Connect(string host, int port, int clientId)
         {
             Start();
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 if (isConnected)
                 {
@@ -180,7 +181,7 @@ namespace Backtester
 
         public void Disconnect()
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 isConnected = false;
                 _responsesQueue.Add(() => Callbacks.connectionClosed());
@@ -196,7 +197,8 @@ namespace Backtester
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
 
             _cancellationTokenSource = new CancellationTokenSource();
-            _responsesTask = StartResponsesTask();
+            _requestsTask = StartConsumerTask(_requestsQueue);
+            _responsesTask = StartConsumerTask(_responsesQueue);
             _passingTimeTask = StartPassingTimeTask();
         }
 
@@ -210,7 +212,7 @@ namespace Backtester
             StopPassingTimeTask();
         }
 
-        Task StartResponsesTask()
+        Task StartConsumerTask(BlockingCollection<Action> collection)
         {
             var mainToken = _cancellationTokenSource.Token;
             var task = Task.Run(() =>
@@ -219,7 +221,7 @@ namespace Backtester
                 {
                     while (true)
                     {
-                        Action action = _responsesQueue.Take(mainToken);
+                        Action action = collection.Take(mainToken);
                         action();
                     }
                 }
@@ -238,8 +240,8 @@ namespace Backtester
             {
                 try
                 {
-                    while(_requestsQueue.TryDequeue(out Action action))
-                        action.Invoke();
+                    if (_requestsQueue.Count > 0)
+                        break;
 
                     ClockTick?.Invoke(_currentFakeTime);
                     if(TimeDelays.OneSecond > 0)
@@ -261,7 +263,7 @@ namespace Backtester
 
         public void RequestCurrentTime()
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 DateTimeOffset dto = new DateTimeOffset(_currentFakeTime.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.currentTime(dto.ToUnixTimeSeconds()));
@@ -276,7 +278,7 @@ namespace Backtester
             Debug.Assert(Position != null);
             Debug.Assert(!_executedOrders.Contains(order));
 
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 var price = order.TotalQuantity * _currentBidAskNode.Value.Ask;
                 if(order.Action == OrderAction.BUY && _fakeAccount.CashBalances["BASE"] < price)
@@ -591,7 +593,7 @@ namespace Backtester
 
         public void CancelOrder(int orderId)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 CancelOrderInternal(orderId);
             });
@@ -614,7 +616,7 @@ namespace Backtester
 
         public void CancelAllOrders() 
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 foreach (var o in _openOrders.ToList())
                     CancelOrderInternal(o.Id);
@@ -626,8 +628,8 @@ namespace Backtester
             if (accountCode != _fakeAccount.Code)
                 throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
-            _requestsQueue.Enqueue(SendAccountUpdate);
-            _requestsQueue.Enqueue(() => ToggleAccountUpdates(true));
+            _requestsQueue.Add(SendAccountUpdate);
+            _requestsQueue.Add(() => ToggleAccountUpdates(true));
         }
 
         public void CancelAccountUpdates(string accountCode)
@@ -635,7 +637,7 @@ namespace Backtester
             if (accountCode != _fakeAccount.Code)
                 throw new InvalidOperationException($"Can only return the fake account \"{_fakeAccount.Code}\"");
 
-            _requestsQueue.Enqueue(() => ToggleAccountUpdates(false));
+            _requestsQueue.Add(() => ToggleAccountUpdates(false));
         }
 
         void ToggleAccountUpdates(bool receiveUpdates)
@@ -697,7 +699,7 @@ namespace Backtester
 
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 if (_reqId5SecBar < 0)
                 {
@@ -730,7 +732,7 @@ namespace Backtester
 
         public void CancelFiveSecondsBarsUpdates(int reqId)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 if (reqId == _reqId5SecBar)
                 {
@@ -742,7 +744,7 @@ namespace Backtester
 
         public void RequestOpenOrders()
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 SendOpenOrders();
             });
@@ -805,7 +807,7 @@ namespace Backtester
 
         public void RequestPositionsUpdates()
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 _positionRequested = true;
                 _responsesQueue.Add(() => Callbacks.position(_fakeAccount.Code, Position.Contract.ToIBApiContract(), Position.PositionAmount, Position.AverageCost));
@@ -815,12 +817,12 @@ namespace Backtester
 
         public void CancelPositionsUpdates()
         {
-            _requestsQueue.Enqueue(() => _positionRequested = false);
+            _requestsQueue.Add(() => _positionRequested = false);
         }
 
         public void RequestPnLUpdates(int reqId, int contractId)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
                 _reqIdPnL = reqId;
@@ -836,7 +838,7 @@ namespace Backtester
 
         public void CancelPnLUpdates(int contractId)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 ClockTick -= OnClockTick_PnL;
                 _reqIdPnL = -1;
@@ -848,7 +850,7 @@ namespace Backtester
             if(!string.IsNullOrEmpty(endDateTime))
                 throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
             
-            _requestsQueue.Enqueue(() => 
+            _requestsQueue.Add(() => 
             {
                 int nbBars = -1;
                 switch(barSizeStr)
@@ -888,7 +890,7 @@ namespace Backtester
             if (tickType != "BidAsk")
                 throw new NotImplementedException("Only \"BidAsk\" tick by tick data is implemented");
 
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 _reqIdBidAsk = reqId;
                 BidAskSubscription += SendBidAsk;
@@ -902,7 +904,7 @@ namespace Backtester
 
         public void CancelTickByTickData(int reqId)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 BidAskSubscription -= SendBidAsk;
                 _reqIdBidAsk = -1;
@@ -912,12 +914,12 @@ namespace Backtester
         public void RequestValidOrderIds()
         {
             int next = NextValidOrderId;
-            _requestsQueue.Enqueue(() => _responsesQueue.Add(() => Callbacks.nextValidId(next)));
+            _requestsQueue.Add(() => _responsesQueue.Add(() => Callbacks.nextValidId(next)));
         }
 
         public void RequestContractDetails(int reqId, Contract contract)
         {
-            _requestsQueue.Enqueue(() =>
+            _requestsQueue.Add(() =>
             {
                 if(contract.Symbol != Contract.Symbol)
                 {
