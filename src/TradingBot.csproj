@@ -28,6 +28,7 @@
     <PackageReference Include="NLog" Version="5.0.4" />
     <PackageReference Include="NLog.Schema" Version="5.0.4" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.10" />
+    <PackageReference Include="Skender.Stock.Indicators" Version="2.4.0" />
   </ItemGroup>
 
   <ItemGroup>

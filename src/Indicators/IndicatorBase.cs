@@ -2,23 +2,27 @@
 using System.Collections.Generic;
 using System.Linq;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils;
 
 namespace TradingBot.Indicators
 {
     internal abstract class IndicatorBase : IIndicator
     {
-        LinkedList<Bar> _bars = new LinkedList<Bar>();
+        LinkedListWithMaxSize<Bar> _bars;
 
-        public IndicatorBase(BarLength barLength, int nbPeriods)
+        public IndicatorBase(BarLength barLength, int nbPeriodsWithConvergence)
         {
-            NbPeriods = nbPeriods;
+            NbPeriodsWithConvergence = nbPeriodsWithConvergence;
             BarLength = barLength;
+            
+            _bars = new LinkedListWithMaxSize<Bar>(NbPeriodsWithConvergence);
         }
 
         // TODO : remove bars from indicators?
         public LinkedList<Bar> Bars => _bars;
         public BarLength BarLength { get; private set; }
-        public int NbPeriods { get; private set; }
+        public virtual int NbPeriods => NbPeriodsWithConvergence;
+        public int NbPeriodsWithConvergence { get; private set; }
         public virtual bool IsReady => _bars.Count == NbPeriods;
 
         public void Update(Bar bar)
@@ -29,9 +33,7 @@ namespace TradingBot.Indicators
             if (_bars.Any() && _bars.Last() == bar)
                 return;
 
-            _bars.AddLast(bar);
-            if (_bars.Count > NbPeriods)
-                _bars.RemoveFirst();
+            _bars.Add(bar);
 
             Compute();
         }
