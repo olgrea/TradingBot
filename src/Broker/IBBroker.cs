@@ -1,19 +1,21 @@
 ﻿using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using NLog;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Client;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
-using System.Threading.Tasks;
-using System.Runtime.CompilerServices;
-using NLog;
-using System.Diagnostics;
 using TradingBot.Indicators;
 using TradingBot.Utils;
-using TradingBot.Broker.Client.Messages;
-using System.Globalization;
-using System.Threading;
+using static TradingBot.Utils.MarketDataUtils;
+using static TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher;
 
 [assembly: InternalsVisibleTo("HistoricalDataFetcher")]
 [assembly: InternalsVisibleTo("Tests")]
@@ -704,14 +706,58 @@ namespace TradingBot.Broker
             if (!indicators.Any())
                 return;
 
-            var longestTime = indicators.Max(i => i.NbPeriods * (int)i.BarLength);
-            var pastBars = await GetPastBars(contract, BarLength._5Sec, longestTime/(int)BarLength._5Sec);
+            // How many past bars do we need?
+            int longestNbOfOneSecBarsNeededForInit = indicators.Max(i => i.NbPeriodsWithConvergence * (int)i.BarLength);
 
-            //TODO : remove bars from indicators? I don't know what I was thinking...
-            foreach(Bar bar in pastBars)
+            var fetcher = new HistoricalDataFetcher(this, null);
+            DateTime currentTime = await GetCurrentTimeAsync();
+            IEnumerable<Bar> allBars = Enumerable.Empty<Bar>();
+
+            // Get the ones from today : from opening to now
+            if(currentTime.TimeOfDay > MarketStartTime)
             {
-                UpdateBarsAndInvoke(contract, bar);
+                allBars = await fetcher.GetDataForDay<Bar>(currentTime.Date, (MarketStartTime, currentTime.TimeOfDay), contract);
             }
+            
+            int count = allBars.Count();
+            if (count < longestNbOfOneSecBarsNeededForInit)
+            {
+                // Not enough. Getting previous market day to fill the rest.
+                int rest = longestNbOfOneSecBarsNeededForInit - count;
+
+                var previousMarketDay = currentTime;
+                IEnumerable<Bar> previousMarketDayBars = null;
+                while (previousMarketDayBars == null)
+                {
+                    previousMarketDay = previousMarketDay.AddDays(-1);
+                    try
+                    {
+                        if(!MarketDataUtils.IsWeekend(previousMarketDay))
+                        {
+                            var start = new TimeSpan(MarketEndTime.Ticks - TimeSpan.FromSeconds(rest).Ticks);
+                            previousMarketDayBars = await fetcher.GetDataForDay<Bar>(previousMarketDay.Date, (start, MarketEndTime), contract);
+                            allBars = previousMarketDayBars.Concat(allBars);
+                        }
+                    }
+                    catch (MarketHolidayException) { }
+                }
+            }
+
+            // Update all indicators.
+            foreach (var indicator in indicators)
+            {
+                var nbSecs = (int)indicator.BarLength;
+
+                var bars = allBars;
+                while (bars.Count() > nbSecs)
+                {
+                    var newBar = MakeBar(bars.Take(nbSecs));
+                    indicator.Update(newBar);
+                    bars = bars.Skip(nbSecs);
+                }
+            }
+
+            Debug.Assert(indicators.All(i => i.IsReady));
         }
 
         internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)

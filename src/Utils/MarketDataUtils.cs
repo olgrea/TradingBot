@@ -174,7 +174,7 @@ namespace TradingBot.Utils
             public HistoricalDataFetcher(IBBroker broker, ILogger logger)
             {
                 _broker = broker ?? new IBBroker(321);
-                _logger = logger ?? LogManager.GetLogger($"{nameof(HistoricalDataFetcher)}");
+                _logger = logger;
             }
 
             public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract) where TData : IMarketData, new()
@@ -182,7 +182,7 @@ namespace TradingBot.Utils
                 DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
                 DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
-                _logger.Info($"Getting data for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+                _logger?.Info($"Getting data for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
                 // In order to respect TWS limitationsm, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
                 // time range to the beginning. 
@@ -193,18 +193,20 @@ namespace TradingBot.Utils
                 {
                     var begin = current.AddMinutes(-30);
                     var end = current;
+                    IEnumerable<TData> data;
                     if (DataExists<TData>(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay)))
                     {
+                        data = DbUtils.SelectData<TData>(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                         var dateStr = current.Date.ToShortDateString();
-                        _logger.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
+                        _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                     }
                     else
                     {
-                        LinkedList<TData> data = await FetchHistoricalData<TData>(contract, current);
-                        dailyData = data.Concat(dailyData);
+                        data = await FetchHistoricalData<TData>(contract, current);
                         SaveData(contract.Symbol, current, data);
                     }
-
+                    
+                    dailyData = data.Concat(dailyData);
                     current = current.AddMinutes(-30);
                 }
 
@@ -226,13 +228,13 @@ namespace TradingBot.Utils
 
                 if (_nbRequest == 60)
                 {
-                    _logger.Info($"60 requests made : waiting 10 minutes...");
+                    _logger?.Info($"60 requests made : waiting 10 minutes...");
                     Wait10Minutes();
                     _nbRequest = 0;
                 }
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
-                    _logger.Info($"{NbRequest} requests made : waiting 2 seconds...");
+                    _logger?.Info($"{NbRequest} requests made : waiting 2 seconds...");
                     Task.Delay(2000).Wait();
                 }
             }
@@ -243,9 +245,9 @@ namespace TradingBot.Utils
                 {
                     Task.Delay(60 * 1000).Wait();
                     if (i < 9)
-                        _logger.Info($"{9 - i} minutes left...");
+                        _logger?.Info($"{9 - i} minutes left...");
                     else
-                        _logger.Info($"Resuming historical data fetching");
+                        _logger?.Info($"Resuming historical data fetching");
                 }
             }
 
@@ -256,7 +258,7 @@ namespace TradingBot.Utils
                 IEnumerable<TData> data = await Fetch<TData>(contract, time);
                 if (IsPossibleMarketHoliday(time, data))
                 {
-                    _logger.Info($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
+                    _logger?.Info($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
                     throw new MarketHolidayException();
                 }
 
@@ -292,7 +294,7 @@ namespace TradingBot.Utils
 
             private async Task<IEnumerable<TData>> FetchBidAsk<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
-                _logger.Info($"Retrieving bid ask from TWS for '{contract.Symbol} {time}'.");
+                _logger?.Info($"Retrieving bid ask from TWS for '{contract.Symbol} {time}'.");
 
                 // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
                 // There doesn't seem to be a way to convert ticks to seconds...
@@ -337,7 +339,7 @@ namespace TradingBot.Utils
 
             private async Task<IEnumerable<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
-                _logger.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
+                _logger?.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
                 var bars = await _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800);
                 NbRequest++;
                 return bars.Cast<TData>();

@@ -115,6 +115,8 @@ namespace TradingBot
 
             _currentTime = await _broker.GetCurrentTimeAsync();
 
+            InitIndicators(_strategies.SelectMany(s => s.Indicators));
+
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 

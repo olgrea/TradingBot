@@ -252,6 +252,11 @@ namespace TradingBot.Utils
 
         public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date) where TMarketData : IMarketData, new()
         {
+            return SelectData<TMarketData>(symbol, date, (MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime));
+        }
+        
+        public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TMarketData : IMarketData, new()
+        {
             using var connection = new SqliteConnection($"Data Source={DbPath}");
             connection.Open();
 
@@ -262,6 +267,8 @@ namespace TradingBot.Utils
                 SELECT * FROM Historical{tableName}View
                 WHERE Ticker = '{symbol}'
                 AND Date = '{date.ToShortDateString()}'
+                AND Time >= '{timeRange.Item1}'
+                AND Time < '{timeRange.Item2}'
                 ORDER BY Time;
             ";
 
