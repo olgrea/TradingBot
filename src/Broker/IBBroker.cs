@@ -466,11 +466,7 @@ namespace TradingBot.Broker
                     Bar barToUse = bar;
                     if(barLength > BarLength._5Sec)
                     {
-                        LinkedListNode<Bar> current = list.Last;
-                        for (int i = 0; i < nbBars; ++i)
-                            current = current.Previous;
-
-                        bar = MarketDataUtils.MakeBar(current, nbBars);
+                        bar = MakeBar(list.TakeLast(nbBars));
                     }
 
                     InvokeCallbacks(contract, bar);
@@ -723,12 +719,12 @@ namespace TradingBot.Broker
             return await GetHistoricalDataAsync(contract, barLength, default(DateTime), count);   
         }
    
-        public Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        public Task<IEnumerable<Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;
-            var tmpList = new LinkedList<MarketData.Bar>();
+            var tmpList = new LinkedList<Bar>();
 
-            var resolveResult = new TaskCompletionSource<LinkedList<MarketData.Bar>>();
+            var resolveResult = new TaskCompletionSource<IEnumerable<Bar>>();
             SetupHistoricalBarCallbacks(tmpList, reqId, barLength, resolveResult);
 
             //string timeFormat = "yyyyMMdd-HH:mm:ss";
@@ -771,14 +767,14 @@ namespace TradingBot.Broker
 
             string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
 
-            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, false);
+            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, true);
 
             return resolveResult.Task;
         }
 
-        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<LinkedList<MarketData.Bar>> resolveResult)
+        private void SetupHistoricalBarCallbacks(LinkedList<MarketData.Bar> tmpList, int reqId, BarLength barLength, TaskCompletionSource<IEnumerable<Bar>> resolveResult)
         {
-            var historicalData = new Action<int, MarketData.Bar>((rId, bar) =>
+            var historicalData = new Action<int, Bar>((rId, bar) =>
             {
                 if (rId == reqId)
                 {

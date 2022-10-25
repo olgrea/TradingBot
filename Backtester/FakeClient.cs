@@ -714,7 +714,15 @@ namespace Backtester
 
             if (_reqId5SecBar > 0 && newTime.Second % 5 == 0)
             {
-                var b = MarketDataUtils.MakeBar(_currentBarNode, 5);
+                var list = new LinkedList<Bar>();
+                var current = _currentBarNode;
+                for (int i = 0; i < 5; i++)
+                {
+                    list.AddLast(current.Value);
+                    current = current.Next;
+                }
+
+                var b = MarketDataUtils.MakeBar(list);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }
