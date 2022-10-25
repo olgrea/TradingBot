@@ -101,36 +101,37 @@ namespace TradingBot.Utils
             File.WriteAllText(path, json);
         }
 
-        public static Bar MakeBar(LinkedListNode<Bar> node, int nbBars)
+        public static Bar MakeBar(IEnumerable<Bar> bars)
         {
-            BarLength barLength = (BarLength)Enum.ToObject(typeof(BarLength), (int)node.Value.BarLength * nbBars);
-            
-            Bar bar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
+            int nbBars = bars.Count();
 
-            LinkedListNode<Bar> currNode = node;
-            for (int i = 0; i < nbBars; i++)
+            BarLength barLength = (BarLength)Enum.ToObject(typeof(BarLength), nbBars);
+
+            Bar newBar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
+
+            int i = 0;
+            foreach (Bar bar in bars)
             {
-                Bar current = currNode.Value;
                 if (i == 0)
                 {
-                    bar.Open = current.Open;
-                    bar.Time = current.Time;
+                    newBar.Open = bar.Open;
+                    newBar.Time = bar.Time;
                 }
 
-                bar.High = Math.Max(bar.High, current.High);
-                bar.Low = Math.Min(bar.Low, current.Low);
-                bar.Volume += current.Volume;
-                bar.TradeAmount += current.TradeAmount;
+                newBar.High = Math.Max(bar.High, bar.High);
+                newBar.Low = Math.Min(bar.Low, bar.Low);
+                newBar.Volume += bar.Volume;
+                newBar.TradeAmount += bar.TradeAmount;
 
                 if (i == nbBars - 1)
                 {
-                    bar.Close = current.Close;
+                    newBar.Close = bar.Close;
                 }
 
-                currNode = currNode.Next;
+                i++;
             }
 
-            return bar;
+            return newBar;
         }
 
         internal class HistoricalDataFetcher
@@ -250,9 +251,9 @@ namespace TradingBot.Utils
 
             public class MarketHolidayException : Exception { }
 
-            async Task<LinkedList<TData>> FetchHistoricalData<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+            async Task<IEnumerable<TData>> FetchHistoricalData<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
-                LinkedList<TData> data = await Fetch<TData>(contract, time);
+                IEnumerable<TData> data = await Fetch<TData>(contract, time);
                 if (IsPossibleMarketHoliday(time, data))
                 {
                     _logger.Info($"Possible market holiday on {time} (returned data time mismatch). Skipping.");
@@ -275,7 +276,7 @@ namespace TradingBot.Utils
                 return d != null && time.Date != d.Time.Date;
             }
 
-            async Task<LinkedList<TData>> Fetch<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+            async Task<IEnumerable<TData>> Fetch<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
                 if (typeof(TData) == typeof(Bar))
                 {
@@ -289,7 +290,7 @@ namespace TradingBot.Utils
                 return new LinkedList<TData>();
             }
 
-            private async Task<LinkedList<TData>> FetchBidAsk<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+            private async Task<IEnumerable<TData>> FetchBidAsk<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
                 _logger.Info($"Retrieving bid ask from TWS for '{contract.Symbol} {time}'.");
 
@@ -334,12 +335,12 @@ namespace TradingBot.Utils
                 return list;
             }
 
-            private async Task<LinkedList<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+            private async Task<IEnumerable<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
                 _logger.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
                 var bars = await _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800);
                 NbRequest++;
-                return new LinkedList<TData>(bars.Cast<TData>());
+                return bars.Cast<TData>();
             }
         }
     }

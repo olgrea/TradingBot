@@ -53,7 +53,7 @@ namespace TradingBot.Broker
         void RequestPositionsUpdates();
         void CancelPositionsUpdates();
 
-        Task<LinkedList<MarketData.Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count);
+        Task<IEnumerable<Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count);
         Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count);
 
         Task<int> GetNextValidOrderIdAsync();
