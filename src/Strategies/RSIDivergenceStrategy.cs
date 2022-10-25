@@ -23,7 +23,7 @@ namespace TradingBot.Strategies
 
             AddIndicator(new BollingerBands(BarLength._1Min));
             AddIndicator(new RSIDivergence(BarLength._1Min, 14, 5));
-            AddIndicator(new RSIDivergence(BarLength._5Sec, 12*14, 12*5));
+            AddIndicator(new RSIDivergence(BarLength._5Sec, 14, 5));
         }
 
         internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);

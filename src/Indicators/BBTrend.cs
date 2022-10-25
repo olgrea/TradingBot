@@ -17,9 +17,11 @@ namespace TradingBot.Indicators
         public double Value { get; private set; }
         public bool IsReady => _bb50.IsReady;
         public int NbPeriods => _bb50.NbPeriods;
+        public int NbPeriodsWithConvergence => NbPeriods;
         public BarLength BarLength => _bb50.BarLength;
 
-    public void Update(Bar bar)
+
+        public void Update(Bar bar)
         {
             _bb20.Update(bar);
             _bb50.Update(bar);

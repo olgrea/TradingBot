@@ -6,6 +6,7 @@ namespace TradingBot.Indicators
     {
         public bool IsReady { get; }
         public int NbPeriods { get; }
+        public int NbPeriodsWithConvergence { get; }
         public BarLength BarLength { get; }
         void Update(Bar bar);
     }

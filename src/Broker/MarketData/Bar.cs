@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Text;
+using Skender.Stock.Indicators;
 
 namespace TradingBot.Broker.MarketData
 {
@@ -14,7 +12,7 @@ namespace TradingBot.Broker.MarketData
         _1Day = 3600 * 24,
     }
 
-    public class Bar : IMarketData
+    public class Bar : IMarketData, IQuote
     {
         public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
 
@@ -26,6 +24,18 @@ namespace TradingBot.Broker.MarketData
         public int TradeAmount { get; set; }
         public DateTime Time { get; set; }
         public BarLength BarLength { get; set; }
+
+        public DateTime Date => Time;
+
+        decimal IQuote.Open => Convert.ToDecimal(Open);
+
+        decimal IQuote.High => Convert.ToDecimal(High);
+
+        decimal IQuote.Low => Convert.ToDecimal(Low);
+
+        decimal IQuote.Close => Convert.ToDecimal(Close);
+
+        decimal IQuote.Volume => Convert.ToDecimal(Volume);
 
         public override bool Equals(object obj)
         {
