@@ -101,15 +101,12 @@ namespace TradingBot.Utils
             File.WriteAllText(path, json);
         }
 
-        public static Bar MakeBar(IEnumerable<Bar> bars)
+        public static Bar MakeBar(IEnumerable<Bar> bars, BarLength barLength)
         {
-            int nbBars = bars.Count();
-
-            BarLength barLength = (BarLength)Enum.ToObject(typeof(BarLength), nbBars);
-
             Bar newBar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
 
             int i = 0;
+            int nbBars = bars.Count();
             foreach (Bar bar in bars)
             {
                 if (i == 0)

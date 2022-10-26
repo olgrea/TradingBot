@@ -104,6 +104,9 @@ namespace TradingBot
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
+            InitIndicators(_strategies.SelectMany(s => s.Indicators));
+            SubscribeToData();
+            
             _logger.Info($"Starting USD cash balance : {_USDCashBalance:c}");
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
@@ -111,12 +114,7 @@ namespace TradingBot
                 msg += $"{strat.GetType().Name}, ";
             _logger.Info(msg);
 
-            SubscribeToData();
-
             _currentTime = await _broker.GetCurrentTimeAsync();
-
-            InitIndicators(_strategies.SelectMany(s => s.Indicators));
-
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
