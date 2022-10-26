@@ -8,4 +8,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.10" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\src\TradingBot.csproj" />
+  </ItemGroup>
+
 </Project>
