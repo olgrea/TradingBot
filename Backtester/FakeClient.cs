@@ -148,6 +148,10 @@ namespace Backtester
                 },
                 Positions = new List<Position>() { new Position() { Contract = _contract } }
             };
+
+            _cancellationTokenSource = new CancellationTokenSource();
+            _requestsTask = StartConsumerTask(_requestsQueue);
+            _responsesTask = StartConsumerTask(_responsesQueue);
         }
 
         public IBCallbacks Callbacks { get; private set; }
@@ -195,10 +199,6 @@ namespace Backtester
             ClockTick += OnClockTick_UpdateBarNode;
             ClockTick += OnClockTick_UpdateBidAskNode;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
-
-            _cancellationTokenSource = new CancellationTokenSource();
-            _requestsTask = StartConsumerTask(_requestsQueue);
-            _responsesTask = StartConsumerTask(_responsesQueue);
             _passingTimeTask = StartPassingTimeTask();
         }
 
@@ -206,10 +206,10 @@ namespace Backtester
         {
             _logger.Info($"Fake client stopped at {_currentFakeTime}");
 
+            StopPassingTimeTask();
             ClockTick -= OnClockTick_UpdateBarNode;
             ClockTick -= OnClockTick_UpdateBidAskNode;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
-            StopPassingTimeTask();
         }
 
         Task StartConsumerTask(BlockingCollection<Action> collection)
@@ -240,11 +240,12 @@ namespace Backtester
             {
                 try
                 {
-                    if (_requestsQueue.Count > 0)
-                        break;
+                    // Let's process the requests first before evaluating ClockTick callbacks
+                    if (_requestsQueue.Count != 0)
+                        continue;
 
                     ClockTick?.Invoke(_currentFakeTime);
-                    if(TimeDelays.OneSecond > 0)
+                    if (TimeDelays.OneSecond > 0)
                         await Task.Delay(TimeDelays.OneSecond, mainToken);
                     _currentFakeTime = _currentFakeTime.AddSeconds(1);
                 }
@@ -724,7 +725,7 @@ namespace Backtester
                     current = current.Next;
                 }
 
-                var b = MarketDataUtils.MakeBar(list);
+                var b = MarketDataUtils.MakeBar(list, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }

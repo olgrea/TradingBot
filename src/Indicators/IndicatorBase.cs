@@ -23,7 +23,7 @@ namespace TradingBot.Indicators
         public BarLength BarLength { get; private set; }
         public virtual int NbPeriods => NbPeriodsWithConvergence;
         public int NbPeriodsWithConvergence { get; private set; }
-        public virtual bool IsReady => _bars.Count == NbPeriods;
+        public virtual bool IsReady => _bars.Count == NbPeriodsWithConvergence;
 
         public void Update(Bar bar)
         {

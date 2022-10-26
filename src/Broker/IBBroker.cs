@@ -463,12 +463,12 @@ namespace TradingBot.Broker
 
                 int sec = (int)barLength;
                 int nbBars = (sec / 5);
-                if (list.Count > nbBars && (bar.Time.Second % sec) == 0)
+                if (list.Count >= nbBars && ((bar.Time.Second  + 5) % sec) == 0)
                 {
                     Bar barToUse = bar;
                     if(barLength > BarLength._5Sec)
                     {
-                        bar = MakeBar(list.TakeLast(nbBars));
+                        bar = MakeBar(list.TakeLast(nbBars), barLength);
                     }
 
                     InvokeCallbacks(contract, bar);
@@ -751,7 +751,7 @@ namespace TradingBot.Broker
                 var bars = allBars;
                 while (bars.Count() > nbSecs)
                 {
-                    var newBar = MakeBar(bars.Take(nbSecs));
+                    var newBar = MakeBar(bars.Take(nbSecs), indicator.BarLength);
                     indicator.Update(newBar);
                     bars = bars.Skip(nbSecs);
                 }
