@@ -20,6 +20,7 @@ namespace TradingBot.Utils
 
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);
+        public static (TimeSpan, TimeSpan) MarketDayTimeRange = (MarketStartTime, MarketEndTime);
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
@@ -264,11 +265,6 @@ namespace TradingBot.Utils
                 }
 
                 return data;
-            }
-
-            private bool DataExists<TData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TData : IMarketData, new()
-            {
-                return DbUtils.DataExistsInDb<TData>(symbol, date, timeRange);
             }
 
             bool IsPossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData, new()

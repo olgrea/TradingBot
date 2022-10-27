@@ -27,7 +27,9 @@ namespace TradingBot.Utils.Db.DbCommandFactories
             _connection?.Dispose();
         }
 
+        public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateTime date);
         public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
+        public abstract DbCommand<IEnumerable<TMarketData>> CreateSelectCommand(string symbol, DateTime date);
         public abstract DbCommand<IEnumerable<TMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
         public abstract DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<TMarketData> dataCollection);
     }

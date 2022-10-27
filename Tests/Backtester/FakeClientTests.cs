@@ -10,6 +10,7 @@ using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Utils.Db;
+using TradingBot.Utils.Db.DbCommandFactories;
 
 [assembly: LevelOfParallelism(3)]
 
@@ -45,22 +46,26 @@ namespace Tests.Backtester
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _downwardBidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart);
-            _downwardBars = LoadData<Bar>(_downwardFileTime, _downwardStart);
-            _upwardBidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart);
-            _upwardBars = LoadData<Bar>(_upwardFileTime, _upwardStart);
-            _downThenUpBidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart);
-            _downThenUpBars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart);
-            _upThenDownBidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart);
-            _upThenDownBars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart);
+            var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
+            var bidAskCmdFactory = new BidAskCommandFactory();
+
+            _downwardBidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart, bidAskCmdFactory);
+            _downwardBars = LoadData<Bar>(_downwardFileTime, _downwardStart, barCmdFactory);
+            _upwardBidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart, bidAskCmdFactory);
+            _upwardBars = LoadData<Bar>(_upwardFileTime, _upwardStart, barCmdFactory);
+            _downThenUpBidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart, bidAskCmdFactory);
+            _downThenUpBars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart, barCmdFactory);
+            _upThenDownBidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory);
+            _upThenDownBars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart, barCmdFactory);
 
             FakeClient.TimeDelays.TimeScale = 0.001;
             await Task.CompletedTask;
         }
 
-        IEnumerable<T> LoadData<T>(DateTime fileTime, DateTime start) where T : IMarketData, new()
+        IEnumerable<T> LoadData<T>(DateTime fileTime, DateTime start, DbCommandFactory<T> dbCommandFactory) where T : IMarketData, new()
         {
-            return DbUtils.SelectData<T>(Symbol, fileTime.Date).SkipWhile(i => i.Time < start);
+            var cmd = dbCommandFactory.CreateSelectCommand(Symbol, fileTime.Date);
+            return cmd.Execute().SkipWhile(i => i.Time < start);
         }
 
         [TearDown]
