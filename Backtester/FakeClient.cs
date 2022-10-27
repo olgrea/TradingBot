@@ -133,8 +133,8 @@ namespace Backtester
                 Code = "FAKEACCOUNT123",
                 CashBalances = new Dictionary<string, double>() 
                 { 
-                    { "BASE", 5000.00 },
-                    { "USD", 5000.00 },
+                    { "BASE", 25000.00 },
+                    { "USD", 25000.00 },
                 },
                 UnrealizedPnL = new Dictionary<string, double>()
                 {
