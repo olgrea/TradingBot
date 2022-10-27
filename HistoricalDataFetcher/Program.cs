@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -7,11 +8,10 @@ using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils.Db.DbCommandFactories;
-using static TradingBot.Utils.MarketDataUtils;
-using static TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher;
+using TradingBot.Utils.MarketData;
 
 [assembly: InternalsVisibleTo("Tests")]
-namespace HistoricalDataFetcher
+namespace HistoricalDataFetcherApp
 {
     internal class Program
     {
@@ -37,43 +37,44 @@ namespace HistoricalDataFetcher
             if (!string.IsNullOrEmpty(parsedArgs.Value.EndDate))
                 endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
-            await FetchEverything(ticker, startDate.AddTicks(MarketStartTime.Ticks), endDate.AddTicks(MarketEndTime.Ticks));
+            await FetchEverything(ticker, startDate.AddTicks(MarketDataUtils.MarketStartTime.Ticks), endDate.AddTicks(MarketDataUtils.MarketEndTime.Ticks));
         }
 
         public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate)
         {
             var broker = new IBBroker(321);
-            var logger = LogManager.GetLogger($"{nameof(TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher)}");
-            var dataFetcher = new TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher(broker, logger);
-            broker.ErrorHandler = new FetcherErrorHandler(dataFetcher, broker, logger); 
+            var logger = LogManager.GetLogger($"{nameof(HistoricalDataFetcher)}");
+            var dataFetcher = new HistoricalDataFetcher(broker, logger);
+            broker.ErrorHandler = new HistoricalDataFetcher.FetcherErrorHandler(dataFetcher, broker, logger);
 
             await broker.ConnectAsync();
             var contract = await broker.GetContractAsync(ticker);
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
-            var marketDays = GetMarketDays(startDate, endDate).ToList();
+            var marketDays = MarketDataUtils.GetMarketDays(startDate, endDate).ToList();
+
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
-            foreach ((DateTime, DateTime) pair in marketDays)
-            {
-                try
-                {
-                    await dataFetcher.GetDataForDay<Bar>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, barCmdFactory);
-                }
-                catch (MarketHolidayException) { break; }
-            }
+            await Fetch(dataFetcher, contract, marketDays, barCmdFactory);
 
             var bidAskCmdFactory = new BidAskCommandFactory();
+            await Fetch(dataFetcher, contract, marketDays, bidAskCmdFactory);
+
+            // TODO : fetch and store BarLength._1Day
+
+            logger.Info($"\nComplete!\n");
+        }
+
+        private static async Task Fetch<TMarketData>(HistoricalDataFetcher dataFetcher, Contract contract, List<(DateTime, DateTime)> marketDays, DbCommandFactory<TMarketData> cmdFactory) where TMarketData : IMarketData, new()
+        {
             foreach ((DateTime, DateTime) pair in marketDays)
             {
                 try
                 {
-                    await dataFetcher.GetDataForDay<BidAsk>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, bidAskCmdFactory);
+                    await dataFetcher.GetDataForDay<TMarketData>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, cmdFactory);
                 }
                 catch (MarketHolidayException) { break; }
             }
-
-            logger.Info($"\nComplete!\n");
         }
     }
 }

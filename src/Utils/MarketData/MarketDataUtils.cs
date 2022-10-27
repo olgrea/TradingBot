@@ -3,16 +3,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using NLog;
 using System.Threading.Tasks;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.Client;
+using NLog;
 using TradingBot.Broker;
+using TradingBot.Broker.Client;
+using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
-using TradingBot.Utils.Db;
 using TradingBot.Utils.Db.DbCommandFactories;
 
-namespace TradingBot.Utils
+namespace TradingBot.Utils.MarketData
 {
     public static class MarketDataUtils
     {
@@ -47,7 +46,7 @@ namespace TradingBot.Utils
             DateTime current = start;
             while (current < end)
             {
-                if (!IsWeekend(current))
+                if (!current.IsWeekend())
                 {
                     if (i == 0 && start < marketEndTime)
                         yield return (start, marketEndTime);
@@ -61,7 +60,7 @@ namespace TradingBot.Utils
                 i++;
             }
 
-            if (!IsWeekend(end) && end > marketStartTime)
+            if (!end.IsWeekend() && end > marketStartTime)
             {
                 if (end > marketEndTime)
                     end = marketEndTime;
@@ -93,7 +92,7 @@ namespace TradingBot.Utils
 
         public static void SerializeData<TData>(string path, IEnumerable<TData> data) where TData : IMarketData, new()
         {
-            if(data == null)
+            if (data == null)
                 throw new ArgumentNullException(nameof(data));
 
             var dirPath = Path.GetDirectoryName(path);
@@ -209,7 +208,7 @@ namespace TradingBot.Utils
                         var insertCmd = commandFactory.CreateInsertCommand(contract.Symbol, data);
                         insertCmd.Execute();
                     }
-                    
+
                     dailyData = data.Concat(dailyData);
                     current = current.AddMinutes(-30);
                 }

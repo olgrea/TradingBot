@@ -6,9 +6,8 @@ using NUnit.Framework;
 using Tests.Broker;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
-using TradingBot.Utils.Db;
 using TradingBot.Utils.Db.DbCommandFactories;
+using TradingBot.Utils.MarketData;
 
 namespace Tests.Backtester
 {

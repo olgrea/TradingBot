@@ -13,7 +13,7 @@ using TradingBot.Broker.Client;
 using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
-using TradingBot.Utils;
+using TradingBot.Utils.MarketData;
 
 namespace Backtester
 {

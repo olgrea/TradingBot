@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils.Db.DbCommands;
+using TradingBot.Utils.MarketData;
 
 namespace TradingBot.Utils.Db.DbCommandFactories
 {
