@@ -6,7 +6,7 @@ using NUnit.Framework;
 using TradingBot.Broker;
 using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.Orders;
-using TradingBot.Utils;
+using TradingBot.Utils.MarketData;
 
 namespace Tests.Broker
 {

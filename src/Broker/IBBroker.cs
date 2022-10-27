@@ -13,10 +13,8 @@ using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
-using TradingBot.Utils;
 using TradingBot.Utils.Db.DbCommandFactories;
-using static TradingBot.Utils.MarketDataUtils;
-using static TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher;
+using TradingBot.Utils.MarketData;
 
 [assembly: InternalsVisibleTo("HistoricalDataFetcher")]
 [assembly: InternalsVisibleTo("Tests")]
@@ -469,7 +467,7 @@ namespace TradingBot.Broker
                     Bar barToUse = bar;
                     if(barLength > BarLength._5Sec)
                     {
-                        bar = MakeBar(list.TakeLast(nbBars), barLength);
+                        bar = MarketDataUtils.MakeBar(list.TakeLast(nbBars), barLength);
                     }
 
                     InvokeCallbacks(contract, bar);
@@ -716,9 +714,9 @@ namespace TradingBot.Broker
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
 
             // Get the ones from today : from opening to now
-            if(currentTime.TimeOfDay > MarketStartTime)
+            if(currentTime.TimeOfDay > MarketDataUtils.MarketStartTime)
             {
-                allBars = await fetcher.GetDataForDay<Bar>(currentTime.Date, (MarketStartTime, currentTime.TimeOfDay), contract, barCmdFactory);
+                allBars = await fetcher.GetDataForDay<Bar>(currentTime.Date, (MarketDataUtils.MarketStartTime, currentTime.TimeOfDay), contract, barCmdFactory);
             }
             
             int count = allBars.Count();
@@ -736,8 +734,8 @@ namespace TradingBot.Broker
                     {
                         if(!MarketDataUtils.IsWeekend(previousMarketDay))
                         {
-                            var start = new TimeSpan(MarketEndTime.Ticks - TimeSpan.FromSeconds(rest).Ticks);
-                            previousMarketDayBars = await fetcher.GetDataForDay<Bar>(previousMarketDay.Date, (start, MarketEndTime), contract, barCmdFactory);
+                            var start = new TimeSpan(MarketDataUtils.MarketEndTime.Ticks - TimeSpan.FromSeconds(rest).Ticks);
+                            previousMarketDayBars = await fetcher.GetDataForDay<Bar>(previousMarketDay.Date, (start, MarketDataUtils.MarketEndTime), contract, barCmdFactory);
                             allBars = previousMarketDayBars.Concat(allBars);
                         }
                     }
@@ -753,7 +751,7 @@ namespace TradingBot.Broker
                 var bars = allBars;
                 while (bars.Count() > nbSecs)
                 {
-                    var newBar = MakeBar(bars.Take(nbSecs), indicator.BarLength);
+                    var newBar = MarketDataUtils.MakeBar(bars.Take(nbSecs), indicator.BarLength);
                     indicator.Update(newBar);
                     bars = bars.Skip(nbSecs);
                 }

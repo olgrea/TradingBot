@@ -7,9 +7,8 @@ using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
-using TradingBot.Utils;
-using TradingBot.Utils.Db;
 using TradingBot.Utils.Db.DbCommandFactories;
+using TradingBot.Utils.MarketData;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace Backtester

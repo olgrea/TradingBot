@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using CommandLine;
 using TradingBot;
 using TradingBot.Strategies;
-using TradingBot.Utils;
+using TradingBot.Utils.MarketData;
 
 namespace ConsoleApp
 {
