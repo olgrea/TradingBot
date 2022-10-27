@@ -10,22 +10,22 @@ namespace TradingBot.Utils.Db.DbCommandFactories
     {
         BarLength _barLength;
 
-        public BarCommandFactory(BarLength barLength, SqliteConnection connection) : base(connection)
+        public BarCommandFactory(BarLength barLength, SqliteConnection connection = null) : base(connection)
         {
             _barLength = barLength;
         }
 
-        protected override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new BarExistsCommand(symbol, date, timeRange, _barLength, _connection);
         }
 
-        protected override DbCommand<IEnumerable<Bar>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<Bar>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new SelectBarsCommand(symbol, date, timeRange, _barLength, _connection);
         }
 
-        protected override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<Bar> dataCollection)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<Bar> dataCollection)
         {
             return new InsertBarsCommand(symbol, dataCollection, _connection);
         }

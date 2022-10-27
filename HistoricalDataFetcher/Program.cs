@@ -6,6 +6,7 @@ using CommandLine;
 using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils.Db.DbCommandFactories;
 using static TradingBot.Utils.MarketDataUtils;
 using static TradingBot.Utils.MarketDataUtils.HistoricalDataFetcher;
 
@@ -52,20 +53,22 @@ namespace HistoricalDataFetcher
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
             var marketDays = GetMarketDays(startDate, endDate).ToList();
+            var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
             foreach ((DateTime, DateTime) pair in marketDays)
             {
                 try
                 {
-                    await dataFetcher.GetDataForDay<Bar>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract);
+                    await dataFetcher.GetDataForDay<Bar>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, barCmdFactory);
                 }
                 catch (MarketHolidayException) { break; }
             }
 
+            var bidAskCmdFactory = new BidAskCommandFactory();
             foreach ((DateTime, DateTime) pair in marketDays)
             {
                 try
                 {
-                    await dataFetcher.GetDataForDay<BidAsk>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract);
+                    await dataFetcher.GetDataForDay<BidAsk>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, bidAskCmdFactory);
                 }
                 catch (MarketHolidayException) { break; }
             }
