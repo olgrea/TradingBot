@@ -8,21 +8,21 @@ namespace TradingBot.Utils.Db.DbCommandFactories
 {
     public class BidAskCommandFactory : DbCommandFactory<BidAsk>
     {
-        public BidAskCommandFactory(SqliteConnection connection) : base(connection)
+        public BidAskCommandFactory(SqliteConnection connection = null) : base(connection)
         {
         }
 
-        protected override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new BidAskExistsCommand(symbol, date, timeRange, _connection);
         }
 
-        protected override DbCommand<IEnumerable<BidAsk>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<BidAsk>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new SelectBidAsksCommand(symbol, date, timeRange, _connection);
         }
 
-        protected override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<BidAsk> dataCollection)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<BidAsk> dataCollection)
         {
             return new InsertBidAsksCommand(symbol, dataCollection, _connection);
         }

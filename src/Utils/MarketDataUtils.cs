@@ -10,6 +10,7 @@ using TradingBot.Broker.Client;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils.Db;
+using TradingBot.Utils.Db.DbCommandFactories;
 
 namespace TradingBot.Utils
 {
@@ -175,7 +176,7 @@ namespace TradingBot.Utils
                 _logger = logger;
             }
 
-            public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract) where TData : IMarketData, new()
+            public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
             {
                 DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
                 DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
@@ -187,21 +188,28 @@ namespace TradingBot.Utils
                 // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
                 IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
+
+
                 while (current >= morning)
                 {
                     var begin = current.AddMinutes(-30);
                     var end = current;
+
+                    var existsCmd = commandFactory.CreateExistsCommand(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+
                     IEnumerable<TData> data;
-                    if (DataExists<TData>(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay)))
+                    if (existsCmd.Execute())
                     {
-                        data = DbUtils.SelectData<TData>(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+                        var selectCmd = commandFactory.CreateSelectCommand(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+                        data = selectCmd.Execute();
                         var dateStr = current.Date.ToShortDateString();
                         _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                     }
                     else
                     {
                         data = await FetchHistoricalData<TData>(contract, current);
-                        SaveData(contract.Symbol, current, data);
+                        var insertCmd = commandFactory.CreateInsertCommand(contract.Symbol, data);
+                        insertCmd.Execute();
                     }
                     
                     dailyData = data.Concat(dailyData);
@@ -209,11 +217,6 @@ namespace TradingBot.Utils
                 }
 
                 return dailyData;
-            }
-
-            private void SaveData<TData>(string symbol, DateTime date, IEnumerable<TData> dailyData) where TData : IMarketData, new()
-            {
-                DbUtils.InsertData<TData>(symbol, dailyData);
             }
 
             private void CheckForPacingViolations()

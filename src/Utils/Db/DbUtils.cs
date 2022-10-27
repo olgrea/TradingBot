@@ -15,10 +15,11 @@ namespace TradingBot.Utils.Db
     public static class DbUtils
     {
         public const string DbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
+        public const string DbConnectionString = "Data Source=" + DbPath;
 
         public static bool DataExistsInDb<TMarketData>(string symbol, DateTime date) where TMarketData : IMarketData, new()
         {
-            using var connection = new SqliteConnection($"Data Source={DbPath}");
+            using var connection = new SqliteConnection(DbConnectionString);
             connection.Open();
             return DataExistsInDb<TMarketData>(symbol, date, connection);
         }
@@ -30,7 +31,7 @@ namespace TradingBot.Utils.Db
 
         public static bool DataExistsInDb<TMarketData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TMarketData : IMarketData, new()
         {
-            using var connection = new SqliteConnection($"Data Source={DbPath}");
+            using var connection = new SqliteConnection(DbConnectionString);
             connection.Open();
             return DataExistsInDb<TMarketData>(symbol, date, timeRange, connection);
         }
@@ -65,7 +66,7 @@ namespace TradingBot.Utils.Db
 
         public static void InsertData<TMarketData>(string symbol, IEnumerable<TMarketData> data) where TMarketData : IMarketData, new()
         {
-            using var connection = new SqliteConnection($"Data Source={DbPath}");
+            using var connection = new SqliteConnection(DbConnectionString);
             connection.Open();
             InsertData(symbol, data, connection);
         }
@@ -257,7 +258,7 @@ namespace TradingBot.Utils.Db
 
         public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TMarketData : IMarketData, new()
         {
-            using var connection = new SqliteConnection($"Data Source={DbPath}");
+            using var connection = new SqliteConnection(DbConnectionString);
             connection.Open();
 
             string tableName = typeof(TMarketData).Name;
