@@ -105,7 +105,7 @@ namespace TradingBot.Utils.Db.DbCommands
             SqliteCommand command = _connection.CreateCommand();
             command.CommandText = MakeSelectCommandText();
             using SqliteDataReader reader = command.ExecuteReader();
-            return reader.Cast<IDataRecord>().Select(MakeDataFromResults);
+            return new LinkedList<TMarketData>(reader.Cast<IDataRecord>().Select(MakeDataFromResults));
         }
 
         protected virtual string MakeSelectCommandText()

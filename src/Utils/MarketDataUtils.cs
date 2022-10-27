@@ -189,13 +189,10 @@ namespace TradingBot.Utils
                 // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
                 IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
-
-
                 while (current >= morning)
                 {
                     var begin = current.AddMinutes(-30);
                     var end = current;
-
                     var existsCmd = commandFactory.CreateExistsCommand(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
 
                     IEnumerable<TData> data;

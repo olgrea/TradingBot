@@ -61,21 +61,17 @@ namespace TradingBot.Utils.Db.DbCommands
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO HistoricalBidAsk (Stock, Date, Time, BidAsk)
+                INSERT OR IGNORE INTO HistoricalBidAsk (Stock, DateTime, BidAsk)
                 SELECT 
                     Stock.Id AS StockId,
-                    Date.Id AS DateId,
-                    Time.Id AS TimeId,
+                    {Sanitize(new DateTimeOffset(data.Time).ToUnixTimeSeconds())} AS DateTime,                                    
                     BidAsk.Id AS BidAskId   
-                FROM Stock
-                LEFT JOIN Date ON Date.Date = {Sanitize(data.Time.Date)}
-                LEFT JOIN Time ON Time.Time = {Sanitize(data.Time.TimeOfDay)}
-                LEFT JOIN BidAsk 
-                    ON Bid = {Sanitize(data.Bid)}
-                    AND BidSize = {Sanitize(data.BidSize)}
-                    AND Ask = {Sanitize(data.Ask)}
-                    AND AskSize = {Sanitize(data.AskSize)}
-                WHERE Symbol = {Sanitize(_symbol)}
+                FROM BidAsk
+                LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)} 
+                WHERE Bid = {Sanitize(data.Bid)}
+                AND BidSize = {Sanitize(data.BidSize)}
+                AND Ask = {Sanitize(data.Ask)}
+                AND AskSize = {Sanitize(data.AskSize)}
             ";
 
             command.ExecuteNonQuery();
