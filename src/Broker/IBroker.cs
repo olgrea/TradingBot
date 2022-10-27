@@ -58,7 +58,5 @@ namespace TradingBot.Broker
 
         Task<int> GetNextValidOrderIdAsync();
         Task<DateTime> GetCurrentTimeAsync();
-
-        void InitIndicators(Contract contract, IEnumerable<IIndicator> indicators);
     }
 }

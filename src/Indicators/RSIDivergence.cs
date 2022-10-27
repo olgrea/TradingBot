@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using Skender.Stock.Indicators;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
 
@@ -7,6 +7,11 @@ namespace TradingBot.Indicators
 {
     internal class RSIDivergence : IIndicator
     {
+        class RSIDivergenceResults : ResultBase
+        {
+            public double? RSIDivergence { get; set; }
+        }
+
         RSI _slowRsi;
         RSI _fastRsi;
         LinkedListWithMaxSize<(DateTime, double)> _values;

@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 using System.Threading;
 using TradingBot.Indicators;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils.Db.DbCommandFactories;
+using TradingBot.Utils.MarketData;
 
 [assembly: Fody.ConfigureAwait(false)]
 
@@ -227,9 +229,64 @@ namespace TradingBot
             _broker.CancelAccountUpdates(_account.Code);
         }
 
-        public void InitIndicators(IEnumerable<IIndicator> indicators)
+        public async void InitIndicators(IEnumerable<IIndicator> indicators)
         {
-            Broker.InitIndicators(Contract, indicators);
+            if (!indicators.Any())
+                return;
+
+            // How many past bars do we need?
+            int longestNbOfOneSecBarsNeededForInit = indicators.Max(i => i.NbPeriodsWithConvergence * (int)i.BarLength);
+
+            var fetcher = new HistoricalDataFetcher(_broker, null);
+            DateTime currentTime = await _broker.GetCurrentTimeAsync();
+            IEnumerable<Bar> allBars = Enumerable.Empty<Bar>();
+            var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
+
+            // Get the ones from today : from opening to now
+            if (currentTime.TimeOfDay > MarketDataUtils.MarketStartTime)
+            {
+                allBars = await fetcher.GetDataForDay<Bar>(currentTime.Date, (MarketDataUtils.MarketStartTime, currentTime.TimeOfDay), _contract, barCmdFactory);
+            }
+
+            int count = allBars.Count();
+            if (count < longestNbOfOneSecBarsNeededForInit)
+            {
+                // Not enough. Getting previous market day to fill the rest.
+                int rest = longestNbOfOneSecBarsNeededForInit - count;
+
+                var previousMarketDay = currentTime;
+                IEnumerable<Bar> previousMarketDayBars = null;
+                while (previousMarketDayBars == null)
+                {
+                    previousMarketDay = previousMarketDay.AddDays(-1);
+                    try
+                    {
+                        if (!MarketDataUtils.IsWeekend(previousMarketDay))
+                        {
+                            var start = new TimeSpan(MarketDataUtils.MarketEndTime.Ticks - TimeSpan.FromSeconds(rest).Ticks);
+                            previousMarketDayBars = await fetcher.GetDataForDay<Bar>(previousMarketDay.Date, (start, MarketDataUtils.MarketEndTime), _contract, barCmdFactory);
+                            allBars = previousMarketDayBars.Concat(allBars);
+                        }
+                    }
+                    catch (MarketHolidayException) { }
+                }
+            }
+
+            // Update all indicators.
+            foreach (var indicator in indicators)
+            {
+                var nbSecs = (int)indicator.BarLength;
+
+                var bars = allBars;
+                while (bars.Count() > nbSecs)
+                {
+                    var newBar = MarketDataUtils.MakeBar(bars.Take(nbSecs), indicator.BarLength);
+                    indicator.Update(newBar);
+                    bars = bars.Skip(nbSecs);
+                }
+            }
+
+            Debug.Assert(indicators.All(i => i.IsReady));
         }
 
         void OnAccountValueUpdated(string key, string value, string currency, string account)
