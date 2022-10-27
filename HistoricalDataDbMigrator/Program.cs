@@ -4,6 +4,7 @@ using System.IO;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
+using TradingBot.Utils.Db;
 
 namespace HistoricalDataToDb
 {

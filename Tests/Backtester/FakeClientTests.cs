@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Backtester;
-using HistoricalDataFetcher;
 using NUnit.Framework;
 using TradingBot.Broker;
 using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
-using TradingBot.Utils;
+using TradingBot.Utils.Db;
+
 [assembly: LevelOfParallelism(3)]
 
 namespace Tests.Backtester
