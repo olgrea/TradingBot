@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using DbUtils.DbCommands;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils.Db.DbCommands;
 
-namespace DbUtils.DbCommandFactories
+namespace TradingBot.Utils.Db.DbCommandFactories
 {
     public class BidAskCommandFactory : DbCommandFactory<BidAsk>
     {

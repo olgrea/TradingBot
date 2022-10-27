@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using TradingBot;
@@ -9,6 +8,7 @@ using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
 using TradingBot.Utils;
+using TradingBot.Utils.Db;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace Backtester

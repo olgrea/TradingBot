@@ -1,19 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
 using Microsoft.Data.Sqlite;
-using NLog.Fluent;
 using TradingBot.Broker.MarketData;
 
-namespace DbUtils.DbCommands
+namespace TradingBot.Utils.Db.DbCommands
 {
     internal class BarExistsCommand : ExistsCommand<Bar>
     {
         BarLength _barLength;
 
-        public BarExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, BarLength barLength, SqliteConnection connection) 
+        public BarExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, BarLength barLength, SqliteConnection connection)
             : base(symbol, date, timeRange, connection)
         {
             _barLength = barLength;

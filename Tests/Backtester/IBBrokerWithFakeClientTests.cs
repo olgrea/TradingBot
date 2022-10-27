@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
+using Backtester;
 using NUnit.Framework;
 using Tests.Broker;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
-using Backtester;
-using System.IO;
 using TradingBot.Utils;
+using TradingBot.Utils.Db;
 
 namespace Tests.Backtester
 {

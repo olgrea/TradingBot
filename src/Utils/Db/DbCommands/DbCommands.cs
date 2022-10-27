@@ -6,7 +6,7 @@ using System.Linq;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
 
-namespace DbUtils.DbCommands
+namespace TradingBot.Utils.Db.DbCommands
 {
     public abstract class DbCommand<TResult>
     {
@@ -50,10 +50,10 @@ namespace DbUtils.DbCommands
     {
         protected string _symbol;
         protected DateTime _date;
-        protected(TimeSpan, TimeSpan) _timeRange;
+        protected (TimeSpan, TimeSpan) _timeRange;
         protected string _marketDataName;
 
-        public ExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection) : base(connection) 
+        public ExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection) : base(connection)
         {
             _symbol = symbol;
             _date = date;
@@ -110,7 +110,7 @@ namespace DbUtils.DbCommands
 
         protected virtual string MakeSelectCommandText()
         {
-            return 
+            return
             $@"
                 SELECT * FROM Historical{_marketDataName}View
                 WHERE Ticker = {Sanitize(_symbol)}
@@ -120,7 +120,7 @@ namespace DbUtils.DbCommands
                 ORDER BY Time;
             ";
         }
-        
+
         protected abstract TMarketData MakeDataFromResults(IDataRecord record);
     }
 

@@ -10,9 +10,9 @@ using System.Linq;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
 
-namespace TradingBot.Utils
+namespace TradingBot.Utils.Db
 {
-    public static  class DbUtils
+    public static class DbUtils
     {
         public const string DbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
 
@@ -25,7 +25,7 @@ namespace TradingBot.Utils
 
         public static bool DataExistsInDb<TMarketData>(string symbol, DateTime date, SqliteConnection connection) where TMarketData : IMarketData, new()
         {
-            return DataExistsInDb<TMarketData>(symbol, date, default((TimeSpan, TimeSpan)), connection);
+            return DataExistsInDb<TMarketData>(symbol, date, default, connection);
         }
 
         public static bool DataExistsInDb<TMarketData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TMarketData : IMarketData, new()
@@ -41,7 +41,7 @@ namespace TradingBot.Utils
             SqliteCommand command = connection.CreateCommand();
 
             string AND_Time = "";
-            if(timeRange != default)
+            if (timeRange != default)
             {
                 AND_Time = $"AND Time >= '{timeRange.Item1}' AND Time < '{timeRange.Item2}'";
             }
@@ -91,7 +91,7 @@ namespace TradingBot.Utils
                 if (data is Bar bar)
                     values = new object[] { bar.Open, bar.Close, bar.High, bar.Low, bar.Volume };
                 else if (data is BidAsk ba)
-                    values = new object[] { ba.Bid, ba.BidSize, ba.Ask, ba.AskSize};
+                    values = new object[] { ba.Bid, ba.BidSize, ba.Ask, ba.AskSize };
 
                 string tableName = data.GetType().Name;
                 InsertFromValues(marketDataCmd, tableName, GetColumns(connection, tableName).ToArray(), values);
@@ -254,7 +254,7 @@ namespace TradingBot.Utils
         {
             return SelectData<TMarketData>(symbol, date, (MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime));
         }
-        
+
         public static IEnumerable<TMarketData> SelectData<TMarketData>(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange) where TMarketData : IMarketData, new()
         {
             using var connection = new SqliteConnection($"Data Source={DbPath}");
@@ -310,6 +310,6 @@ namespace TradingBot.Utils
                 AskSize = Convert.ToInt32(dr.GetInt64(6)),
             };
             return ba;
-        }       
+        }
     }
 }

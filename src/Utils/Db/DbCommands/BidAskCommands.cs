@@ -6,7 +6,7 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using TradingBot.Broker.MarketData;
 
-namespace DbUtils.DbCommands
+namespace TradingBot.Utils.Db.DbCommands
 {
     internal class BidAskExistsCommand : ExistsCommand<BidAsk>
     {

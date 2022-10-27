@@ -9,6 +9,7 @@ using TradingBot.Broker.Client.Messages;
 using TradingBot.Broker.Client;
 using TradingBot.Broker;
 using TradingBot.Broker.MarketData;
+using TradingBot.Utils.Db;
 
 namespace TradingBot.Utils
 {
