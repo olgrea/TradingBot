@@ -81,13 +81,9 @@ namespace TradingBot.Utils.Db.DbCommands
 
         protected override void InsertMarketData(SqliteCommand command, Bar data)
         {
-            Insert(command, "Date", "Date", data.Time.Date.ToShortDateString());
-            Insert(command, "Time", "Time", data.Time.TimeOfDay.ToString());
-
             var columns = new string[] { "Open", "Close", "High", "Low", "Volume" };
             var values = new object[] { data.Open, data.Close, data.High, data.Low, data.Volume };
             Insert(command, "Bar", columns, values);
-
             InsertFromSelect(command, data);
         }
 
@@ -95,23 +91,19 @@ namespace TradingBot.Utils.Db.DbCommands
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO HistoricalBar (Stock, Date, Time, BarLength, Bar)
+                INSERT OR IGNORE INTO HistoricalBar (Stock, DateTime, BarLength, Bar)
                 SELECT 
                     Stock.Id AS StockId,
-                    Date.Id AS DateId,
-                    Time.Id AS TimeId,
+                    {Sanitize(new DateTimeOffset(data.Time).ToUnixTimeSeconds())} AS DateTime,
                     {Sanitize(data.BarLength)} AS BarLength,
                     Bar.Id AS BarId   
-                FROM Stock
-                LEFT JOIN Date ON Date.Date = {Sanitize(data.Time.Date)}
-                LEFT JOIN Time ON Time.Time = {Sanitize(data.Time.TimeOfDay)}
-                LEFT JOIN Bar 
-                    ON Open = {Sanitize(data.Open)}
-                    AND Close = {Sanitize(data.Close)}
-                    AND High = {Sanitize(data.High)}
-                    AND Low = {Sanitize(data.Low)}
-                    AND Volume = {Sanitize(data.Volume)}
-                WHERE Symbol = {Sanitize(_symbol)}
+                FROM Bar
+                LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)}  
+                WHERE Open = {Sanitize(data.Open)}
+                AND Close = {Sanitize(data.Close)}
+                AND High = {Sanitize(data.High)}
+                AND Low = {Sanitize(data.Low)}
+                AND Volume = {Sanitize(data.Volume)}
             ";
 
             return command.ExecuteNonQuery();
