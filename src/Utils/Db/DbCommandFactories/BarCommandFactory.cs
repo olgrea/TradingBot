@@ -15,9 +15,19 @@ namespace TradingBot.Utils.Db.DbCommandFactories
             _barLength = barLength;
         }
 
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
+        {
+            return CreateExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange);   
+        }
+
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new BarExistsCommand(symbol, date, timeRange, _barLength, _connection);
+        }
+
+        public override DbCommand<IEnumerable<Bar>> CreateSelectCommand(string symbol, DateTime date)
+        {
+            return new SelectBarsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _barLength, _connection);
         }
 
         public override DbCommand<IEnumerable<Bar>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)

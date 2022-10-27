@@ -9,6 +9,7 @@ using TradingBot.Broker.MarketData;
 using TradingBot.Strategies;
 using TradingBot.Utils;
 using TradingBot.Utils.Db;
+using TradingBot.Utils.Db.DbCommandFactories;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace Backtester
@@ -20,6 +21,8 @@ namespace Backtester
         DateTime _startTime;
         DateTime _endTime;
         string _ticker;
+        BarCommandFactory _barCommandFactory;
+        BidAskCommandFactory _bidAskCommandFactory;
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
 
@@ -28,13 +31,16 @@ namespace Backtester
             _ticker = ticker;
             _startTime = new DateTime(startDate.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
             _endTime = new DateTime(endDate.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
+            _barCommandFactory = new BarCommandFactory(BarLength._1Sec);
+            _bidAskCommandFactory = new BidAskCommandFactory();
         }
 
         public async Task Start()
         {
+
             foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
-                var marketData = LoadHistoricalData(_ticker, day.Item1);
+                var marketData = LoadHistoricalData(_ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay));
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
@@ -49,17 +55,13 @@ namespace Backtester
             }
         }
 
-        static (IEnumerable<Bar>, IEnumerable<BidAsk>) LoadHistoricalData(string symbol, DateTime date)
+        (IEnumerable<Bar>, IEnumerable<BidAsk>) LoadHistoricalData(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
-            var barList = DbUtils.SelectData<Bar>(symbol, date);
-            var bidAskList = DbUtils.SelectData<BidAsk>(symbol, date);
-            return (barList, bidAskList);
-        }
+            var barSelectCmd = _barCommandFactory.CreateSelectCommand(symbol, date, timeRange);
+            var bidAskSelectCmd = _bidAskCommandFactory.CreateSelectCommand(symbol, date, timeRange);
 
-        static (IEnumerable<Bar>, IEnumerable<BidAsk>) DeserializeHistoricalData(string symbol, DateTime date)
-        {
-            var barList = MarketDataUtils.DeserializeData<Bar>(RootDir, symbol, date);
-            var bidAskList = MarketDataUtils.DeserializeData<BidAsk>(RootDir, symbol, date);
+            var barList = barSelectCmd.Execute();
+            var bidAskList = bidAskSelectCmd.Execute();
             return (barList, bidAskList);
         }
     }
