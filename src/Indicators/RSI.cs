@@ -5,33 +5,36 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    internal class RSI : IndicatorBase
+    public class Rsi : IIndicator
     {
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
         
         IEnumerable<RsiResult> _rsiResults;
         int _nbPeriods;
+        int _nbWarmupPeriods;
+        BarLength _barLength;
 
-        public RSI(BarLength barLength, int nbPeriods) : base(barLength, 10*nbPeriods) 
+        public Rsi(BarLength barLength, int nbPeriods = 14)
         {
+            _barLength = barLength;
             _nbPeriods = nbPeriods;
+            _nbWarmupPeriods = 10*nbPeriods;
         }
+        
+        public bool IsOverbought => IsReady && LatestResult.Rsi > _overboughtThreshold;
+        public bool IsOversold => IsReady && LatestResult.Rsi < _oversoldThreshold;
+        public RsiResult LatestResult => _rsiResults?.LastOrDefault();
+        public IEnumerable<RsiResult> Results => _rsiResults;
 
-        public override int NbPeriods => _nbPeriods;
+        public BarLength BarLength => _barLength;
+        public bool IsReady => LatestResult != null && _rsiResults.Count() == _nbWarmupPeriods;
+        public int NbPeriods => _nbPeriods;
+        public int NbWarmupPeriods => _nbWarmupPeriods;
 
-        public RsiResult RsiResult => _rsiResults?.LastOrDefault();
-
-        public double Value => RsiResult?.Rsi ?? double.MinValue;
-
-        public bool IsOverbought => IsReady && Value > _overboughtThreshold;
-        public bool IsOversold => IsReady && Value < _oversoldThreshold;
-
-        public override bool IsReady => base.IsReady && Value != double.MinValue;
-
-        public override void Compute()
+        public void Compute(IEnumerable<IQuote> quotes)
         {
-            _rsiResults = Bars.GetRsi(NbPeriods);
+            _rsiResults = quotes.GetRsi(_nbPeriods);
         }
     }
 }

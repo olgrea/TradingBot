@@ -24,6 +24,8 @@ namespace TradingBot.Strategies
         public Trader Trader { get; protected set; }
         public IEnumerable<IIndicator> Indicators => _indicators.SelectMany(i => i.Value);
 
+        public Bar LatestBar { get; private set; }
+
         protected void AddIndicator(IIndicator indicator)
         {
             if (!_indicators.ContainsKey(indicator.BarLength))
@@ -101,27 +103,12 @@ namespace TradingBot.Strategies
         internal bool IsCancelled(Order order) => Trader.OrderManager.IsCancelled(order);
         internal bool IsExecuted(Order order, out OrderExecution orderExecution) => Trader.OrderManager.IsExecuted(order, out orderExecution);
 
-        async void InitIndicators(BarLength barLength, IEnumerable<IIndicator> indicators)
+        public void ComputeIndicators(IEnumerable<Bar> bars)
         {
-            if (!indicators.Any())
-                return;
-
-            var longestPeriod = indicators.Max(i => i.NbPeriods);
-
-            var pastBars = await Trader.Broker.GetPastBars(Trader.Contract, barLength, longestPeriod);
-
-            foreach (var indicator in indicators)
+            LatestBar = bars.Last();
+            foreach (var indicator in _indicators[LatestBar.BarLength])
             {
-                foreach(var bar in pastBars)
-                    indicator.Update(bar);
-            }
-        }
-
-        public void Update(Bar bar)
-        {
-            foreach (var indicator in _indicators[bar.BarLength])
-            {
-                indicator.Update(bar);
+                indicator.Compute(bars);
             }
         }
     }

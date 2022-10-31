@@ -15,6 +15,8 @@ using TradingBot.Indicators;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils.Db.DbCommandFactories;
 using TradingBot.Utils.MarketData;
+using TradingBot.Utils;
+using Skender.Stock.Indicators;
 
 [assembly: Fody.ConfigureAwait(false)]
 
@@ -49,6 +51,9 @@ namespace TradingBot
 
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+
+        int _longestPeriod;
+        Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
             : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
@@ -235,7 +240,8 @@ namespace TradingBot
                 return;
 
             // How many past bars do we need?
-            int longestNbOfOneSecBarsNeededForInit = indicators.Max(i => i.NbPeriodsWithConvergence * (int)i.BarLength);
+            int longestNbOfOneSecBarsNeededForInit = indicators.Max(i => i.NbWarmupPeriods * (int)i.BarLength);
+            _longestPeriod = longestNbOfOneSecBarsNeededForInit;
 
             var fetcher = new HistoricalDataFetcher(_broker, null);
             DateTime currentTime = await _broker.GetCurrentTimeAsync();
@@ -272,18 +278,26 @@ namespace TradingBot
                 }
             }
 
-            // Update all indicators.
-            foreach (var indicator in indicators)
+            // build bar collections from 1 sec bars
+            foreach (var barLength in indicators.Select(i => i.BarLength).Distinct())
             {
-                var nbSecs = (int)indicator.BarLength;
+                if (!_bars.ContainsKey(barLength))
+                    _bars[barLength] = new LinkedListWithMaxSize<Bar>(_longestPeriod);
+
+                var nbSecs = (int)barLength;
 
                 var bars = allBars;
                 while (bars.Count() > nbSecs)
                 {
-                    var newBar = MarketDataUtils.MakeBar(bars.Take(nbSecs), indicator.BarLength);
-                    indicator.Update(newBar);
+                    _bars[barLength].Add(MarketDataUtils.MakeBar(bars.Take(nbSecs), barLength));
                     bars = bars.Skip(nbSecs);
                 }
+            }
+
+            // Update all indicators.
+            foreach (var indicator in indicators)
+            {
+                indicator.Compute(_bars[indicator.BarLength]);
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
@@ -344,8 +358,16 @@ namespace TradingBot
 
         void OnBarReceived(Contract contract, Bar bar)
         {
-            UpdateStrategies(bar);
-            EvaluateStrategies();
+            if(contract.Symbol == _ticker)
+            {
+                if (!_bars.ContainsKey(bar.BarLength))
+                    _bars[bar.BarLength] = new LinkedListWithMaxSize<Bar>(_longestPeriod);
+
+                _bars[bar.BarLength].Add(bar);
+
+                UpdateStrategies(_bars[bar.BarLength]);
+                EvaluateStrategies();
+            }
         }
 
         void OnOrderUpdated(Order o, OrderStatus os)
@@ -363,10 +385,10 @@ namespace TradingBot
             Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares * oe.AvgPrice, ci.Commission, ci.RealizedPNL);
         }
 
-        private void UpdateStrategies(Bar bar)
+        private void UpdateStrategies(IEnumerable<Bar> bars)
         {
             foreach (IStrategy strategy in _strategies)
-                strategy.Update(bar);
+                strategy.ComputeIndicators(bars);
         }
 
         void EvaluateStrategies()

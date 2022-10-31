@@ -1,26 +1,34 @@
-﻿using MathNet.Numerics.Statistics;
+﻿using System.Collections.Generic;
 using System.Linq;
-using TradingBot.Broker.MarketData;
 using Skender.Stock.Indicators;
-using System.Collections.Generic;
-using TradingBot.Utils;
+using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    internal class BollingerBands : IndicatorBase
+    internal class BollingerBands : IIndicator
     {
         IEnumerable<BollingerBandsResult> _bbResults;
 
-        public BollingerBands(BarLength barLength, int nbPeriods = 20) : base(barLength, nbPeriods) {}
+        BarLength _barLength;
+        int _nbPeriods;
 
-        public double MovingAverage => _bbResults?.Last().Sma ?? double.MinValue;
-        public double UpperBB => _bbResults?.Last().UpperBand ?? double.MinValue;
-        public double LowerBB => _bbResults?.Last().LowerBand ?? double.MinValue;  
-        public Bar LatestBar => Bars.Last.Value;
-
-        public override void Compute()
+        public BollingerBands(BarLength barLength, int nbPeriods = 20)
         {
-            _bbResults = Bars.Use(CandlePart.HLC3).GetBollingerBands();
+            _barLength = barLength;
+            _nbPeriods = nbPeriods;
+        }
+        
+        public BollingerBandsResult LatestResult => _bbResults?.LastOrDefault();
+        public IEnumerable<BollingerBandsResult> Results => _bbResults;
+
+        public BarLength BarLength => _barLength;
+        public bool IsReady => LatestResult != null && _bbResults.Count() == NbWarmupPeriods;
+        public int NbPeriods => _nbPeriods;
+        public int NbWarmupPeriods => _nbPeriods;
+
+        public void Compute(IEnumerable<IQuote> quotes)
+        {
+            _bbResults = quotes.Use(CandlePart.HLC3).GetBollingerBands();
         }
     }
 }
