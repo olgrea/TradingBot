@@ -1,44 +1,52 @@
-﻿using System;
+﻿using System.Collections.Generic;
+using System.Linq;
+using Skender.Stock.Indicators;
 using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    internal class BBTrend : IIndicator
+    public class BBTrendResult : ResultBase
     {
-        BollingerBands _bb20;
-        BollingerBands _bb50;
+        public double? BBTrend { get; set; }
+    }
 
-        public BBTrend(BarLength barLength)
+    public class BBTrend : IIndicator
+    {
+        IEnumerable<BBTrendResult> _bbTrendResults;
+        
+        BarLength _barLength;
+        BollingerBands _slowBB;
+        BollingerBands _fastBB;
+
+        public BBTrend(BarLength barLength, int slowPeriod = 50, int fastPeriod = 20)
         {
-            _bb20 = new BollingerBands(barLength, 20);
-            _bb50 = new BollingerBands(barLength, 50);
+            _barLength = barLength;
+            _slowBB = new BollingerBands(barLength, slowPeriod);
+            _fastBB = new BollingerBands(barLength, fastPeriod);
         }
+        
+        public BBTrendResult LatestResult => _bbTrendResults?.LastOrDefault();
 
-        public double Value { get; private set; }
-        public bool IsReady => _bb50.IsReady;
-        public int NbPeriods => _bb50.NbPeriods;
-        public int NbPeriodsWithConvergence => NbPeriods;
-        public BarLength BarLength => _bb50.BarLength;
+        public BarLength BarLength => _barLength;
+        public bool IsReady => LatestResult != null && _bbTrendResults.Count() == _slowBB.NbWarmupPeriods;
+        public int NbPeriods => _slowBB.NbPeriods;
+        public int NbWarmupPeriods => _slowBB.NbWarmupPeriods;
 
-
-        public void Update(Bar bar)
+        public void Compute(IEnumerable<IQuote> quotes)
         {
-            _bb20.Update(bar);
-            _bb50.Update(bar);
-            Compute();
-        }
+            _slowBB.Compute(quotes);
+            _fastBB.Compute(quotes);
 
-        public void Compute()
-        {
-            if(!IsReady)
+            _bbTrendResults = _slowBB.Results.Zip(_fastBB.Results, (slow, fast) =>
             {
-                Value = 0;
-                return;
-            }
-
-            var lower = Math.Abs(_bb20.LowerBB - _bb50.LowerBB);
-            var upper = Math.Abs(_bb20.UpperBB - _bb50.UpperBB);
-            Value = (lower - upper) / _bb20.MovingAverage;
+                var lower = NullMath.Abs(fast.LowerBand - slow.LowerBand);
+                var upper = NullMath.Abs(fast.UpperBand - slow.UpperBand);
+                return new BBTrendResult()
+                {
+                    BBTrend = (lower - upper) / slow.Sma,
+                    Date = slow.Date
+                };
+            });
         }
     }
 }

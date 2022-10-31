@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using IBApi;
-using TradingBot.Broker.Orders;
+﻿using TradingBot.Broker;
 
 namespace TradingBot.Indicators
 {

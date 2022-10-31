@@ -8,7 +8,7 @@ namespace TradingBot.Strategies
     public interface IStrategy
     {
         IEnumerable<IIndicator> Indicators { get; }
-        void Update(Bar bar);
+        void ComputeIndicators(IEnumerable<Bar> bars);
         void Evaluate();
     }
 }

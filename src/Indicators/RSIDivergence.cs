@@ -1,44 +1,53 @@
 ﻿using System;
+using System.Linq;
+using System.Collections.Generic;
 using Skender.Stock.Indicators;
 using TradingBot.Broker.MarketData;
 using TradingBot.Utils;
 
 namespace TradingBot.Indicators
 {
-    internal class RSIDivergence : IIndicator
+    public class RsiDivergenceResult : ResultBase
     {
-        class RSIDivergenceResults : ResultBase
+        public double? RSIDivergence { get; set; }
+    }
+
+    public class RsiDivergence : IIndicator
+    {
+        Rsi _slowRsi;
+        Rsi _fastRsi;
+        IEnumerable<RsiDivergenceResult> _rsiDivergenceResults;
+
+        BarLength _barLength;
+
+        public RsiDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5)
         {
-            public double? RSIDivergence { get; set; }
+            _barLength = barLength;
+            _slowRsi = new Rsi(barLength, slowPeriod);
+            _fastRsi = new Rsi(barLength, fastPeriod);
         }
 
-        RSI _slowRsi;
-        RSI _fastRsi;
-        LinkedListWithMaxSize<(DateTime, double)> _values;
-
-        public RSIDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5)
-        {
-            _slowRsi = new RSI(barLength, slowPeriod);
-            _fastRsi = new RSI(barLength, fastPeriod);
-
-            _values = new LinkedListWithMaxSize<(DateTime, double)>(fastPeriod);
-        }
-
-        public double Value => _fastRsi.Value - _slowRsi.Value;
-        public bool IsReady => _slowRsi.IsReady && _fastRsi.IsReady;
-        public BarLength BarLength => _slowRsi.BarLength;
+        public RsiDivergenceResult LatestResult => _rsiDivergenceResults?.LastOrDefault();
+        public Rsi SlowRSI => _slowRsi;
+        public Rsi FastRSI => _fastRsi;
+        
+        public BarLength BarLength => _barLength;
+        public bool IsReady => LatestResult != null && _rsiDivergenceResults.Count() == NbWarmupPeriods;
         public int NbPeriods => _slowRsi.NbPeriods;
-        public int NbPeriodsWithConvergence => _slowRsi.NbPeriodsWithConvergence;
-        public Bar LatestBar => _fastRsi.Bars.Last.Value;
+        public int NbWarmupPeriods => _slowRsi.NbWarmupPeriods;
 
-        public RSI SlowRSI => _slowRsi;
-        public RSI FastRSI => _fastRsi;
-
-        public void Update(Bar bar)
+        public void Compute(IEnumerable<IQuote> quotes)
         {
-            _slowRsi.Update(bar);
-            _fastRsi.Update(bar);
-            _values.Add((bar.Time, Value));
+            _slowRsi.Compute(quotes);
+            _fastRsi.Compute(quotes);
+            _rsiDivergenceResults = _slowRsi.Results.Zip(_fastRsi.Results, (slow, fast) =>
+            {
+                return new RsiDivergenceResult()
+                {
+                    RSIDivergence = fast.Rsi - slow.Rsi,
+                    Date = fast.Date,
+                };
+            });
         }
     }
 }

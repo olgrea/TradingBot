@@ -43,7 +43,7 @@ namespace TradingBot.Strategies
 
             public override IState Evaluate()
             {
-                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close <= _strategy.BollingerBands_1Min.LowerBB)
+                if (_strategy.LatestBar.Close <= _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value)
                 {
                     if(_order == null)
                         _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
@@ -67,7 +67,7 @@ namespace TradingBot.Strategies
 
             public override IState Evaluate()
             {
-                if (_strategy.BollingerBands_1Min.Bars.Last.Value.Close >= _strategy.BollingerBands_1Min.UpperBB)
+                if (_strategy.LatestBar.Close >= _strategy.BollingerBands_1Min.LatestResult.UpperBand.Value)
                 {
                     if (_order == null)
                         _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
