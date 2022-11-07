@@ -187,6 +187,20 @@ namespace TradingBot.Broker.Client
             TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
+        public Action<int, Last> TickByTickAllLast;
+        public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
+        {
+            var last = new Last()
+            {
+                Price = price,
+                Size = size,
+                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
+            };
+
+            _logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
+            TickByTickAllLast?.Invoke(reqId, last);
+        }
+
         public Action<int, ContractDetails> ContractDetails;
         public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
         {
@@ -333,6 +347,20 @@ namespace TradingBot.Broker.Client
             _logger.Trace($"historicalTicksBidAsk");
         }
 
+        public Action<int, IEnumerable<Last>, bool> HistoricalTicksLast;
+        public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
+        {
+            IEnumerable<Last> lasts = ticks.Select(t => new Last()
+            {
+                Price = t.Price,
+                Size = Convert.ToInt32(t.Size),
+                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
+            });
+
+            HistoricalTicksLast?.Invoke(reqId, lasts, done);
+            _logger.Trace($"historicalTicksLast");
+        }
+
         public Action<long> CurrentTime;
         public void currentTime(long time)
         {
@@ -431,11 +459,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void historicalTicks(int reqId, HistoricalTick[] ticks, bool done)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
         {
             throw new NotImplementedException();
         }
@@ -541,11 +564,6 @@ namespace TradingBot.Broker.Client
         }
 
         public void symbolSamples(int reqId, ContractDescription[] contractDescriptions)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
             throw new NotImplementedException();
         }

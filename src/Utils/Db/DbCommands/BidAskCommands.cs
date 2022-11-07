@@ -47,13 +47,9 @@ namespace TradingBot.Utils.Db.DbCommands
 
         protected override void InsertMarketData(SqliteCommand command, BidAsk data)
         {
-            Insert(command, "Date", "Date", data.Time.Date.ToShortDateString());
-            Insert(command, "Time", "Time", data.Time.TimeOfDay.ToString());
-
             var columns = new string[] { "Bid", "BidSize", "Ask", "AskSize" };
             var values = new object[] { data.Bid, data.BidSize, data.Ask, data.AskSize };
             Insert(command, "BidAsk", columns, values);
-
             InsertFromSelect(command, data);
         }
 

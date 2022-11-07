@@ -38,6 +38,8 @@ namespace TradingBot.Broker
         Task<BidAsk> GetLatestBidAskAsync(Contract contract);
         void RequestBidAskUpdates(Contract contract);
         void CancelBidAskUpdates(Contract contract);
+        void RequestLastUpdates(Contract contract);
+        void CancelLastUpdates(Contract contract);
         void RequestBarsUpdates(Contract contract);
         void CancelBarsUpdates(Contract contract);
         
@@ -53,8 +55,8 @@ namespace TradingBot.Broker
         void RequestPositionsUpdates();
         void CancelPositionsUpdates();
 
-        Task<IEnumerable<Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count);
-        Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count);
+        Task<IEnumerable<Bar>> GetHistoricalBarsAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count);
+        Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(Contract contract, DateTime time, int count);
 
         Task<int> GetNextValidOrderIdAsync();
         Task<DateTime> GetCurrentTimeAsync();

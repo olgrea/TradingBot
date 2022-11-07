@@ -27,6 +27,7 @@ namespace TradingBot.Broker
 
         //TODO : remove all that "by Contract" stuff?
         public Dictionary<Contract, int> BidAsk { get; set; } = new Dictionary<Contract, int>();
+        public Dictionary<Contract, int> Last { get; set; } = new Dictionary<Contract, int>();
         public Dictionary<Contract, int> FiveSecBars { get; set; } = new Dictionary<Contract, int>();
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
     }
@@ -60,6 +61,7 @@ namespace TradingBot.Broker
         );
 
         public event Action<Contract, BidAsk> BidAskReceived;
+        public event Action<Contract, Last> LastReceived;
 
         public event Action<string, string, string, string> AccountValueUpdated
         {
@@ -416,7 +418,39 @@ namespace TradingBot.Broker
             var reqId = _subscriptions.BidAsk[contract];
             _subscriptions.BidAsk.Remove(contract);
             if (_subscriptions.BidAsk.Count == 0)
-                _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
+                _client.Callbacks.TickByTickBidAsk -= TickByTickBidAsk;
+
+            _client.CancelTickByTickData(reqId);
+        }
+
+        public void RequestLastUpdates(Contract contract)
+        {
+            if (_subscriptions.Last.ContainsKey(contract))
+                return;
+
+            int reqId = NextRequestId;
+            _subscriptions.Last[contract] = reqId;
+            if (_subscriptions.Last.Count == 1)
+                _client.Callbacks.TickByTickAllLast += TickByTickLast;
+
+            _client.RequestTickByTickData(reqId, contract, "Last");
+        }
+
+        void TickByTickLast(int reqId, Last last)
+        {
+            var contract = _subscriptions.Last.First(c => c.Value == reqId).Key;
+            LastReceived?.Invoke(contract, last);
+        }
+
+        public void CancelLastUpdates(Contract contract)
+        {
+            if (!_subscriptions.Last.ContainsKey(contract))
+                return;
+
+            var reqId = _subscriptions.Last[contract];
+            _subscriptions.Last.Remove(contract);
+            if (_subscriptions.Last.Count == 0)
+                _client.Callbacks.TickByTickAllLast-= TickByTickLast;
 
             _client.CancelTickByTickData(reqId);
         }
@@ -702,10 +736,10 @@ namespace TradingBot.Broker
 
         internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return await GetHistoricalDataAsync(contract, barLength, default(DateTime), count);   
+            return await GetHistoricalBarsAsync(contract, barLength, default(DateTime), count);   
         }
    
-        public Task<IEnumerable<Bar>> GetHistoricalDataAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
+        public Task<IEnumerable<Bar>> GetHistoricalBarsAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;
             var tmpList = new LinkedList<Bar>();
@@ -789,38 +823,64 @@ namespace TradingBot.Broker
             });
         }
 
-        public Task<IEnumerable<BidAsk>> RequestHistoricalTicks(Contract contract, DateTime time, int count)
+        public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(Contract contract, DateTime time, int count)
+        {
+            return GetHistoricalTicksAsync<BidAsk>(contract, time, count, "BID_ASK");
+        }
+        public Task<IEnumerable<Last>> GetHistoricalLastsAsync(Contract contract, DateTime time, int count)
+        {
+            return GetHistoricalTicksAsync<Last>(contract, time, count, "TRADES");
+        }
+
+        Task<IEnumerable<TData>> GetHistoricalTicksAsync<TData>(Contract contract, DateTime time, int count, string whatToShow) where TData : IMarketData, new()
         {
             var reqId = NextRequestId;
-            var tmpList = new LinkedList<BidAsk>();
+            var tmpList = new LinkedList<TData>();
 
-            var resolveResult = new TaskCompletionSource<IEnumerable<BidAsk>>();
-            var historicalTicksBidAsk = new Action<int, IEnumerable<BidAsk>, bool>((rId, bas, isDone) =>
+            var tcs = new TaskCompletionSource<IEnumerable<TData>>();
+            var historicalTicks = new Action<int, IEnumerable<TData>, bool>((rId, data, isDone) =>
             {
                 if (rId == reqId)
                 {
-                    _logger.Trace($"RequestHistoricalTicks - adding {bas.Count()} bidasks");
+                    _logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - adding {data.Count()}");
 
-                    foreach (var ba in bas)
+                    foreach (var ba in data)
                         tmpList.AddLast(ba);
 
                     if (isDone)
                     {
-                        _logger.Trace($"RequestHistoricalTicks - SetResult");
-                        resolveResult.SetResult(tmpList);
+                        _logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - SetResult");
+                        tcs.SetResult(tmpList);
                     }
                 }
             });
 
-            _client.Callbacks.HistoricalTicksBidAsk += historicalTicksBidAsk;
-            resolveResult.Task.ContinueWith(t =>
+            if (typeof(TData) == typeof(BidAsk))
             {
-                _client.Callbacks.HistoricalTicksBidAsk -= historicalTicksBidAsk;
-            });
+                Action<int, IEnumerable<BidAsk>, bool> callback = (Action<int, IEnumerable<BidAsk>, bool>)historicalTicks;
 
-            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+                _client.Callbacks.HistoricalTicksBidAsk += callback;
+                tcs.Task.ContinueWith(t =>
+                {
+                    _client.Callbacks.HistoricalTicksBidAsk -= callback;
+                });
+            }
+            else if (typeof(TData) == typeof(Last))
+            {
+                Action<int, IEnumerable<Last>, bool> callback = (Action<int, IEnumerable<Last>, bool>)historicalTicks;
 
-            return resolveResult.Task;
+                _client.Callbacks.HistoricalTicksLast += callback;
+                tcs.Task.ContinueWith(t =>
+                {
+                    _client.Callbacks.HistoricalTicksLast -= callback;
+                });
+            }
+            else
+                throw new NotImplementedException();
+
+            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, whatToShow, false, true);
+
+            return tcs.Task;
         }
 
         public Task<DateTime> GetCurrentTimeAsync()
