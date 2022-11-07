@@ -60,6 +60,9 @@ namespace HistoricalDataFetcherApp
             var bidAskCmdFactory = new BidAskCommandFactory();
             await Fetch(dataFetcher, contract, marketDays, bidAskCmdFactory);
 
+            var lastCmdFactory = new LastCommandFactory();
+            await Fetch(dataFetcher, contract, marketDays, lastCmdFactory);
+
             // TODO : fetch and store BarLength._1Day
 
             logger.Info($"\nComplete!\n");

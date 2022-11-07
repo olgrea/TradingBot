@@ -61,14 +61,14 @@ namespace TradingBot.Utils.MarketData
             DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
             DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
-            _logger?.Info($"Getting data for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+            _logger?.Info($"Getting {typeof(TData).Name}s for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             // In order to respect TWS limitationsm, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
             // time range to the beginning. 
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
             IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
-            while (current >= morning)
+            while (current > morning)
             {
                 var begin = current.AddMinutes(-30);
                 var end = current;
@@ -80,7 +80,7 @@ namespace TradingBot.Utils.MarketData
                     var selectCmd = commandFactory.CreateSelectCommand(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                     data = selectCmd.Execute();
                     var dateStr = current.Date.ToShortDateString();
-                    _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
+                    _logger?.Info($"{typeof(TData).Name}s for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                 }
                 else
                 {
@@ -141,7 +141,7 @@ namespace TradingBot.Utils.MarketData
             return data;
         }
 
-        bool IsPossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData, new()
+        bool IsPossibleMarketHoliday<TData>(DateTime time, IEnumerable<TData> data) where TData : IMarketData
         {
             // TODO : better way to know if the market was opened or not?
             // On market holidays, TWS seems to return the bars of the previous trading day.
@@ -153,24 +153,32 @@ namespace TradingBot.Utils.MarketData
         {
             if (typeof(TData) == typeof(Bar))
             {
-                return await FetchBars<TData>(contract, time);
+                var bars = await FetchBars(contract, time);
+                return bars.Cast<TData>();
             }
             else if (typeof(TData) == typeof(BidAsk))
             {
-                return await FetchBidAsk<TData>(contract, time);
+                var ba = await FetchTickData<BidAsk>(contract, time);
+                return ba.Cast<TData>();
             }
-
-            return new LinkedList<TData>();
+            else if (typeof(TData) == typeof(Last))
+            {
+                var last = await FetchTickData<Last>(contract, time);
+                return last.Cast<TData>();
+            }
+            else throw new NotImplementedException();
         }
 
-        private async Task<IEnumerable<TData>> FetchBidAsk<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+        private async Task<IEnumerable<TData>> FetchTickData<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
         {
-            _logger?.Info($"Retrieving bid ask from TWS for '{contract.Symbol} {time}'.");
+            var type = typeof(TData);
+
+            _logger?.Info($"Retrieving {type.Name} from TWS for '{contract.Symbol} {time}'.");
 
             // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
             // There doesn't seem to be a way to convert ticks to seconds...
             // So we just do requests as long as we don't have 30 minutes.
-            IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
+            IEnumerable<IMarketData> tickData = Enumerable.Empty<IMarketData>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
             //TimeSpan _20min = TimeSpan.FromMinutes(20);
@@ -182,38 +190,42 @@ namespace TradingBot.Utils.MarketData
                 //if(diff > _20min)
                 //    tickCount = 100;
 
-                var ticks = await _broker.RequestHistoricalTicks(contract, current, tickCount);
+                IEnumerable<IMarketData> ticks = null;
+                if (typeof(TData) == typeof(BidAsk))
+                {
+                    ticks = await _broker.GetHistoricalBidAsksAsync(contract, current, tickCount);
+                    
+                    // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
+                    NbRequest++;
 
-                // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
-                NbRequest++; NbRequest++;
+                }
+                else if (typeof(TData) == typeof(Last))
+                {
+                    ticks = await _broker.GetHistoricalLastsAsync(contract, current, tickCount);
+                }
+
+                NbRequest++;
                 if (IsPossibleMarketHoliday(current, ticks))
-                    return new LinkedList<TData>();
+                    return Enumerable.Empty<TData>();
 
-                bidask = ticks.Concat(bidask);
+                tickData = ticks.Concat(tickData);
                 current = ticks.First().Time;
 
                 diff = time - current;
             }
 
             // Remove out of range data.
-            var list = new LinkedList<TData>(bidask.Cast<TData>());
-            var currNode = list.First;
-            var timeOfDay = (time - _30min).TimeOfDay;
-            while (currNode != null && currNode.Value.Time.TimeOfDay < timeOfDay)
-            {
-                list.RemoveFirst();
-                currNode = list.First;
-            }
 
-            return list;
+            var timeOfDay = (time - _30min).TimeOfDay;
+            return tickData.SkipWhile(d => d.Time.TimeOfDay < timeOfDay).Cast<TData>();
         }
 
-        private async Task<IEnumerable<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+        private async Task<IEnumerable<Bar>> FetchBars(Contract contract, DateTime time)
         {
             _logger?.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
-            var bars = await _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800);
+            var bars = await _broker.GetHistoricalBarsAsync(contract, BarLength._1Sec, time, 1800);
             NbRequest++;
-            return bars.Cast<TData>();
+            return bars;
         }
     }
 }

@@ -304,7 +304,7 @@ namespace TradingBot.Utils.MarketData
                     //if(diff > _20min)
                     //    tickCount = 100;
 
-                    var ticks = await _broker.RequestHistoricalTicks(contract, current, tickCount);
+                    var ticks = await _broker.GetHistoricalBidAsksAsync(contract, current, tickCount);
 
                     // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
                     NbRequest++; NbRequest++;
@@ -333,7 +333,7 @@ namespace TradingBot.Utils.MarketData
             private async Task<IEnumerable<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
             {
                 _logger?.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
-                var bars = await _broker.GetHistoricalDataAsync(contract, BarLength._1Sec, time, 1800);
+                var bars = await _broker.GetHistoricalBarsAsync(contract, BarLength._1Sec, time, 1800);
                 NbRequest++;
                 return bars.Cast<TData>();
             }
