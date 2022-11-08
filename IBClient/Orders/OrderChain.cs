@@ -2,7 +2,7 @@
 
 namespace InteractiveBrokers.Orders
 {
-    internal class OrderChain
+    public class OrderChain
     {
         public OrderChain(Order order, List<OrderChain> attachedOrders = null)
         {

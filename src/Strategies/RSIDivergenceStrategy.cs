@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
-using MathNet.Numerics;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Orders;
 
 namespace TradingBot.Strategies
 {
@@ -209,7 +208,7 @@ namespace TradingBot.Strategies
 
                     var previousStop = stopOrder.StopPrice;
                     var nextStop = Math.Max(previousStop, stop);
-                    if (!nextStop.AlmostEqual(previousStop, 2) && !IsCancelled(stopOrder) && !IsExecuted(stopOrder, out _))
+                    if (nextStop != previousStop && !IsCancelled(stopOrder) && !IsExecuted(stopOrder, out _))
                     {
                         stopOrder.StopPrice = nextStop;
                         ModifyOrder(_strategy.StopOrder);
@@ -219,7 +218,7 @@ namespace TradingBot.Strategies
                     var previousTouch = marketIfTouchedOrder.TouchPrice;
                     var nextTouch = _strategy.BollingerBands_1Min.LatestResult.Sma.Value;
 
-                    if (!nextTouch.AlmostEqual(previousTouch, 2))
+                    if (nextTouch != previousTouch)
                     {
                         marketIfTouchedOrder.TouchPrice = nextTouch;
                         ModifyOrder(_strategy.MITOrder);
@@ -270,7 +269,7 @@ namespace TradingBot.Strategies
 
                     var previousStop = stopOrder.StopPrice;
                     var nextStop = Math.Max(stop, previousStop);
-                    if (!nextStop.AlmostEqual(previousStop, 2))
+                    if (nextStop != previousStop)
                     {
                         stopOrder.StopPrice = nextStop;
                         ModifyOrder(_strategy.StopOrder);
@@ -279,7 +278,7 @@ namespace TradingBot.Strategies
                     MarketIfTouchedOrder marketIfTouchedOrder = (_strategy.MITOrder as MarketIfTouchedOrder);
                     var previousTouch = marketIfTouchedOrder.TouchPrice;
                     var nextTouch = _strategy.BollingerBands_1Min.LatestResult.UpperBand.Value;
-                    if (!nextTouch.AlmostEqual(previousTouch, 2))
+                    if (nextTouch != previousTouch)
                     {
                         marketIfTouchedOrder.TouchPrice = nextTouch;
                         ModifyOrder(_strategy.MITOrder);
@@ -345,7 +344,7 @@ namespace TradingBot.Strategies
 
                     var previousStop = stopOrder.StopPrice;
                     var nextStop = Math.Max(stop, previousStop);
-                    if (!nextStop.AlmostEqual(previousStop, 2))
+                    if (nextStop != previousStop)
                     {
                         stopOrder.StopPrice = nextStop;
                         ModifyOrder(_strategy.StopOrder);

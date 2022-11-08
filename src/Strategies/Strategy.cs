@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
-using TradingBot.Broker;
-using TradingBot.Broker.Orders;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Orders;
 
 namespace TradingBot.Strategies
 {
@@ -108,7 +105,7 @@ namespace TradingBot.Strategies
             LatestBar = bars.Last();
             foreach (var indicator in _indicators[LatestBar.BarLength])
             {
-                indicator.Compute(bars);
+                indicator.Compute(bars.Cast<BarQuote>());
             }
         }
     }

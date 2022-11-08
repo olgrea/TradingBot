@@ -1,6 +1,6 @@
 ﻿using System.Linq;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Orders;
 using TradingBot.Indicators;
 
 namespace TradingBot.Strategies

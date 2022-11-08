@@ -3,7 +3,7 @@
 namespace InteractiveBrokers.Accounts
 {
     //TODO : is this class really necessary?
-    internal class PnL
+    public class PnL
     {
         public Contract Contract { get; set; }
         public double PositionAmount { get; set; }

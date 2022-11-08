@@ -5,8 +5,9 @@ using System.Diagnostics;
 using NLog;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
-using TradingBot.Broker;
-using TradingBot.Broker.Orders;
+using InteractiveBrokers.Orders;
+using InteractiveBrokers;
+using InteractiveBrokers.Contracts;
 
 namespace TradingBot
 {
@@ -14,7 +15,7 @@ namespace TradingBot
     internal class OrderManager
     {
         ILogger _logger;
-        IBBroker _broker;
+        IBClient _broker;
 
         ConcurrentDictionary<int, Order> _ordersRequested = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
@@ -23,7 +24,7 @@ namespace TradingBot
         ConcurrentDictionary<int, Order> _ordersCancelled = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<string, OrderExecution> _executions = new ConcurrentDictionary<string, OrderExecution>();
 
-        public OrderManager(IBBroker broker, ILogger logger)
+        public OrderManager(IBClient broker, ILogger logger)
         {
             _logger = logger;
             _broker = broker;

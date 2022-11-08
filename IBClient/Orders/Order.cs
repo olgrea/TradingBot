@@ -59,12 +59,12 @@ namespace InteractiveBrokers.Orders
         }
     }
 
-    internal class MarketOrder : Order
+    public class MarketOrder : Order
     {
         public MarketOrder() : base("MKT") { }
     }
 
-    internal class MarketIfTouchedOrder : Order
+    public class MarketIfTouchedOrder : Order
     {
         public MarketIfTouchedOrder() : base("MIT") { }
         public double TouchPrice { get; set; }
@@ -75,7 +75,7 @@ namespace InteractiveBrokers.Orders
         }
     }
 
-    internal class LimitOrder : Order
+    public class LimitOrder : Order
     {
         public LimitOrder() : base("LMT") { }
         public double LmtPrice { get; set; }
@@ -86,7 +86,7 @@ namespace InteractiveBrokers.Orders
         }
     }
 
-    internal class StopOrder : Order
+    public class StopOrder : Order
     {
         public StopOrder() : base("STP") { }
         public double StopPrice { get; set; }
@@ -97,7 +97,7 @@ namespace InteractiveBrokers.Orders
         }
     }
 
-    internal class TrailingStopOrder : Order
+    public class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
         internal double StopPrice { get; set; } = double.MaxValue;

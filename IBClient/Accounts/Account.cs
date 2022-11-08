@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace InteractiveBrokers.Accounts
 {
-    internal class Account
+    public class Account
     {
         public string Code { get; set; }
         public DateTime Time { get; set; }
