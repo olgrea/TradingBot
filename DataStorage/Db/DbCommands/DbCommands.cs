@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Linq;
+using InteractiveBrokers.MarketData;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
 
-namespace TradingBot.Utils.Db.DbCommands
+namespace DataStorage.Db.DbCommands
 {
     public abstract class DbCommand<TResult>
     {

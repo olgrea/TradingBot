@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using DataStorage.Db.DbCommands;
+using InteractiveBrokers.MarketData;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils.Db.DbCommands;
 
-namespace TradingBot.Utils.Db.DbCommandFactories
+namespace DataStorage.Db.DbCommandFactories
 {
     public abstract class DbCommandFactory<TMarketData> where TMarketData : IMarketData, new()
     {
@@ -12,9 +12,9 @@ namespace TradingBot.Utils.Db.DbCommandFactories
 
         protected DbCommandFactory(SqliteConnection connection = null)
         {
-            if(connection == null)
+            if (connection == null)
             {
-                connection = new SqliteConnection(DbUtils.DbConnectionString);
+                connection = new SqliteConnection(Constants.DbConnectionString);
                 connection.Open();
             }
 

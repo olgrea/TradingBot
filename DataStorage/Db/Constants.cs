@@ -1,6 +1,6 @@
-﻿namespace TradingBot.Utils.Db
+﻿namespace DataStorage.Db
 {
-    public static class DbUtils
+    public static class Constants
     {
         public const string DbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
         public const string DbConnectionString = "Data Source=" + DbPath;

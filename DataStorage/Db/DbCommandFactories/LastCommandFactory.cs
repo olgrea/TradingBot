@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using DataStorage.Db.DbCommands;
+using InteractiveBrokers.MarketData;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils.Db.DbCommands;
-using TradingBot.Utils.MarketData;
 
-namespace TradingBot.Utils.Db.DbCommandFactories
+namespace DataStorage.Db.DbCommandFactories
 {
     public class LastCommandFactory : DbCommandFactory<Last>
     {
@@ -15,7 +14,7 @@ namespace TradingBot.Utils.Db.DbCommandFactories
 
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
         {
-            return new LastExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
+            return new LastExistsCommand(symbol, date, Utils.MarketDayTimeRange, _connection);
         }
 
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
@@ -25,7 +24,7 @@ namespace TradingBot.Utils.Db.DbCommandFactories
 
         public override DbCommand<IEnumerable<Last>> CreateSelectCommand(string symbol, DateTime date)
         {
-            return new SelectLastsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
+            return new SelectLastsCommand(symbol, date, Utils.MarketDayTimeRange, _connection);
         }
 
         public override DbCommand<IEnumerable<Last>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)

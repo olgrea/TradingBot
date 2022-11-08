@@ -13,9 +13,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataFetcher", "Hi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBClient.Tests", "IBClient.Tests\IBClient.Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IBClient", "IBClient\IBClient.csproj", "{3966C751-61BF-4847-8DAB-BC0F778DDBD8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBClient", "IBClient\IBClient.csproj", "{3966C751-61BF-4847-8DAB-BC0F778DDBD8}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataStorage", "DataStorage\DataStorage.csproj", "{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,10 @@ Global
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
