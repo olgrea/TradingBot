@@ -31,7 +31,7 @@ namespace HistoricalDataFetcherApp
         public IBClient _client;
         public ILogger _logger;
 
-        internal class FetcherErrorHandler : IBBrokerErrorHandler
+        internal class FetcherErrorHandler : IBClientErrorHandler
         {
             HistoricalDataFetcher _fetcher;
             public FetcherErrorHandler(HistoricalDataFetcher fetcher, IBClient client, ILogger logger) : base(client, logger)
@@ -55,6 +55,8 @@ namespace HistoricalDataFetcherApp
         {
             _client = client ?? new IBClient(321);
             _logger = logger;
+
+            _client.ErrorHandler = new FetcherErrorHandler(this, _client, _logger);
         }
 
         public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()

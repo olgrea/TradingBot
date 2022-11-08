@@ -14,7 +14,7 @@ using InteractiveBrokers.Messages;
 using InteractiveBrokers.Orders;
 using NLog;
 
-[assembly: InternalsVisibleTo("HistoricalDataFetcher")]
+[assembly: InternalsVisibleTo("Backtester")]
 [assembly: InternalsVisibleTo("IBClient.Tests")]
 [assembly: Fody.ConfigureAwait(false)]
 
@@ -898,6 +898,34 @@ namespace InteractiveBrokers
             _logger.Debug("Requesting current time");
             _socket.RequestCurrentTime();
             return tcs.Task;
+        }
+    }
+
+    public class IBClientErrorHandler : DefaultErrorHandler
+    {
+        IBClient _client;
+        public IBClientErrorHandler(IBClient client, ILogger logger) : base(logger)
+        {
+            _client = client;
+        }
+
+        public override bool IsHandled(ErrorMessageException msg)
+        {
+            switch (msg.ErrorCode)
+            {
+                //case 1011: // Connectivity between IB and TWS has been restored- data lost.*
+                //    RestoreSubscriptions();
+                //    break;
+
+                default:
+                    return base.IsHandled(msg);
+            }
+        }
+
+        void RestoreSubscriptions()
+        {
+            // TODO : RestoreSubscriptions
+            var subs = _client.Subscriptions;
         }
     }
 }
