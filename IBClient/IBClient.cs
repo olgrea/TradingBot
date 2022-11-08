@@ -15,7 +15,7 @@ using InteractiveBrokers.Orders;
 using NLog;
 
 [assembly: InternalsVisibleTo("HistoricalDataFetcher")]
-[assembly: InternalsVisibleTo("Tests")]
+[assembly: InternalsVisibleTo("IBClient.Tests")]
 [assembly: Fody.ConfigureAwait(false)]
 
 namespace InteractiveBrokers

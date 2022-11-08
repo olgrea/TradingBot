@@ -3,30 +3,31 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using TradingBot.Broker;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.Orders;
-using TradingBot.Utils.MarketData;
+using InteractiveBrokers;
+using InteractiveBrokers.Messages;
+using InteractiveBrokers.Orders;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Contracts;
 
 namespace Tests.Broker
 {
     [TestFixture]
-    internal class IBBrokerTests
+    internal class IBClientTests
     {
-        protected IBBroker _broker;
+        protected IBClient _client;
         protected ConnectResult _connectMessage;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _broker = new IBBroker(191919);
+            _client = new IBClient(191919);
             await Task.CompletedTask;
         }
 
         [SetUp]
         public virtual async Task SetUp()
         {
-            _connectMessage = await _broker.ConnectAsync();
+            _connectMessage = await _client.ConnectAsync();
             await Task.Delay(50);
             Assert.IsTrue(_connectMessage.AccountCode == "DU5962304");
         }
@@ -34,9 +35,9 @@ namespace Tests.Broker
         [TearDown]
         public async Task TearDown()
         {
-            _broker.CancelAllOrders();
+            _client.CancelAllOrders();
             await Task.Delay(50);
-            await _broker.DisconnectAsync();
+            await _client.DisconnectAsync();
             await Task.Delay(50);
         }
 
@@ -44,11 +45,11 @@ namespace Tests.Broker
         public async Task ConnectAsync_OnSuccess_ReturnsRelevantConnectionInfo()
         {
             // Setup
-            await _broker.DisconnectAsync();
+            await _client.DisconnectAsync();
             await Task.Delay(50);
 
             // Test
-            var msg = await _broker.ConnectAsync();
+            var msg = await _client.ConnectAsync();
 
             // Assert
             Assert.IsNotNull(msg);
@@ -60,23 +61,23 @@ namespace Tests.Broker
         public async Task ConnectAsync_AlreadyConnected_ThrowsError()
         {
             // Setup
-            await _broker.DisconnectAsync();
+            await _client.DisconnectAsync();
             await Task.Delay(50);
-            await _broker.ConnectAsync();
+            await _client.ConnectAsync();
             
             // Test
-            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.ConnectAsync()); 
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _client.ConnectAsync()); 
         }
 
         [Test]
         public async Task ConnectAsync_CanBeCancelled()
         {
             // Setup
-            await _broker.DisconnectAsync();
+            await _client.DisconnectAsync();
             await Task.Delay(50);
 
             // Test
-            Assert.ThrowsAsync<TimeoutException>(async () => await _broker.ConnectAsync(new CancellationToken(true)));
+            Assert.ThrowsAsync<TimeoutException>(async () => await _client.ConnectAsync(new CancellationToken(true)));
         }
 
         [Test]
@@ -86,18 +87,18 @@ namespace Tests.Broker
             string accountReceived = null;
             var tcs = new TaskCompletionSource<string>();
             var callback = new Action<string, string, string, string>( (key, value, currency, acc) => tcs.SetResult(acc));
-            _broker.AccountValueUpdated += callback;
+            _client.AccountValueUpdated += callback;
 
             // Test
             try
             {
-                _broker.RequestAccountUpdates(_connectMessage.AccountCode);
+                _client.RequestAccountUpdates(_connectMessage.AccountCode);
                 accountReceived = await tcs.Task;
             }
             finally
             {
-                _broker.CancelAccountUpdates(_connectMessage.AccountCode);
-                _broker.AccountValueUpdated -= callback;
+                _client.CancelAccountUpdates(_connectMessage.AccountCode);
+                _client.AccountValueUpdated -= callback;
             }
 
             // Assert
@@ -108,7 +109,7 @@ namespace Tests.Broker
         public async Task GetNextValidIdAsync_ReturnsId()
         {
             // Test
-            var id = await _broker.GetNextValidOrderIdAsync();
+            var id = await _client.GetNextValidOrderIdAsync();
             Assert.IsTrue(id > 0);
         }
 
@@ -119,7 +120,7 @@ namespace Tests.Broker
             var dummy = MakeDummyContract("GME");
 
             // Test
-            var details = await _broker.GetContractDetailsAsync(dummy);
+            var details = await _client.GetContractDetailsAsync(dummy);
 
             // Assert
             Assert.NotNull(details);
@@ -139,7 +140,7 @@ namespace Tests.Broker
             var dummy = MakeDummyContract("GMEdasdafafsafaf");
 
             // Test
-            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.GetContractDetailsAsync(dummy));
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _client.GetContractDetailsAsync(dummy));
             await Task.CompletedTask;
         }
 
@@ -151,25 +152,25 @@ namespace Tests.Broker
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
 
             // Test
-            Assert.ThrowsAsync<ArgumentException>(async () => await _broker.PlaceOrderAsync(contract, order));
+            Assert.ThrowsAsync<ArgumentException>(async () => await _client.PlaceOrderAsync(contract, order));
         }
 
         [Test]
         public async Task PlaceOrder_WithValidOrderParams_ShouldSucceed()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!Utils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
             var dummy = MakeDummyContract("GME");
-            var details = await _broker.GetContractDetailsAsync(dummy);
+            var details = await _client.GetContractDetailsAsync(dummy);
             var contract = details.First().Contract;
 
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty, LmtPrice = 5 };
-            order.Id = await _broker.GetNextValidOrderIdAsync();
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
-            OrderResult result = await _broker.PlaceOrderAsync(contract, order);
+            OrderResult result = await _client.PlaceOrderAsync(contract, order);
 
             // Assert
             var orderPlacedResult = result as OrderPlacedResult;
@@ -182,16 +183,16 @@ namespace Tests.Broker
         [Test]
         public async Task PlaceOrder_WithMarketOrderFilledInstantly_ShouldSucceed()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!Utils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
             var contract = await GetContractAsync("GME");
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty };
-            order.Id = await _broker.GetNextValidOrderIdAsync();
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
-            var result = await _broker.PlaceOrderAsync(contract, order);
+            var result = await _client.PlaceOrderAsync(contract, order);
 
             // Assert
             if(result is OrderPlacedResult opr)
@@ -213,17 +214,17 @@ namespace Tests.Broker
         [Test]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!Utils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
             var contract = await GetContractAsync("GME");
-            var account = await _broker.GetAccountAsync(_connectMessage.AccountCode);
-            var bidAsk = await _broker.GetLatestBidAskAsync(contract);
+            var account = await _client.GetAccountAsync(_connectMessage.AccountCode);
+            var bidAsk = await _client.GetLatestBidAskAsync(contract);
             var qty = (int)Math.Round(account.CashBalances["BASE"] / bidAsk.Ask + 500);
 
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty};
-            order.Id = await _broker.GetNextValidOrderIdAsync();
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
             // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync() ?? related to ConfigureAwait() maybe ?
@@ -232,7 +233,7 @@ namespace Tests.Broker
             OrderResult result = null;
             try
             {
-                result = await _broker.PlaceOrderAsync(contract, order);
+                result = await _client.PlaceOrderAsync(contract, order);
             }
             catch (Exception e)
             {
@@ -251,7 +252,7 @@ namespace Tests.Broker
         // TODO : enforce disallowing of stock shorting in Trader
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!Utils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
@@ -262,14 +263,14 @@ namespace Tests.Broker
             Assert.IsTrue(buyOrderResult?.OrderState.Status == Status.PreSubmitted || buyOrderResult?.OrderState.Status == Status.Submitted);
 
             var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 10 };
-            sellOrder.Id = await _broker.GetNextValidOrderIdAsync();
+            sellOrder.Id = await _client.GetNextValidOrderIdAsync();
 
             // Test
             Exception ex = null;
             OrderResult sellOrderResult = null;
             try
             {
-                sellOrderResult = await _broker.PlaceOrderAsync(contract, sellOrder);
+                sellOrderResult = await _client.PlaceOrderAsync(contract, sellOrder);
             }
             catch (Exception e)
             {
@@ -294,7 +295,7 @@ namespace Tests.Broker
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            OrderStatus orderStatus = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
+            OrderStatus orderStatus = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
 
             // Assert
             Assert.NotNull(orderStatus);
@@ -312,7 +313,7 @@ namespace Tests.Broker
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            OrderStatus orderStatus = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
+            OrderStatus orderStatus = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
             Assert.NotNull(orderStatus);
             Assert.IsTrue(orderStatus.Status == Status.Cancelled);
 
@@ -323,7 +324,7 @@ namespace Tests.Broker
             OrderStatus os2 = null;
             try
             {
-                os2 = await _broker.CancelOrderAsync(openOrderMsg.Order.Id);
+                os2 = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
             }
             catch (Exception e)
             {
@@ -349,8 +350,8 @@ namespace Tests.Broker
         async Task<OrderPlacedResult> PlaceDummyOrderAsync(Order order)
         {
             var contract = await GetContractAsync("GME");
-            order.Id = await _broker.GetNextValidOrderIdAsync();
-            var result = await _broker.PlaceOrderAsync(contract, order);
+            order.Id = await _client.GetNextValidOrderIdAsync();
+            var result = await _client.PlaceOrderAsync(contract, order);
             return result as OrderPlacedResult;
         }
 
@@ -359,7 +360,7 @@ namespace Tests.Broker
         async Task<Contract> GetContractAsync(string symbol)
         {
             var dummy = MakeDummyContract(symbol);
-            var details = await _broker.GetContractDetailsAsync(dummy);
+            var details = await _client.GetContractDetailsAsync(dummy);
             return details.First().Contract;
         }
     }
