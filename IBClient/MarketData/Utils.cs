@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace InteractiveBrokers.MarketData
 {
-    internal static class Utils
+    public static class Utils
     {
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);

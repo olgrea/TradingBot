@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
+using InteractiveBrokers.MarketData;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
 
-namespace TradingBot.Utils.Db.DbCommands
+namespace DataStorage.Db.DbCommands
 {
     internal class BidAskExistsCommand : ExistsCommand<BidAsk>
     {

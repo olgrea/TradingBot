@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
@@ -10,6 +10,11 @@
     <Compile Remove="testdata\**" />
     <EmbeddedResource Remove="testdata\**" />
     <None Remove="testdata\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="BacktestingIBClientTests.cs" />
+    <Compile Remove="FakeSocketTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
