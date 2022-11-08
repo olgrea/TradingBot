@@ -1,6 +1,6 @@
-﻿using IBClient.Contracts;
+﻿using InteractiveBrokers.Contracts;
 
-namespace IBClient.Accounts
+namespace InteractiveBrokers.Accounts
 {
     //TODO : is this class really necessary?
     internal class PnL

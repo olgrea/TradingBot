@@ -1,4 +1,4 @@
-﻿namespace IBClient.Messages
+﻿namespace InteractiveBrokers.Messages
 {
     internal class ConnectResult
     {

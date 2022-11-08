@@ -1,7 +1,7 @@
-﻿using IBClient.Orders;
-using IBClient.Contracts;
+﻿using InteractiveBrokers.Orders;
+using InteractiveBrokers.Contracts;
 
-namespace IBClient.Backend
+namespace InteractiveBrokers.Backend
 {
     internal interface IIBSocket
     {

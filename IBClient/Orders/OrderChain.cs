@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace IBClient.Orders
+namespace InteractiveBrokers.Orders
 {
     internal class OrderChain
     {

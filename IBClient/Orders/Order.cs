@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace IBClient.Orders
+namespace InteractiveBrokers.Orders
 {
     public enum OrderAction
     {
