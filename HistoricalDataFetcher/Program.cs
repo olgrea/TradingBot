@@ -9,7 +9,6 @@ using InteractiveBrokers;
 using InteractiveBrokers.Contracts;
 using InteractiveBrokers.MarketData;
 using NLog;
-using static HistoricalDataFetcherApp.HistoricalDataFetcher;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace HistoricalDataFetcherApp
@@ -43,13 +42,12 @@ namespace HistoricalDataFetcherApp
 
         public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate)
         {
-            var broker = new IBClient(321);
+            var client = new IBClient(321);
             var logger = LogManager.GetLogger($"{nameof(HistoricalDataFetcher)}");
-            var dataFetcher = new HistoricalDataFetcher(broker, logger);
-            broker.ErrorHandler = new HistoricalDataFetcher.FetcherErrorHandler(dataFetcher, broker, logger);
+            var dataFetcher = new HistoricalDataFetcher(client, logger);
 
-            await broker.ConnectAsync();
-            var contract = await broker.GetContractAsync(ticker);
+            await client.ConnectAsync();
+            var contract = await client.GetContractAsync(ticker);
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
@@ -75,7 +73,7 @@ namespace HistoricalDataFetcherApp
             {
                 try
                 {
-                    await dataFetcher.GetDataForDay<TMarketData>(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, cmdFactory);
+                    await dataFetcher.GetDataForDay(pair.Item1.Date, (pair.Item1.TimeOfDay, pair.Item2.TimeOfDay), contract, cmdFactory);
                 }
                 catch (MarketHolidayException) { break; }
             }

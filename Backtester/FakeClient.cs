@@ -6,14 +6,14 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using InteractiveBrokers;
+using InteractiveBrokers.Accounts;
+using InteractiveBrokers.Backend;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Messages;
+using InteractiveBrokers.Orders;
 using NLog;
-using TradingBot.Broker;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Utils.MarketData;
 
 namespace Backtester
 {
@@ -30,18 +30,18 @@ namespace Backtester
 
             async Task<Contract> FetchContract(string symbol)
             {
-                var broker = new IBBroker();
-                await broker.ConnectAsync();
+                var client = new IBClient();
+                await client.ConnectAsync();
                 await Task.Delay(50);
-                var contract = await broker.GetContractAsync(symbol);
-                await broker.DisconnectAsync();
+                var contract = await client.GetContractAsync(symbol);
+                await client.DisconnectAsync();
                 await Task.Delay(50);
                 return contract;
             }
         }
     }
 
-    internal class FakeClient : IIBClient
+    internal class FakeClient : IIBSocket
     {
         /// <summary>
         /// For market hours 7:00 to 16:00 : 9 hours = 32400s
@@ -725,7 +725,7 @@ namespace Backtester
                     current = current.Next;
                 }
 
-                var b = MarketDataUtils.MakeBar(list, BarLength._5Sec);
+                var b = Utils.MakeBar(list, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }

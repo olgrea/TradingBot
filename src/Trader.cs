@@ -17,7 +17,9 @@ using DataStorage.Db.DbCommandFactories;
 using HistoricalDataFetcherApp;
 using TradingBot.Utils;
 using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
+using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Backtester")]
 [assembly: Fody.ConfigureAwait(false)]
 
 namespace TradingBot

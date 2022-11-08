@@ -57,32 +57,4 @@ namespace InteractiveBrokers.Backend
         //    code == 10090 ||
         //    (code >= 10148 && code <= 10284);
     }
-
-    internal class IBBrokerErrorHandler : DefaultErrorHandler
-    {
-        IBClient _client;
-        public IBBrokerErrorHandler(IBClient client, ILogger logger) : base(logger)
-        {
-            _client = client;
-        }
-
-        public override bool IsHandled(ErrorMessageException msg)
-        {
-            switch (msg.ErrorCode)
-            {
-                //case 1011: // Connectivity between IB and TWS has been restored- data lost.*
-                //    RestoreSubscriptions();
-                //    break;
-
-                default:
-                    return base.IsHandled(msg);
-            }
-        }
-
-        void RestoreSubscriptions()
-        {
-            // TODO : RestoreSubscriptions
-            var subs = _client.Subscriptions;
-        }
-    }
 }
