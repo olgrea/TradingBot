@@ -1,7 +1,7 @@
-﻿using IBClient.Contracts;
-using IBClient.Orders;
+﻿using InteractiveBrokers.Contracts;
+using InteractiveBrokers.Orders;
 
-namespace IBClient.Messages
+namespace InteractiveBrokers.Messages
 {
     internal abstract class OrderResult
     {

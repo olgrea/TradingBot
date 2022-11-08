@@ -3,10 +3,10 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using IBApi;
 using NLog;
-using Contract = IBClient.Contracts.Contract;
+using Contract = InteractiveBrokers.Contracts.Contract;
 
 [assembly: InternalsVisibleTo("Tests")]
-namespace IBClient.Backend
+namespace InteractiveBrokers.Backend
 {
     internal class IBSocket : IIBSocket
     {

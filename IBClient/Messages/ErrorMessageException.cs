@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IBClient.Messages
+namespace InteractiveBrokers.Messages
 {
     internal class ErrorMessageException : Exception
     {

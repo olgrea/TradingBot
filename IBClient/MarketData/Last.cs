@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace IBClient.MarketData
+namespace InteractiveBrokers.MarketData
 {
     public class Last : IMarketData
     {

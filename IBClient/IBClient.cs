@@ -6,19 +6,19 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using IBClient.Accounts;
-using IBClient.Backend;
-using IBClient.Contracts;
-using IBClient.MarketData;
-using IBClient.Messages;
-using IBClient.Orders;
+using InteractiveBrokers.Accounts;
+using InteractiveBrokers.Backend;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Messages;
+using InteractiveBrokers.Orders;
 using NLog;
 
 [assembly: InternalsVisibleTo("HistoricalDataFetcher")]
 [assembly: InternalsVisibleTo("Tests")]
 [assembly: Fody.ConfigureAwait(false)]
 
-namespace IBClient
+namespace InteractiveBrokers
 {
     internal class DataSubscriptions
     {

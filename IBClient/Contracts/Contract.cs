@@ -1,4 +1,4 @@
-﻿namespace IBClient.Contracts
+﻿namespace InteractiveBrokers.Contracts
 {
     internal enum OptionType
     {

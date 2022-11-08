@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Globalization;
-using IBClient.Contracts;
-using IBClient.Orders;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.Orders;
 
-namespace IBClient.Backend
+namespace InteractiveBrokers.Backend
 {
     internal static class Conversions
     {

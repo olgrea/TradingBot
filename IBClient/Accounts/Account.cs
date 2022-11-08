@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IBClient.Accounts
+namespace InteractiveBrokers.Accounts
 {
     internal class Account
     {

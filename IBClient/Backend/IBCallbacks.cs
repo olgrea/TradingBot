@@ -3,18 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using IBApi;
-using IBClient.Accounts;
-using IBClient.Contracts;
-using IBClient.MarketData;
-using IBClient.Messages;
-using IBClient.Orders;
-using Contract = IBClient.Contracts.Contract;
-using ContractDetails = IBClient.Contracts.ContractDetails;
+using InteractiveBrokers.Accounts;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Messages;
+using InteractiveBrokers.Orders;
+using Contract = InteractiveBrokers.Contracts.Contract;
+using ContractDetails = InteractiveBrokers.Contracts.ContractDetails;
 using ILogger = NLog.ILogger;
-using Order = IBClient.Orders.Order;
-using OrderState = IBClient.Orders.OrderState;
+using Order = InteractiveBrokers.Orders.Order;
+using OrderState = InteractiveBrokers.Orders.OrderState;
 
-namespace IBClient.Backend
+namespace InteractiveBrokers.Backend
 {
     internal class IBCallbacks : EWrapper
     {

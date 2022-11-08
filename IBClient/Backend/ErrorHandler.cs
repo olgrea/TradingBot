@@ -1,7 +1,7 @@
-﻿using IBClient.Messages;
+﻿using InteractiveBrokers.Messages;
 using ILogger = NLog.ILogger;
 
-namespace IBClient.Backend
+namespace InteractiveBrokers.Backend
 {
     internal interface IErrorHandler
     {

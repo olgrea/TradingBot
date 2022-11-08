@@ -1,4 +1,4 @@
-﻿namespace IBClient.Orders
+﻿namespace InteractiveBrokers.Orders
 {
     public class CommissionInfo
     {
