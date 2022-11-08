@@ -3,7 +3,7 @@ using InteractiveBrokers.Contracts;
 
 namespace InteractiveBrokers.Backend
 {
-    public interface IIBSocket
+    public interface IIBClientSocket
     {
         IBCallbacks Callbacks { get; }
         void Connect(string host, int port, int clientId);
