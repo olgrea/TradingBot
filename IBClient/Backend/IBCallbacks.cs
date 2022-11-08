@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using IBApi;
 using InteractiveBrokers.Accounts;
-using InteractiveBrokers.Contracts;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Messages;
 using InteractiveBrokers.Orders;

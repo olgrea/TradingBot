@@ -16,7 +16,7 @@ using NUnit.Framework;
 namespace Tests.Backtester
 {
     [TestFixture]
-    public class FakeIBSocketTests
+    public class FakeClientSocketTests
     {
         const string Symbol = "GME";
 
@@ -40,7 +40,7 @@ namespace Tests.Backtester
         IEnumerable<BidAsk> _upThenDownBidAsks;
         IEnumerable<Bar> _upThenDownBars;
 
-        FakeIBSocket _fakeIBSocket;
+        FakeClientSocket _fakeIBSocket;
 
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
@@ -57,7 +57,7 @@ namespace Tests.Backtester
             _upThenDownBidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory);
             _upThenDownBars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart, barCmdFactory);
 
-            FakeIBSocket.TimeDelays.TimeScale = 0.001;
+            FakeClientSocket.TimeDelays.TimeScale = 0.001;
             await Task.CompletedTask;
         }
 
@@ -78,7 +78,7 @@ namespace Tests.Backtester
         public async Task MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -101,7 +101,7 @@ namespace Tests.Backtester
         public async Task MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -128,7 +128,7 @@ namespace Tests.Backtester
         public async Task LimitOrder_Buy_OverAskPrice_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -152,7 +152,7 @@ namespace Tests.Backtester
         public async Task LimitOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -176,7 +176,7 @@ namespace Tests.Backtester
         public async Task LimitOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -204,7 +204,7 @@ namespace Tests.Backtester
         public async Task LimitOrder_Sell_UnderBidPrice_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -232,7 +232,7 @@ namespace Tests.Backtester
         public async Task StopOrder_Buy_OverAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -256,7 +256,7 @@ namespace Tests.Backtester
         public async Task StopOrder_Buy_UnderAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -280,7 +280,7 @@ namespace Tests.Backtester
         public async Task StopOrder_Sell_OverBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -308,7 +308,7 @@ namespace Tests.Backtester
         public async Task StopOrder_Sell_UnderBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -336,7 +336,7 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Buy_OverAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -360,7 +360,7 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -384,7 +384,7 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -412,7 +412,7 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Sell_UnderBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -441,7 +441,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -467,7 +467,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -493,7 +493,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -523,7 +523,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -553,7 +553,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _downThenUpStart, end, _downThenUpBars, _downThenUpBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downThenUpStart, end, _downThenUpBars, _downThenUpBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -578,7 +578,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new FakeIBSocket(Symbol, _upThenDownStart, end, _upThenDownBars, _upThenDownBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upThenDownStart, end, _upThenDownBars, _upThenDownBidAsks);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,

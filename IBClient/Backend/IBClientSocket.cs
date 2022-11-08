@@ -8,7 +8,7 @@ using Contract = InteractiveBrokers.Contracts.Contract;
 [assembly: InternalsVisibleTo("Tests")]
 namespace InteractiveBrokers.Backend
 {
-    internal class IBSocket : IIBSocket
+    internal class IBClientSocket : IIBClientSocket
     {
         EClientSocket _clientSocket;
         EReaderSignal _signal;
@@ -18,7 +18,7 @@ namespace InteractiveBrokers.Backend
         Task _processMsgTask;
         string _accountCode = null;
 
-        public IBSocket(ILogger logger)
+        public IBClientSocket(ILogger logger)
         {
             _logger = logger;
             _callbacks = new IBCallbacks(logger);
@@ -26,7 +26,7 @@ namespace InteractiveBrokers.Backend
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
 
-        internal IBSocket(IBCallbacks callbacks, ILogger logger)
+        internal IBClientSocket(IBCallbacks callbacks, ILogger logger)
         {
             _logger = logger;
             _callbacks = callbacks;

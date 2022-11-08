@@ -38,8 +38,8 @@ namespace Tests.Backtester
             var startTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
             var endTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
 
-            var FakeIBSocket = new FakeIBSocket(Symbol, startTime, endTime, _bars, _bidAsks);
-            _client = new IBClient(951, FakeIBSocket);
+            var fakeSocket = new FakeClientSocket(Symbol, startTime, endTime, _bars, _bidAsks);
+            _client = new BacktesterClient(951, fakeSocket);
 
             _connectMessage = await _client.ConnectAsync();
             Assert.IsTrue(_connectMessage.AccountCode == "FAKEACCOUNT123");

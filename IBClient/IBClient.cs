@@ -44,7 +44,7 @@ namespace InteractiveBrokers
         int _clientId = 1337;
         int _reqId = 0;
         DataSubscriptions _subscriptions = new DataSubscriptions();
-        IIBSocket _socket;
+        IIBClientSocket _socket;
         ILogger _logger;
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
@@ -125,17 +125,17 @@ namespace InteractiveBrokers
             Init(clientId, null, null);
         }
 
-        public IBClient(int clientId, IIBSocket socket)
+        protected IBClient(int clientId, IIBClientSocket socket)
         {
             Init(clientId, socket, null);
         }
 
-        void Init(int clientId, IIBSocket socket, ILogger logger)
+        void Init(int clientId, IIBClientSocket socket, ILogger logger)
         {
             _port = GetPort();
             _clientId = clientId;
             _logger = logger ?? LogManager.GetLogger($"{nameof(IBClient)}-{_clientId}");
-            _socket = socket ?? new IBSocket(_logger);
+            _socket = socket ?? new IBClientSocket(_logger);
         }
 
         int GetPort()
