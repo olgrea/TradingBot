@@ -2,7 +2,7 @@
 
 namespace InteractiveBrokers.Messages
 {
-    internal class ErrorMessageException : Exception
+    public class ErrorMessageException : Exception
     {
         public ErrorMessageException(Exception innerException) : base(innerException.Message, innerException) { }
         public ErrorMessageException(string msg, Exception innerException = null) : base(msg, innerException) { }

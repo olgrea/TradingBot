@@ -32,7 +32,7 @@ namespace InteractiveBrokers
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
     }
 
-    internal class IBClient
+    public class IBClient
     {
         static Random rand = new Random();
 

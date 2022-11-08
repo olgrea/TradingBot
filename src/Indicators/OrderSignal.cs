@@ -1,4 +1,4 @@
-﻿using TradingBot.Broker;
+﻿using InteractiveBrokers.Contracts;
 
 namespace TradingBot.Indicators
 {

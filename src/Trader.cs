@@ -2,21 +2,21 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using TradingBot.Broker;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client;
-using TradingBot.Broker.Orders;
 using TradingBot.Strategies;
 using System.Globalization;
 using NLog;
 using System.Threading.Tasks;
 using System.Threading;
 using TradingBot.Indicators;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils.Db.DbCommandFactories;
-using TradingBot.Utils.MarketData;
+using InteractiveBrokers;
+using InteractiveBrokers.Accounts;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.MarketData;
+using InteractiveBrokers.Orders;
+using DataStorage.Db.DbCommandFactories;
+using HistoricalDataFetcherApp;
 using TradingBot.Utils;
-using Skender.Stock.Indicators;
+using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
 
 [assembly: Fody.ConfigureAwait(false)]
 
@@ -26,8 +26,7 @@ namespace TradingBot
     {
         ILogger _logger;
         ILogger _csvLogger;
-        TraderErrorHandler _errorHandler;
-        IBBroker _broker;
+        IBClient _client;
         OrderManager _orderManager;
 
         DateTime _startTime;
@@ -56,17 +55,17 @@ namespace TradingBot
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
 
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
-            : this(ticker, startTime, endTime, new IBBroker(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
+            : this(ticker, startTime, endTime, new IBClient(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
 
-        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBBroker broker, string loggerName)
+        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBClient client, string loggerName)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
-            Trace.Assert(broker != null);
+            Trace.Assert(client != null);
 
             _ticker = ticker;
             _startTime = startTime;
-            _broker = broker;
-            _orderManager = new OrderManager(_broker, _logger);
+            _client = client;
+            _orderManager = new OrderManager(_client, _logger);
 
             // We remove 5 minutes to have the time to sell remaining positions, if any, at the end of the day.
             _endTime = endTime.AddMinutes(-5);
@@ -74,13 +73,10 @@ namespace TradingBot
             var now = DateTime.Now.ToShortTimeString();
             _logger = LogManager.GetLogger(loggerName).WithProperty("now", now);
             _csvLogger = LogManager.GetLogger($"{loggerName}_Report").WithProperty("now", now);
-
-            _errorHandler = new TraderErrorHandler(this);
-            _broker.ErrorHandler = _errorHandler;
         }
 
         internal ILogger Logger => _logger;
-        internal IBBroker Broker => _broker;
+        internal IBClient Broker => _client;
         internal OrderManager OrderManager => _orderManager;
         internal Contract Contract => _contract;
         internal HashSet<IStrategy> Strategies => _strategies;
@@ -96,9 +92,9 @@ namespace TradingBot
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
             
-            var res = await _broker.ConnectAsync();
+            var res = await _client.ConnectAsync();
             _accountCode = res.AccountCode;
-            _account = await _broker.GetAccountAsync(_accountCode);
+            _account = await _client.GetAccountAsync(_accountCode);
 
             if (_account.Code != "DU5962304" && _account.Code != "FAKEACCOUNT123")
                 throw new Exception($"Only paper trading and tests are allowed for now");
@@ -107,7 +103,7 @@ namespace TradingBot
                 throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
             _USDCashBalance = _account.CashBalances["USD"];
 
-            _contract = await _broker.GetContractAsync(_ticker);
+            _contract = await _client.GetContractAsync(_ticker);
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
@@ -121,7 +117,7 @@ namespace TradingBot
                 msg += $"{strat.GetType().Name}, ";
             _logger.Info(msg);
 
-            _currentTime = await _broker.GetCurrentTimeAsync();
+            _currentTime = await _client.GetCurrentTimeAsync();
             _logger.Info($"Current server time : {_currentTime}");
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
@@ -140,7 +136,7 @@ namespace TradingBot
                 while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                 {
                     await Task.Delay(500);
-                    _currentTime = await _broker.GetCurrentTimeAsync();
+                    _currentTime = await _client.GetCurrentTimeAsync();
                     if(!_tradingStarted && _currentTime >= _startTime)
                     {
                         _logger.Info($"Trading started!");
@@ -150,7 +146,7 @@ namespace TradingBot
             }
             finally
             {
-                _broker.CancelAllOrders();
+                _client.CancelAllOrders();
                 if (_contractPosition?.PositionAmount > 0)
                 {
                     _logger.Info($"Selling all remaining positions.");
@@ -200,38 +196,38 @@ namespace TradingBot
 
         void SubscribeToData()
         {
-            _broker.AccountValueUpdated += OnAccountValueUpdated;
-            _broker.PositionReceived += OnPositionReceived;
-            _broker.PnLReceived += OnPnLReceived;
+            _client.AccountValueUpdated += OnAccountValueUpdated;
+            _client.PositionReceived += OnPositionReceived;
+            _client.PnLReceived += OnPnLReceived;
 
-            _broker.RequestBarsUpdates(Contract);
+            _client.RequestBarsUpdates(Contract);
             foreach(BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
-                _broker.BarReceived[barLength] += OnBarReceived;
+                _client.BarReceived[barLength] += OnBarReceived;
 
             _orderManager.OrderUpdated += OnOrderUpdated;
             _orderManager.OrderExecuted += OnOrderExecuted;
 
-            _broker.RequestAccountUpdates(_account.Code);
-            _broker.RequestPositionsUpdates();
-            _broker.RequestPnLUpdates(_contract);
+            _client.RequestAccountUpdates(_account.Code);
+            _client.RequestPositionsUpdates();
+            _client.RequestPnLUpdates(_contract);
         }
 
         void UnsubscribeToData()
         {
-            _broker.AccountValueUpdated -= OnAccountValueUpdated;
-            _broker.PositionReceived -= OnPositionReceived;
-            _broker.PnLReceived -= OnPnLReceived;
+            _client.AccountValueUpdated -= OnAccountValueUpdated;
+            _client.PositionReceived -= OnPositionReceived;
+            _client.PnLReceived -= OnPnLReceived;
 
             _orderManager.OrderUpdated -= OnOrderUpdated;
             _orderManager.OrderExecuted -= OnOrderExecuted;
 
             Broker.CancelBarsUpdates(Contract);
             foreach (BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
-                _broker.BarReceived[barLength] -= OnBarReceived;
+                _client.BarReceived[barLength] -= OnBarReceived;
 
-            _broker.CancelPositionsUpdates();
-            _broker.CancelPnLUpdates(_contract);
-            _broker.CancelAccountUpdates(_account.Code);
+            _client.CancelPositionsUpdates();
+            _client.CancelPnLUpdates(_contract);
+            _client.CancelAccountUpdates(_account.Code);
         }
 
         public async void InitIndicators(IEnumerable<IIndicator> indicators)
@@ -243,8 +239,8 @@ namespace TradingBot
             int longestNbOfOneSecBarsNeededForInit = indicators.Max(i => i.NbWarmupPeriods * (int)i.BarLength);
             _longestPeriod = longestNbOfOneSecBarsNeededForInit;
 
-            var fetcher = new HistoricalDataFetcher(_broker, null);
-            DateTime currentTime = await _broker.GetCurrentTimeAsync();
+            var fetcher = new HistoricalDataFetcher(_client, null);
+            DateTime currentTime = await _client.GetCurrentTimeAsync();
             IEnumerable<Bar> allBars = Enumerable.Empty<Bar>();
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
 
@@ -297,7 +293,7 @@ namespace TradingBot
             // Update all indicators.
             foreach (var indicator in indicators)
             {
-                indicator.Compute(_bars[indicator.BarLength]);
+                indicator.Compute(_bars[indicator.BarLength].Cast<BarQuote>());
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
@@ -449,7 +445,7 @@ namespace TradingBot
             _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");
 
             UnsubscribeToData();
-            await _broker.DisconnectAsync();
+            await _client.DisconnectAsync();
         }
 
         private void SellAllPositions()
@@ -475,7 +471,7 @@ namespace TradingBot
                     throw new Exception("The trader ended with unclosed positions!");
             });
 
-            _broker.PlaceOrder(_contract, mo);
+            _client.PlaceOrder(_contract, mo);
             tcs.Task.Wait(2000);
         }
     }

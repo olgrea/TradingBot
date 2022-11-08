@@ -1,6 +1,6 @@
 ﻿namespace InteractiveBrokers.Messages
 {
-    internal class ConnectResult
+    public class ConnectResult
     {
         public int NextValidOrderId { get; set; }
         public string AccountCode { get; set; }

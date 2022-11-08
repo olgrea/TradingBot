@@ -12,9 +12,9 @@ using NLog;
 
 namespace HistoricalDataFetcherApp
 {
-    internal class MarketHolidayException : Exception { }
+    public  class MarketHolidayException : Exception { }
 
-    internal class HistoricalDataFetcher
+    public class HistoricalDataFetcher
     {
         public int _nbRequest = 0;
 

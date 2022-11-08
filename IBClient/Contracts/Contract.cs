@@ -1,11 +1,11 @@
 ﻿namespace InteractiveBrokers.Contracts
 {
-    internal enum OptionType
+    public enum OptionType
     {
         Call, Put
     }
 
-    internal abstract class Contract
+    public abstract class Contract
     {
         public int Id { get; set; }
         public string Symbol { get; set; }
@@ -21,7 +21,7 @@
         }
     }
 
-    internal class Cash : Contract
+    public class Cash : Contract
     {
         public Cash() => SecType = "CASH";
         public override string ToString()
@@ -30,7 +30,7 @@
         }
     }
 
-    internal class Stock : Contract
+    public class Stock : Contract
     {
         public Stock() => SecType = "STK";
         public string LastTradeDate { get; set; }
@@ -41,7 +41,7 @@
         }
     }
 
-    internal class Option : Contract
+    public class Option : Contract
     {
         public Option() => SecType = "OPT";
         public double Strike { get; set; }

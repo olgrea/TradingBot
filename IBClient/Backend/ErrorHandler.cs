@@ -3,12 +3,12 @@ using ILogger = NLog.ILogger;
 
 namespace InteractiveBrokers.Backend
 {
-    internal interface IErrorHandler
+    public interface IErrorHandler
     {
         bool IsHandled(ErrorMessageException msg);
     }
 
-    internal class DefaultErrorHandler : IErrorHandler
+    public class DefaultErrorHandler : IErrorHandler
     {
         protected ILogger _logger;
 
@@ -85,23 +85,4 @@ namespace InteractiveBrokers.Backend
             var subs = _client.Subscriptions;
         }
     }
-
-    //internal class TraderErrorHandler : IBBrokerErrorHandler
-    //{
-    //    Trader _trader;
-    //    public TraderErrorHandler(Trader trader) : base(trader.Broker as IBBroker, trader.Logger)
-    //    {
-    //        _trader = trader;
-    //    }
-
-    //    public override bool IsHandled(ErrorMessageException msg)
-    //    {
-    //        switch (msg.ErrorCode)
-    //        {
-
-    //            default:
-    //                return base.IsHandled(msg); ;
-    //        }
-    //    }
-    //}
 }

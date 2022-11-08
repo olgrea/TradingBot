@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
-using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {

@@ -1,6 +1,6 @@
 ﻿namespace InteractiveBrokers.Contracts
 {
-    internal class ContractDetails
+    public class ContractDetails
     {
         public Contract Contract { get; set; }
         public string MarketName { get; set; }

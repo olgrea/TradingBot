@@ -2,7 +2,7 @@
 
 namespace InteractiveBrokers.Accounts
 {
-    internal class Position
+    public class Position
     {
         public Position() { }
 
