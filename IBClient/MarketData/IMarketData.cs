@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TradingBot.Broker.MarketData
+namespace IBClient.MarketData
 {
     public interface IMarketData
     {

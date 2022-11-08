@@ -1,10 +1,7 @@
-﻿using System.Threading.Tasks;
-using NLog;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Utils;
+﻿using IBClient.Messages;
 using ILogger = NLog.ILogger;
 
-namespace TradingBot.Broker.Client
+namespace IBClient.Backend
 {
     internal interface IErrorHandler
     {
@@ -63,10 +60,10 @@ namespace TradingBot.Broker.Client
 
     internal class IBBrokerErrorHandler : DefaultErrorHandler
     {
-        IBBroker _broker;
-        public IBBrokerErrorHandler(IBBroker broker, ILogger logger) : base(logger)
+        IBClient _client;
+        public IBBrokerErrorHandler(IBClient client, ILogger logger) : base(logger)
         {
-            _broker = broker;
+            _client = client;
         }
 
         public override bool IsHandled(ErrorMessageException msg)
@@ -85,26 +82,26 @@ namespace TradingBot.Broker.Client
         void RestoreSubscriptions()
         {
             // TODO : RestoreSubscriptions
-            var subs = _broker.Subscriptions;
+            var subs = _client.Subscriptions;
         }
     }
 
-    internal class TraderErrorHandler : IBBrokerErrorHandler
-    {
-        Trader _trader;
-        public TraderErrorHandler(Trader trader) : base(trader.Broker as IBBroker, trader.Logger)
-        {
-            _trader = trader;
-        }
+    //internal class TraderErrorHandler : IBBrokerErrorHandler
+    //{
+    //    Trader _trader;
+    //    public TraderErrorHandler(Trader trader) : base(trader.Broker as IBBroker, trader.Logger)
+    //    {
+    //        _trader = trader;
+    //    }
 
-        public override bool IsHandled(ErrorMessageException msg)
-        {
-            switch (msg.ErrorCode)
-            {
+    //    public override bool IsHandled(ErrorMessageException msg)
+    //    {
+    //        switch (msg.ErrorCode)
+    //        {
 
-                default:
-                    return base.IsHandled(msg); ;
-            }
-        }
-    }
+    //            default:
+    //                return base.IsHandled(msg); ;
+    //        }
+    //    }
+    //}
 }

@@ -1,4 +1,6 @@
-﻿namespace TradingBot.Broker.Accounts
+﻿using IBClient.Contracts;
+
+namespace IBClient.Accounts
 {
     //TODO : is this class really necessary?
     internal class PnL

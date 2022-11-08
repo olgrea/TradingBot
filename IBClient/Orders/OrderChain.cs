@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace TradingBot.Broker.Orders
+namespace IBClient.Orders
 {
     internal class OrderChain
     {
@@ -13,10 +13,10 @@ namespace TradingBot.Broker.Orders
             {
                 attachedOrder.Parent = order;
             }
-        }   
+        }
 
         public Order Order { get; }
-        public Order Parent{ get; set; }
+        public Order Parent { get; set; }
         public List<OrderChain> AttachedOrders { get; }
 
         public static implicit operator OrderChain(Order o) => new OrderChain(o);
@@ -40,7 +40,7 @@ namespace TradingBot.Broker.Orders
         void Flatten(OrderChain o, List<Order> list)
         {
             list.Add(o.Order);
-            foreach(OrderChain order in o.AttachedOrders)
+            foreach (OrderChain order in o.AttachedOrders)
             {
                 Flatten(order, list);
             }

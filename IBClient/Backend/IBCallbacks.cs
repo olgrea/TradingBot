@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using IBApi;
-using NLog;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Utils;
+using IBClient.Accounts;
+using IBClient.Contracts;
+using IBClient.MarketData;
+using IBClient.Messages;
+using IBClient.Orders;
+using Contract = IBClient.Contracts.Contract;
+using ContractDetails = IBClient.Contracts.ContractDetails;
 using ILogger = NLog.ILogger;
+using Order = IBClient.Orders.Order;
+using OrderState = IBClient.Orders.OrderState;
 
-namespace TradingBot.Broker.Client
+namespace IBClient.Backend
 {
     internal class IBCallbacks : EWrapper
     {
@@ -221,7 +224,7 @@ namespace TradingBot.Broker.Client
             Contract c = contract.ToTBContract();
             Orders.Order o = order.ToTBOrder();
             Orders.OrderState os = orderState.ToTBOrderState();
-            
+
             _logger.Trace($"openOrder {orderId} : {c}, {o}, {os.Status}");
             if (!string.IsNullOrEmpty(os.WarningText))
                 _logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
@@ -230,7 +233,7 @@ namespace TradingBot.Broker.Client
         }
 
         public Action OpenOrderEnd;
-        
+
         // This is not called when placing an order.
         public void openOrderEnd()
         {
@@ -284,13 +287,13 @@ namespace TradingBot.Broker.Client
             CommissionReport?.Invoke(commissionReport.ToTBCommission());
         }
 
-        public Action<Contract, Orders.Order, Orders.OrderState> CompletedOrder;
+        public Action<Contract, Order, OrderState> CompletedOrder;
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            Orders.OrderState os = orderState.ToTBOrderState();
-            Orders.Order o = order.ToTBOrder();
+            OrderState os = orderState.ToTBOrderState();
+            Order o = order.ToTBOrder();
             Contract c = contract.ToTBContract();
-            
+
             _logger.Trace($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
             if (!string.IsNullOrEmpty(os.WarningText))
                 _logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
@@ -334,7 +337,7 @@ namespace TradingBot.Broker.Client
         public Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
-            IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk() 
+            IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk()
             {
                 Bid = t.PriceBid,
                 BidSize = Convert.ToInt32(t.SizeBid),
@@ -365,7 +368,7 @@ namespace TradingBot.Broker.Client
         public void currentTime(long time)
         {
             _logger.Trace($"currentTime");
-            CurrentTime?.Invoke(time);  
+            CurrentTime?.Invoke(time);
         }
 
         public IErrorHandler ErrorHandler;
@@ -380,7 +383,7 @@ namespace TradingBot.Broker.Client
         public void error(string str)
         {
             ErrorMessageException msg = new ErrorMessageException(str);
-            if(ErrorHandler == null || !ErrorHandler.IsHandled(msg)) 
+            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
                 Error?.Invoke(msg);
         }
 

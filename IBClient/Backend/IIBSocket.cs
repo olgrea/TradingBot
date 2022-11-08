@@ -1,15 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
+﻿using IBClient.Orders;
+using IBClient.Contracts;
 
-namespace TradingBot.Broker.Client
+namespace IBClient.Backend
 {
-    internal interface IIBClient
+    internal interface IIBSocket
     {
         IBCallbacks Callbacks { get; }
         void Connect(string host, int port, int clientId);
@@ -32,6 +26,6 @@ namespace TradingBot.Broker.Client
         void CancelAllOrders();
         void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH);
         void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize);
-        public void RequestCurrentTime();
+        void RequestCurrentTime();
     }
 }

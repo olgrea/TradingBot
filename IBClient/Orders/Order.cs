@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using TradingBot.Broker.MarketData;
+﻿using System.Diagnostics;
 
-namespace TradingBot.Broker.Orders
+namespace IBClient.Orders
 {
     public enum OrderAction
     {
@@ -82,7 +79,7 @@ namespace TradingBot.Broker.Orders
     {
         public LimitOrder() : base("LMT") { }
         public double LmtPrice { get; set; }
-        
+
         public override string ToString()
         {
             return $"{base.ToString()} Limit price : {LmtPrice:c}";
@@ -104,8 +101,8 @@ namespace TradingBot.Broker.Orders
     {
         public TrailingStopOrder() : base("TRAIL") { }
         internal double StopPrice { get; set; } = double.MaxValue;
-        
-        public double TrailingAmount{ get; set; } = double.MaxValue;
+
+        public double TrailingAmount { get; set; } = double.MaxValue;
         // Takes priority over TrailingAmount if set
         public double TrailingPercent { get; set; } = double.MaxValue;
 

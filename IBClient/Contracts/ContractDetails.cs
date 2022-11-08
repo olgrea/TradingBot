@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace TradingBot.Broker
+﻿namespace IBClient.Contracts
 {
     internal class ContractDetails
     {
@@ -16,6 +12,6 @@ namespace TradingBot.Broker
         public string TimeZoneId { get; set; }
         public string RegularTradingHours { get; set; }
         public string StockType { get; set; }
-        
-    }   
+
+    }
 }

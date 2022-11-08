@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TradingBot.Broker.Orders
+namespace IBClient.Orders
 {
     public class OrderExecution
     {
