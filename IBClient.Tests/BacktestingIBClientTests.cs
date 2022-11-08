@@ -12,7 +12,7 @@ using TradingBot.Utils.MarketData;
 namespace Tests.Backtester
 {
     [TestFixture]
-    internal class IBBrokerWithFakeClientTests : IBBrokerTests
+    internal class IBBrokerWithFakeClientTests : IBClientTests
     {
         const string Symbol = "GME";
 
@@ -40,9 +40,9 @@ namespace Tests.Backtester
             var endTime = new DateTime(_fileTime.Date.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
 
             var fakeClient = new FakeClient(Symbol, startTime, endTime, _bars, _bidAsks);
-            _broker = new IBBroker(951, fakeClient);
+            _client = new IBBroker(951, fakeClient);
 
-            _connectMessage = await _broker.ConnectAsync();
+            _connectMessage = await _client.ConnectAsync();
             Assert.IsTrue(_connectMessage.AccountCode == "FAKEACCOUNT123");
         }
     }
