@@ -1,7 +1,7 @@
 ﻿using System;
 using IBApi;
 
-namespace TradingBot.Broker.Orders
+namespace IBClient.Orders
 {
     public class OrderStatus
     {

@@ -1,4 +1,6 @@
-﻿namespace TradingBot.Broker.Accounts
+﻿using IBClient.Contracts;
+
+namespace IBClient.Accounts
 {
     internal class Position
     {

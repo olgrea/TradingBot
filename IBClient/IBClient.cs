@@ -6,19 +6,19 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using IBClient.Accounts;
+using IBClient.Backend;
+using IBClient.Contracts;
+using IBClient.MarketData;
+using IBClient.Messages;
+using IBClient.Orders;
 using NLog;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Client;
-using TradingBot.Broker.Client.Messages;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Indicators;
-using TradingBot.Utils.Db.DbCommandFactories;
-using TradingBot.Utils.MarketData;
 
 [assembly: InternalsVisibleTo("HistoricalDataFetcher")]
 [assembly: InternalsVisibleTo("Tests")]
-namespace TradingBot.Broker
+[assembly: Fody.ConfigureAwait(false)]
+
+namespace IBClient
 {
     internal class DataSubscriptions
     {
@@ -32,7 +32,7 @@ namespace TradingBot.Broker
         public Dictionary<Contract, int> Pnl { get; set; } = new Dictionary<Contract, int>();
     }
 
-    internal class IBBroker : IBroker
+    internal class IBClient
     {
         static Random rand = new Random();
 
@@ -44,7 +44,7 @@ namespace TradingBot.Broker
         int _clientId = 1337;
         int _reqId = 0;
         DataSubscriptions _subscriptions = new DataSubscriptions();
-        IIBClient _client;
+        IIBSocket _socket;
         ILogger _logger;
         Dictionary<Contract, LinkedList<MarketData.Bar>> _fiveSecBars = new Dictionary<Contract, LinkedList<MarketData.Bar>>();
 
@@ -65,83 +65,83 @@ namespace TradingBot.Broker
 
         public event Action<string, string, string, string> AccountValueUpdated
         {
-            add => _client.Callbacks.UpdateAccountValue += value;
-            remove => _client.Callbacks.UpdateAccountValue -= value;
+            add => _socket.Callbacks.UpdateAccountValue += value;
+            remove => _socket.Callbacks.UpdateAccountValue -= value;
         }
 
         public event Action<Position> PositionReceived
         {
-            add => _client.Callbacks.Position += value;
-            remove => _client.Callbacks.Position -= value;
+            add => _socket.Callbacks.Position += value;
+            remove => _socket.Callbacks.Position -= value;
         }
 
         public event Action<PnL> PnLReceived;
-        
+
         public event Action<Contract, Order, OrderState> OrderOpened
         {
-            add => _client.Callbacks.OpenOrder += value;
-            remove => _client.Callbacks.OpenOrder -= value;
+            add => _socket.Callbacks.OpenOrder += value;
+            remove => _socket.Callbacks.OpenOrder -= value;
         }
 
         public event Action<OrderStatus> OrderStatusChanged
         {
-            add => _client.Callbacks.OrderStatus += value;
-            remove => _client.Callbacks.OrderStatus -= value;
+            add => _socket.Callbacks.OrderStatus += value;
+            remove => _socket.Callbacks.OrderStatus -= value;
         }
 
         public event Action<Contract, OrderExecution> OrderExecuted
         {
-            add => _client.Callbacks.ExecDetails += value;
-            remove => _client.Callbacks.ExecDetails -= value;
+            add => _socket.Callbacks.ExecDetails += value;
+            remove => _socket.Callbacks.ExecDetails -= value;
         }
 
         public event Action<CommissionInfo> CommissionInfoReceived
         {
-            add => _client.Callbacks.CommissionReport += value;
-            remove => _client.Callbacks.CommissionReport -= value;
+            add => _socket.Callbacks.CommissionReport += value;
+            remove => _socket.Callbacks.CommissionReport -= value;
         }
 
         public event Action<long> CurrentTimeReceived
         {
-            add => _client.Callbacks.CurrentTime += value;
-            remove => _client.Callbacks.CurrentTime -= value;
+            add => _socket.Callbacks.CurrentTime += value;
+            remove => _socket.Callbacks.CurrentTime -= value;
         }
 
         public IErrorHandler ErrorHandler
         {
-            get => _client.Callbacks.ErrorHandler;
-            set => _client.Callbacks.ErrorHandler = value;
+            get => _socket.Callbacks.ErrorHandler;
+            set => _socket.Callbacks.ErrorHandler = value;
         }
 
         #endregion Events
 
-        public IBBroker()
+        public IBClient()
         {
             Init(rand.Next(), null, null);
         }
 
-        public IBBroker(int clientId)
+        public IBClient(int clientId)
         {
             Init(clientId, null, null);
         }
 
-        internal IBBroker(int clientId, IIBClient client)
+        internal IBClient(int clientId, IIBSocket socket)
         {
-            Init(clientId, client, null);
+            Init(clientId, socket, null);
         }
 
-        void Init(int clientId, IIBClient client, ILogger logger)
+        void Init(int clientId, IIBSocket socket, ILogger logger)
         {
             _port = GetPort();
             _clientId = clientId;
-            _logger = logger ?? LogManager.GetLogger($"{nameof(IBBroker)}-{_clientId}"); 
-            _client = client ?? new IBClient(_logger);            
+            _logger = logger ?? LogManager.GetLogger($"{nameof(IBClient)}-{_clientId}");
+            _socket = socket ?? new IBSocket(_logger);
         }
 
         int GetPort()
         {
             var ibGatewayProc = Process.GetProcessesByName("ibgateway").FirstOrDefault();
-            if(ibGatewayProc != null)
+            if (ibGatewayProc != null)
                 return DefaultIBGatewayPort;
 
             var twsProc = Process.GetProcessesByName("tws").FirstOrDefault();
@@ -163,13 +163,13 @@ namespace TradingBot.Broker
             var result = new ConnectResult();
             var tcs = new TaskCompletionSource<ConnectResult>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
-            
+
             var nextValidId = new Action<int>(id =>
             {
                 _logger.Trace($"ConnectAsync : next valid id {id}");
                 result.NextValidOrderId = id;
-                
-                if(result.IsSet())
+
+                if (result.IsSet())
                     tcs.TrySetResult(result);
             });
 
@@ -177,25 +177,25 @@ namespace TradingBot.Broker
             {
                 _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
                 result.AccountCode = acc;
-                
+
                 if (result.IsSet())
                     tcs.TrySetResult(result);
             });
 
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.NextValidId += nextValidId;
-            _client.Callbacks.ManagedAccounts += managedAccounts;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.NextValidId += nextValidId;
+            _socket.Callbacks.ManagedAccounts += managedAccounts;
+            _socket.Callbacks.Error += error;
 
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.NextValidId -= nextValidId;
-                _client.Callbacks.ManagedAccounts -= managedAccounts;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.NextValidId -= nextValidId;
+                _socket.Callbacks.ManagedAccounts -= managedAccounts;
+                _socket.Callbacks.Error -= error;
             });
 
-            _client.Connect(DefaultIP, _port, _clientId);
+            _socket.Connect(DefaultIP, _port, _clientId);
 
             return tcs.Task;
         }
@@ -208,15 +208,15 @@ namespace TradingBot.Broker
             var disconnect = new Action(() => tcs.TrySetResult(true));
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.ConnectionClosed += disconnect;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.ConnectionClosed += disconnect;
+            _socket.Callbacks.Error += error;
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.ConnectionClosed -= disconnect;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.ConnectionClosed -= disconnect;
+                _socket.Callbacks.Error -= error;
             });
 
-            _client.Disconnect();
+            _socket.Disconnect();
 
             return tcs.Task;
         }
@@ -231,16 +231,16 @@ namespace TradingBot.Broker
             });
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.NextValidId += nextValidId;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.NextValidId += nextValidId;
+            _socket.Callbacks.Error += error;
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.NextValidId -= nextValidId;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.NextValidId -= nextValidId;
+                _socket.Callbacks.Error -= error;
             });
 
             _logger.Debug($"Requesting next valid order ids");
-            _client.RequestValidOrderIds();
+            _socket.RequestValidOrderIds();
             return tcs.Task;
         }
 
@@ -285,21 +285,21 @@ namespace TradingBot.Broker
                 tcs.SetResult(account);
             });
 
-            _client.Callbacks.UpdateAccountTime += updateAccountTime;
-            _client.Callbacks.UpdateAccountValue += updateAccountValue;
-            _client.Callbacks.UpdatePortfolio += updatePortfolio;
-            _client.Callbacks.AccountDownloadEnd += accountDownloadEnd;
+            _socket.Callbacks.UpdateAccountTime += updateAccountTime;
+            _socket.Callbacks.UpdateAccountValue += updateAccountValue;
+            _socket.Callbacks.UpdatePortfolio += updatePortfolio;
+            _socket.Callbacks.AccountDownloadEnd += accountDownloadEnd;
 
-            _client.RequestAccountUpdates(accountCode);
-            
+            _socket.RequestAccountUpdates(accountCode);
+
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.UpdateAccountTime -= updateAccountTime;
-                _client.Callbacks.UpdateAccountValue -= updateAccountValue;
-                _client.Callbacks.UpdatePortfolio -= updatePortfolio;
-                _client.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
+                _socket.Callbacks.UpdateAccountTime -= updateAccountTime;
+                _socket.Callbacks.UpdateAccountValue -= updateAccountValue;
+                _socket.Callbacks.UpdatePortfolio -= updatePortfolio;
+                _socket.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
 
-                _client.CancelAccountUpdates(accountCode);
+                _socket.CancelAccountUpdates(accountCode);
             });
 
             return tcs.Task;
@@ -343,19 +343,19 @@ namespace TradingBot.Broker
             });
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.ContractDetails += contractDetails;
-            _client.Callbacks.ContractDetailsEnd += contractDetailsEnd;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.ContractDetails += contractDetails;
+            _socket.Callbacks.ContractDetailsEnd += contractDetailsEnd;
+            _socket.Callbacks.Error += error;
 
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.ContractDetails -= contractDetails;
-                _client.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.ContractDetails -= contractDetails;
+                _socket.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
+                _socket.Callbacks.Error -= error;
             });
 
             _logger.Debug($"Requesting contract details for {contract} (reqId={reqId})");
-            _client.RequestContractDetails(reqId, contract);
+            _socket.RequestContractDetails(reqId, contract);
 
             return tcs.Task;
         }
@@ -377,16 +377,16 @@ namespace TradingBot.Broker
 
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.TickByTickBidAsk += tickByTickBidAsk;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.TickByTickBidAsk += tickByTickBidAsk;
+            _socket.Callbacks.Error += error;
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.TickByTickBidAsk -= tickByTickBidAsk;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.TickByTickBidAsk -= tickByTickBidAsk;
+                _socket.Callbacks.Error -= error;
             });
 
             source.CancelAfter(timeoutInMs);
-            _client.RequestTickByTickData(reqId, contract, "BidAsk");
+            _socket.RequestTickByTickData(reqId, contract, "BidAsk");
 
             return tcs.Task;
         }
@@ -398,10 +398,10 @@ namespace TradingBot.Broker
 
             int reqId = NextRequestId;
             _subscriptions.BidAsk[contract] = reqId;
-            if(_subscriptions.BidAsk.Count == 1)
-                _client.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
+            if (_subscriptions.BidAsk.Count == 1)
+                _socket.Callbacks.TickByTickBidAsk += TickByTickBidAsk;
 
-            _client.RequestTickByTickData(reqId, contract, "BidAsk");
+            _socket.RequestTickByTickData(reqId, contract, "BidAsk");
         }
 
         void TickByTickBidAsk(int reqId, BidAsk bidAsk)
@@ -418,9 +418,9 @@ namespace TradingBot.Broker
             var reqId = _subscriptions.BidAsk[contract];
             _subscriptions.BidAsk.Remove(contract);
             if (_subscriptions.BidAsk.Count == 0)
-                _client.Callbacks.TickByTickBidAsk -= TickByTickBidAsk;
+                _socket.Callbacks.TickByTickBidAsk -= TickByTickBidAsk;
 
-            _client.CancelTickByTickData(reqId);
+            _socket.CancelTickByTickData(reqId);
         }
 
         public void RequestLastUpdates(Contract contract)
@@ -431,9 +431,9 @@ namespace TradingBot.Broker
             int reqId = NextRequestId;
             _subscriptions.Last[contract] = reqId;
             if (_subscriptions.Last.Count == 1)
-                _client.Callbacks.TickByTickAllLast += TickByTickLast;
+                _socket.Callbacks.TickByTickAllLast += TickByTickLast;
 
-            _client.RequestTickByTickData(reqId, contract, "Last");
+            _socket.RequestTickByTickData(reqId, contract, "Last");
         }
 
         void TickByTickLast(int reqId, Last last)
@@ -450,9 +450,9 @@ namespace TradingBot.Broker
             var reqId = _subscriptions.Last[contract];
             _subscriptions.Last.Remove(contract);
             if (_subscriptions.Last.Count == 0)
-                _client.Callbacks.TickByTickAllLast-= TickByTickLast;
+                _socket.Callbacks.TickByTickAllLast -= TickByTickLast;
 
-            _client.CancelTickByTickData(reqId);
+            _socket.CancelTickByTickData(reqId);
         }
 
         public void RequestBarsUpdates(Contract contract)
@@ -464,10 +464,10 @@ namespace TradingBot.Broker
             _subscriptions.FiveSecBars[contract] = reqId;
             _fiveSecBars[contract] = new LinkedList<Bar>();
             if (_subscriptions.FiveSecBars.Count == 1)
-                _client.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
+                _socket.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
             // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-            _client.RequestFiveSecondsBarUpdates(reqId, contract);
+            _socket.RequestFiveSecondsBarUpdates(reqId, contract);
         }
 
         void OnFiveSecondsBarReceived(int reqId, MarketData.Bar bar)
@@ -477,7 +477,7 @@ namespace TradingBot.Broker
             var contract = _subscriptions.FiveSecBars.First(c => c.Value == reqId).Key;
 
             _logger.Debug($"FiveSecondsBarReceived for {contract}");
-            
+
             UpdateBarsAndInvoke(contract, bar);
         }
 
@@ -495,13 +495,13 @@ namespace TradingBot.Broker
                     continue;
 
                 int sec = (int)barLength;
-                int nbBars = (sec / 5);
-                if (list.Count >= nbBars && ((bar.Time.Second  + 5) % sec) == 0)
+                int nbBars = sec / 5;
+                if (list.Count >= nbBars && (bar.Time.Second + 5) % sec == 0)
                 {
                     Bar barToUse = bar;
-                    if(barLength > BarLength._5Sec)
+                    if (barLength > BarLength._5Sec)
                     {
-                        bar = MarketDataUtils.MakeBar(list.TakeLast(nbBars), barLength);
+                        bar = Utils.MakeBar(list.TakeLast(nbBars), barLength);
                     }
 
                     InvokeCallbacks(contract, bar);
@@ -528,11 +528,11 @@ namespace TradingBot.Broker
             var reqId = _subscriptions.FiveSecBars[contract];
             _subscriptions.FiveSecBars.Remove(contract);
             _fiveSecBars.Remove(contract);
-            
-            if(_subscriptions.FiveSecBars.Count == 0)
-                _client.Callbacks.RealtimeBar -= OnFiveSecondsBarReceived;
 
-            _client.CancelFiveSecondsBarsUpdates(reqId);
+            if (_subscriptions.FiveSecBars.Count == 0)
+                _socket.Callbacks.RealtimeBar -= OnFiveSecondsBarReceived;
+
+            _socket.CancelFiveSecondsBarsUpdates(reqId);
         }
 
         public Task<OrderResult> PlaceOrderAsync(Contract contract, Order order)
@@ -551,7 +551,7 @@ namespace TradingBot.Broker
 
             var tcs = new TaskCompletionSource<OrderResult>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
-            
+
             var openOrder = new Action<Contract, Order, OrderState>((c, o, oState) =>
             {
                 if (order.Id == o.Id)
@@ -590,7 +590,7 @@ namespace TradingBot.Broker
 
             var error = new Action<ErrorMessageException>(msg =>
             {
-                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                if (!Utils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
                 {
                     return;
                 }
@@ -598,21 +598,21 @@ namespace TradingBot.Broker
                 tcs.TrySetException(msg);
             });
 
-            _client.Callbacks.OpenOrder += openOrder;
-            _client.Callbacks.OrderStatus += orderStatus;
-            _client.Callbacks.ExecDetails += execDetails;
-            _client.Callbacks.CommissionReport += commissionReport;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.OpenOrder += openOrder;
+            _socket.Callbacks.OrderStatus += orderStatus;
+            _socket.Callbacks.ExecDetails += execDetails;
+            _socket.Callbacks.CommissionReport += commissionReport;
+            _socket.Callbacks.Error += error;
 
-            _client.PlaceOrder(contract, order);
+            _socket.PlaceOrder(contract, order);
 
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.OpenOrder -= openOrder;
-                _client.Callbacks.OrderStatus -= orderStatus;
-                _client.Callbacks.CommissionReport -= commissionReport;
-                _client.Callbacks.ExecDetails -= execDetails;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.OpenOrder -= openOrder;
+                _socket.Callbacks.OrderStatus -= orderStatus;
+                _socket.Callbacks.CommissionReport -= commissionReport;
+                _socket.Callbacks.ExecDetails -= execDetails;
+                _socket.Callbacks.Error -= error;
             });
 
             return tcs.Task;
@@ -626,7 +626,7 @@ namespace TradingBot.Broker
             if (!order.Info.Transmit)
                 _logger.Warn($"Order will not be submitted automatically since \"{nameof(order.Info.Transmit)}\" is set to false.");
 
-            _client.PlaceOrder(contract, order);
+            _socket.PlaceOrder(contract, order);
         }
 
         public Task<OrderStatus> CancelOrderAsync(int orderId)
@@ -650,18 +650,18 @@ namespace TradingBot.Broker
 
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
-            _client.Callbacks.OrderStatus += orderStatus;
-            _client.Callbacks.Error += error;
+            _socket.Callbacks.OrderStatus += orderStatus;
+            _socket.Callbacks.Error += error;
             tcs.Task.ContinueWith(t =>
             {
-                _client.Callbacks.OrderStatus -= orderStatus;
-                _client.Callbacks.Error -= error;
+                _socket.Callbacks.OrderStatus -= orderStatus;
+                _socket.Callbacks.Error -= error;
             });
 
             _logger.Debug($"Requesting order cancellation for order id : {orderId}");
 
             source.CancelAfter(timeoutInMs);
-            _client.CancelOrder(orderId);
+            _socket.CancelOrder(orderId);
 
             return tcs.Task;
         }
@@ -669,24 +669,24 @@ namespace TradingBot.Broker
         public void CancelOrder(Order order)
         {
             Trace.Assert(order.Id > 0);
-            _client.CancelOrder(order.Id);
+            _socket.CancelOrder(order.Id);
         }
 
         public void CancelAllOrders()
         {
-            _client.CancelAllOrders();
+            _socket.CancelAllOrders();
         }
 
         public void RequestPositionsUpdates()
         {
-            _client.RequestPositionsUpdates();
+            _socket.RequestPositionsUpdates();
             _subscriptions.Positions = true;
         }
 
         public void CancelPositionsUpdates()
         {
             _subscriptions.Positions = false;
-            _client.CancelPositionsUpdates();
+            _socket.CancelPositionsUpdates();
         }
 
         public void RequestPnLUpdates(Contract contract)
@@ -696,10 +696,10 @@ namespace TradingBot.Broker
 
             int reqId = NextRequestId;
             _subscriptions.Pnl[contract] = reqId;
-            if(_subscriptions.Pnl.Count == 1)
-                _client.Callbacks.PnlSingle += PnlSingle;
+            if (_subscriptions.Pnl.Count == 1)
+                _socket.Callbacks.PnlSingle += PnlSingle;
 
-            _client.RequestPnLUpdates(reqId, contract.Id);
+            _socket.RequestPnLUpdates(reqId, contract.Id);
         }
 
         void PnlSingle(int reqId, PnL pnl)
@@ -712,33 +712,33 @@ namespace TradingBot.Broker
         {
             if (!_subscriptions.Pnl.ContainsKey(contract))
                 return;
-            
+
             _subscriptions.Pnl.Remove(contract);
             if (_subscriptions.Pnl.Count == 0)
-                _client.Callbacks.PnlSingle -= PnlSingle;
+                _socket.Callbacks.PnlSingle -= PnlSingle;
 
-            _client.CancelPnLUpdates(_subscriptions.Pnl[contract]);
+            _socket.CancelPnLUpdates(_subscriptions.Pnl[contract]);
         }
 
         public void RequestAccountUpdates(string account)
         {
             _subscriptions.AccountUpdates = true;
-            _client.RequestAccountUpdates(account);
+            _socket.RequestAccountUpdates(account);
         }
 
         public void CancelAccountUpdates(string account)
         {
             if (_subscriptions.AccountUpdates)
             {
-                _client.CancelAccountUpdates(account);
+                _socket.CancelAccountUpdates(account);
             }
         }
 
         internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
         {
-            return await GetHistoricalBarsAsync(contract, barLength, default(DateTime), count);   
+            return await GetHistoricalBarsAsync(contract, barLength, default, count);
         }
-   
+
         public Task<IEnumerable<Bar>> GetHistoricalBarsAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;
@@ -785,9 +785,9 @@ namespace TradingBot.Broker
                     throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
             }
 
-            string edt = endDateTime == DateTime.MinValue ? String.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
+            string edt = endDateTime == DateTime.MinValue ? string.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
 
-            _client.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, true);
+            _socket.RequestHistoricalData(reqId, contract, edt, durationStr, barSizeStr, true);
 
             return resolveResult.Task;
         }
@@ -813,13 +813,13 @@ namespace TradingBot.Broker
                 }
             });
 
-            _client.Callbacks.HistoricalData += historicalData;
-            _client.Callbacks.HistoricalDataEnd += historicalDataEnd;
+            _socket.Callbacks.HistoricalData += historicalData;
+            _socket.Callbacks.HistoricalDataEnd += historicalDataEnd;
 
             resolveResult.Task.ContinueWith(t =>
             {
-                _client.Callbacks.HistoricalData -= historicalData;
-                _client.Callbacks.HistoricalDataEnd -= historicalDataEnd;
+                _socket.Callbacks.HistoricalData -= historicalData;
+                _socket.Callbacks.HistoricalDataEnd -= historicalDataEnd;
             });
         }
 
@@ -859,26 +859,26 @@ namespace TradingBot.Broker
             {
                 Action<int, IEnumerable<BidAsk>, bool> callback = (Action<int, IEnumerable<BidAsk>, bool>)historicalTicks;
 
-                _client.Callbacks.HistoricalTicksBidAsk += callback;
+                _socket.Callbacks.HistoricalTicksBidAsk += callback;
                 tcs.Task.ContinueWith(t =>
                 {
-                    _client.Callbacks.HistoricalTicksBidAsk -= callback;
+                    _socket.Callbacks.HistoricalTicksBidAsk -= callback;
                 });
             }
             else if (typeof(TData) == typeof(Last))
             {
                 Action<int, IEnumerable<Last>, bool> callback = (Action<int, IEnumerable<Last>, bool>)historicalTicks;
 
-                _client.Callbacks.HistoricalTicksLast += callback;
+                _socket.Callbacks.HistoricalTicksLast += callback;
                 tcs.Task.ContinueWith(t =>
                 {
-                    _client.Callbacks.HistoricalTicksLast -= callback;
+                    _socket.Callbacks.HistoricalTicksLast -= callback;
                 });
             }
             else
                 throw new NotImplementedException();
 
-            _client.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, whatToShow, false, true);
+            _socket.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, whatToShow, false, true);
 
             return tcs.Task;
         }
@@ -891,12 +891,12 @@ namespace TradingBot.Broker
             {
                 tcs.SetResult(DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime());
             });
-            
-            _client.Callbacks.CurrentTime += currentTime;
-            tcs.Task.ContinueWith(task => _client.Callbacks.CurrentTime -= currentTime);
+
+            _socket.Callbacks.CurrentTime += currentTime;
+            tcs.Task.ContinueWith(task => _socket.Callbacks.CurrentTime -= currentTime);
 
             _logger.Debug("Requesting current time");
-            _client.RequestCurrentTime();
+            _socket.RequestCurrentTime();
             return tcs.Task;
         }
     }

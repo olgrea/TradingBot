@@ -1,6 +1,7 @@
-﻿using TradingBot.Broker.Orders;
+﻿using IBClient.Contracts;
+using IBClient.Orders;
 
-namespace TradingBot.Broker.Client.Messages
+namespace IBClient.Messages
 {
     internal abstract class OrderResult
     {

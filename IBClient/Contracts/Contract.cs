@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker
+﻿namespace IBClient.Contracts
 {
     internal enum OptionType
     {

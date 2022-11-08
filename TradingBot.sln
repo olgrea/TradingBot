@@ -4,11 +4,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "src\TradingBot.csproj", "{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}"
-	ProjectSection(ProjectDependencies) = postProject
-		{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6} = {FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}
-	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevTesting", "DevTesting\DevTesting.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
 EndProject
@@ -17,6 +12,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataFetcher", "HistoricalDataFetcher\HistoricalDataFetcher.csproj", "{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tests", "Tests\Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IBClient", "IBClient\IBClient.csproj", "{3966C751-61BF-4847-8DAB-BC0F778DDBD8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,10 +27,6 @@ Global
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FCC1FDE2-AC8C-4F0C-AA9A-A61585A267C6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -48,6 +43,14 @@ Global
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

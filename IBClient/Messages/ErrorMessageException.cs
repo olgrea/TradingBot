@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TradingBot.Broker.Client.Messages
+namespace IBClient.Messages
 {
     internal class ErrorMessageException : Exception
     {
@@ -21,7 +21,7 @@ namespace TradingBot.Broker.Client.Messages
             get
             {
                 string baseMsg = base.Message;
-                if (ErrorCode >=0 || Id >= 0)
+                if (ErrorCode >= 0 || Id >= 0)
                 {
                     baseMsg += " (";
                     if (ErrorCode >= 0)

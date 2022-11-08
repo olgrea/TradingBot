@@ -3,11 +3,12 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using IBApi;
 using NLog;
+using Contract = IBClient.Contracts.Contract;
 
 [assembly: InternalsVisibleTo("Tests")]
-namespace TradingBot.Broker.Client
+namespace IBClient.Backend
 {
-    internal class IBClient : IIBClient
+    internal class IBSocket : IIBSocket
     {
         EClientSocket _clientSocket;
         EReaderSignal _signal;
@@ -17,7 +18,7 @@ namespace TradingBot.Broker.Client
         Task _processMsgTask;
         string _accountCode = null;
 
-        public IBClient(ILogger logger)
+        public IBSocket(ILogger logger)
         {
             _logger = logger;
             _callbacks = new IBCallbacks(logger);
@@ -25,7 +26,7 @@ namespace TradingBot.Broker.Client
             _clientSocket = new EClientSocket(_callbacks, _signal);
         }
 
-        internal IBClient(IBCallbacks callbacks, ILogger logger)
+        internal IBSocket(IBCallbacks callbacks, ILogger logger)
         {
             _logger = logger;
             _callbacks = callbacks;
@@ -65,7 +66,7 @@ namespace TradingBot.Broker.Client
         {
             _logger.Debug($"Requesting next valid order ids");
             _clientSocket.reqIds(-1); // param is deprecated
-        }     
+        }
 
         public void RequestAccountUpdates(string accountCode)
         {

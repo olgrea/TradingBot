@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Globalization;
-using TradingBot.Broker.Orders;
+using IBClient.Contracts;
+using IBClient.Orders;
 
-namespace TradingBot.Broker.Client
+namespace IBClient.Backend
 {
     internal static class Conversions
     {
@@ -223,10 +224,10 @@ namespace TradingBot.Broker.Client
         {
             return new CommissionInfo()
             {
-                 Commission = report.Commission,
-                 ExecId = report.ExecId,   
-                 Currency = report.Currency,
-                 RealizedPNL = report.RealizedPNL,
+                Commission = report.Commission,
+                ExecId = report.ExecId,
+                Currency = report.Currency,
+                RealizedPNL = report.RealizedPNL,
             };
         }
     }
