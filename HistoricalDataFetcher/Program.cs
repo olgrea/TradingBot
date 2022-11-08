@@ -4,11 +4,12 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using CommandLine;
+using DataStorage.Db.DbCommandFactories;
+using InteractiveBrokers;
+using InteractiveBrokers.Contracts;
+using InteractiveBrokers.MarketData;
 using NLog;
-using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils.Db.DbCommandFactories;
-using TradingBot.Utils.MarketData;
+using static HistoricalDataFetcherApp.HistoricalDataFetcher;
 
 [assembly: InternalsVisibleTo("Tests")]
 namespace HistoricalDataFetcherApp
@@ -37,12 +38,12 @@ namespace HistoricalDataFetcherApp
             if (!string.IsNullOrEmpty(parsedArgs.Value.EndDate))
                 endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
-            await FetchEverything(ticker, startDate.AddTicks(MarketDataUtils.MarketStartTime.Ticks), endDate.AddTicks(MarketDataUtils.MarketEndTime.Ticks));
+            await FetchEverything(ticker, startDate.AddTicks(Utils.MarketStartTime.Ticks), endDate.AddTicks(Utils.MarketEndTime.Ticks));
         }
 
         public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate)
         {
-            var broker = new IBBroker(321);
+            var broker = new IBClient(321);
             var logger = LogManager.GetLogger($"{nameof(HistoricalDataFetcher)}");
             var dataFetcher = new HistoricalDataFetcher(broker, logger);
             broker.ErrorHandler = new HistoricalDataFetcher.FetcherErrorHandler(dataFetcher, broker, logger);
@@ -52,7 +53,7 @@ namespace HistoricalDataFetcherApp
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
-            var marketDays = MarketDataUtils.GetMarketDays(startDate, endDate).ToList();
+            var marketDays = Utils.GetMarketDays(startDate, endDate).ToList();
 
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
             await Fetch(dataFetcher, contract, marketDays, barCmdFactory);
@@ -81,5 +82,3 @@ namespace HistoricalDataFetcherApp
         }
     }
 }
-
-
