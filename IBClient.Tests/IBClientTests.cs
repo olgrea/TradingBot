@@ -12,7 +12,7 @@ using InteractiveBrokers.Contracts;
 namespace Tests.Broker
 {
     [TestFixture]
-    internal class IBClientTests
+    public class IBClientTests
     {
         protected IBClient _client;
         protected ConnectResult _connectMessage;
