@@ -125,7 +125,7 @@ namespace InteractiveBrokers
             Init(clientId, null, null);
         }
 
-        internal IBClient(int clientId, IIBSocket socket)
+        public IBClient(int clientId, IIBSocket socket)
         {
             Init(clientId, socket, null);
         }

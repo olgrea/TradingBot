@@ -16,7 +16,7 @@ using OrderState = InteractiveBrokers.Orders.OrderState;
 
 namespace InteractiveBrokers.Backend
 {
-    internal class IBCallbacks : EWrapper
+    public class IBCallbacks : EWrapper
     {
         ILogger _logger;
 

@@ -41,7 +41,7 @@ namespace Backtester
         }
     }
 
-    internal class FakeClient : IIBSocket
+    internal class FakeIBSocket : IIBSocket
     {
         /// <summary>
         /// For market hours 7:00 to 16:00 : 9 hours = 32400s
@@ -108,9 +108,9 @@ namespace Backtester
 
         internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClient(string symbol, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        public FakeIBSocket(string symbol, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
         {
-            _logger = LogManager.GetLogger(nameof(FakeClient));
+            _logger = LogManager.GetLogger(nameof(FakeIBSocket));
             Callbacks = new IBCallbacks(_logger);
             _requestsQueue = new BlockingCollection<Action>();
             _responsesQueue = new BlockingCollection<Action>();

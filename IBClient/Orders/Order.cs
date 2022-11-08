@@ -100,7 +100,7 @@ namespace InteractiveBrokers.Orders
     public class TrailingStopOrder : Order
     {
         public TrailingStopOrder() : base("TRAIL") { }
-        internal double StopPrice { get; set; } = double.MaxValue;
+        public double StopPrice { get; set; } = double.MaxValue;
 
         public double TrailingAmount { get; set; } = double.MaxValue;
         // Takes priority over TrailingAmount if set

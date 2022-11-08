@@ -40,9 +40,9 @@ namespace Backtester
                 var bars = marketData.Item1;
                 var bidAsks = marketData.Item2;
 
-                var fakeClient = new FakeClient(_ticker, day.Item1, day.Item2, bars, bidAsks);
-                var broker = new IBClient(1337, fakeClient);
-                Trader trader = new Trader(_ticker, day.Item1, day.Item2, broker, $"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
+                var fakeClient = new FakeIBSocket(_ticker, day.Item1, day.Item2, bars, bidAsks);
+                var client = new IBClient(1337, fakeClient);
+                Trader trader = new Trader(_ticker, day.Item1, day.Item2, client, $"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
 
                 trader.AddStrategyForTicker<RSIDivergenceStrategy>();
                 
