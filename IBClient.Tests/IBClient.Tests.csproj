@@ -22,9 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Backtester\Backtester.csproj" />
-    <ProjectReference Include="..\HistoricalDataFetcher\HistoricalDataFetcher.csproj" />
-    <ProjectReference Include="..\src\TradingBot.csproj" />
+    <ProjectReference Include="..\IBClient\IBClient.csproj" />
   </ItemGroup>
 
 </Project>
