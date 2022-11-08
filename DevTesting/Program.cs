@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
 using CommandLine;
+using InteractiveBrokers.MarketData;
 using TradingBot;
 using TradingBot.Strategies;
-using TradingBot.Utils.MarketData;
 
 namespace ConsoleApp
 {
@@ -30,12 +30,12 @@ namespace ConsoleApp
 
             string ticker = parsedArgs.Value.Ticker;
             TimeSpan startTime = TimeSpan.Parse(parsedArgs.Value.StartTime);
-            if (startTime < MarketDataUtils.MarketStartTime)
-                throw new ArgumentException($"The start time must be at least {MarketDataUtils.MarketStartTime}");
+            if (startTime < Utils.MarketStartTime)
+                throw new ArgumentException($"The start time must be at least {Utils.MarketStartTime}");
             
             TimeSpan endTime = TimeSpan.Parse(parsedArgs.Value.EndTime);
-            if (endTime > MarketDataUtils.MarketEndTime)
-                throw new ArgumentException($"The end time must be at most {MarketDataUtils.MarketEndTime}");
+            if (endTime > Utils.MarketEndTime)
+                throw new ArgumentException($"The end time must be at most {Utils.MarketEndTime}");
 
             var start = new DateTime(DateTime.Today.Ticks + startTime.Ticks, DateTimeKind.Local);
             var end = new DateTime(DateTime.Today.Ticks + endTime.Ticks, DateTimeKind.Local);
