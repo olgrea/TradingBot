@@ -71,7 +71,7 @@ namespace HistoricalDataFetcherApp
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
             IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
-            while (current >= morning)
+            while (current > morning)
             {
                 var begin = current.AddMinutes(-30);
                 var end = current;
@@ -88,6 +88,9 @@ namespace HistoricalDataFetcherApp
                 else
                 {
                     data = await FetchHistoricalData<TData>(contract, current);
+                    var dateStr = current.Date.ToShortDateString();
+                    _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS. Inserting.");
+
                     var insertCmd = commandFactory.CreateInsertCommand(contract.Symbol, data);
                     insertCmd.Execute();
                 }
@@ -158,57 +161,52 @@ namespace HistoricalDataFetcherApp
             {
                 return await FetchBars<TData>(contract, time);
             }
-            else if (typeof(TData) == typeof(BidAsk))
+            else 
             {
-                return await FetchBidAsk<TData>(contract, time);
+                return await FetchTooMuchData<TData>(contract, time);
             }
-
-            return new LinkedList<TData>();
         }
 
-        private async Task<IEnumerable<TData>> FetchBidAsk<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
+        private async Task<IEnumerable<TData>> FetchTooMuchData<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
         {
-            _logger?.Info($"Retrieving bid ask from TWS for '{contract.Symbol} {time}'.");
+            Type datatype = typeof(TData);
+            _logger?.Info($"Retrieving {datatype.Name} from TWS for '{contract.Symbol} {time}'.");
 
             // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
             // There doesn't seem to be a way to convert ticks to seconds...
             // So we just do requests as long as we don't have 30 minutes.
-            IEnumerable<BidAsk> bidask = new LinkedList<BidAsk>();
+            IEnumerable<TData> data = new LinkedList<TData>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
-            //TimeSpan _20min = TimeSpan.FromMinutes(20);
             var diff = time - current;
             int tickCount = 1000;
             while (diff <= _30min)
             {
-                //// Adjusting tick count for the last 5 minutes in order to not retrieve too much out of range data...
-                //if(diff > _20min)
-                //    tickCount = 100;
+                IEnumerable<TData> ticks = Enumerable.Empty<TData>();
+                if(datatype == typeof(BidAsk))
+                {
+                    ticks = (await _client.GetHistoricalBidAsksAsync(contract, current, tickCount)).Cast<TData>();
+                    // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
+                    NbRequest++; NbRequest++;
+                }
+                else if (datatype == typeof(Last))
+                {
+                    ticks = (await _client.GetHistoricalLastsAsync(contract, current, tickCount)).Cast<TData>();
+                    NbRequest++;
+                }
 
-                var ticks = await _client.GetHistoricalBidAsksAsync(contract, current, tickCount);
-
-                // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
-                NbRequest++; NbRequest++;
                 if (IsPossibleMarketHoliday(current, ticks))
-                    return new LinkedList<TData>();
+                    return Enumerable.Empty<TData>();
 
-                bidask = ticks.Concat(bidask);
+                data = ticks.Concat(data);
                 current = ticks.First().Time;
 
                 diff = time - current;
             }
 
             // Remove out of range data.
-            var list = new LinkedList<TData>(bidask.Cast<TData>());
-            var currNode = list.First;
             var timeOfDay = (time - _30min).TimeOfDay;
-            while (currNode != null && currNode.Value.Time.TimeOfDay < timeOfDay)
-            {
-                list.RemoveFirst();
-                currNode = list.First;
-            }
-
-            return list;
+            return data.SkipWhile(d => d.Time.TimeOfDay < timeOfDay);
         }
 
         private async Task<IEnumerable<TData>> FetchBars<TData>(Contract contract, DateTime time) where TData : IMarketData, new()
