@@ -67,7 +67,7 @@ namespace HistoricalDataFetcherApp
 
             _logger?.Info($"Getting data for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
-            // In order to respect TWS limitationsm, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
+            // In order to respect TWS limitations, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
             // time range to the beginning. 
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
