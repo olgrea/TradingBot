@@ -86,11 +86,9 @@ namespace Backtester
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
 
-        LinkedList<Bar> _dailyBars;
-        LinkedListNode<Bar> _currentBarNode;
-
-        LinkedList<BidAsk> _dailyBidAsks;
-        LinkedListNode<BidAsk> _currentBidAskNode;
+        MarketDataCollections _dailyData;
+        IEnumerator<Bar> _currentBar;
+        IEnumerator<BidAsk> _currentBidAsk;
 
         ILogger _logger;
 
@@ -105,10 +103,8 @@ namespace Backtester
         Position Position => _fakeAccount.Positions.FirstOrDefault();
         internal Contract Contract => _contract;
         internal Account Account => _fakeAccount;
-
-        internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClientSocket(string symbol, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        public FakeClientSocket(string symbol, DateTime startTime, DateTime endTime, MarketDataCollections dailyData)
         {
             _logger = LogManager.GetLogger(nameof(FakeClientSocket));
             Callbacks = new IBCallbacks(_logger);
@@ -120,11 +116,9 @@ namespace Backtester
             _start = startTime;
             _end = endTime;
 
-            _dailyBars = new LinkedList<Bar>(dailyBars);
-            _currentBarNode = InitFirstNode(_dailyBars);
-
-            _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
-            _currentBidAskNode = InitFirstNode(_dailyBidAsks);
+            _dailyData = dailyData;
+            _currentBar = GetStartEnumerator(_dailyData.Bars);
+            _currentBidAsk = GetStartEnumerator(_dailyData.BidAsks);
 
             _contract = s_ContractsCache.Get(_symbol);
 
@@ -158,12 +152,11 @@ namespace Backtester
 
         internal Task PassingTimeTask => _passingTimeTask;
 
-        LinkedListNode<T> InitFirstNode<T>(LinkedList<T> list) where T : IMarketData
+        IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
-            var current = list.First;
-            while (current.Value.Time < _start)
-                current = current.Next;
-            return current;
+            var e = data.SkipWhile(d => d?.Time < _start).GetEnumerator();
+            //e.MoveNext();
+            return e;
         }
 
         public void Connect(string host, int port, int clientId)
@@ -281,7 +274,7 @@ namespace Backtester
 
             _requestsQueue.Add(() =>
             {
-                var price = order.TotalQuantity * _currentBidAskNode.Value.Ask;
+                var price = order.TotalQuantity * _currentBidAsk.Current.Ask;
                 if(order.Action == OrderAction.BUY && _fakeAccount.CashBalances["BASE"] < price)
                 {
                     _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
@@ -712,17 +705,17 @@ namespace Backtester
 
         void OnClockTick_UpdateBarNode(DateTime newTime)
         {
-            if (_currentBarNode?.Value.Time < newTime)
-                _currentBarNode = _currentBarNode.Next;
+            if (_currentBar.Current.Time < newTime)
+                _currentBar.MoveNext();
 
             if (_reqId5SecBar > 0 && newTime.Second % 5 == 0)
             {
                 var list = new LinkedList<Bar>();
-                var current = _currentBarNode;
+                var current = _currentBar;
                 for (int i = 0; i < 5; i++)
                 {
-                    list.AddLast(current.Value);
-                    current = current.Next;
+                    list.AddLast(current.Current);
+                    current.MoveNext();
                 }
 
                 var b = Utils.MakeBar(list, BarLength._5Sec);
@@ -768,17 +761,17 @@ namespace Backtester
         void OnClockTick_UpdateBidAskNode(DateTime newTime)
         {
             // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
-            while (_currentBidAskNode?.Value.Time < newTime)
+            while (_currentBidAsk.Current.Time < newTime)
             {
-                EvaluateOpenOrders(_currentBidAskNode.Value);
-                BidAskSubscription?.Invoke(_currentBidAskNode.Value);
-                _currentBidAskNode = _currentBidAskNode.Next;
+                EvaluateOpenOrders(_currentBidAsk.Current);
+                BidAskSubscription?.Invoke(_currentBidAsk.Current);
+                _currentBidAsk.MoveNext();
             }
         }
 
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
-            var ba = _currentBidAskNode.Value;
+            var ba = _currentBidAsk.Current;
             var currentPrice = ba.Ask;
 
             var oldPos = new Position(Position);
@@ -861,23 +854,29 @@ namespace Backtester
                         throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
                 }
 
-                LinkedListNode<Bar> first = _currentBarNode;
-                LinkedListNode<Bar> current = first;
+                // TODO : does TWS really sends bars in reverse? I don't remember. Need to re-check
 
-                for (int i = 0; i < nbBars; i++, current = current.Previous)
+                IEnumerator<Bar> first = _currentBar;
+                var bars = _dailyData.Bars.Reverse().SkipWhile(b => b != _currentBar.Current).Take(nbBars);
+
+                foreach (var b in bars)
                 {
-                    _responsesQueue.Add(() => Callbacks.historicalData(reqId, new IBApi.Bar(
-                        current.Value.Time.ToString(Bar.TWSTimeFormat), 
-                        current.Value.Open, 
-                        current.Value.High, 
-                        current.Value.Low, 
-                        current.Value.Close, 
-                        current.Value.Volume, 
-                        current.Value.TradeAmount, 
-                        0)));
+                    _responsesQueue.Add(() =>
+                    {
+                        Callbacks.historicalData(reqId, 
+                            new IBApi.Bar(
+                                b.Time.ToString(Utils.TWSTimeFormat),
+                                b.Open,
+                                b.High,
+                                b.Low,
+                                b.Close,
+                                b.Volume,
+                                b.TradeAmount,
+                                0));
+                    });
                 }
 
-                _responsesQueue.Add(() => Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat)));
+                _responsesQueue.Add(() => Callbacks.historicalDataEnd(reqId, first.Current.Time.ToString(Utils.TWSTimeFormat), bars.Last().Time.ToString(Utils.TWSTimeFormat)));
             });
         }
 

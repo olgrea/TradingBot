@@ -734,11 +734,6 @@ namespace InteractiveBrokers
             }
         }
 
-        internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
-        {
-            return await GetHistoricalBarsAsync(contract, barLength, default, count);
-        }
-
         public Task<IEnumerable<Bar>> GetHistoricalBarsAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;

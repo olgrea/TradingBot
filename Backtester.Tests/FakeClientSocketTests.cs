@@ -22,23 +22,19 @@ namespace Tests.Backtester
 
         DateTime _downwardFileTime = new DateTime(2022, 09, 19, 11, 30, 00, DateTimeKind.Local);
         DateTime _downwardStart = new DateTime(2022, 09, 19, 11, 17, 00);
-        IEnumerable<BidAsk> _downwardBidAsks;
-        IEnumerable<Bar> _downwardBars;
+        MarketDataCollections _downwardData;
 
         DateTime _upwardFileTime = new DateTime(2022, 09, 19, 14, 30, 00, DateTimeKind.Local);
         DateTime _upwardStart = new DateTime(2022, 09, 19, 14, 21, 00);
-        IEnumerable<BidAsk> _upwardBidAsks;
-        IEnumerable<Bar> _upwardBars;
+        MarketDataCollections _upwardData;
 
         DateTime _downThenUpFileTime = new DateTime(2022, 09, 19, 15, 30, 00, DateTimeKind.Local);
         DateTime _downThenUpStart = new DateTime(2022, 09, 19, 15, 15, 00);
-        IEnumerable<BidAsk> _downThenUpBidAsks;
-        IEnumerable<Bar> _downThenUpBars;
+        MarketDataCollections _downThenUpData;
 
         DateTime _upThenDownFileTime = new DateTime(2022, 09, 19, 11, 30, 00, DateTimeKind.Local);
         DateTime _upThenDownStart = new DateTime(2022, 09, 19, 11, 13, 00);
-        IEnumerable<BidAsk> _upThenDownBidAsks;
-        IEnumerable<Bar> _upThenDownBars;
+        MarketDataCollections _upThenDownData;
 
         FakeClientSocket _fakeIBSocket;
 
@@ -48,14 +44,29 @@ namespace Tests.Backtester
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
             var bidAskCmdFactory = new BidAskCommandFactory();
 
-            _downwardBidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart, bidAskCmdFactory);
-            _downwardBars = LoadData<Bar>(_downwardFileTime, _downwardStart, barCmdFactory);
-            _upwardBidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart, bidAskCmdFactory);
-            _upwardBars = LoadData<Bar>(_upwardFileTime, _upwardStart, barCmdFactory);
-            _downThenUpBidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart, bidAskCmdFactory);
-            _downThenUpBars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart, barCmdFactory);
-            _upThenDownBidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory);
-            _upThenDownBars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart, barCmdFactory);
+            _downwardData = new MarketDataCollections()
+            {
+                BidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart, bidAskCmdFactory),
+                Bars = LoadData<Bar>(_downwardFileTime, _downwardStart, barCmdFactory),
+            };
+
+            _upwardData = new MarketDataCollections()
+            {
+                BidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart, bidAskCmdFactory),
+                Bars = LoadData<Bar>(_upwardFileTime, _upwardStart, barCmdFactory),
+            };
+
+            _downThenUpData = new MarketDataCollections()
+            {
+                BidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart, bidAskCmdFactory),
+                Bars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart, barCmdFactory),
+            };
+
+            _upThenDownData = new MarketDataCollections()
+            {
+                BidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory),
+                Bars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart, barCmdFactory),
+            };
 
             FakeClientSocket.TimeDelays.TimeScale = 0.001;
             await Task.CompletedTask;
@@ -78,7 +89,7 @@ namespace Tests.Backtester
         public async Task MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new MarketOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -92,7 +103,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First().Ask;
+            var expectedPrice = _upwardData.BidAsks.First().Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -101,7 +112,7 @@ namespace Tests.Backtester
         public async Task MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new MarketOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -119,7 +130,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First().Bid;
+            var expectedPrice = _upwardData.BidAsks.First().Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -128,12 +139,12 @@ namespace Tests.Backtester
         public async Task LimitOrder_Buy_OverAskPrice_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                LmtPrice = _upwardBidAsks.First().Ask + 0.5,
+                LmtPrice = _upwardData.BidAsks.First().Ask + 0.5,
                 TotalQuantity = 50
             };
 
@@ -143,7 +154,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First().Ask;
+            var expectedPrice = _upwardData.BidAsks.First().Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -152,12 +163,12 @@ namespace Tests.Backtester
         public async Task LimitOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                LmtPrice = _downwardBidAsks.First().Ask - 0.02,
+                LmtPrice = _downwardData.BidAsks.First().Ask - 0.02,
                 TotalQuantity = 50
             };
 
@@ -167,7 +178,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First(ba => ba.Ask <= order.LmtPrice).Ask;
+            var expectedPrice = _downwardData.BidAsks.First(ba => ba.Ask <= order.LmtPrice).Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -176,12 +187,12 @@ namespace Tests.Backtester
         public async Task LimitOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                LmtPrice = _upwardBidAsks.First().Bid + 0.03,
+                LmtPrice = _upwardData.BidAsks.First().Bid + 0.03,
                 TotalQuantity = 50
             };
 
@@ -195,7 +206,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First(ba => ba.Bid >= order.LmtPrice).Bid;
+            var expectedPrice = _upwardData.BidAsks.First(ba => ba.Bid >= order.LmtPrice).Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -204,12 +215,12 @@ namespace Tests.Backtester
         public async Task LimitOrder_Sell_UnderBidPrice_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new LimitOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                LmtPrice = _downwardBidAsks.First().Bid - 0.1,
+                LmtPrice = _downwardData.BidAsks.First().Bid - 0.1,
                 TotalQuantity = 50
             };
 
@@ -223,7 +234,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First().Bid;
+            var expectedPrice = _downwardData.BidAsks.First().Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -232,12 +243,12 @@ namespace Tests.Backtester
         public async Task StopOrder_Buy_OverAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                StopPrice = _upwardBidAsks.First().Ask + 0.02,
+                StopPrice = _upwardData.BidAsks.First().Ask + 0.02,
                 TotalQuantity = 50
             };
 
@@ -247,7 +258,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First(ba => ba.Ask >= order.StopPrice).Ask;
+            var expectedPrice = _upwardData.BidAsks.First(ba => ba.Ask >= order.StopPrice).Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -256,12 +267,12 @@ namespace Tests.Backtester
         public async Task StopOrder_Buy_UnderAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                StopPrice = _downwardBidAsks.First().Ask - 0.1,
+                StopPrice = _downwardData.BidAsks.First().Ask - 0.1,
                 TotalQuantity = 50
             };
 
@@ -271,7 +282,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First().Ask;
+            var expectedPrice = _downwardData.BidAsks.First().Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -280,12 +291,12 @@ namespace Tests.Backtester
         public async Task StopOrder_Sell_OverBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                StopPrice = _upwardBidAsks.First().Bid + 0.03,
+                StopPrice = _upwardData.BidAsks.First().Bid + 0.03,
                 TotalQuantity = 50
             };
 
@@ -299,7 +310,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First().Bid;
+            var expectedPrice = _upwardData.BidAsks.First().Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -308,12 +319,12 @@ namespace Tests.Backtester
         public async Task StopOrder_Sell_UnderBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new StopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                StopPrice = _downwardBidAsks.First().Bid - 0.02,
+                StopPrice = _downwardData.BidAsks.First().Bid - 0.02,
                 TotalQuantity = 50
             };
 
@@ -327,7 +338,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First(ba => ba.Bid <= order.StopPrice).Bid;
+            var expectedPrice = _downwardData.BidAsks.First(ba => ba.Bid <= order.StopPrice).Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -336,12 +347,12 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Buy_OverAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                TouchPrice = _upwardBidAsks.First().Ask + 0.02,
+                TouchPrice = _upwardData.BidAsks.First().Ask + 0.02,
                 TotalQuantity = 50
             };
 
@@ -351,7 +362,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First().Ask;
+            var expectedPrice = _upwardData.BidAsks.First().Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -360,12 +371,12 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                TouchPrice = _downwardBidAsks.First().Ask - 0.03,
+                TouchPrice = _downwardData.BidAsks.First().Ask - 0.03,
                 TotalQuantity = 50
             };
 
@@ -375,7 +386,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First(ba => ba.Bid <= order.TouchPrice).Ask;
+            var expectedPrice = _downwardData.BidAsks.First(ba => ba.Bid <= order.TouchPrice).Ask;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -384,12 +395,12 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, _upwardStart.AddMinutes(30), _upwardData);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                TouchPrice = _upwardBidAsks.First().Bid + 0.03,
+                TouchPrice = _upwardData.BidAsks.First().Bid + 0.03,
                 TotalQuantity = 50
             };
 
@@ -403,7 +414,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upwardBidAsks.First(ba => ba.Ask >= order.TouchPrice).Bid;
+            var expectedPrice = _upwardData.BidAsks.First(ba => ba.Ask >= order.TouchPrice).Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -412,12 +423,12 @@ namespace Tests.Backtester
         public async Task MarketIfTouchedOrder_Sell_UnderBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, _downwardStart.AddMinutes(30), _downwardData);
             var order = new MarketIfTouchedOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                TouchPrice = _downwardBidAsks.First().Bid - 0.02,
+                TouchPrice = _downwardData.BidAsks.First().Bid - 0.02,
                 TotalQuantity = 50
             };
 
@@ -431,7 +442,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downwardBidAsks.First().Bid;
+            var expectedPrice = _downwardData.BidAsks.First().Bid;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.0001);
         }
@@ -441,7 +452,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -455,7 +466,7 @@ namespace Tests.Backtester
             Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
-            var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask + order.TrailingAmount);
+            var expectedStopPrice = _downwardData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask + order.TrailingAmount);
             var actualStopPrice = order.StopPrice;
             Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
             
@@ -467,7 +478,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardBars, _downwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downwardStart, end, _downwardData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -481,7 +492,7 @@ namespace Tests.Backtester
             Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
-            var expectedStopPrice = _downwardBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask * order.TrailingPercent + ba.Ask);
+            var expectedStopPrice = _downwardData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask * order.TrailingPercent + ba.Ask);
             var actualStopPrice = order.StopPrice;
             Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
 
@@ -493,7 +504,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -511,7 +522,7 @@ namespace Tests.Backtester
             Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
-            var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - order.TrailingAmount);
+            var expectedStopPrice = _upwardData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - order.TrailingAmount);
             var actualStopPrice = order.StopPrice;
             Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
 
@@ -523,7 +534,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardBars, _upwardBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upwardStart, end, _upwardData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -541,7 +552,7 @@ namespace Tests.Backtester
             Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
 
             // Assert
-            var expectedStopPrice = _upwardBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - ba.Bid * order.TrailingPercent);
+            var expectedStopPrice = _upwardData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - ba.Bid * order.TrailingPercent);
             var actualStopPrice = order.StopPrice;
             Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
 
@@ -553,7 +564,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _downThenUpStart, end, _downThenUpBars, _downThenUpBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _downThenUpStart, end, _downThenUpData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -568,7 +579,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _downThenUpBidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask) + order.TrailingAmount;
+            var expectedPrice = _downThenUpData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask) + order.TrailingAmount;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.01);
         }
@@ -578,7 +589,7 @@ namespace Tests.Backtester
         {
             // Setup
             var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new FakeClientSocket(Symbol, _upThenDownStart, end, _upThenDownBars, _upThenDownBidAsks);
+            _fakeIBSocket = new FakeClientSocket(Symbol, _upThenDownStart, end, _upThenDownData);
             var order = new TrailingStopOrder()
             {
                 Id = _fakeIBSocket.NextValidOrderId,
@@ -597,7 +608,7 @@ namespace Tests.Backtester
 
             // Assert
             Assert.NotNull(orderExecution);
-            var expectedPrice = _upThenDownBidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid) - order.TrailingAmount;
+            var expectedPrice = _upThenDownData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid) - order.TrailingAmount;
             var actualPrice = orderExecution.AvgPrice;
             Assert.AreEqual(expectedPrice, actualPrice, 0.01);
         }

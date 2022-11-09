@@ -9,6 +9,7 @@ namespace InteractiveBrokers.MarketData
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);
         public static (TimeSpan, TimeSpan) MarketDayTimeRange = (MarketStartTime, MarketEndTime);
+        public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 

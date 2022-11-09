@@ -13,8 +13,6 @@ namespace InteractiveBrokers.MarketData
 
     public class Bar : IMarketData
     {
-        public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
-
         public double Open { get; set; }
         public double Close { get; set; }
         public double High { get; set; }
