@@ -18,6 +18,7 @@ using HistoricalDataFetcherApp;
 using TradingBot.Utils;
 using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
 using System.Runtime.CompilerServices;
+using TradingBot.Indicators.Quotes;
 
 [assembly: InternalsVisibleTo("Backtester")]
 [assembly: Fody.ConfigureAwait(false)]

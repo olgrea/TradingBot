@@ -12,8 +12,9 @@ namespace TradingBot.Indicators
 
     public class BBTrend : IIndicator
     {
-        IEnumerable<BBTrendResult> _bbTrendResults;
-        
+        IEnumerable<BBTrendResult> _results;
+        IEnumerable<BBTrendResult> _trendingResults = Enumerable.Empty<BBTrendResult>();
+
         BarLength _barLength;
         BollingerBands _slowBB;
         BollingerBands _fastBB;
@@ -25,10 +26,10 @@ namespace TradingBot.Indicators
             _fastBB = new BollingerBands(barLength, fastPeriod);
         }
         
-        public BBTrendResult LatestResult => _bbTrendResults?.LastOrDefault();
+        public BBTrendResult LatestResult => _results?.LastOrDefault();
 
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _bbTrendResults.Count() == _slowBB.NbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() == _slowBB.NbWarmupPeriods;
         public int NbPeriods => _slowBB.NbPeriods;
         public int NbWarmupPeriods => _slowBB.NbWarmupPeriods;
 
@@ -36,8 +37,19 @@ namespace TradingBot.Indicators
         {
             _slowBB.Compute(quotes);
             _fastBB.Compute(quotes);
+            _results = ComputeResults(_slowBB.Results, _fastBB.Results);
+        }
 
-            _bbTrendResults = _slowBB.Results.Zip(_fastBB.Results, (slow, fast) =>
+        public void ComputeTrend(IQuote partialQuote)
+        {
+            _slowBB.ComputeTrend(partialQuote);
+            _fastBB.ComputeTrend(partialQuote);
+            _trendingResults = ComputeResults(_slowBB.TrendingResults, _fastBB.TrendingResults);
+        }
+
+        IEnumerable<BBTrendResult> ComputeResults(IEnumerable<BollingerBandsResult> slowBBResults, IEnumerable<BollingerBandsResult> fastBBResults)
+        {
+            return slowBBResults.Zip(fastBBResults, (slow, fast) =>
             {
                 var lower = NullMath.Abs(fast.LowerBand - slow.LowerBand);
                 var upper = NullMath.Abs(fast.UpperBand - slow.UpperBand);

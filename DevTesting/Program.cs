@@ -44,7 +44,7 @@ namespace ConsoleApp
             //var end = new DateTime(DateTime.Today.Ticks + DateTime.Now.AddSeconds(30).TimeOfDay.Ticks, DateTimeKind.Local);
 
             Trader trader = new Trader(ticker, start, end, parsedArgs.Value.ClientId);
-            trader.AddStrategyForTicker<TestStrategy>();
+            trader.AddStrategyForTicker<BollingerBandsStrategy>();
             
             await trader.Start();
             trader.Stop();

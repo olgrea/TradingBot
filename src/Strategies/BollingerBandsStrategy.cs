@@ -5,9 +5,9 @@ using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public class TestStrategy : Strategy
+    public class BollingerBandsStrategy : Strategy
     {
-        public TestStrategy(Trader trader) : base(trader)
+        public BollingerBandsStrategy(Trader trader) : base(trader)
         {
             AddState<InitState>();
             AddState<MonitoringState>();
@@ -22,9 +22,9 @@ namespace TradingBot.Strategies
 
         #region States
 
-        class InitState : State<TestStrategy>
+        class InitState : State<BollingerBandsStrategy>
         {
-            public InitState(TestStrategy strategy) : base(strategy) { }
+            public InitState(BollingerBandsStrategy strategy) : base(strategy) { }
 
             public override IState Evaluate()
             {
@@ -35,11 +35,11 @@ namespace TradingBot.Strategies
             }
         }
 
-        class MonitoringState : State<TestStrategy>
+        class MonitoringState : State<BollingerBandsStrategy>
         {
             Order _order;
 
-            public MonitoringState(TestStrategy strategy) : base(strategy) {}
+            public MonitoringState(BollingerBandsStrategy strategy) : base(strategy) {}
 
             public override IState Evaluate()
             {
@@ -59,11 +59,11 @@ namespace TradingBot.Strategies
             }
         }
 
-        class BoughtState : State<TestStrategy>
+        class BoughtState : State<BollingerBandsStrategy>
         {
             Order _order;
 
-            public BoughtState(TestStrategy strategy) : base(strategy) {}
+            public BoughtState(BollingerBandsStrategy strategy) : base(strategy) {}
 
             public override IState Evaluate()
             {
