@@ -17,30 +17,6 @@ using NLog;
 
 namespace Backtester
 {
-    class ContractsCache
-    {
-        ConcurrentDictionary<string, Contract> _contracts = new ConcurrentDictionary<string, Contract>();    
-
-        public Contract Get(string symbol)
-        {
-            return _contracts.GetOrAdd(symbol, symbol =>
-            {
-                return FetchContract(symbol).Result;
-            });
-
-            async Task<Contract> FetchContract(string symbol)
-            {
-                var client = new IBClient();
-                await client.ConnectAsync();
-                await Task.Delay(50);
-                var contract = await client.GetContractAsync(symbol);
-                await client.DisconnectAsync();
-                await Task.Delay(50);
-                return contract;
-            }
-        }
-    }
-
     internal class FakeClientSocket : IIBClientSocket
     {
         /// <summary>
@@ -54,9 +30,12 @@ namespace Backtester
             public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
         }
 
-        static ContractsCache s_ContractsCache = new ContractsCache();
+        static ConcurrentDictionary<string, Contract> _contractsCache = new ConcurrentDictionary<string, Contract>();
+
         string _symbol;
         Contract _contract;
+
+        IBClient _innerClient;
 
         Stopwatch _st = new Stopwatch();
 
@@ -120,7 +99,14 @@ namespace Backtester
             _currentBar = GetStartEnumerator(_dailyData.Bars);
             _currentBidAsk = GetStartEnumerator(_dailyData.BidAsks);
 
-            _contract = s_ContractsCache.Get(_symbol);
+            _innerClient = new IBClient();
+            _innerClient.ConnectAsync().Wait(2000);
+
+            if (!_contractsCache.TryGetValue(symbol, out _contract))
+            {
+                _contract = _innerClient.GetContractAsync(symbol).Result;
+                _contractsCache.TryAdd(symbol, _contract);
+            }
 
             _fakeAccount = new Account()
             {
@@ -146,6 +132,11 @@ namespace Backtester
             _cancellationTokenSource = new CancellationTokenSource();
             _requestsTask = StartConsumerTask(_requestsQueue);
             _responsesTask = StartConsumerTask(_responsesQueue);
+        }
+
+        ~FakeClientSocket()
+        {
+            _innerClient.DisconnectAsync().Wait(2000);
         }
 
         public IBCallbacks Callbacks { get; private set; }
@@ -841,48 +832,12 @@ namespace Backtester
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
-            if(!string.IsNullOrEmpty(endDateTime))
-                throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
-            
-            _requestsQueue.Add(() => 
-            {
-                int nbBars = -1;
-                switch(barSizeStr)
-                {
-                    case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
-                    case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
-                        throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
-                }
-
-                // TODO : does TWS really sends bars in reverse? I don't remember. Need to re-check
-
-                IEnumerator<Bar> first = _currentBar;
-                var bars = _dailyData.Bars.Reverse().SkipWhile(b => b != _currentBar.Current).Take(nbBars);
-
-                foreach (var b in bars)
-                {
-                    _responsesQueue.Add(() =>
-                    {
-                        Callbacks.historicalData(reqId, 
-                            new IBApi.Bar(
-                                b.Time.ToString(Utils.TWSTimeFormat),
-                                b.Open,
-                                b.High,
-                                b.Low,
-                                b.Close,
-                                b.Volume,
-                                b.TradeAmount,
-                                0));
-                    });
-                }
-
-                _responsesQueue.Add(() => Callbacks.historicalDataEnd(reqId, first.Current.Time.ToString(Utils.TWSTimeFormat), bars.Last().Time.ToString(Utils.TWSTimeFormat)));
-            });
+            _innerClient.Socket.RequestHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, onlyRTH);
         }
 
         public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
-            throw new NotImplementedException();
+            _innerClient.Socket.RequestHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, onlyRTH, ignoreSize);
         }
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)

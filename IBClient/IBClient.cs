@@ -51,6 +51,8 @@ namespace InteractiveBrokers
         int NextRequestId => _reqId++;
         internal DataSubscriptions Subscriptions => _subscriptions;
 
+        internal IIBClientSocket Socket => _socket;
+
         #region Events
 
         public Dictionary<BarLength, Action<Contract, Bar>> BarReceived { get; set; } = new Dictionary<BarLength, Action<Contract, Bar>>(
