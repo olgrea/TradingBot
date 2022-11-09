@@ -10,7 +10,12 @@ namespace TradingBot.Indicators
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
         
-        IEnumerable<RsiResult> _rsiResults;
+        IEnumerable<IQuote> _quotes;
+        IEnumerable<RsiResult> _results;
+
+        LinkedList<IQuote> _partialQuotes = new LinkedList<IQuote>();
+        IEnumerable<RsiResult> _trendingResults;
+
         int _nbPeriods;
         int _nbWarmupPeriods;
         BarLength _barLength;
@@ -24,17 +29,34 @@ namespace TradingBot.Indicators
         
         public bool IsOverbought => IsReady && LatestResult.Rsi > _overboughtThreshold;
         public bool IsOversold => IsReady && LatestResult.Rsi < _oversoldThreshold;
-        public RsiResult LatestResult => _rsiResults?.LastOrDefault();
-        public IEnumerable<RsiResult> Results => _rsiResults;
+
+        public RsiResult LatestResult => _results?.LastOrDefault();
+        public IEnumerable<RsiResult> Results => _results;
+
+        public RsiResult LatestTrendingResult => _trendingResults?.LastOrDefault();
+        public IEnumerable<RsiResult> TrendingResults => _trendingResults;
 
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _rsiResults.Count() == _nbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() == _nbWarmupPeriods;
         public int NbPeriods => _nbPeriods;
         public int NbWarmupPeriods => _nbWarmupPeriods;
 
         public void Compute(IEnumerable<IQuote> quotes)
         {
-            _rsiResults = quotes.GetRsi(_nbPeriods);
+            _partialQuotes.Clear();
+            _quotes = quotes;
+            _results = ComputeResults(_quotes);
+        }
+
+        public void ComputeTrend(IQuote partialQuote)
+        {
+            _partialQuotes.AddLast(partialQuote);
+            _trendingResults = ComputeResults(_quotes.Concat(_partialQuotes));
+        }
+
+        IEnumerable<RsiResult> ComputeResults(IEnumerable<IQuote> quotes)
+        {
+            return quotes.GetRsi(_nbPeriods);
         }
     }
 }

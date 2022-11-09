@@ -16,7 +16,9 @@ namespace TradingBot.Indicators
     {
         Rsi _slowRsi;
         Rsi _fastRsi;
-        IEnumerable<RsiDivergenceResult> _rsiDivergenceResults;
+
+        IEnumerable<RsiDivergenceResult> _results;
+        IEnumerable<RsiDivergenceResult> _trendingResults;
 
         BarLength _barLength;
 
@@ -27,12 +29,12 @@ namespace TradingBot.Indicators
             _fastRsi = new Rsi(barLength, fastPeriod);
         }
 
-        public RsiDivergenceResult LatestResult => _rsiDivergenceResults?.LastOrDefault();
+        public RsiDivergenceResult LatestResult => _results?.LastOrDefault();
         public Rsi SlowRSI => _slowRsi;
         public Rsi FastRSI => _fastRsi;
         
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _rsiDivergenceResults.Count() == NbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() == NbWarmupPeriods;
         public int NbPeriods => _slowRsi.NbPeriods;
         public int NbWarmupPeriods => _slowRsi.NbWarmupPeriods;
 
@@ -40,7 +42,19 @@ namespace TradingBot.Indicators
         {
             _slowRsi.Compute(quotes);
             _fastRsi.Compute(quotes);
-            _rsiDivergenceResults = _slowRsi.Results.Zip(_fastRsi.Results, (slow, fast) =>
+            _results = ComputeResults(_slowRsi.Results, _fastRsi.Results);
+        }
+
+        public void ComputeTrend(IQuote partialQuote)
+        {
+            _slowRsi.ComputeTrend(partialQuote);
+            _fastRsi.ComputeTrend(partialQuote);
+            _trendingResults = ComputeResults(_slowRsi.TrendingResults, _fastRsi.TrendingResults);
+        }
+
+        IEnumerable<RsiDivergenceResult> ComputeResults(IEnumerable<RsiResult> slowRsiResults, IEnumerable<RsiResult> fastRsiResults)
+        {
+            return slowRsiResults.Zip(fastRsiResults, (slow, fast) =>
             {
                 return new RsiDivergenceResult()
                 {

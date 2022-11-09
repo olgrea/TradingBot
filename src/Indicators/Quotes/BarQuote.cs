@@ -2,7 +2,7 @@
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 
-namespace TradingBot.Indicators
+namespace TradingBot.Indicators.Quotes
 {
     internal class BarQuote : IQuote
     {

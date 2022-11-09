@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TradingBot.Indicators;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Orders;
+using TradingBot.Indicators.Quotes;
 
 namespace TradingBot.Strategies
 {
