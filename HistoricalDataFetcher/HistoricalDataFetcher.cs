@@ -61,6 +61,7 @@ namespace HistoricalDataFetcherApp
 
         public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
         {
+            Type datatype = typeof(TData);
             DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
             DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
@@ -83,13 +84,13 @@ namespace HistoricalDataFetcherApp
                     var selectCmd = commandFactory.CreateSelectCommand(contract.Symbol, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                     data = selectCmd.Execute();
                     var dateStr = current.Date.ToShortDateString();
-                    _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
+                    _logger?.Info($"{datatype.Name} for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                 }
                 else
                 {
                     data = await FetchHistoricalData<TData>(contract, current);
                     var dateStr = current.Date.ToShortDateString();
-                    _logger?.Info($"Data for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS. Inserting.");
+                    _logger?.Info($"{datatype.Name} for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS. Inserting.");
 
                     var insertCmd = commandFactory.CreateInsertCommand(contract.Symbol, data);
                     insertCmd.Execute();
@@ -172,9 +173,8 @@ namespace HistoricalDataFetcherApp
             Type datatype = typeof(TData);
             _logger?.Info($"Retrieving {datatype.Name} from TWS for '{contract.Symbol} {time}'.");
 
-            // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes...
-            // There doesn't seem to be a way to convert ticks to seconds...
-            // So we just do requests as long as we don't have 30 minutes.
+            // max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes.
+            // I don't see a way to convert ticks to seconds so we just do requests as long as we don't have 30 minutes.
             IEnumerable<TData> data = new LinkedList<TData>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
