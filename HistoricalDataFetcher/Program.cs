@@ -25,6 +25,19 @@ namespace HistoricalDataFetcherApp
 
             [Option('e', "end", Required = false, HelpText = "When specified, historical data will be retrieved from start date to end date. Format : YYYY-MM-dd")]
             public string EndDate { get; set; } = "";
+
+            [Option('m', "marketData",  Group ="marketData", Required = false, Default ="All", HelpText = "What type of data to fetch [All,Bar,BidAsk,Last]")]
+            public string MarketData { get; set; } = "";
+        }
+
+        [Flags]
+        public enum MarketDataOptions
+        {
+            None = 0,
+            Bar = 1 << 0,
+            BidAsk = 1 << 1,
+            Last = 1 << 2,
+            All = Bar | BidAsk | Last,
         }
 
         static async Task Main(string[] args)
@@ -37,10 +50,17 @@ namespace HistoricalDataFetcherApp
             if (!string.IsNullOrEmpty(parsedArgs.Value.EndDate))
                 endDate = DateTime.Parse(parsedArgs.Value.EndDate);
 
-            await FetchEverything(ticker, startDate.AddTicks(Utils.MarketStartTime.Ticks), endDate.AddTicks(Utils.MarketEndTime.Ticks));
+            MarketDataOptions opts = MarketDataOptions.None;
+            foreach(string s in parsedArgs.Value.MarketData.Split(','))
+                opts |= Enum.Parse<MarketDataOptions>(s);
+
+            if (opts == MarketDataOptions.None)
+                throw new ArgumentException("No market data type specified", nameof(Options.MarketData));
+
+            await FetchEverything(ticker, startDate.AddTicks(Utils.MarketStartTime.Ticks), endDate.AddTicks(Utils.MarketEndTime.Ticks), opts);
         }
 
-        public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate)
+        public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate, MarketDataOptions marketDataOptions)
         {
             var client = new IBClient(321);
             var logger = LogManager.GetLogger($"{nameof(HistoricalDataFetcher)}");
@@ -53,14 +73,24 @@ namespace HistoricalDataFetcherApp
 
             var marketDays = Utils.GetMarketDays(startDate, endDate).ToList();
 
-            var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
-            await Fetch(dataFetcher, contract, marketDays, barCmdFactory);
+            bool fetchEverything = marketDataOptions.HasFlag(MarketDataOptions.All);
+            if(fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.Bar))
+            {
+                var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
+                await Fetch(dataFetcher, contract, marketDays, barCmdFactory);
+            }
 
-            var bidAskCmdFactory = new BidAskCommandFactory();
-            await Fetch(dataFetcher, contract, marketDays, bidAskCmdFactory);
+            if (fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.BidAsk))
+            {
+                var bidAskCmdFactory = new BidAskCommandFactory();
+                await Fetch(dataFetcher, contract, marketDays, bidAskCmdFactory);
+            }
 
-            var lastCmdFactory = new LastCommandFactory();
-            await Fetch(dataFetcher, contract, marketDays, lastCmdFactory);
+            if (fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.Last)) 
+            {
+                var lastCmdFactory = new LastCommandFactory();
+                await Fetch(dataFetcher, contract, marketDays, lastCmdFactory);
+            }
 
             // TODO : fetch and store BarLength._1Day
 
