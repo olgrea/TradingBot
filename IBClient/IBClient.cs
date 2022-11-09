@@ -305,12 +305,12 @@ namespace InteractiveBrokers
             return tcs.Task;
         }
 
-        public async Task<Contract> GetContractAsync(string symbol)
+        public async Task<Contract> GetContractAsync(string symbol, string exchange = "SMART")
         {
             var sampleContract = new Stock()
             {
                 Currency = "USD",
-                Exchange = "SMART",
+                Exchange = exchange,
                 Symbol = symbol,
                 SecType = "STK"
             };
