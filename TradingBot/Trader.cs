@@ -289,7 +289,7 @@ namespace TradingBot
                 var bars = allBars;
                 while (bars.Count() > nbSecs)
                 {
-                    _bars[barLength].Add(MarketDataUtils.MakeBar(bars.Take(nbSecs), barLength));
+                    _bars[barLength].Add(MarketDataUtils.CombineBars(bars.Take(nbSecs), barLength));
                     bars = bars.Skip(nbSecs);
                 }
             }
