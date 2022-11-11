@@ -29,7 +29,7 @@ namespace TradingBot.Indicators
         public IEnumerable<BollingerBandsResult> TrendingResults => _trendingResults;
 
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() == NbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() >= NbWarmupPeriods;
         public int NbPeriods => _nbPeriods;
         public int NbWarmupPeriods => _nbPeriods;
 

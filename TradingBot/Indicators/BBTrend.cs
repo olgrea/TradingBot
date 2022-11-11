@@ -29,7 +29,7 @@ namespace TradingBot.Indicators
         public BBTrendResult LatestResult => _results?.LastOrDefault();
 
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() == _slowBB.NbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() >= _slowBB.NbWarmupPeriods;
         public int NbPeriods => _slowBB.NbPeriods;
         public int NbWarmupPeriods => _slowBB.NbWarmupPeriods;
 

@@ -37,7 +37,7 @@ namespace TradingBot.Indicators
         public IEnumerable<RsiResult> TrendingResults => _trendingResults;
 
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() == _nbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() >= _nbWarmupPeriods;
         public int NbPeriods => _nbPeriods;
         public int NbWarmupPeriods => _nbWarmupPeriods;
 
