@@ -65,9 +65,9 @@ namespace HistoricalDataFetcherApp
             DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
             DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
-            _logger?.Info($"Getting data for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+            _logger?.Info($"Getting {datatype.Name} for {contract.Symbol} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
-            // In order to respect TWS limitationsm, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
+            // In order to respect TWS limitations, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
             // time range to the beginning. 
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
@@ -115,12 +115,14 @@ namespace HistoricalDataFetcherApp
             {
                 _logger?.Info($"60 requests made : waiting 10 minutes...");
                 Wait10Minutes();
+                _logger?.Info($"Resuming.");
                 _nbRequest = 0;
             }
             else if (_nbRequest != 0 && _nbRequest % 5 == 0)
             {
                 _logger?.Info($"{NbRequest} requests made : waiting 2 seconds...");
                 Task.Delay(2000).Wait();
+                _logger?.Info($"Resuming.");
             }
         }
 
@@ -131,8 +133,6 @@ namespace HistoricalDataFetcherApp
                 Task.Delay(60 * 1000).Wait();
                 if (i < 9)
                     _logger?.Info($"{9 - i} minutes left...");
-                else
-                    _logger?.Info($"Resuming historical data fetching");
             }
         }
 

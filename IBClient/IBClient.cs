@@ -51,6 +51,8 @@ namespace InteractiveBrokers
         int NextRequestId => _reqId++;
         internal DataSubscriptions Subscriptions => _subscriptions;
 
+        internal IIBClientSocket Socket => _socket;
+
         #region Events
 
         public Dictionary<BarLength, Action<Contract, Bar>> BarReceived { get; set; } = new Dictionary<BarLength, Action<Contract, Bar>>(
@@ -485,7 +487,7 @@ namespace InteractiveBrokers
         {
             var list = _fiveSecBars[contract];
             list.AddLast(bar);
-            // keeping 5 minutes of bars
+            // arbitrarily keeping 5 minutes of bars
             if (list.Count > 60)
                 list.RemoveFirst();
 
@@ -501,10 +503,10 @@ namespace InteractiveBrokers
                     Bar barToUse = bar;
                     if (barLength > BarLength._5Sec)
                     {
-                        bar = Utils.MakeBar(list.TakeLast(nbBars), barLength);
+                        barToUse = Utils.CombineBars(list.TakeLast(nbBars), barLength);
                     }
 
-                    InvokeCallbacks(contract, bar);
+                    InvokeCallbacks(contract, barToUse);
                 }
             }
         }
@@ -734,11 +736,6 @@ namespace InteractiveBrokers
             }
         }
 
-        internal async Task<IEnumerable<Bar>> GetPastBars(Contract contract, BarLength barLength, int count)
-        {
-            return await GetHistoricalBarsAsync(contract, barLength, default, count);
-        }
-
         public Task<IEnumerable<Bar>> GetHistoricalBarsAsync(Contract contract, BarLength barLength, DateTime endDateTime, int count)
         {
             var reqId = NextRequestId;
@@ -825,19 +822,22 @@ namespace InteractiveBrokers
 
         public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(Contract contract, DateTime time, int count)
         {
-            return GetHistoricalTicksAsync<BidAsk>(contract, time, count, "BID_ASK");
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return GetHistoricalTicksAsync<BidAsk>(contract, time, count, "BID_ASK", source.Token);
         }
         public Task<IEnumerable<Last>> GetHistoricalLastsAsync(Contract contract, DateTime time, int count)
         {
-            return GetHistoricalTicksAsync<Last>(contract, time, count, "TRADES");
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return GetHistoricalTicksAsync<Last>(contract, time, count, "TRADES", source.Token);
         }
 
-        Task<IEnumerable<TData>> GetHistoricalTicksAsync<TData>(Contract contract, DateTime time, int count, string whatToShow) where TData : IMarketData, new()
+        Task<IEnumerable<TData>> GetHistoricalTicksAsync<TData>(Contract contract, DateTime time, int count, string whatToShow, CancellationToken token) where TData : IMarketData, new()
         {
             var reqId = NextRequestId;
             var tmpList = new LinkedList<TData>();
 
             var tcs = new TaskCompletionSource<IEnumerable<TData>>();
+            token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistorical{typeof(TData).Name}Async")));
             var historicalTicks = new Action<int, IEnumerable<TData>, bool>((rId, data, isDone) =>
             {
                 if (rId == reqId)

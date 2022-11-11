@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TradingBot.Indicators;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Orders;
+using TradingBot.Indicators.Quotes;
 
 namespace TradingBot.Strategies
 {
@@ -105,7 +106,7 @@ namespace TradingBot.Strategies
             LatestBar = bars.Last();
             foreach (var indicator in _indicators[LatestBar.BarLength])
             {
-                indicator.Compute(bars.Cast<BarQuote>());
+                indicator.Compute(bars.Select(b => (BarQuote)b));
             }
         }
     }

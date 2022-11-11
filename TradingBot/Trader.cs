@@ -18,6 +18,7 @@ using HistoricalDataFetcherApp;
 using TradingBot.Utils;
 using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
 using System.Runtime.CompilerServices;
+using TradingBot.Indicators.Quotes;
 
 [assembly: InternalsVisibleTo("Backtester")]
 [assembly: Fody.ConfigureAwait(false)]
@@ -52,6 +53,8 @@ namespace TradingBot
 
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+        HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
+        Bar _partialBarFromLasts;
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
@@ -137,6 +140,7 @@ namespace TradingBot
             {
                 while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                 {
+                    //TODO : need another apporach. Skips of 5 sec when backtesting
                     await Task.Delay(500);
                     _currentTime = await _client.GetCurrentTimeAsync();
                     if(!_tradingStarted && _currentTime >= _startTime)
@@ -287,7 +291,7 @@ namespace TradingBot
                 var bars = allBars;
                 while (bars.Count() > nbSecs)
                 {
-                    _bars[barLength].Add(MarketDataUtils.MakeBar(bars.Take(nbSecs), barLength));
+                    _bars[barLength].Add(MarketDataUtils.CombineBars(bars.Take(nbSecs), barLength));
                     bars = bars.Skip(nbSecs);
                 }
             }
@@ -295,10 +299,44 @@ namespace TradingBot
             // Update all indicators.
             foreach (var indicator in indicators)
             {
-                indicator.Compute(_bars[indicator.BarLength].Cast<BarQuote>());
+                indicator.Compute(_bars[indicator.BarLength].Select(b => (BarQuote)b));
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
+        }
+
+        public void RequestLastTradedPricesUpdates(IIndicator indicator)
+        {
+            if(!_indicatorsRequiringLastUpdates.Contains(indicator))
+            {
+                _indicatorsRequiringLastUpdates.Add(indicator);
+                if(_indicatorsRequiringLastUpdates.Count == 1)
+                {
+                    _client.LastReceived += OnLastReceived;
+                    _client.RequestLastUpdates(_contract);
+                }
+            }
+        }
+
+        void OnLastReceived(Contract contract, Last last)
+        {
+            foreach(var indicator in _indicatorsRequiringLastUpdates)
+            {
+                indicator.ComputeTrend(last);
+            }
+            EvaluateStrategies();
+        }
+
+        public void CancelLastTradedPricesUpdates(IIndicator indicator)
+        {
+            if(_indicatorsRequiringLastUpdates.Remove(indicator))
+            {
+                if (_indicatorsRequiringLastUpdates.Count == 0)
+                {
+                    _client.LastReceived -= OnLastReceived;
+                    _client.CancelLastUpdates(_contract);
+                }
+            }
         }
 
         void OnAccountValueUpdated(string key, string value, string currency, string account)

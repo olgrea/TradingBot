@@ -6,7 +6,7 @@ using DataStorage.Db.DbCommandFactories;
 using InteractiveBrokers;
 using InteractiveBrokers.MarketData;
 using NUnit.Framework;
-using Tests.Broker;
+using Tests.IBClient;
 
 namespace Tests.Backtester
 {
@@ -16,8 +16,6 @@ namespace Tests.Backtester
         const string Symbol = "GME";
 
         DateTime _fileTime = new DateTime(2022, 10, 05, 09, 30, 00, DateTimeKind.Local);
-        IEnumerable<BidAsk> _bidAsks;
-        IEnumerable<Bar> _bars;
         BarCommandFactory _barCommandFactory;
         BidAskCommandFactory _bidAskCommandFactory;
 
@@ -32,13 +30,16 @@ namespace Tests.Backtester
         [SetUp]
         public override async Task SetUp()
         {
-            _bars = _barCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute();
-            _bidAsks = _bidAskCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute();
+            var marketData = new MarketDataCollections()
+            {
+                Bars = _barCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
+                BidAsks = _bidAskCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
+            };
 
             var startTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
             var endTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
 
-            var fakeSocket = new FakeClientSocket(Symbol, startTime, endTime, _bars, _bidAsks);
+            var fakeSocket = new FakeClientSocket(Symbol, startTime, endTime, marketData);
             _client = new BacktesterClient(951, fakeSocket);
 
             _connectMessage = await _client.ConnectAsync();

@@ -2,10 +2,12 @@
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 
-namespace TradingBot.Indicators
+namespace TradingBot.Indicators.Quotes
 {
     internal class BarQuote : IQuote
     {
+        public BarQuote() { }
+
         public BarQuote(Bar bar)
         {
             Bar = bar;
@@ -25,6 +27,6 @@ namespace TradingBot.Indicators
 
         decimal IQuote.Volume => Convert.ToDecimal(Bar.Volume);
 
-        public static implicit operator BarQuote(Bar b) => new BarQuote(b);
+        public static explicit operator BarQuote(Bar b) => new BarQuote(b);
     }
 }

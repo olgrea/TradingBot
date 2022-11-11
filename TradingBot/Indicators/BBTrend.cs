@@ -10,34 +10,36 @@ namespace TradingBot.Indicators
         public double? BBTrend { get; set; }
     }
 
-    public class BBTrend : IIndicator
+    internal class BBTrend : IndicatorBase<BBTrendResult>
     {
-        IEnumerable<BBTrendResult> _bbTrendResults;
-        
-        BarLength _barLength;
         BollingerBands _slowBB;
         BollingerBands _fastBB;
 
-        public BBTrend(BarLength barLength, int slowPeriod = 50, int fastPeriod = 20)
+        public BBTrend(BarLength barLength, int slowPeriod = 50, int fastPeriod = 20) : base(barLength, slowPeriod, slowPeriod)
         {
-            _barLength = barLength;
             _slowBB = new BollingerBands(barLength, slowPeriod);
             _fastBB = new BollingerBands(barLength, fastPeriod);
         }
         
-        public BBTrendResult LatestResult => _bbTrendResults?.LastOrDefault();
-
-        public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _bbTrendResults.Count() == _slowBB.NbWarmupPeriods;
-        public int NbPeriods => _slowBB.NbPeriods;
-        public int NbWarmupPeriods => _slowBB.NbWarmupPeriods;
-
-        public void Compute(IEnumerable<IQuote> quotes)
+        public override void Compute(IEnumerable<IQuote> quotes)
         {
+            base.Compute(quotes);
             _slowBB.Compute(quotes);
             _fastBB.Compute(quotes);
+            _results = ComputeResults(_slowBB.Results, _fastBB.Results);
+        }
 
-            _bbTrendResults = _slowBB.Results.Zip(_fastBB.Results, (slow, fast) =>
+        public override void ComputeTrend(Last last)
+        {
+            base.ComputeTrend(last);
+            _slowBB.ComputeTrend(last);
+            _fastBB.ComputeTrend(last);
+            _trendingResults = ComputeResults(_slowBB.TrendingResults, _fastBB.TrendingResults);
+        }
+
+        IEnumerable<BBTrendResult> ComputeResults(IEnumerable<IResult> slowBBResults, IEnumerable<IResult> fastBBResults)
+        {
+            return slowBBResults.Cast<BollingerBandsResult>().Zip(fastBBResults.Cast<BollingerBandsResult>(), (slow, fast) =>
             {
                 var lower = NullMath.Abs(fast.LowerBand - slow.LowerBand);
                 var upper = NullMath.Abs(fast.UpperBand - slow.UpperBand);

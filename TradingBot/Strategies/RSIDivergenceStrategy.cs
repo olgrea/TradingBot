@@ -22,12 +22,10 @@ namespace TradingBot.Strategies
 
             AddIndicator(new BollingerBands(BarLength._1Min));
             AddIndicator(new RsiDivergence(BarLength._1Min, 14, 5));
-            AddIndicator(new RsiDivergence(BarLength._5Sec, 14, 5));
         }
 
-        internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
-        internal RsiDivergence RSIDivergence_1Min => GetIndicator<RsiDivergence>(BarLength._1Min);
-        internal RsiDivergence RSIDivergence_5Sec => GetIndicator<RsiDivergence>(BarLength._5Sec);
+        internal BollingerBands BollingerBands => GetIndicator<BollingerBands>(BarLength._1Min);
+        internal RsiDivergence RSIDivergence => GetIndicator<RsiDivergence>(BarLength._1Min);
 
         internal Order BuyOrder { get; set; }
         internal Order MITOrder { get; set; }
@@ -56,11 +54,12 @@ namespace TradingBot.Strategies
             public override IState Evaluate()
             {
                 // We want to find a bar candle that goes below the lower BB
-                if (_strategy.LatestBar.Close < _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value
-                    && _strategy.RSIDivergence_1Min.LatestResult.RSIDivergence.Value < 0
-                    && _strategy.RSIDivergence_1Min.FastRSI.IsOversold)
+                if (_strategy.LatestBar.Close < _strategy.BollingerBands.LatestResult.LowerBand.Value
+                    && _strategy.RSIDivergence.LatestResult.RSIDivergence.Value < 0
+                    && _strategy.RSIDivergence.FastRSI.IsOversold)
                 {
-                    Logger.Info($"Lower band reached. RSIDivergence < 0. Switching to 5 sec resolution.");
+                    Logger.Info($"Lower band reached. RSIDivergence < 0.");
+                    _strategy.Trader.RequestLastTradedPricesUpdates(_strategy.RSIDivergence);
                     return GetState<OversoldState>();
                 }
                 else
@@ -80,12 +79,11 @@ namespace TradingBot.Strategies
 
                 if (!_buySignal)
                 {
-                    if(_strategy.RSIDivergence_5Sec.LatestResult.RSIDivergence > 0 && !_strategy.RSIDivergence_5Sec.FastRSI.IsOversold)
+                    if(_strategy.RSIDivergence.LatestTrendingResult.RSIDivergence > 0 && !_strategy.RSIDivergence.FastRSI.IsOversold)
                         _buySignal = true;
                     else
                         return this;
                 }
-
 
                 if (!_isInitialized)
                     InitializeOrders();
@@ -98,7 +96,8 @@ namespace TradingBot.Strategies
 
                 if(EvaluateOrder(_strategy.BuyOrder, null, out OrderExecution orderExecution))
                 {
-                    if(orderExecution != null)
+                    _strategy.Trader.CancelLastTradedPricesUpdates(_strategy.RSIDivergence);
+                    if (orderExecution != null)
                     {
                         _strategy.Executions.Add(_strategy.BuyOrder.Id, orderExecution);
                         return GetState<BoughtState>();
@@ -168,11 +167,11 @@ namespace TradingBot.Strategies
                 var qty = execution.Shares;
 
                 // TODO : to test
-                double halfDiff = (_strategy.BollingerBands_1Min.LatestResult.Sma.Value - _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value) / 2;
-                var stop = _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value - halfDiff;
+                double halfDiff = (_strategy.BollingerBands.LatestResult.Sma.Value - _strategy.BollingerBands.LatestResult.LowerBand.Value) / 2;
+                var stop = _strategy.BollingerBands.LatestResult.LowerBand.Value - halfDiff;
 
                 _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop };
-                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.LatestResult.Sma.Value};
+                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands.LatestResult.Sma.Value};
 
                 _isInitialized = true;
             }
@@ -188,11 +187,11 @@ namespace TradingBot.Strategies
                 {
                     StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
 
-                    double halfDiff = (_strategy.BollingerBands_1Min.LatestResult.Sma.Value - _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value) / 2;
-                    double lowerHalf = (_strategy.BollingerBands_1Min.LatestResult.LowerBand.Value + _strategy.BollingerBands_1Min.LatestResult.Sma.Value) / 2;
-                    double lowerQuarter = (_strategy.BollingerBands_1Min.LatestResult.LowerBand.Value + lowerHalf) / 2;
+                    double halfDiff = (_strategy.BollingerBands.LatestResult.Sma.Value - _strategy.BollingerBands.LatestResult.LowerBand.Value) / 2;
+                    double lowerHalf = (_strategy.BollingerBands.LatestResult.LowerBand.Value + _strategy.BollingerBands.LatestResult.Sma.Value) / 2;
+                    double lowerQuarter = (_strategy.BollingerBands.LatestResult.LowerBand.Value + lowerHalf) / 2;
 
-                    var stop = _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value - halfDiff;
+                    var stop = _strategy.BollingerBands.LatestResult.LowerBand.Value - halfDiff;
                     if (_strategy.LatestBar.Close > lowerHalf)
                     {
                         stop = lowerHalf;
@@ -201,9 +200,9 @@ namespace TradingBot.Strategies
                     {
                         stop = lowerQuarter;
                     }
-                    else if (_strategy.LatestBar.Close > _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value)
+                    else if (_strategy.LatestBar.Close > _strategy.BollingerBands.LatestResult.LowerBand.Value)
                     {
-                        stop = _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value;
+                        stop = _strategy.BollingerBands.LatestResult.LowerBand.Value;
                     }
 
                     var previousStop = stopOrder.StopPrice;
@@ -216,7 +215,7 @@ namespace TradingBot.Strategies
 
                     MarketIfTouchedOrder marketIfTouchedOrder = (_strategy.MITOrder as MarketIfTouchedOrder);
                     var previousTouch = marketIfTouchedOrder.TouchPrice;
-                    var nextTouch = _strategy.BollingerBands_1Min.LatestResult.Sma.Value;
+                    var nextTouch = _strategy.BollingerBands.LatestResult.Sma.Value;
 
                     if (nextTouch != previousTouch)
                     {
@@ -243,10 +242,10 @@ namespace TradingBot.Strategies
                 _strategy.Executions.TryGetValue(previousMITOrder.Id, out OrderExecution execution);
                 var qty = execution.Shares;
 
-                var stop = (_strategy.BollingerBands_1Min.LatestResult.Sma.Value + _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value) / 2;
+                var stop = (_strategy.BollingerBands.LatestResult.Sma.Value + _strategy.BollingerBands.LatestResult.LowerBand.Value) / 2;
 
                 _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stop};
-                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands_1Min.LatestResult.UpperBand.Value};
+                _strategy.MITOrder = new MarketIfTouchedOrder() { Action = OrderAction.SELL, TotalQuantity = qty / 2, TouchPrice = _strategy.BollingerBands.LatestResult.UpperBand.Value};
 
                 _isInitialized = true;
             }
@@ -261,10 +260,10 @@ namespace TradingBot.Strategies
                 {
                     StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
 
-                    double stop = (_strategy.BollingerBands_1Min.LatestResult.Sma.Value + _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value) / 2; 
-                    if(_strategy.LatestBar.Close > _strategy.BollingerBands_1Min.LatestResult.Sma.Value)
+                    double stop = (_strategy.BollingerBands.LatestResult.Sma.Value + _strategy.BollingerBands.LatestResult.LowerBand.Value) / 2; 
+                    if(_strategy.LatestBar.Close > _strategy.BollingerBands.LatestResult.Sma.Value)
                     {
-                        stop = _strategy.BollingerBands_1Min.LatestResult.Sma.Value;
+                        stop = _strategy.BollingerBands.LatestResult.Sma.Value;
                     }
 
                     var previousStop = stopOrder.StopPrice;
@@ -277,7 +276,7 @@ namespace TradingBot.Strategies
 
                     MarketIfTouchedOrder marketIfTouchedOrder = (_strategy.MITOrder as MarketIfTouchedOrder);
                     var previousTouch = marketIfTouchedOrder.TouchPrice;
-                    var nextTouch = _strategy.BollingerBands_1Min.LatestResult.UpperBand.Value;
+                    var nextTouch = _strategy.BollingerBands.LatestResult.UpperBand.Value;
                     if (nextTouch != previousTouch)
                     {
                         marketIfTouchedOrder.TouchPrice = nextTouch;
@@ -321,7 +320,7 @@ namespace TradingBot.Strategies
                 var qty = execution.Shares;
 
                 // TODO : to test
-                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = _strategy.BollingerBands_1Min.LatestResult.Sma.Value};
+                _strategy.StopOrder = new StopOrder { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = _strategy.BollingerBands.LatestResult.Sma.Value};
                 _isInitialized = true;
             }
 
@@ -335,7 +334,7 @@ namespace TradingBot.Strategies
                 {
                     StopOrder stopOrder = (_strategy.StopOrder as StopOrder);
 
-                    double stop = _strategy.BollingerBands_1Min.LatestResult.Sma.Value;
+                    double stop = _strategy.BollingerBands.LatestResult.Sma.Value;
                     //double upperHalf = (_strategy.BollingerBands_1Min.Result.UpperBand.Value + _strategy.BollingerBands_1Min.Result.Sma.Value) / 2;
                     //if (_strategy.LatestBar.Close > upperHalf)
                     //{
