@@ -25,6 +25,6 @@ namespace TradingBot.Indicators.Quotes
 
         decimal IQuote.Volume => Convert.ToDecimal(Bar.Volume);
 
-        public static implicit operator BarQuote(Bar b) => new BarQuote(b);
+        public static explicit operator BarQuote(Bar b) => new BarQuote(b);
     }
 }

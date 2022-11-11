@@ -53,6 +53,7 @@ namespace TradingBot
 
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+        HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
@@ -296,10 +297,45 @@ namespace TradingBot
             // Update all indicators.
             foreach (var indicator in indicators)
             {
-                indicator.Compute(_bars[indicator.BarLength].Cast<BarQuote>());
+                indicator.Compute(_bars[indicator.BarLength].Select(b => (BarQuote)b));
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
+        }
+
+        public void RequestLastTradedPricesUpdates(IIndicator indicator)
+        {
+            if(!_indicatorsRequiringLastUpdates.Contains(indicator))
+            {
+                _indicatorsRequiringLastUpdates.Add(indicator);
+                if(_indicatorsRequiringLastUpdates.Count == 1)
+                {
+                    _client.LastReceived += OnLastReceived;
+                    _client.RequestLastUpdates(_contract);
+                }
+            }
+        }
+
+        void OnLastReceived(Contract contract, Last last)
+        {
+            // Update partial bar with lasts
+
+            foreach(var indicator in _indicatorsRequiringLastUpdates)
+            {
+                indicator.ComputeTrend(new LastQuote(last));
+            }
+        }
+
+        public void CancelLastTradedPricesUpdates(IIndicator indicator)
+        {
+            if(_indicatorsRequiringLastUpdates.Remove(indicator))
+            {
+                if (_indicatorsRequiringLastUpdates.Count == 0)
+                {
+                    _client.LastReceived -= OnLastReceived;
+                    _client.CancelLastUpdates(_contract);
+                }
+            }
         }
 
         void OnAccountValueUpdated(string key, string value, string currency, string account)

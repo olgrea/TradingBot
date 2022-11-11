@@ -106,7 +106,7 @@ namespace TradingBot.Strategies
             LatestBar = bars.Last();
             foreach (var indicator in _indicators[LatestBar.BarLength])
             {
-                indicator.Compute(bars.Cast<BarQuote>());
+                indicator.Compute(bars.Select(b => (BarQuote)b));
             }
         }
     }
