@@ -30,11 +30,16 @@ namespace TradingBot.Indicators
         }
 
         public RsiDivergenceResult LatestResult => _results?.LastOrDefault();
+        public IEnumerable<RsiDivergenceResult> Results => _results;
+
+        public RsiDivergenceResult LatestTrendingResult => _trendingResults?.LastOrDefault();
+        public IEnumerable<RsiDivergenceResult> TrendingResults => _trendingResults;
+
         public Rsi SlowRSI => _slowRsi;
         public Rsi FastRSI => _fastRsi;
         
         public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() == NbWarmupPeriods;
+        public bool IsReady => LatestResult != null && _results.Count() >= NbWarmupPeriods;
         public int NbPeriods => _slowRsi.NbPeriods;
         public int NbWarmupPeriods => _slowRsi.NbWarmupPeriods;
 
