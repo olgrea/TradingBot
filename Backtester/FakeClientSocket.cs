@@ -17,46 +17,20 @@ using NLog;
 
 namespace Backtester
 {
-    class ContractsCache
-    {
-        ConcurrentDictionary<string, Contract> _contracts = new ConcurrentDictionary<string, Contract>();    
-
-        public Contract Get(string symbol)
-        {
-            return _contracts.GetOrAdd(symbol, symbol =>
-            {
-                return FetchContract(symbol).Result;
-            });
-
-            async Task<Contract> FetchContract(string symbol)
-            {
-                var client = new IBClient();
-                await client.ConnectAsync();
-                await Task.Delay(50);
-                var contract = await client.GetContractAsync(symbol);
-                await client.DisconnectAsync();
-                await Task.Delay(50);
-                return contract;
-            }
-        }
-    }
-
     internal class FakeClientSocket : IIBClientSocket
     {
-        /// <summary>
-        /// For market hours 7:00 to 16:00 : 9 hours = 32400s
-        /// - To have 1 day pass in 1 hour => TimeScale = 3600.0d/32400 ~ 111 ms/sec
-        /// - To have 1 week (5 days) pass in 1 hour => TimeScale = 3600.0d/162000 ~ 22 ms/sec
-        /// </summary>
         internal static class TimeDelays
         {
             public static double TimeScale = 0.001;
             public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
         }
 
-        static ContractsCache s_ContractsCache = new ContractsCache();
+        static ConcurrentDictionary<string, Contract> _contractsCache = new ConcurrentDictionary<string, Contract>();
+
         string _symbol;
         Contract _contract;
+
+        IBClient _innerClient;
 
         Stopwatch _st = new Stopwatch();
 
@@ -74,11 +48,12 @@ namespace Backtester
 
         event Action<DateTime> ClockTick;
         event Action<BidAsk> BidAskSubscription;
+        event Action<Last> LastSubscription;
 
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
         
-        bool isConnected = false;
+        bool _isConnected = false;
         int _nextValidOrderId = 1;
         int _nextExecId = 0;
         double _totalCommission = 0;
@@ -86,17 +61,17 @@ namespace Backtester
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
 
-        LinkedList<Bar> _dailyBars;
-        LinkedListNode<Bar> _currentBarNode;
-
-        LinkedList<BidAsk> _dailyBidAsks;
-        LinkedListNode<BidAsk> _currentBidAskNode;
+        MarketDataCollections _dailyData;
+        IEnumerator<Bar> _currentBar;
+        IEnumerator<BidAsk> _currentBidAsk;
+        IEnumerator<Last> _currentLast;
 
         ILogger _logger;
 
         bool _positionRequested = false;
         int _reqId5SecBar = -1;
         int _reqIdBidAsk = -1;
+        int _reqIdLast = -1;
         int _reqIdPnL = -1;
         
         internal int NextValidOrderId => _nextValidOrderId++;
@@ -105,10 +80,8 @@ namespace Backtester
         Position Position => _fakeAccount.Positions.FirstOrDefault();
         internal Contract Contract => _contract;
         internal Account Account => _fakeAccount;
-
-        internal LinkedListNode<BidAsk> CurrentBidAskNode => _currentBidAskNode;
         
-        public FakeClientSocket(string symbol, DateTime startTime, DateTime endTime, IEnumerable<Bar> dailyBars, IEnumerable<BidAsk> dailyBidAsks)
+        public FakeClientSocket(string symbol, DateTime startTime, DateTime endTime, MarketDataCollections dailyData)
         {
             _logger = LogManager.GetLogger(nameof(FakeClientSocket));
             Callbacks = new IBCallbacks(_logger);
@@ -120,13 +93,19 @@ namespace Backtester
             _start = startTime;
             _end = endTime;
 
-            _dailyBars = new LinkedList<Bar>(dailyBars);
-            _currentBarNode = InitFirstNode(_dailyBars);
+            _dailyData = dailyData;
+            _currentBar = GetStartEnumerator(_dailyData.Bars);
+            _currentBidAsk = GetStartEnumerator(_dailyData.BidAsks);
+            _currentLast = GetStartEnumerator(_dailyData.Lasts);
 
-            _dailyBidAsks = new LinkedList<BidAsk>(dailyBidAsks);
-            _currentBidAskNode = InitFirstNode(_dailyBidAsks);
+            _innerClient = new IBClient();
+            _innerClient.ConnectAsync().Wait(2000);
 
-            _contract = s_ContractsCache.Get(_symbol);
+            if (!_contractsCache.TryGetValue(symbol, out _contract))
+            {
+                _contract = _innerClient.GetContractAsync(symbol).Result;
+                _contractsCache.TryAdd(symbol, _contract);
+            }
 
             _fakeAccount = new Account()
             {
@@ -154,16 +133,23 @@ namespace Backtester
             _responsesTask = StartConsumerTask(_responsesQueue);
         }
 
+        ~FakeClientSocket()
+        {
+            _innerClient.DisconnectAsync().Wait(2000);
+        }
+
         public IBCallbacks Callbacks { get; private set; }
 
         internal Task PassingTimeTask => _passingTimeTask;
 
-        LinkedListNode<T> InitFirstNode<T>(LinkedList<T> list) where T : IMarketData
+        IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
-            var current = list.First;
-            while (current.Value.Time < _start)
-                current = current.Next;
-            return current;
+            if (data == null || !data.Any())
+                throw new ArgumentException("no market data");
+
+            var e = data.SkipWhile(d => d?.Time < _start).GetEnumerator();
+            e.MoveNext();
+            return e;
         }
 
         public void Connect(string host, int port, int clientId)
@@ -171,13 +157,13 @@ namespace Backtester
             Start();
             _requestsQueue.Add(() =>
             {
-                if (isConnected)
+                if (_isConnected)
                 {
                     _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(501, "Already Connected.")));
                     return;
                 }
 
-                isConnected = true;
+                _isConnected = true;
                 _responsesQueue.Add(() => Callbacks.nextValidId(NextValidOrderId));
                 _responsesQueue.Add(() => Callbacks.managedAccounts(_fakeAccount.Code));
             });
@@ -187,17 +173,21 @@ namespace Backtester
         {
             _requestsQueue.Add(() =>
             {
-                isConnected = false;
+                _isConnected = false;
                 _responsesQueue.Add(() => Callbacks.connectionClosed());
             });
         }
 
         internal void Start()
         {
+            if (_passingTimeTask != null)
+                return;
+
             _logger.Info($"Fake client started : {_currentFakeTime} to {_end}");
 
-            ClockTick += OnClockTick_UpdateBarNode;
-            ClockTick += OnClockTick_UpdateBidAskNode;
+            ClockTick += OnClockTick_UpdateBar;
+            ClockTick += OnClockTick_UpdateBidAsk;
+            ClockTick += OnClockTick_UpdateLast;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
             _passingTimeTask = StartPassingTimeTask();
         }
@@ -207,8 +197,9 @@ namespace Backtester
             _logger.Info($"Fake client stopped at {_currentFakeTime}");
 
             StopPassingTimeTask();
-            ClockTick -= OnClockTick_UpdateBarNode;
-            ClockTick -= OnClockTick_UpdateBidAskNode;
+            ClockTick -= OnClockTick_UpdateBar;
+            ClockTick -= OnClockTick_UpdateBidAsk;
+            ClockTick -= OnClockTick_UpdateLast;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
         }
 
@@ -281,7 +272,7 @@ namespace Backtester
 
             _requestsQueue.Add(() =>
             {
-                var price = order.TotalQuantity * _currentBidAskNode.Value.Ask;
+                var price = order.TotalQuantity * _currentBidAsk.Current.Ask;
                 if(order.Action == OrderAction.BUY && _fakeAccount.CashBalances["BASE"] < price)
                 {
                     _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(201, "Order rejected - Reason:")));
@@ -700,6 +691,9 @@ namespace Backtester
 
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
+            if (_reqId5SecBar != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
                 if (_reqId5SecBar < 0)
@@ -710,22 +704,22 @@ namespace Backtester
             });
         }
 
-        void OnClockTick_UpdateBarNode(DateTime newTime)
+        void OnClockTick_UpdateBar(DateTime newTime)
         {
-            if (_currentBarNode?.Value.Time < newTime)
-                _currentBarNode = _currentBarNode.Next;
+            if (_currentBar.Current.Time < newTime)
+                _currentBar.MoveNext();
 
             if (_reqId5SecBar > 0 && newTime.Second % 5 == 0)
             {
                 var list = new LinkedList<Bar>();
-                var current = _currentBarNode;
+                var current = _currentBar;
                 for (int i = 0; i < 5; i++)
                 {
-                    list.AddLast(current.Value);
-                    current = current.Next;
+                    list.AddLast(current.Current);
+                    current.MoveNext();
                 }
 
-                var b = Utils.MakeBar(list, BarLength._5Sec);
+                var b = Utils.CombineBars(list, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }
@@ -733,6 +727,9 @@ namespace Backtester
 
         public void CancelFiveSecondsBarsUpdates(int reqId)
         {
+            if (_reqId5SecBar == -1) 
+                return;
+
             _requestsQueue.Add(() =>
             {
                 if (reqId == _reqId5SecBar)
@@ -765,20 +762,9 @@ namespace Backtester
             _responsesQueue.Add(() => Callbacks.openOrderEnd());
         }
 
-        void OnClockTick_UpdateBidAskNode(DateTime newTime)
-        {
-            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
-            while (_currentBidAskNode?.Value.Time < newTime)
-            {
-                EvaluateOpenOrders(_currentBidAskNode.Value);
-                BidAskSubscription?.Invoke(_currentBidAskNode.Value);
-                _currentBidAskNode = _currentBidAskNode.Next;
-            }
-        }
-
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
         {
-            var ba = _currentBidAskNode.Value;
+            var ba = _currentBidAsk.Current;
             var currentPrice = ba.Ask;
 
             var oldPos = new Position(Position);
@@ -823,6 +809,9 @@ namespace Backtester
 
         public void RequestPnLUpdates(int reqId, int contractId)
         {
+            if (_reqIdPnL != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
                 //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
@@ -848,53 +837,58 @@ namespace Backtester
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
-            if(!string.IsNullOrEmpty(endDateTime))
-                throw new NotImplementedException("Can only request historical data from the current moment in this Fake client");
-            
-            _requestsQueue.Add(() => 
-            {
-                int nbBars = -1;
-                switch(barSizeStr)
-                {
-                    case "5 secs": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 5; break;
-                    case "1 min": nbBars = Convert.ToInt32(durationStr.Split()[0]) / 60; break;
-                        throw new NotImplementedException("Only \"5 secs\" or \"1 min\" historical data is implemented");
-                }
+            // TODO : fetch from db if data is available
 
-                LinkedListNode<Bar> first = _currentBarNode;
-                LinkedListNode<Bar> current = first;
-
-                for (int i = 0; i < nbBars; i++, current = current.Previous)
-                {
-                    _responsesQueue.Add(() => Callbacks.historicalData(reqId, new IBApi.Bar(
-                        current.Value.Time.ToString(Bar.TWSTimeFormat), 
-                        current.Value.Open, 
-                        current.Value.High, 
-                        current.Value.Low, 
-                        current.Value.Close, 
-                        current.Value.Volume, 
-                        current.Value.TradeAmount, 
-                        0)));
-                }
-
-                _responsesQueue.Add(() => Callbacks.historicalDataEnd(reqId, first.Value.Time.ToString(Bar.TWSTimeFormat), current.Value.Time.ToString(Bar.TWSTimeFormat)));
-            });
+            _innerClient.Socket.Callbacks.HistoricalData = Callbacks.HistoricalData;
+            _innerClient.Socket.Callbacks.HistoricalDataEnd = Callbacks.HistoricalDataEnd;
+            _innerClient.Socket.RequestHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, onlyRTH);
         }
 
         public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
-            throw new NotImplementedException();
+            switch (whatToShow)
+            {
+                case "BID_ASK":
+                    _innerClient.Socket.Callbacks.HistoricalTicksBidAsk = Callbacks.HistoricalTicksBidAsk;
+                    break;
+
+                case "TRADES":
+                    _innerClient.Socket.Callbacks.HistoricalTicksLast = Callbacks.HistoricalTicksLast;
+                    break;
+
+                default: throw new NotImplementedException($"\"{whatToShow}\" tick type is not implemented");
+            }
+
+            _innerClient.Socket.RequestHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, onlyRTH, ignoreSize);
         }
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
-            if (tickType != "BidAsk")
-                throw new NotImplementedException("Only \"BidAsk\" tick by tick data is implemented");
+            switch (tickType)
+            {
+                case "BidAsk":
+                    RequestBidAskData(reqId);
+                    break;
+
+                case "Last":
+                    RequestLastData(reqId);
+                    break;
+
+                default: throw new NotImplementedException($"\"{tickType}\" tick type is not implemented");
+            }
+        }
+
+        void RequestBidAskData(int reqId)
+        {
+            if (_reqIdBidAsk != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
 
             _requestsQueue.Add(() =>
             {
                 _reqIdBidAsk = reqId;
-                BidAskSubscription += SendBidAsk;
+
+                if(BidAskSubscription == null)
+                    BidAskSubscription += SendBidAsk;
             });
         }
 
@@ -903,12 +897,62 @@ namespace Backtester
             _responsesQueue.Add(() => Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk()));
         }
 
-        public void CancelTickByTickData(int reqId)
+        void OnClockTick_UpdateBidAsk(DateTime newTime)
         {
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
+            while (_currentBidAsk.Current.Time < newTime)
+            {
+                EvaluateOpenOrders(_currentBidAsk.Current);
+                BidAskSubscription?.Invoke(_currentBidAsk.Current);
+                _currentBidAsk.MoveNext();
+            }
+        }
+
+        void RequestLastData(int reqId)
+        {
+            if (_reqIdLast != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
-                BidAskSubscription -= SendBidAsk;
-                _reqIdBidAsk = -1;
+                _reqIdLast = reqId;
+                if(LastSubscription == null)
+                    LastSubscription += SendLast;
+            });
+        }
+
+        void SendLast(Last last)
+        {
+            _responsesQueue.Add(() => Callbacks.tickByTickAllLast(_reqIdLast, 0, new DateTimeOffset(last.Time.ToUniversalTime()).ToUnixTimeSeconds(), last.Price, last.Size, new IBApi.TickAttribLast(), "", ""));
+        }
+
+        void OnClockTick_UpdateLast(DateTime newTime)
+        {
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed...
+            while (_currentLast.Current.Time < newTime)
+            {
+                LastSubscription?.Invoke(_currentLast.Current);
+                _currentLast.MoveNext();
+            }
+        }
+
+        public void CancelTickByTickData(int reqId)
+        {
+            if (reqId == -1) 
+                return;
+
+            _requestsQueue.Add(() =>
+            {
+                if(reqId == _reqIdBidAsk)
+                {
+                    BidAskSubscription -= SendBidAsk;
+                    _reqIdBidAsk = -1;
+                }
+                else if (reqId == _reqIdLast)
+                {
+                    LastSubscription -= SendLast;
+                    _reqIdLast = -1;
+                }
             });
         }
 

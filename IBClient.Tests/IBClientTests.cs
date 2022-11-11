@@ -3,24 +3,23 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using InteractiveBrokers;
 using InteractiveBrokers.Messages;
 using InteractiveBrokers.Orders;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Contracts;
 
-namespace Tests.Broker
+namespace Tests.IBClient
 {
     [TestFixture]
     public class IBClientTests
     {
-        protected IBClient _client;
+        protected InteractiveBrokers.IBClient _client;
         protected ConnectResult _connectMessage;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _client = new IBClient(191919);
+            _client = new InteractiveBrokers.IBClient(191919);
             await Task.CompletedTask;
         }
 
@@ -64,7 +63,8 @@ namespace Tests.Broker
             await _client.DisconnectAsync();
             await Task.Delay(50);
             await _client.ConnectAsync();
-            
+            await Task.Delay(50);
+
             // Test
             Assert.ThrowsAsync<ErrorMessageException>(async () => await _client.ConnectAsync()); 
         }
