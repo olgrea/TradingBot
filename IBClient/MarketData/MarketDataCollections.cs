@@ -1,11 +1,12 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace InteractiveBrokers.MarketData
 {
     public class MarketDataCollections
     {
-        public IEnumerable<Bar> Bars { get; set; }
-        public IEnumerable<BidAsk> BidAsks { get; set; }
-        public IEnumerable<Last> Lasts { get; set; }
+        public IEnumerable<Bar> Bars { get; set; } = Enumerable.Empty<Bar>();
+        public IEnumerable<BidAsk> BidAsks { get; set; } = Enumerable.Empty<BidAsk>();
+        public IEnumerable<Last> Lasts { get; set; } = Enumerable.Empty<Last>();
     }
 }

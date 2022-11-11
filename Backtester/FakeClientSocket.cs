@@ -53,6 +53,7 @@ namespace Backtester
 
         event Action<DateTime> ClockTick;
         event Action<BidAsk> BidAskSubscription;
+        event Action<Last> LastSubscription;
 
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
@@ -68,12 +69,14 @@ namespace Backtester
         MarketDataCollections _dailyData;
         IEnumerator<Bar> _currentBar;
         IEnumerator<BidAsk> _currentBidAsk;
+        IEnumerator<Last> _currentLast;
 
         ILogger _logger;
 
         bool _positionRequested = false;
         int _reqId5SecBar = -1;
         int _reqIdBidAsk = -1;
+        int _reqIdLast = -1;
         int _reqIdPnL = -1;
         
         internal int NextValidOrderId => _nextValidOrderId++;
@@ -98,6 +101,7 @@ namespace Backtester
             _dailyData = dailyData;
             _currentBar = GetStartEnumerator(_dailyData.Bars);
             _currentBidAsk = GetStartEnumerator(_dailyData.BidAsks);
+            _currentLast = GetStartEnumerator(_dailyData.Lasts);
 
             _innerClient = new IBClient();
             _innerClient.ConnectAsync().Wait(2000);
@@ -183,8 +187,9 @@ namespace Backtester
 
             _logger.Info($"Fake client started : {_currentFakeTime} to {_end}");
 
-            ClockTick += OnClockTick_UpdateBarNode;
-            ClockTick += OnClockTick_UpdateBidAskNode;
+            ClockTick += OnClockTick_UpdateBar;
+            ClockTick += OnClockTick_UpdateBidAsk;
+            ClockTick += OnClockTick_UpdateLast;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
             _passingTimeTask = StartPassingTimeTask();
         }
@@ -194,8 +199,9 @@ namespace Backtester
             _logger.Info($"Fake client stopped at {_currentFakeTime}");
 
             StopPassingTimeTask();
-            ClockTick -= OnClockTick_UpdateBarNode;
-            ClockTick -= OnClockTick_UpdateBidAskNode;
+            ClockTick -= OnClockTick_UpdateBar;
+            ClockTick -= OnClockTick_UpdateBidAsk;
+            ClockTick -= OnClockTick_UpdateLast;
             ClockTick -= OnClockTick_UpdateUnrealizedPNL;
         }
 
@@ -687,6 +693,9 @@ namespace Backtester
 
         public void RequestFiveSecondsBarUpdates(int reqId, Contract contract)
         {
+            if (_reqId5SecBar != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
                 if (_reqId5SecBar < 0)
@@ -697,7 +706,7 @@ namespace Backtester
             });
         }
 
-        void OnClockTick_UpdateBarNode(DateTime newTime)
+        void OnClockTick_UpdateBar(DateTime newTime)
         {
             if (_currentBar.Current.Time < newTime)
                 _currentBar.MoveNext();
@@ -720,6 +729,9 @@ namespace Backtester
 
         public void CancelFiveSecondsBarsUpdates(int reqId)
         {
+            if (_reqId5SecBar == -1) 
+                return;
+
             _requestsQueue.Add(() =>
             {
                 if (reqId == _reqId5SecBar)
@@ -750,17 +762,6 @@ namespace Backtester
             }
 
             _responsesQueue.Add(() => Callbacks.openOrderEnd());
-        }
-
-        void OnClockTick_UpdateBidAskNode(DateTime newTime)
-        {
-            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
-            while (_currentBidAsk.Current.Time < newTime)
-            {
-                EvaluateOpenOrders(_currentBidAsk.Current);
-                BidAskSubscription?.Invoke(_currentBidAsk.Current);
-                _currentBidAsk.MoveNext();
-            }
         }
 
         void OnClockTick_UpdateUnrealizedPNL(DateTime newTime)
@@ -810,6 +811,9 @@ namespace Backtester
 
         public void RequestPnLUpdates(int reqId, int contractId)
         {
+            if (_reqIdPnL != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
                 //updates are returned to IBApi.EWrapper.pnlSingle approximately once per second
@@ -845,13 +849,31 @@ namespace Backtester
 
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
-            if (tickType != "BidAsk")
-                throw new NotImplementedException("Only \"BidAsk\" tick by tick data is implemented");
+            switch (tickType)
+            {
+                case "BidAsk":
+                    RequestBidAskData(reqId);
+                    break;
+
+                case "Last":
+                    RequestLastData(reqId);
+                    break;
+
+                default: throw new NotImplementedException($"\"{tickType}\" tick type is not implemented");
+            }
+        }
+
+        void RequestBidAskData(int reqId)
+        {
+            if (_reqIdBidAsk != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
 
             _requestsQueue.Add(() =>
             {
                 _reqIdBidAsk = reqId;
-                BidAskSubscription += SendBidAsk;
+
+                if(BidAskSubscription == null)
+                    BidAskSubscription += SendBidAsk;
             });
         }
 
@@ -860,12 +882,62 @@ namespace Backtester
             _responsesQueue.Add(() => Callbacks.tickByTickBidAsk(_reqIdBidAsk, new DateTimeOffset(ba.Time.ToUniversalTime()).ToUnixTimeSeconds(), ba.Bid, ba.Ask, ba.BidSize, ba.AskSize, new IBApi.TickAttribBidAsk()));
         }
 
-        public void CancelTickByTickData(int reqId)
+        void OnClockTick_UpdateBidAsk(DateTime newTime)
         {
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
+            while (_currentBidAsk.Current.Time < newTime)
+            {
+                EvaluateOpenOrders(_currentBidAsk.Current);
+                BidAskSubscription?.Invoke(_currentBidAsk.Current);
+                _currentBidAsk.MoveNext();
+            }
+        }
+
+        void RequestLastData(int reqId)
+        {
+            if (_reqIdLast != -1)
+                throw new NotSupportedException("Multiple requests not supported for now.");
+
             _requestsQueue.Add(() =>
             {
-                BidAskSubscription -= SendBidAsk;
-                _reqIdBidAsk = -1;
+                _reqIdLast = reqId;
+                if(LastSubscription != null)
+                    LastSubscription += SendLast;
+            });
+        }
+
+        void SendLast(Last last)
+        {
+            _responsesQueue.Add(() => Callbacks.tickByTickAllLast(_reqIdLast, 0, new DateTimeOffset(last.Time.ToUniversalTime()).ToUnixTimeSeconds(), last.Price, last.Size, new IBApi.TickAttribLast(), "", ""));
+        }
+
+        void OnClockTick_UpdateLast(DateTime newTime)
+        {
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
+            while (_currentLast.Current.Time < newTime)
+            {
+                LastSubscription?.Invoke(_currentLast.Current);
+                _currentLast.MoveNext();
+            }
+        }
+
+        public void CancelTickByTickData(int reqId)
+        {
+            if (reqId == -1) 
+                return;
+
+            _requestsQueue.Add(() =>
+            {
+                if(reqId == _reqIdBidAsk)
+                {
+                    BidAskSubscription -= SendBidAsk;
+                    _reqIdBidAsk = -1;
+                }
+                else if (reqId == _reqIdLast)
+                {
+                    LastSubscription -= SendLast;
+                    _reqIdLast = -1;
+                }
             });
         }
 
