@@ -19,11 +19,6 @@ namespace Backtester
 {
     internal class FakeClientSocket : IIBClientSocket
     {
-        /// <summary>
-        /// For market hours 7:00 to 16:00 : 9 hours = 32400s
-        /// - To have 1 day pass in 1 hour => TimeScale = 3600.0d/32400 ~ 111 ms/sec
-        /// - To have 1 week (5 days) pass in 1 hour => TimeScale = 3600.0d/162000 ~ 22 ms/sec
-        /// </summary>
         internal static class TimeDelays
         {
             public static double TimeScale = 0.001;
@@ -149,6 +144,9 @@ namespace Backtester
 
         IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
+            if (data == null || !data.Any())
+                throw new ArgumentException("no market data");
+
             var e = data.SkipWhile(d => d?.Time < _start).GetEnumerator();
             e.MoveNext();
             return e;
@@ -839,11 +837,28 @@ namespace Backtester
 
         public void RequestHistoricalData(int reqId, Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
         {
+            // TODO : fetch from db if data is available
+
+            _innerClient.Socket.Callbacks.HistoricalData = Callbacks.HistoricalData;
+            _innerClient.Socket.Callbacks.HistoricalDataEnd = Callbacks.HistoricalDataEnd;
             _innerClient.Socket.RequestHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, onlyRTH);
         }
 
         public void RequestHistoricalTicks(int reqId, Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
+            switch (whatToShow)
+            {
+                case "BID_ASK":
+                    _innerClient.Socket.Callbacks.HistoricalTicksBidAsk = Callbacks.HistoricalTicksBidAsk;
+                    break;
+
+                case "TRADES":
+                    _innerClient.Socket.Callbacks.HistoricalTicksLast = Callbacks.HistoricalTicksLast;
+                    break;
+
+                default: throw new NotImplementedException($"\"{whatToShow}\" tick type is not implemented");
+            }
+
             _innerClient.Socket.RequestHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, onlyRTH, ignoreSize);
         }
 
@@ -901,7 +916,7 @@ namespace Backtester
             _requestsQueue.Add(() =>
             {
                 _reqIdLast = reqId;
-                if(LastSubscription != null)
+                if(LastSubscription == null)
                     LastSubscription += SendLast;
             });
         }
