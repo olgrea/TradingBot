@@ -503,7 +503,7 @@ namespace InteractiveBrokers
                     Bar barToUse = bar;
                     if (barLength > BarLength._5Sec)
                     {
-                        barToUse = Utils.MakeBar(list.TakeLast(nbBars), barLength);
+                        barToUse = Utils.CombineBars(list.TakeLast(nbBars), barLength);
                     }
 
                     InvokeCallbacks(contract, barToUse);

@@ -719,7 +719,7 @@ namespace Backtester
                     current.MoveNext();
                 }
 
-                var b = Utils.MakeBar(list, BarLength._5Sec);
+                var b = Utils.CombineBars(list, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(b.Time.ToUniversalTime());
                 _responsesQueue.Add(() => Callbacks.realtimeBar(_reqId5SecBar, dto.ToUnixTimeSeconds(), b.Open, b.High, b.Low, b.Close, b.Volume, 0, b.TradeAmount));
             }

@@ -59,7 +59,7 @@ namespace InteractiveBrokers.MarketData
             }
         }
         
-        public static Bar MakeBar(IEnumerable<Bar> bars, BarLength barLength)
+        public static Bar CombineBars(IEnumerable<Bar> bars, BarLength barLength)
         {
             Bar newBar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
 
@@ -81,6 +81,35 @@ namespace InteractiveBrokers.MarketData
                 if (i == nbBars - 1)
                 {
                     newBar.Close = bar.Close;
+                }
+
+                i++;
+            }
+
+            return newBar;
+        }
+
+        public static Bar MakeBarFromLasts(IEnumerable<Last> lasts, BarLength barLength)
+        {
+            Bar newBar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
+
+            int i = 0;
+            int count = lasts.Count();
+            foreach (Last last in lasts)
+            {
+                if (i == 0)
+                {
+                    newBar.Open = last.Price;
+                    newBar.Time = last.Time;
+                }
+
+                newBar.High = Math.Max(newBar.High, last.Price);
+                newBar.Low = Math.Min(newBar.Low, last.Price);
+                newBar.Volume += last.Size;
+
+                if (i == count - 1)
+                {
+                    newBar.Close = last.Price;
                 }
 
                 i++;
