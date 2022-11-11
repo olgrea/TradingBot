@@ -73,8 +73,8 @@ namespace InteractiveBrokers.MarketData
                     newBar.Time = bar.Time;
                 }
 
-                newBar.High = Math.Max(bar.High, bar.High);
-                newBar.Low = Math.Min(bar.Low, bar.Low);
+                newBar.High = Math.Max(newBar.High, bar.High);
+                newBar.Low = Math.Min(newBar.Low, bar.Low);
                 newBar.Volume += bar.Volume;
                 newBar.TradeAmount += bar.TradeAmount;
 
