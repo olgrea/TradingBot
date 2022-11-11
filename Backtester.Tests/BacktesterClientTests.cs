@@ -6,7 +6,7 @@ using DataStorage.Db.DbCommandFactories;
 using InteractiveBrokers;
 using InteractiveBrokers.MarketData;
 using NUnit.Framework;
-using Tests.Broker;
+using Tests.IBClient;
 
 namespace Tests.Backtester
 {
