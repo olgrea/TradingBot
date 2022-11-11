@@ -19,6 +19,7 @@ namespace Backtester
         string _ticker;
         BarCommandFactory _barCommandFactory;
         BidAskCommandFactory _bidAskCommandFactory;
+        LastCommandFactory _lastCommandFactory;
 
         Dictionary<int, PnL> _PnLs = new Dictionary<int, PnL>();
 
@@ -29,6 +30,7 @@ namespace Backtester
             _endTime = new DateTime(endDate.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
             _barCommandFactory = new BarCommandFactory(BarLength._1Sec);
             _bidAskCommandFactory = new BidAskCommandFactory();
+            _lastCommandFactory = new LastCommandFactory();
         }
 
         public async Task Start()
@@ -52,14 +54,17 @@ namespace Backtester
         {
             var barSelectCmd = _barCommandFactory.CreateSelectCommand(symbol, date, timeRange);
             var bidAskSelectCmd = _bidAskCommandFactory.CreateSelectCommand(symbol, date, timeRange);
+            var lastSelectCmd = _lastCommandFactory.CreateSelectCommand(symbol, date, timeRange);
 
             var barList = barSelectCmd.Execute();
             var bidAskList = bidAskSelectCmd.Execute();
+            var lastList = lastSelectCmd.Execute();
 
             return new MarketDataCollections()
             {
                 Bars = new LinkedList<Bar>(barList),
                 BidAsks = new LinkedList<BidAsk>(bidAskList),
+                Lasts = new LinkedList<Last>(lastList),
             };
         }
     }
