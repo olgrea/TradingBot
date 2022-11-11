@@ -2,7 +2,7 @@
   "profiles": {
     "HistoricalDataFetcher": {
       "commandName": "Project",
-      "commandLineArgs": "-t GME -s 2022-10-19"
+      "commandLineArgs": "-t U -s 2022-11-08"
     }
   }
 }
