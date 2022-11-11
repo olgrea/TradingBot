@@ -57,7 +57,7 @@ namespace Backtester
         DateTime _lastAccountUpdate;
         Account _fakeAccount;
         
-        bool isConnected = false;
+        bool _isConnected = false;
         int _nextValidOrderId = 1;
         int _nextExecId = 0;
         double _totalCommission = 0;
@@ -146,7 +146,7 @@ namespace Backtester
         IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
             var e = data.SkipWhile(d => d?.Time < _start).GetEnumerator();
-            //e.MoveNext();
+            e.MoveNext();
             return e;
         }
 
@@ -155,13 +155,13 @@ namespace Backtester
             Start();
             _requestsQueue.Add(() =>
             {
-                if (isConnected)
+                if (_isConnected)
                 {
                     _responsesQueue.Add(() => Callbacks.error(new ErrorMessageException(501, "Already Connected.")));
                     return;
                 }
 
-                isConnected = true;
+                _isConnected = true;
                 _responsesQueue.Add(() => Callbacks.nextValidId(NextValidOrderId));
                 _responsesQueue.Add(() => Callbacks.managedAccounts(_fakeAccount.Code));
             });
@@ -171,13 +171,16 @@ namespace Backtester
         {
             _requestsQueue.Add(() =>
             {
-                isConnected = false;
+                _isConnected = false;
                 _responsesQueue.Add(() => Callbacks.connectionClosed());
             });
         }
 
         internal void Start()
         {
+            if (_passingTimeTask != null)
+                return;
+
             _logger.Info($"Fake client started : {_currentFakeTime} to {_end}");
 
             ClockTick += OnClockTick_UpdateBarNode;
