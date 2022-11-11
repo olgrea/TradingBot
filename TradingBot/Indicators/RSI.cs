@@ -1,62 +1,38 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 
 namespace TradingBot.Indicators
 {
-    public class Rsi : IIndicator
+    internal class Rsi : IndicatorBase<RsiResult>
     {
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
-        
-        IEnumerable<IQuote> _quotes;
-        IEnumerable<RsiResult> _results;
 
-        LinkedList<IQuote> _partialQuotes = new LinkedList<IQuote>();
-        IEnumerable<RsiResult> _trendingResults;
-
-        int _nbPeriods;
-        int _nbWarmupPeriods;
-        BarLength _barLength;
-
-        public Rsi(BarLength barLength, int nbPeriods = 14)
+        public Rsi(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods, 10*nbPeriods)
         {
-            _barLength = barLength;
-            _nbPeriods = nbPeriods;
-            _nbWarmupPeriods = 10*nbPeriods;
         }
         
         public bool IsOverbought => IsReady && LatestResult.Rsi > _overboughtThreshold;
         public bool IsOversold => IsReady && LatestResult.Rsi < _oversoldThreshold;
 
-        public RsiResult LatestResult => _results?.LastOrDefault();
-        public IEnumerable<RsiResult> Results => _results;
-
-        public RsiResult LatestTrendingResult => _trendingResults?.LastOrDefault();
-        public IEnumerable<RsiResult> TrendingResults => _trendingResults;
-
-        public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() >= _nbWarmupPeriods;
-        public int NbPeriods => _nbPeriods;
-        public int NbWarmupPeriods => _nbWarmupPeriods;
-
-        public void Compute(IEnumerable<IQuote> quotes)
+        public override void Compute(IEnumerable<IQuote> quotes)
         {
-            _partialQuotes.Clear();
-            _quotes = quotes;
+            base.Compute(quotes);
             _results = ComputeResults(_quotes);
         }
 
-        public void ComputeTrend(IQuote partialQuote)
+        public override void ComputeTrend(Last last)
         {
-            _partialQuotes.AddLast(partialQuote);
-            _trendingResults = ComputeResults(_quotes.Concat(_partialQuotes));
+            base.ComputeTrend(last);
+            _trendingResults = ComputeResults(_quotes.Append(_partialQuote));
         }
 
         IEnumerable<RsiResult> ComputeResults(IEnumerable<IQuote> quotes)
         {
-            return quotes.GetRsi(_nbPeriods);
+            return quotes.GetRsi(NbPeriods);
         }
     }
 }

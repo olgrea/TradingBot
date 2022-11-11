@@ -54,6 +54,7 @@ namespace TradingBot
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
+        Bar _partialBarFromLasts;
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
@@ -139,6 +140,7 @@ namespace TradingBot
             {
                 while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
                 {
+                    //TODO : need another apporach. Skips of 5 sec when backtesting
                     await Task.Delay(500);
                     _currentTime = await _client.GetCurrentTimeAsync();
                     if(!_tradingStarted && _currentTime >= _startTime)
@@ -318,12 +320,11 @@ namespace TradingBot
 
         void OnLastReceived(Contract contract, Last last)
         {
-            // Update partial bar with lasts
-
             foreach(var indicator in _indicatorsRequiringLastUpdates)
             {
-                indicator.ComputeTrend(new LastQuote(last));
+                indicator.ComputeTrend(last);
             }
+            EvaluateStrategies();
         }
 
         public void CancelLastTradedPricesUpdates(IIndicator indicator)

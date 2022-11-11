@@ -12,48 +12,34 @@ namespace TradingBot.Indicators
         public double? RSIDivergence { get; set; }
     }
 
-    public class RsiDivergence : IIndicator
+    internal class RsiDivergence : IndicatorBase<RsiDivergenceResult>
     {
         Rsi _slowRsi;
         Rsi _fastRsi;
 
-        IEnumerable<RsiDivergenceResult> _results;
-        IEnumerable<RsiDivergenceResult> _trendingResults;
-
-        BarLength _barLength;
-
-        public RsiDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5)
+        public RsiDivergence(BarLength barLength, int slowPeriod=14, int fastPeriod=5) 
+            : base(barLength, slowPeriod, 10*slowPeriod)
         {
-            _barLength = barLength;
             _slowRsi = new Rsi(barLength, slowPeriod);
             _fastRsi = new Rsi(barLength, fastPeriod);
         }
 
-        public RsiDivergenceResult LatestResult => _results?.LastOrDefault();
-        public IEnumerable<RsiDivergenceResult> Results => _results;
-
-        public RsiDivergenceResult LatestTrendingResult => _trendingResults?.LastOrDefault();
-        public IEnumerable<RsiDivergenceResult> TrendingResults => _trendingResults;
-
         public Rsi SlowRSI => _slowRsi;
         public Rsi FastRSI => _fastRsi;
-        
-        public BarLength BarLength => _barLength;
-        public bool IsReady => LatestResult != null && _results.Count() >= NbWarmupPeriods;
-        public int NbPeriods => _slowRsi.NbPeriods;
-        public int NbWarmupPeriods => _slowRsi.NbWarmupPeriods;
 
-        public void Compute(IEnumerable<IQuote> quotes)
+        public override void Compute(IEnumerable<IQuote> quotes)
         {
+            base.Compute(quotes);
             _slowRsi.Compute(quotes);
             _fastRsi.Compute(quotes);
             _results = ComputeResults(_slowRsi.Results, _fastRsi.Results);
         }
 
-        public void ComputeTrend(IQuote partialQuote)
+        public override void ComputeTrend(Last last)
         {
-            _slowRsi.ComputeTrend(partialQuote);
-            _fastRsi.ComputeTrend(partialQuote);
+            base.ComputeTrend(last);
+            _slowRsi.ComputeTrend(last);
+            _fastRsi.ComputeTrend(last);
             _trendingResults = ComputeResults(_slowRsi.TrendingResults, _fastRsi.TrendingResults);
         }
 

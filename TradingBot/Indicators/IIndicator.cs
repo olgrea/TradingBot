@@ -13,6 +13,6 @@ namespace TradingBot.Indicators
 
         // TODO : update this when Skender.Stock.Indicators' streaming feature will be available.
         void Compute(IEnumerable<IQuote> quotes);
-        void ComputeTrend(IQuote partialQuote);
+        void ComputeTrend(Last last);
     }
 }

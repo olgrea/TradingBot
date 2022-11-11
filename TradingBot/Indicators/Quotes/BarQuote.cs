@@ -6,6 +6,8 @@ namespace TradingBot.Indicators.Quotes
 {
     internal class BarQuote : IQuote
     {
+        public BarQuote() { }
+
         public BarQuote(Bar bar)
         {
             Bar = bar;

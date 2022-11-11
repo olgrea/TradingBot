@@ -928,7 +928,7 @@ namespace Backtester
 
         void OnClockTick_UpdateLast(DateTime newTime)
         {
-            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed.
+            // Since the lowest resolution is 1 second, all bid/asks that happen in between are delayed...
             while (_currentLast.Current.Time < newTime)
             {
                 LastSubscription?.Invoke(_currentLast.Current);
