@@ -41,6 +41,7 @@
         }
     }
 
+    //TODO : add proper options support
     public class Option : Contract
     {
         public Option() => SecType = "OPT";

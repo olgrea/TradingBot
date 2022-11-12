@@ -172,7 +172,6 @@ namespace InteractiveBrokers.Backend
             RealtimeBar?.Invoke(reqId, bar);
         }
 
-        // TODO : support 1 sec bars using tick by tick data?
         public Action<int, BidAsk> TickByTickBidAsk;
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
@@ -189,6 +188,7 @@ namespace InteractiveBrokers.Backend
             TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
+        // TODO : support 1 sec bars using tick by tick data?
         public Action<int, Last> TickByTickAllLast;
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {

@@ -126,7 +126,6 @@ namespace InteractiveBrokers.Backend
         public void RequestTickByTickData(int reqId, Contract contract, string tickType)
         {
             _logger.Debug($"Requesting tick by tick data ({tickType}) for {contract} (reqId={reqId})");
-            // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
             _clientSocket.reqTickByTickData(reqId, contract.ToIBApiContract(), tickType, 0, false);
         }
 

@@ -54,7 +54,6 @@ namespace TradingBot
         bool _tradingStarted = false;
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
-        Bar _partialBarFromLasts;
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();

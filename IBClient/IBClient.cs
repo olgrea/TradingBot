@@ -468,7 +468,6 @@ namespace InteractiveBrokers
             if (_subscriptions.FiveSecBars.Count == 1)
                 _socket.Callbacks.RealtimeBar += OnFiveSecondsBarReceived;
 
-            // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
             _socket.RequestFiveSecondsBarUpdates(reqId, contract);
         }
 
