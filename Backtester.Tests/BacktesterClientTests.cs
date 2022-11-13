@@ -39,7 +39,7 @@ namespace Tests.Backtester
             var startTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
             var endTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
 
-            var fakeSocket = new FakeClientSocket(Symbol, startTime, endTime, marketData);
+            var fakeSocket = new BacktesterClientSocket(Symbol, startTime, endTime, marketData);
             _client = new BacktesterClient(951, fakeSocket);
 
             _connectMessage = await _client.ConnectAsync();

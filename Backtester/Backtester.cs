@@ -39,7 +39,7 @@ namespace Backtester
             foreach (var day in Utils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(_ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay));
-                var fakeClient = new FakeClientSocket(_ticker, day.Item1, day.Item2, marketData);
+                var fakeClient = new BacktesterClientSocket(_ticker, day.Item1, day.Item2, marketData);
                 var client = new BacktesterClient(1337, fakeClient);
                 Trader trader = new Trader(_ticker, day.Item1, day.Item2, client, $"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
 
