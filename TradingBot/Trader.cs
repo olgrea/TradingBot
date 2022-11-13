@@ -182,7 +182,7 @@ namespace TradingBot
                         _evaluationEvent.WaitOne();
                         mainToken.ThrowIfCancellationRequested();
                         foreach (IStrategy strategy in _strategies)
-                            strategy.Evaluate();
+                            strategy.GenerateTradeSignal();
                     }
                 }
                 catch (OperationCanceledException) {}
@@ -422,8 +422,9 @@ namespace TradingBot
 
         private void UpdateStrategies(IEnumerable<Bar> bars)
         {
+            var quotes = bars.Select(b => (BarQuote)b);
             foreach (IStrategy strategy in _strategies)
-                strategy.ComputeIndicators(bars);
+                strategy.ComputeIndicators(quotes);
         }
 
         void EvaluateStrategies()

@@ -1,88 +1,46 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Orders;
+using Skender.Stock.Indicators;
 using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public class BollingerBandsStrategy : Strategy
+    public class BollingerBandsStrategy : IStrategy
     {
-        public BollingerBandsStrategy(Trader trader) : base(trader)
+        IEnumerable<IQuote> _quotes;
+
+        public BollingerBandsStrategy()
         {
-            AddState<InitState>();
-            AddState<MonitoringState>();
-            AddState<BoughtState>();
-
-            SetStartState<InitState>();
-
-            AddIndicator(new BollingerBands(BarLength._1Min));
+            BollingerBands = new BollingerBands(BarLength._1Min);
+            Indicators = new List<IIndicator>() { BollingerBands};
         }
 
-        internal BollingerBands BollingerBands_1Min => GetIndicator<BollingerBands>(BarLength._1Min);
+        BollingerBands BollingerBands { get; set; }
+        public IEnumerable<IIndicator> Indicators { get; private set; }
+        IQuote LatestQuote => _quotes.Last();
 
-        #region States
-
-        class InitState : State<BollingerBandsStrategy>
+        public void ComputeIndicators(IEnumerable<IQuote> quotes)
         {
-            public InitState(BollingerBandsStrategy strategy) : base(strategy) { }
+            _quotes = quotes;
+            BollingerBands.Compute(quotes);
+        }
 
-            public override IState Evaluate()
+        public TradeSignal GenerateTradeSignal()
+        {
+            var signal = TradeSignal.Neutral;
+
+            if (((double)LatestQuote.Close) > BollingerBands.LatestResult.UpperBand)
             {
-                if (_strategy.Indicators.All(i => i.IsReady))
-                    return _strategy.GetState<MonitoringState>();
-                else
-                    return this;
+                return TradeSignal.StrongSell;
             }
-        }
-
-        class MonitoringState : State<BollingerBandsStrategy>
-        {
-            Order _order;
-
-            public MonitoringState(BollingerBandsStrategy strategy) : base(strategy) {}
-
-            public override IState Evaluate()
+            else if (((double)LatestQuote.Close) < BollingerBands.LatestResult.LowerBand)
             {
-                if (_strategy.LatestBar.Close <= _strategy.BollingerBands_1Min.LatestResult.LowerBand.Value)
-                {
-                    if(_order == null)
-                        _order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 50 };
-
-                    if(!HasBeenRequested(_order))
-                    {
-                        Logger.Info($"Lower band reached. Placing market BUY order.");
-                        PlaceOrder(_order);
-                    }
-                }
-                
-                return (HasBeenOpened(_order) && IsExecuted(_order, out _)) ? GetState<BoughtState>() : this;
+                return TradeSignal.StrongBuy;
             }
+
+            return signal;
         }
-
-        class BoughtState : State<BollingerBandsStrategy>
-        {
-            Order _order;
-
-            public BoughtState(BollingerBandsStrategy strategy) : base(strategy) {}
-
-            public override IState Evaluate()
-            {
-                if (_strategy.LatestBar.Close >= _strategy.BollingerBands_1Min.LatestResult.UpperBand.Value)
-                {
-                    if (_order == null)
-                        _order = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 50 };
-
-                    if (!HasBeenRequested(_order))
-                    {
-                        Logger.Info($"Higher band reached. Placing market SELL order.");
-                        PlaceOrder(_order);
-                    }
-                }
-                
-                return (HasBeenOpened(_order) && IsExecuted(_order, out _)) ? GetState<MonitoringState>() : this;
-            }
-        }
-
-        #endregion States
     }
 }
