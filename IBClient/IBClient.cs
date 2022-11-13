@@ -898,6 +898,19 @@ namespace InteractiveBrokers
             _socket.RequestCurrentTime();
             return tcs.Task;
         }
+
+        public virtual async Task WaitUntil(DateTime endTime, IProgress<DateTime> progress, CancellationToken token)
+        {
+            var currentTime = await GetCurrentTimeAsync();
+            progress?.Report(currentTime);
+
+            while (!token.IsCancellationRequested && currentTime < endTime)
+            {
+                await Task.Delay(500);
+                currentTime = await GetCurrentTimeAsync();
+                progress?.Report(currentTime);
+            }
+        }
     }
 
     public class IBClientErrorHandler : DefaultErrorHandler
