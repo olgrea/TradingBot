@@ -40,7 +40,7 @@ namespace Backtester
         Task _requestsTask;
         Task _responsesTask;
         Task _passingTimeTask;
-        CancellationTokenSource _cancellationTokenSource;
+        CancellationTokenSource _cancellation;
 
         DateTime _start;
         DateTime _end;
@@ -73,13 +73,6 @@ namespace Backtester
         int _reqIdBidAsk = -1;
         int _reqIdLast = -1;
         int _reqIdPnL = -1;
-        
-        internal int NextValidOrderId => _nextValidOrderId++;
-        int NextExecId => _nextExecId++;
-        
-        Position Position => _fakeAccount.Positions.FirstOrDefault();
-        internal Contract Contract => _contract;
-        internal Account Account => _fakeAccount;
         
         public BacktesterClientSocket(string symbol, DateTime startTime, DateTime endTime, MarketDataCollections dailyData)
         {
@@ -128,7 +121,7 @@ namespace Backtester
                 Positions = new List<Position>() { new Position() { Contract = _contract } }
             };
 
-            _cancellationTokenSource = new CancellationTokenSource();
+            _cancellation = new CancellationTokenSource();
             _requestsTask = StartConsumerTask(_requestsQueue);
             _responsesTask = StartConsumerTask(_responsesQueue);
         }
@@ -140,7 +133,15 @@ namespace Backtester
 
         public IBCallbacks Callbacks { get; private set; }
 
+        internal event Action<DateTime> TimeProgress;
         internal Task PassingTimeTask => _passingTimeTask;
+        internal CancellationTokenSource Cancellation => _cancellation;
+        internal int NextValidOrderId => _nextValidOrderId++;
+        int NextExecId => _nextExecId++;
+
+        Position Position => _fakeAccount.Positions.FirstOrDefault();
+        internal Contract Contract => _contract;
+        internal Account Account => _fakeAccount;
 
         IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
@@ -205,7 +206,7 @@ namespace Backtester
 
         Task StartConsumerTask(BlockingCollection<Action> collection)
         {
-            var mainToken = _cancellationTokenSource.Token;
+            var mainToken = _cancellation.Token;
             var task = Task.Run(() =>
             {
                 try
@@ -224,9 +225,10 @@ namespace Backtester
 
         async Task StartPassingTimeTask()
         {
-            var mainToken = _cancellationTokenSource.Token;
+            var mainToken = _cancellation.Token;
             _st.Start();
             _logger.Trace($"Passing time task started");
+            TimeProgress?.Invoke(_currentFakeTime);
             while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
             {
                 try
@@ -239,6 +241,7 @@ namespace Backtester
                     if (TimeDelays.OneSecond > 0)
                         await Task.Delay(TimeDelays.OneSecond, mainToken);
                     _currentFakeTime = _currentFakeTime.AddSeconds(1);
+                    TimeProgress?.Invoke(_currentFakeTime);
                 }
                 catch (OperationCanceledException) {}
             }
@@ -247,9 +250,9 @@ namespace Backtester
         void StopPassingTimeTask()
         {
             _st.Stop();
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
-            _cancellationTokenSource = null;
+            _cancellation?.Cancel();
+            _cancellation?.Dispose();
+            _cancellation = null;
             _passingTimeTask = null;
         }
 

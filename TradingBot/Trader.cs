@@ -1,24 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using TradingBot.Strategies;
 using System.Globalization;
-using NLog;
-using System.Threading.Tasks;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
-using TradingBot.Indicators;
+using System.Threading.Tasks;
+using DataStorage.Db.DbCommandFactories;
+using HistoricalDataFetcherApp;
 using InteractiveBrokers;
 using InteractiveBrokers.Accounts;
 using InteractiveBrokers.Contracts;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Orders;
-using DataStorage.Db.DbCommandFactories;
-using HistoricalDataFetcherApp;
+using NLog;
+using TradingBot.Indicators;
+using TradingBot.Indicators.Quotes;
+using TradingBot.Strategies;
 using TradingBot.Utils;
 using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
-using System.Runtime.CompilerServices;
-using TradingBot.Indicators.Quotes;
 
 [assembly: InternalsVisibleTo("Backtester")]
 [assembly: Fody.ConfigureAwait(false)]
@@ -83,8 +83,6 @@ namespace TradingBot
         internal IBClient Broker => _client;
         internal OrderManager OrderManager => _orderManager;
         internal Contract Contract => _contract;
-        internal HashSet<IStrategy> Strategies => _strategies;
-        internal bool TradingStarted => _tradingStarted;
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
@@ -133,21 +131,14 @@ namespace TradingBot
 
         async Task StartMonitoringTimeTask()
         {
-            var mainToken = _cancellation.Token;
             _logger.Debug($"Started monitoring current time");
+            var progress = new Progress<DateTime>(t => _currentTime = t);
             try
             {
-                while (!mainToken.IsCancellationRequested && _currentTime < _endTime)
-                {
-                    //TODO : need another apporach. Skips of 5 sec when backtesting
-                    await Task.Delay(500);
-                    _currentTime = await _client.GetCurrentTimeAsync();
-                    if(!_tradingStarted && _currentTime >= _startTime)
-                    {
-                        _logger.Info($"Trading started!");
-                        _tradingStarted = true;
-                    }
-                }
+
+                await _client.WaitUntil(_startTime, progress, _cancellation.Token);
+                _tradingStarted = true;
+                await _client.WaitUntil(_endTime, progress, _cancellation.Token);
             }
             finally
             {
@@ -169,6 +160,7 @@ namespace TradingBot
             _cancellation = null;
         }
 
+        //TODO : rework this approach
         Task StartEvaluationTask()
         {
             var mainToken = _cancellation.Token;
