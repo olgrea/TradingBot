@@ -43,7 +43,7 @@ namespace Backtester
                 var client = new BacktesterClient(1337, fakeClient);
                 Trader trader = new Trader(_ticker, day.Item1, day.Item2, client, $"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
 
-                trader.AddStrategyForTicker<RSIDivergenceStrategy>();
+                trader.AddStrategyForTicker<RsiDivergenceStrategy>();
                 
                 await trader.Start();
                 trader.Stop();

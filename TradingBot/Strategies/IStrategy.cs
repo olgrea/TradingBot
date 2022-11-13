@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using InteractiveBrokers.MarketData;
+using Skender.Stock.Indicators;
 using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
@@ -7,7 +7,7 @@ namespace TradingBot.Strategies
     public interface IStrategy
     {
         IEnumerable<IIndicator> Indicators { get; }
-        void ComputeIndicators(IEnumerable<Bar> bars);
-        void Evaluate();
+        void ComputeIndicators(IEnumerable<IQuote> quotes);
+        TradeSignal GenerateTradeSignal();
     }
 }
