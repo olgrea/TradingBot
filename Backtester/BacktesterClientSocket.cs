@@ -17,7 +17,7 @@ using NLog;
 
 namespace Backtester
 {
-    internal class FakeClientSocket : IIBClientSocket
+    internal class BacktesterClientSocket : IIBClientSocket
     {
         internal static class TimeDelays
         {
@@ -81,9 +81,9 @@ namespace Backtester
         internal Contract Contract => _contract;
         internal Account Account => _fakeAccount;
         
-        public FakeClientSocket(string symbol, DateTime startTime, DateTime endTime, MarketDataCollections dailyData)
+        public BacktesterClientSocket(string symbol, DateTime startTime, DateTime endTime, MarketDataCollections dailyData)
         {
-            _logger = LogManager.GetLogger(nameof(FakeClientSocket));
+            _logger = LogManager.GetLogger(nameof(BacktesterClientSocket));
             Callbacks = new IBCallbacks(_logger);
             _requestsQueue = new BlockingCollection<Action>();
             _responsesQueue = new BlockingCollection<Action>();
@@ -133,7 +133,7 @@ namespace Backtester
             _responsesTask = StartConsumerTask(_responsesQueue);
         }
 
-        ~FakeClientSocket()
+        ~BacktesterClientSocket()
         {
             _innerClient.DisconnectAsync().Wait(2000);
         }
