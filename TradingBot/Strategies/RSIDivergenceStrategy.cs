@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using InteractiveBrokers.Accounts;
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 using TradingBot.Indicators;
@@ -23,8 +24,10 @@ namespace TradingBot.Strategies
         BollingerBands BollingerBands { get; set; }
         RsiDivergence RsiDivergence { get; set; }
         public IEnumerable<IIndicator> Indicators { get; private set; }
-        IQuote LatestQuote => _quotes.LastOrDefault();
+        
         ITradeSignalState CurrentState { get; set; }
+        IQuote LatestQuote => _quotes.LastOrDefault();
+        Position Position { get; set; }
 
         public void ComputeIndicators(IEnumerable<IQuote> quotes)
         {
@@ -33,8 +36,9 @@ namespace TradingBot.Strategies
             RsiDivergence.Compute(quotes);
         }
 
-        public TradeSignal GenerateTradeSignal()
+        public TradeSignal GenerateTradeSignal(Position position)
         {
+            Position = position;
             return CurrentState.GenerateTradeSignal();
         }
 

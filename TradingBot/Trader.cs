@@ -45,19 +45,24 @@ namespace TradingBot
         string _accountCode;
         Account _account;
         Contract _contract;
-        double _USDCashBalance;
         double _totalCommission;
 
-        Position _contractPosition;
+        Position _position;
         PnL _PnL;
 
         bool _tradingStarted = false;
+
+        // TODO : only allow a single strategy? 
+        // TODO : investigate how to handle multiple strategies.
+        // Do a weighted mean of trade signals?
+        // Only allow multiple strategies if their start-end time dont overlap?
         HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
 
+        // TODO : move start and end time in strategy?
         public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
             : this(ticker, startTime, endTime, new IBClient(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
 
@@ -81,11 +86,19 @@ namespace TradingBot
 
         internal ILogger Logger => _logger;
         internal IBClient Broker => _client;
-        internal OrderManager OrderManager => _orderManager;
         internal Contract Contract => _contract;
+        Bar LatestBar
+        {
+            get
+            {
+                var smallest = _bars.Keys.Min(length => length);
+                return _bars[smallest].Last();
+            }
+        }
 
         public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
         {
+            Debug.Assert(_strategies.Count == 0, "Only one strategy is allowed for now.");
             _strategies.Add((IStrategy)Activator.CreateInstance(typeof(TStrategy), this));
         }
 
@@ -93,9 +106,8 @@ namespace TradingBot
         {
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
-            
-            var res = await _client.ConnectAsync();
-            _accountCode = res.AccountCode;
+
+            _accountCode = (await _client.ConnectAsync()).AccountCode;
             _account = await _client.GetAccountAsync(_accountCode);
 
             if (_account.Code != "DU5962304" && _account.Code != "FAKEACCOUNT123")
@@ -103,7 +115,6 @@ namespace TradingBot
 
             if (!_account.CashBalances.ContainsKey("USD"))
                 throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
-            _USDCashBalance = _account.CashBalances["USD"];
 
             _contract = await _client.GetContractAsync(_ticker);
             if (_contract == null)
@@ -112,7 +123,7 @@ namespace TradingBot
             InitIndicators(_strategies.SelectMany(s => s.Indicators));
             SubscribeToData();
             
-            _logger.Info($"Starting USD cash balance : {_USDCashBalance:c}");
+            _logger.Info($"Starting USD cash balance : {_account.USDCash:c}");
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
             foreach (var strat in _strategies)
@@ -124,9 +135,9 @@ namespace TradingBot
             _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
             _cancellation = new CancellationTokenSource();
-            var et = StartEvaluationTask();
+            _evaluationTask = StartEvaluationTask();
             _monitoringTimeTask = StartMonitoringTimeTask();
-            await Task.WhenAll(et, _monitoringTimeTask);
+            await Task.WhenAll(_evaluationTask, _monitoringTimeTask);
         }
 
         async Task StartMonitoringTimeTask()
@@ -143,7 +154,7 @@ namespace TradingBot
             finally
             {
                 _client.CancelAllOrders();
-                if (_contractPosition?.PositionAmount > 0)
+                if (_position?.PositionAmount > 0)
                 {
                     _logger.Info($"Selling all remaining positions.");
                     SellAllPositions();
@@ -161,27 +172,108 @@ namespace TradingBot
         }
 
         //TODO : rework this approach
-        Task StartEvaluationTask()
+        async Task StartEvaluationTask()
         {
             var mainToken = _cancellation.Token;
             _logger.Debug($"Started evaluation task.");
-            _evaluationTask = Task.Factory.StartNew(() =>
+            try
             {
-                try
+                while (!mainToken.IsCancellationRequested)
                 {
-                    while (!mainToken.IsCancellationRequested)
-                    {
-                        _evaluationEvent.WaitOne();
-                        mainToken.ThrowIfCancellationRequested();
-                        foreach (IStrategy strategy in _strategies)
-                            strategy.GenerateTradeSignal();
-                    }
+                    // TODO : correct sync data structure?
+                    _evaluationEvent.WaitOne();
+                    mainToken.ThrowIfCancellationRequested();
+                    await EvaluateStrategies();
                 }
-                catch (OperationCanceledException) {}
+            }
+            catch (OperationCanceledException) {}
 
-            }, mainToken);
+            await Task.CompletedTask;
+        }
 
-            return _evaluationTask;
+        private async Task EvaluateStrategies()
+        {
+            TradeSignal signal = _strategies.Select(s => s.GenerateTradeSignal(_position)).First();
+            if (signal == TradeSignal.Neutral)
+                return;
+
+            //TODO : refine this. Naive implementation first.
+            var latestBidAsk = await _client.GetLatestBidAskAsync(Contract);
+            if (signal >= TradeSignal.Buy)
+            {
+                if(_position.InAny())
+                {
+                    // Average down?
+                    //if(_PnL.UnrealizedPnL < 0)
+                    //{
+                    //}
+                    return;
+                }
+                else
+                {
+                    double cashToInvest = 0;
+                    double acceptableRisk = 0;
+                    if (signal == TradeSignal.CautiousBuy)
+                    {
+                        cashToInvest = _account.AvailableBuyingPower / 4.0;
+                        acceptableRisk = 0.05;
+                    }
+                    else if (signal == TradeSignal.Buy)
+                    {
+                        cashToInvest = _account.AvailableBuyingPower / 2.0;
+                        acceptableRisk = 0.10;
+                    }
+                    else if (signal == TradeSignal.StrongBuy)
+                    {
+                        cashToInvest = _account.AvailableBuyingPower;
+                        acceptableRisk = 0.15;
+                    }
+
+                    if (cashToInvest == 0)
+                        return;
+                    
+                    int qty = (int)Math.Round(cashToInvest / latestBidAsk.Ask);
+                    
+                    // TODO : should use fill price;
+                    double stopPrice = latestBidAsk.Ask * (1 - acceptableRisk);
+
+                    // TODO : investigate IBKR adaptive "split spread" orders
+                    var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
+                    var stopOrder = new StopOrder() { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stopPrice };
+                    var chain = new OrderChain(buyOrder, stopOrder);
+                    _orderManager.PlaceOrder(Contract, chain);
+                }
+
+            }
+            else if (signal <= TradeSignal.Sell)
+            {
+                if (!_position.InAny())
+                    return;
+
+                int qtyToSell = 0;
+                if(signal == TradeSignal.CautiousSell)
+                {
+                    // TODO : check other metrics
+                    return;
+                }
+                if (signal == TradeSignal.Sell)
+                {
+                    qtyToSell = (int)_position.PositionAmount / 2;
+                }
+                else if (signal == TradeSignal.StrongSell)
+                {
+                    qtyToSell = (int)_position.PositionAmount;
+                }
+
+                if(qtyToSell > 0)
+                {
+                    var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = qtyToSell };
+                    _orderManager.PlaceOrder(Contract, sellOrder);
+                    
+                    // TODO : cancel hard stop order
+                    //_orderManager.CancelOrder(stopOrder);
+                }
+            }
         }
 
         void StopEvaluationTask()
@@ -315,7 +407,7 @@ namespace TradingBot
             {
                 indicator.ComputeTrend(last);
             }
-            EvaluateStrategies();
+            SetEvaluationEvent();
         }
 
         public void CancelLastTradedPricesUpdates(IIndicator indicator)
@@ -338,10 +430,10 @@ namespace TradingBot
                     if(currency == "USD")
                     {
                         var newVal = double.Parse(value, CultureInfo.InvariantCulture);
-                        if(newVal != _USDCashBalance)
+                        if(newVal != _account.USDCash)
                         {
                             _logger.Info($"New Account Cash balance : {newVal:c} USD");
-                            _USDCashBalance = newVal;
+                            _account.USDCash = newVal;
                         }
                     }
                     break;
@@ -352,7 +444,7 @@ namespace TradingBot
         {
             if (position.Contract.Symbol == _ticker)
             {
-                if(_contractPosition?.PositionAmount != position.PositionAmount)
+                if(_position?.PositionAmount != position.PositionAmount)
                 {
                     if (position.PositionAmount == 0)
                     {
@@ -364,7 +456,7 @@ namespace TradingBot
                         _logger.Info($"Current Position : {position.PositionAmount} {position.Contract.Symbol} at {position.AverageCost:c}/shares (unrealized PnL : {unrealized})");
                     }
                 }
-                _contractPosition = position;
+                _position = position;
             }
         }
 
@@ -393,19 +485,19 @@ namespace TradingBot
                 _bars[bar.BarLength].Add(bar);
 
                 UpdateStrategies(_bars[bar.BarLength]);
-                EvaluateStrategies();
+                SetEvaluationEvent();
             }
         }
 
         void OnOrderUpdated(Order o, OrderStatus os)
         {
-            EvaluateStrategies();
+            SetEvaluationEvent();
             LogStatusChange(o, os);
         }
 
         void OnOrderExecuted(OrderExecution oe, CommissionInfo ci)
         {
-            EvaluateStrategies();
+            SetEvaluationEvent();
             _totalCommission += ci.Commission;
 
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
@@ -419,7 +511,7 @@ namespace TradingBot
                 strategy.ComputeIndicators(quotes);
         }
 
-        void EvaluateStrategies()
+        void SetEvaluationEvent()
         {
             if (!_tradingStarted)
                 return;
@@ -463,17 +555,12 @@ namespace TradingBot
                 );
         }
 
-        public double GetAvailableFunds()
-        {
-            return _USDCashBalance - 100;
-        }
-
         public async void Stop()
         {
             StopMonitoringTimeTask();
             StopEvaluationTask();
 
-            _logger.Info($"Ending USD cash balance : {_USDCashBalance:c}");
+            _logger.Info($"Ending USD cash balance : {_account.USDCash:c}");
             _logger.Info($"PnL for the day : {_PnL.DailyPnL:c}");
 
             UnsubscribeToData();
@@ -485,7 +572,7 @@ namespace TradingBot
             MarketOrder mo = new MarketOrder()
             {
                 Action = OrderAction.SELL,
-                TotalQuantity = _contractPosition.PositionAmount,
+                TotalQuantity = _position.PositionAmount,
             };
 
             var tcs = new TaskCompletionSource<bool>();

@@ -4,20 +4,23 @@ namespace InteractiveBrokers.Orders
 {
     public class OrderChain
     {
-        public OrderChain(Order order, List<OrderChain> attachedOrders = null)
+        public OrderChain(Order order, params OrderChain[] attachedOrders)
         {
             Order = order;
-            AttachedOrders = attachedOrders ?? new List<OrderChain>();
 
-            foreach (OrderChain attachedOrder in AttachedOrders)
+            if(attachedOrders.Length > 0)
             {
-                attachedOrder.Parent = order;
+                AttachedOrders.AddRange(attachedOrders);
+                foreach (OrderChain attachedOrder in AttachedOrders)
+                {
+                    attachedOrder.Parent = order;
+                }
             }
         }
 
         public Order Order { get; }
         public Order Parent { get; set; }
-        public List<OrderChain> AttachedOrders { get; }
+        public List<OrderChain> AttachedOrders { get; } = new List<OrderChain>();
 
         public static implicit operator OrderChain(Order o) => new OrderChain(o);
 
