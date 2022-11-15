@@ -24,5 +24,7 @@ namespace InteractiveBrokers.Accounts
         public double AverageCost { get; set; }
         public double UnrealizedPNL { get; set; }
         public double RealizedPNL { get; set; }
+
+        public bool InAny() => PositionAmount > 0;
     }
 }

@@ -385,6 +385,7 @@ namespace InteractiveBrokers
             {
                 _socket.Callbacks.TickByTickBidAsk -= tickByTickBidAsk;
                 _socket.Callbacks.Error -= error;
+                _socket.CancelTickByTickData(reqId);
             });
 
             source.CancelAfter(timeoutInMs);

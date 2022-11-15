@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using InteractiveBrokers.Accounts;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Orders;
 using Skender.Stock.Indicators;
@@ -27,7 +28,7 @@ namespace TradingBot.Strategies
             BollingerBands.Compute(quotes);
         }
 
-        public TradeSignal GenerateTradeSignal()
+        public TradeSignal GenerateTradeSignal(Position position)
         {
             var signal = TradeSignal.Neutral;
 
