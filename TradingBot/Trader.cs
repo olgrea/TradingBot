@@ -388,6 +388,11 @@ namespace TradingBot
             Debug.Assert(indicators.All(i => i.IsReady));
         }
 
+        /// <summary>
+        /// //
+        /// </summary>
+        /// <param name="indicator"></param>
+
         public void RequestLastTradedPricesUpdates(IIndicator indicator)
         {
             if(!_indicatorsRequiringLastUpdates.Contains(indicator))
