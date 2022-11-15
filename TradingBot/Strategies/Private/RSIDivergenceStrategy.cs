@@ -24,7 +24,7 @@ namespace TradingBot.Strategies
         BollingerBands BollingerBands { get; set; }
         RsiDivergence RsiDivergence { get; set; }
         public IEnumerable<IIndicator> Indicators { get; private set; }
-        
+
         ITradeSignalState CurrentState { get; set; }
         IQuote LatestQuote => _quotes.LastOrDefault();
         Position Position { get; set; }

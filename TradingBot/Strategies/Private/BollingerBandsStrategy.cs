@@ -2,7 +2,6 @@
 using System.Linq;
 using InteractiveBrokers.Accounts;
 using InteractiveBrokers.MarketData;
-using InteractiveBrokers.Orders;
 using Skender.Stock.Indicators;
 using TradingBot.Indicators;
 
@@ -15,7 +14,7 @@ namespace TradingBot.Strategies
         public BollingerBandsStrategy()
         {
             BollingerBands = new BollingerBands(BarLength._1Min);
-            Indicators = new List<IIndicator>() { BollingerBands};
+            Indicators = new List<IIndicator>() { BollingerBands };
         }
 
         BollingerBands BollingerBands { get; set; }
@@ -32,11 +31,11 @@ namespace TradingBot.Strategies
         {
             var signal = TradeSignal.Neutral;
 
-            if (((double)LatestQuote.Close) > BollingerBands.LatestResult.UpperBand)
+            if ((double)LatestQuote.Close > BollingerBands.LatestResult.UpperBand)
             {
                 return TradeSignal.StrongSell;
             }
-            else if (((double)LatestQuote.Close) < BollingerBands.LatestResult.LowerBand)
+            else if ((double)LatestQuote.Close < BollingerBands.LatestResult.LowerBand)
             {
                 return TradeSignal.StrongBuy;
             }
