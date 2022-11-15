@@ -4,10 +4,11 @@ using InteractiveBrokers.Accounts;
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 using TradingBot.Indicators;
+using TradingBot.Strategies.Private.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public class RsiDivergenceStrategy : IStrategy
+    public class RsiDivergenceStrategy : IIndicatorStrategy
     {
         IEnumerable<IQuote> _quotes;
 

@@ -5,7 +5,7 @@ using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public interface IStrategy
+    public interface IIndicatorStrategy
     {
         IEnumerable<IIndicator> Indicators { get; }
         void ComputeIndicators(IEnumerable<IQuote> quotes);
