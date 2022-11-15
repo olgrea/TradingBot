@@ -7,6 +7,10 @@ using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
+    /// <summary>
+    /// 
+    /// </summary>
+
     public class RsiDivergenceStrategy : IStrategy
     {
         IEnumerable<IQuote> _quotes;
