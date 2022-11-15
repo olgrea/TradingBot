@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Strategies
+﻿namespace TradingBot.Strategies.Private.Indicators
 {
     internal interface ITradeSignalState
     {

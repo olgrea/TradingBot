@@ -8,7 +8,7 @@ using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
-    public class BollingerBandsStrategy : IStrategy
+    public class BollingerBandsStrategy : IIndicatorStrategy
     {
         IEnumerable<IQuote> _quotes;
 

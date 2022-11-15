@@ -56,8 +56,9 @@ namespace TradingBot
         // TODO : investigate how to handle multiple strategies.
         // Do a weighted mean of trade signals?
         // Only allow multiple strategies if their start-end time dont overlap?
-        HashSet<IStrategy> _strategies = new HashSet<IStrategy>();
+        HashSet<IIndicatorStrategy> _indicatorStrategies = new HashSet<IIndicatorStrategy>();
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
+        IOrderStrategy _orderStrategy;
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
@@ -87,6 +88,10 @@ namespace TradingBot
         internal ILogger Logger => _logger;
         internal IBClient Broker => _client;
         internal Contract Contract => _contract;
+        internal IBClient Client => _client;
+        internal Position Position => _position;
+        internal Account Account => _account;
+
         Bar LatestBar
         {
             get
@@ -96,15 +101,15 @@ namespace TradingBot
             }
         }
 
-        public void AddStrategyForTicker<TStrategy>() where TStrategy : IStrategy
+        public void AddStrategyForTicker<TStrategy>() where TStrategy : IIndicatorStrategy
         {
-            Debug.Assert(_strategies.Count == 0, "Only one strategy is allowed for now.");
-            _strategies.Add((IStrategy)Activator.CreateInstance(typeof(TStrategy), this));
+            Debug.Assert(_indicatorStrategies.Count == 0, "Only one strategy is allowed for now.");
+            _indicatorStrategies.Add((IIndicatorStrategy)Activator.CreateInstance(typeof(TStrategy), this));
         }
 
         public async Task Start()
         {
-            if (!_strategies.Any())
+            if (!_indicatorStrategies.Any())
                 throw new Exception("No strategies set for this trader");
 
             _accountCode = (await _client.ConnectAsync()).AccountCode;
@@ -120,13 +125,13 @@ namespace TradingBot
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
-            InitIndicators(_strategies.SelectMany(s => s.Indicators));
+            InitIndicators(_indicatorStrategies.SelectMany(s => s.Indicators));
             SubscribeToData();
             
             _logger.Info($"Starting USD cash balance : {_account.USDCash:c}");
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
-            foreach (var strat in _strategies)
+            foreach (var strat in _indicatorStrategies)
                 msg += $"{strat.GetType().Name}, ";
             _logger.Info(msg);
 
@@ -193,87 +198,8 @@ namespace TradingBot
 
         private async Task EvaluateStrategies()
         {
-            TradeSignal signal = _strategies.Select(s => s.GenerateTradeSignal(_position)).First();
-            if (signal == TradeSignal.Neutral)
-                return;
-
-            //TODO : refine this. Naive implementation first.
-            var latestBidAsk = await _client.GetLatestBidAskAsync(Contract);
-            if (signal >= TradeSignal.Buy)
-            {
-                if(_position.InAny())
-                {
-                    // Average down?
-                    //if(_PnL.UnrealizedPnL < 0)
-                    //{
-                    //}
-                    return;
-                }
-                else
-                {
-                    double cashToInvest = 0;
-                    double acceptableRisk = 0;
-                    if (signal == TradeSignal.CautiousBuy)
-                    {
-                        cashToInvest = _account.AvailableBuyingPower / 4.0;
-                        acceptableRisk = 0.05;
-                    }
-                    else if (signal == TradeSignal.Buy)
-                    {
-                        cashToInvest = _account.AvailableBuyingPower / 2.0;
-                        acceptableRisk = 0.10;
-                    }
-                    else if (signal == TradeSignal.StrongBuy)
-                    {
-                        cashToInvest = _account.AvailableBuyingPower;
-                        acceptableRisk = 0.15;
-                    }
-
-                    if (cashToInvest == 0)
-                        return;
-                    
-                    int qty = (int)Math.Round(cashToInvest / latestBidAsk.Ask);
-                    
-                    // TODO : should use fill price;
-                    double stopPrice = latestBidAsk.Ask * (1 - acceptableRisk);
-
-                    // TODO : investigate IBKR adaptive "split spread" orders
-                    var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
-                    var stopOrder = new StopOrder() { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stopPrice };
-                    var chain = new OrderChain(buyOrder, stopOrder);
-                    _orderManager.PlaceOrder(Contract, chain);
-                }
-
-            }
-            else if (signal <= TradeSignal.Sell)
-            {
-                if (!_position.InAny())
-                    return;
-
-                int qtyToSell = 0;
-                if(signal == TradeSignal.CautiousSell)
-                {
-                    // TODO : check other metrics
-                    return;
-                }
-                if (signal == TradeSignal.Sell)
-                {
-                    qtyToSell = (int)_position.PositionAmount / 2;
-                }
-                else if (signal == TradeSignal.StrongSell)
-                {
-                    qtyToSell = (int)_position.PositionAmount;
-                }
-
-                if(qtyToSell > 0)
-                {
-                    var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = qtyToSell };
-                    _orderManager.PlaceOrder(Contract, sellOrder);
-                    
-                    // TODO : cancel hard stop order
-                    //_orderManager.CancelOrder(stopOrder);
-                }
-            }
+            IEnumerable<TradeSignal> signals = _indicatorStrategies.Select(s => s.GenerateTradeSignal(_position));
+            await _orderStrategy.ManageOrders(signals);
         }
 
         void StopEvaluationTask()
@@ -290,7 +216,7 @@ namespace TradingBot
             _client.PnLReceived += OnPnLReceived;
 
             _client.RequestBarsUpdates(Contract);
-            foreach(BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+            foreach(BarLength barLength in _indicatorStrategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
                 _client.BarReceived[barLength] += OnBarReceived;
 
             _orderManager.OrderUpdated += OnOrderUpdated;
@@ -311,7 +237,7 @@ namespace TradingBot
             _orderManager.OrderExecuted -= OnOrderExecuted;
 
             Broker.CancelBarsUpdates(Contract);
-            foreach (BarLength barLength in _strategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+            foreach (BarLength barLength in _indicatorStrategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
                 _client.BarReceived[barLength] -= OnBarReceived;
 
             _client.CancelPositionsUpdates();
@@ -386,6 +312,16 @@ namespace TradingBot
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
+        }
+
+        internal void PlaceOrder(Order order)
+        {
+            _orderManager.PlaceOrder(Contract, order);
+        }
+
+        internal void PlaceOrder(OrderChain chain)
+        {
+            _orderManager.PlaceOrder(Contract, chain);
         }
 
         public void RequestLastTradedPricesUpdates(IIndicator indicator)
@@ -507,7 +443,7 @@ namespace TradingBot
         private void UpdateStrategies(IEnumerable<Bar> bars)
         {
             var quotes = bars.Select(b => (BarQuote)b);
-            foreach (IStrategy strategy in _strategies)
+            foreach (IIndicatorStrategy strategy in _indicatorStrategies)
                 strategy.ComputeIndicators(quotes);
         }
 
