@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using InteractiveBrokers.Orders;
 
-namespace TradingBot.Strategies.Private.OrderManagement
+namespace TradingBot.Strategies
 {
     internal class ConservativeStrategy : IOrderStrategy
     {
@@ -66,7 +66,7 @@ namespace TradingBot.Strategies.Private.OrderManagement
                     var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
                     var stopOrder = new StopOrder() { Action = OrderAction.SELL, TotalQuantity = qty, StopPrice = stopPrice };
                     var chain = new OrderChain(buyOrder, stopOrder);
-                    Trader.PlaceOrder(chain);
+                    await Trader.OrderManager.PlaceOrderAsync(Trader.Contract, chain);
                 }
 
             }
@@ -93,15 +93,12 @@ namespace TradingBot.Strategies.Private.OrderManagement
                 if (qtyToSell > 0)
                 {
                     var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = qtyToSell };
-                    Trader.PlaceOrder(sellOrder);
+                    await Trader.OrderManager.PlaceOrderAsync(Trader.Contract, sellOrder);
 
                     // TODO : cancel hard stop order
                     //_orderManager.CancelOrder(stopOrder);
                 }
             }
         }
-    
-    
-    
     }
 }

@@ -10,10 +10,11 @@ using InteractiveBrokers;
 using InteractiveBrokers.Contracts;
 using InteractiveBrokers.Messages;
 using System.Threading;
+using System.Net.Sockets;
 
 namespace TradingBot
 {
-    // TODO : not sure what I'll do with this class but I know I'll rework it
+    // TODO : move that to IBClient ?
     internal class OrderManager
     {
         ILogger _logger;
@@ -55,12 +56,16 @@ namespace TradingBot
             return false;
         }
 
-        public async void PlaceOrder(Contract contract, Order order)
+        public async Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, bool waitForExecution = false)
         {
-            if (contract == null || order == null)
-                return;
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return await PlaceOrderAsync(contract, order, source.Token, waitForExecution);
+        }
 
-            order.Id = await _client.GetNextValidOrderIdAsync();
+        // TODO : add param waitForExecution ?
+        public async Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token, bool waitForExecution = false)
+        {
+            order.Id = await _client.GetNextValidOrderIdAsync(token);
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
@@ -69,22 +74,63 @@ namespace TradingBot
 
             _ordersRequested[order.Id] = order;
 
-            _client.PlaceOrder(contract, order);
+            if (!waitForExecution)
+                return await _client.PlaceOrderAsync(contract, order, token);
+            
+            return await PlaceAndWaitForExecution(contract, order, token);
         }
 
-        public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
+        async Task<OrderResult> PlaceAndWaitForExecution(Contract contract, Order order, CancellationToken token)
         {
-            if (contract == null || chain == null || chain.Order == null)
-                return;
+            var tcs = new TaskCompletionSource<OrderResult>();
+            var orderExecutedResult = new OrderExecutedResult() { Contract = contract };
 
+            var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
+            {
+                if (order.Id == oe.OrderId)
+                    orderExecutedResult.OrderExecution = oe;
+            });
+
+            var commissionReport = new Action<CommissionInfo>(ci =>
+            {
+                if (orderExecutedResult.OrderExecution.ExecId == ci.ExecId)
+                {
+                    orderExecutedResult.CommissionInfo = ci;
+                    tcs.TrySetResult(orderExecutedResult);
+                }
+            });
+
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
+
+            _client.OrderExecuted += execDetails;
+            _client.CommissionInfoReceived += commissionReport;
+            _ = tcs.Task.ContinueWith(t =>
+            {
+                _client.OrderExecuted -= execDetails;
+                _client.CommissionInfoReceived -= commissionReport;
+            });
+
+            OrderResult res = await _client.PlaceOrderAsync(contract, order, token);
+            orderExecutedResult.Order = res.Order;
+
+            return await tcs.Task;
+        }
+
+        public async Task<IEnumerable<OrderResult>> PlaceOrderAsync(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
+        {
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return await PlaceOrderAsync(contract, chain, source.Token, useTWSAttachedOrderFeature);
+        }
+
+        public async Task<IEnumerable<OrderResult>> PlaceOrderAsync(Contract contract, OrderChain chain, CancellationToken token, bool useTWSAttachedOrderFeature = false)
+        {
             // For some reasons in TWS, when an order becomes active, the quantity of all its attached orders gets set to the
             // quantity of the parent order regardless of what was set as quantity in children. This is undesirable in
             // some situations (ex : buy 100 shares but only put a stop loss on 50 shares).
             // I've kept the TWS mechanism but I implemented my own attached order mechanism to circumvent this limitation.
             if (useTWSAttachedOrderFeature)
             {
-                PlaceTWSOrderChain(contract, chain);
-                return;
+                return await PlaceTWSOrderChain(contract, chain);
             }
 
             if (chain.AttachedOrders.Any())
@@ -96,15 +142,18 @@ namespace TradingBot
                 _logger.Debug($"Placing last order {chain.Order} from chain.");
             }
 
-            PlaceOrder(contract, chain.Order);
+            var r = await PlaceOrderAsync(contract, chain.Order);
+            
             _chainOrdersRequested[chain.Order.Id] = chain;
+            return new[] { r };
         }
 
-        async void PlaceTWSOrderChain(Contract contract, OrderChain chain)
+        async Task<IEnumerable<OrderResult>> PlaceTWSOrderChain(Contract contract, OrderChain chain)
         {
             _logger.Debug("Placing order chain using TWS mechanism.");
-            var list = await AssignOrderIdsAndFlatten(chain);
+            List<Order> list = await AssignOrderIdsAndFlatten(chain);
 
+            List<OrderResult> results = new List<OrderResult>();
             for (int i = 0; i < list.Count; i++)
             {
                 Order o = list[i];
@@ -116,8 +165,11 @@ namespace TradingBot
                 Trace.Assert(o.Id > 0 && !_ordersRequested.ContainsKey(o.Id));
 
                 _ordersRequested[o.Id] = o;
-                _client.PlaceOrder(contract, o);
+                var r = await _client.PlaceOrderAsync(contract, o);
+                results.Add(r);
             }
+
+            return results;
         }
 
         void OnOrderOpened(Contract contract, Order order, OrderState state)
@@ -170,7 +222,6 @@ namespace TradingBot
                 PlaceNextOrdersInChain(contract, _chainOrdersRequested[execution.OrderId]);
             }
 
-            var order = _ordersOpened[execution.OrderId];
             _ordersExecuted.TryAdd(execution.OrderId, execution);
             _executions.TryAdd(execution.ExecId, execution);
         }
@@ -181,7 +232,7 @@ namespace TradingBot
             OrderExecuted?.Invoke(exec, ci);
         }
 
-        void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
+        async void PlaceNextOrdersInChain(Contract contract, OrderChain chain)
         {
             var executedOrder = chain.Order;
             _logger.Debug($"Order from chain executed : {executedOrder}");
@@ -197,7 +248,7 @@ namespace TradingBot
                         continue;
 
                     _chainOrdersRequested.TryRemove(child.Order.Id, out _);
-                    CancelOrder(child.Order);
+                    await CancelOrderAsync(child.Order);
                 }
             }
 
@@ -205,11 +256,11 @@ namespace TradingBot
             // Then place all child of the executed order
             foreach (OrderChain child in chain.AttachedOrders)
             {
-                PlaceOrder(contract, child);
+                await PlaceOrderAsync(contract, child);
             }
         }
 
-        public void ModifyOrder(Contract contract, Order order)
+        public async Task<OrderResult> ModifyOrderAsync(Contract contract, Order order)
         {
             Trace.Assert(order.Id > 0);
             if (!_ordersOpened.ContainsKey(order.Id))
@@ -218,10 +269,10 @@ namespace TradingBot
             }
 
             _logger.Debug($"Modifying order {order}.");
-            _client.PlaceOrder(contract, order);
+            return await _client.PlaceOrderAsync(contract, order);
         }
 
-        public void CancelOrder(Order order)
+        public async Task<OrderStatus> CancelOrderAsync(Order order)
         {
             Trace.Assert(order.Id > 0);
             if (!_ordersOpened.ContainsKey(order.Id))
@@ -229,7 +280,7 @@ namespace TradingBot
                 throw new ArgumentException($"The order {order} hasn't been placed and therefore cannot be cancelled");
             }
 
-            _client.CancelOrder(order);
+            return await _client.CancelOrderAsync(order.Id);
         }
 
         public void CancelAllOrders()
