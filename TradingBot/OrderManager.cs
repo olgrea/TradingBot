@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using InteractiveBrokers.Orders;
 using InteractiveBrokers;
 using InteractiveBrokers.Contracts;
+using InteractiveBrokers.Messages;
+using System.Threading;
 
 namespace TradingBot
 {
@@ -15,7 +17,7 @@ namespace TradingBot
     internal class OrderManager
     {
         ILogger _logger;
-        IBClient _broker;
+        IBClient _client;
 
         ConcurrentDictionary<int, Order> _ordersRequested = new ConcurrentDictionary<int, Order>();
         ConcurrentDictionary<int, OrderChain> _chainOrdersRequested = new ConcurrentDictionary<int, OrderChain>();
@@ -27,12 +29,12 @@ namespace TradingBot
         public OrderManager(IBClient broker, ILogger logger)
         {
             _logger = logger;
-            _broker = broker;
+            _client = broker;
 
-            _broker.OrderOpened += OnOrderOpened;
-            _broker.OrderStatusChanged += OnOrderStatus;
-            _broker.OrderExecuted += OnOrderExecuted;
-            _broker.CommissionInfoReceived += OnCommissionInfo;
+            _client.OrderOpened += OnOrderOpened;
+            _client.OrderStatusChanged += OnOrderStatus;
+            _client.OrderExecuted += OnOrderExecuted;
+            _client.CommissionInfoReceived += OnCommissionInfo;
         }
 
         public event Action<Order, OrderStatus> OrderUpdated;
@@ -58,7 +60,7 @@ namespace TradingBot
             if (contract == null || order == null)
                 return;
 
-            order.Id = await _broker.GetNextValidOrderIdAsync();
+            order.Id = await _client.GetNextValidOrderIdAsync();
 
             Trace.Assert(!_ordersRequested.ContainsKey(order.Id));
 
@@ -67,7 +69,7 @@ namespace TradingBot
 
             _ordersRequested[order.Id] = order;
 
-            _broker.PlaceOrder(contract, order);
+            _client.PlaceOrder(contract, order);
         }
 
         public void PlaceOrder(Contract contract, OrderChain chain, bool useTWSAttachedOrderFeature = false)
@@ -114,7 +116,7 @@ namespace TradingBot
                 Trace.Assert(o.Id > 0 && !_ordersRequested.ContainsKey(o.Id));
 
                 _ordersRequested[o.Id] = o;
-                _broker.PlaceOrder(contract, o);
+                _client.PlaceOrder(contract, o);
             }
         }
 
@@ -216,7 +218,7 @@ namespace TradingBot
             }
 
             _logger.Debug($"Modifying order {order}.");
-            _broker.PlaceOrder(contract, order);
+            _client.PlaceOrder(contract, order);
         }
 
         public void CancelOrder(Order order)
@@ -227,13 +229,13 @@ namespace TradingBot
                 throw new ArgumentException($"The order {order} hasn't been placed and therefore cannot be cancelled");
             }
 
-            _broker.CancelOrder(order);
+            _client.CancelOrder(order);
         }
 
         public void CancelAllOrders()
         {
             _chainOrdersRequested.Clear();
-            _broker.CancelAllOrders();
+            _client.CancelAllOrders();
         }
 
         async Task<List<Order>> AssignOrderIdsAndFlatten(OrderChain chain, List<Order> list = null)
@@ -243,7 +245,7 @@ namespace TradingBot
 
             list ??= new List<Order>();
 
-            chain.Order.Id = await _broker.GetNextValidOrderIdAsync();
+            chain.Order.Id = await _client.GetNextValidOrderIdAsync();
             list.Add(chain.Order);
 
             if (chain.AttachedOrders.Any())
