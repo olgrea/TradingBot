@@ -91,6 +91,7 @@ namespace TradingBot
         internal IBClient Client => _client;
         internal Position Position => _position;
         internal Account Account => _account;
+        internal OrderManager OrderManager => _orderManager;    
 
         Bar LatestBar
         {
@@ -105,6 +106,7 @@ namespace TradingBot
         {
             Debug.Assert(_indicatorStrategies.Count == 0, "Only one strategy is allowed for now.");
             _indicatorStrategies.Add((IIndicatorStrategy)Activator.CreateInstance(typeof(TStrategy), this));
+            _orderStrategy = new ConservativeStrategy(this);
         }
 
         public async Task Start()
@@ -312,16 +314,6 @@ namespace TradingBot
             }
 
             Debug.Assert(indicators.All(i => i.IsReady));
-        }
-
-        internal void PlaceOrder(Order order)
-        {
-            _orderManager.PlaceOrder(Contract, order);
-        }
-
-        internal void PlaceOrder(OrderChain chain)
-        {
-            _orderManager.PlaceOrder(Contract, chain);
         }
 
         public void RequestLastTradedPricesUpdates(IIndicator indicator)
