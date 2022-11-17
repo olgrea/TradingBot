@@ -181,37 +181,6 @@ namespace Tests.IBClient
         }
 
         [Test]
-        public async Task PlaceOrder_WithMarketOrderFilledInstantly_ShouldSucceed()
-        {
-            if (!Utils.IsMarketOpen())
-                Assert.Ignore();
-
-            // Setup
-            var contract = await GetContractAsync("GME");
-            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = RandomQty };
-            order.Id = await _client.GetNextValidOrderIdAsync();
-
-            // Test
-            var result = await _client.PlaceOrderAsync(contract, order);
-
-            // Assert
-            if(result is OrderPlacedResult opr)
-            {
-                Assert.NotNull(opr);
-                Assert.NotNull(opr.OrderState);
-                Assert.NotNull(opr.OrderStatus);
-            }
-            else if(result is OrderExecutedResult oer)
-            {
-                Assert.NotNull(oer);
-                Assert.NotNull(oer.OrderExecution);
-                Assert.NotNull(oer.CommissionInfo);
-            }
-            else
-                Assert.Fail();
-        }
-
-        [Test]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
             if (!Utils.IsMarketOpen())

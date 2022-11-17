@@ -223,9 +223,16 @@ namespace InteractiveBrokers
             return tcs.Task;
         }
 
-        public Task<int> GetNextValidOrderIdAsync()
+        public async Task<int> GetNextValidOrderIdAsync()
+        {
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            return await GetNextValidOrderIdAsync(source.Token);
+        }
+
+        public Task<int> GetNextValidOrderIdAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<int>();
+            token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(GetNextValidOrderIdAsync)}")));
 
             var nextValidId = new Action<int>(id =>
             {
@@ -549,8 +556,6 @@ namespace InteractiveBrokers
                 throw new ArgumentException("Order id not set");
 
             var orderPlacedResult = new OrderPlacedResult();
-            var orderExecutedResult = new OrderExecutedResult();
-
             var tcs = new TaskCompletionSource<OrderResult>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(PlaceOrderAsync)}")));
 
@@ -558,14 +563,16 @@ namespace InteractiveBrokers
             {
                 if (order.Id == o.Id)
                 {
-                    orderPlacedResult.Contract = orderExecutedResult.Contract = c;
-                    orderPlacedResult.Order = orderExecutedResult.Order = o;
+                    orderPlacedResult.Contract = c;
+                    orderPlacedResult.Order = o;
                     orderPlacedResult.OrderState = oState;
                 }
             });
 
             // With market orders, when the order is accepted and executes immediately, there commonly will not be any
             // corresponding orderStatus callbacks. For that reason it is recommended to also monitor the IBApi.EWrapper.execDetails .
+            // TODO : Wasn't able to reproduce this behavior with tests? Potential relevant discussion here : 
+            // https://groups.io/g/twsapi/topic/trading_in_the_last_minute_of/79443776?p=,,,20,0,0,0::recentpostdate%2Fsticky,,,20,2,0,79443776
             var orderStatus = new Action<OrderStatus>(oStatus =>
             {
                 if (order.Id == oStatus.Info.OrderId && (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted))
@@ -575,35 +582,16 @@ namespace InteractiveBrokers
                 }
             });
 
-            var execDetails = new Action<Contract, OrderExecution>((c, oe) =>
-            {
-                if (order.Id == oe.OrderId)
-                    orderExecutedResult.OrderExecution = oe;
-            });
-
-            var commissionReport = new Action<CommissionInfo>(ci =>
-            {
-                if (orderExecutedResult.OrderExecution.ExecId == ci.ExecId)
-                {
-                    orderExecutedResult.CommissionInfo = ci;
-                    tcs.TrySetResult(orderExecutedResult);
-                }
-            });
-
             var error = new Action<ErrorMessageException>(msg =>
             {
                 if (!Utils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
-                {
                     return;
-                }
 
                 tcs.TrySetException(msg);
             });
 
             _socket.Callbacks.OpenOrder += openOrder;
             _socket.Callbacks.OrderStatus += orderStatus;
-            _socket.Callbacks.ExecDetails += execDetails;
-            _socket.Callbacks.CommissionReport += commissionReport;
             _socket.Callbacks.Error += error;
 
             _socket.PlaceOrder(contract, order);
@@ -612,8 +600,6 @@ namespace InteractiveBrokers
             {
                 _socket.Callbacks.OpenOrder -= openOrder;
                 _socket.Callbacks.OrderStatus -= orderStatus;
-                _socket.Callbacks.CommissionReport -= commissionReport;
-                _socket.Callbacks.ExecDetails -= execDetails;
                 _socket.Callbacks.Error -= error;
             });
 
