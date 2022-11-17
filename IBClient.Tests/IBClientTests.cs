@@ -217,43 +217,6 @@ namespace Tests.IBClient
         }
 
         [Test]
-        [Ignore("Keeping this until I move it in Trader tests.")]
-        // TODO : enforce disallowing of stock shorting in Trader
-        public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
-        {
-            if (!Utils.IsMarketOpen())
-                Assert.Ignore();
-
-            // Setup
-            var contract = await GetContractAsync("GME");
-            
-            var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
-            var buyOrderResult = await PlaceDummyOrderAsync(buyOrder);
-            Assert.IsTrue(buyOrderResult?.OrderState.Status == Status.PreSubmitted || buyOrderResult?.OrderState.Status == Status.Submitted);
-
-            var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 10 };
-            sellOrder.Id = await _client.GetNextValidOrderIdAsync();
-
-            // Test
-            Exception ex = null;
-            OrderResult sellOrderResult = null;
-            try
-            {
-                sellOrderResult = await _client.PlaceOrderAsync(contract, sellOrder);
-            }
-            catch (Exception e)
-            {
-                ex = e;
-            }
-            finally
-            {
-                var r = sellOrderResult as OrderPlacedResult;
-                Assert.IsNull(r);
-                Assert.IsInstanceOf<ErrorMessageException>(ex);
-            }
-        }
-
-        [Test]
         public async Task CancelOrder_ShouldSucceed()
         {
             // Setup
