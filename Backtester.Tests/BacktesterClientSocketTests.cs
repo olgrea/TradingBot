@@ -43,29 +43,34 @@ namespace Tests.Backtester
         {
             var barCmdFactory = new BarCommandFactory(BarLength._1Sec);
             var bidAskCmdFactory = new BidAskCommandFactory();
+            var lastCmdFactory = new LastCommandFactory();
 
             _downwardData = new MarketDataCollections()
             {
-                BidAsks = LoadData<BidAsk>(_downwardFileTime, _downwardStart, bidAskCmdFactory),
-                Bars = LoadData<Bar>(_downwardFileTime, _downwardStart, barCmdFactory),
+                BidAsks = LoadData(_downwardFileTime, _downwardStart, bidAskCmdFactory),
+                Bars = LoadData(_downwardFileTime, _downwardStart, barCmdFactory),
+                Lasts = LoadData(_downwardFileTime, _downwardStart, lastCmdFactory),
             };
 
             _upwardData = new MarketDataCollections()
             {
-                BidAsks = LoadData<BidAsk>(_upwardFileTime, _upwardStart, bidAskCmdFactory),
-                Bars = LoadData<Bar>(_upwardFileTime, _upwardStart, barCmdFactory),
+                BidAsks = LoadData(_upwardFileTime, _upwardStart, bidAskCmdFactory),
+                Bars = LoadData(_upwardFileTime, _upwardStart, barCmdFactory),
+                Lasts = LoadData(_upwardFileTime, _upwardStart, lastCmdFactory),
             };
 
             _downThenUpData = new MarketDataCollections()
             {
-                BidAsks = LoadData<BidAsk>(_downThenUpFileTime, _downThenUpStart, bidAskCmdFactory),
-                Bars = LoadData<Bar>(_downThenUpFileTime, _downThenUpStart, barCmdFactory),
+                BidAsks = LoadData(_downThenUpFileTime, _downThenUpStart, bidAskCmdFactory),
+                Bars = LoadData(_downThenUpFileTime, _downThenUpStart, barCmdFactory),
+                Lasts = LoadData(_downThenUpFileTime, _downThenUpStart, lastCmdFactory),
             };
 
             _upThenDownData = new MarketDataCollections()
             {
-                BidAsks = LoadData<BidAsk>(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory),
-                Bars = LoadData<Bar>(_upThenDownFileTime, _upThenDownStart, barCmdFactory),
+                BidAsks = LoadData(_upThenDownFileTime, _upThenDownStart, bidAskCmdFactory),
+                Bars = LoadData(_upThenDownFileTime, _upThenDownStart, barCmdFactory),
+                Lasts = LoadData(_upThenDownFileTime, _upThenDownStart, lastCmdFactory),
             };
 
             BacktesterClientSocket.TimeDelays.TimeScale = 0.001;

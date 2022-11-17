@@ -146,7 +146,9 @@ namespace Backtester
         IEnumerator<T> GetStartEnumerator<T>(IEnumerable<T> data) where T : IMarketData
         {
             if (data == null || !data.Any())
-                throw new ArgumentException("no market data");
+            {
+                throw new ArgumentException($"Collection empty : no market data of type {typeof(T).Name}");
+            }
 
             var e = data.SkipWhile(d => d?.Time < _start).GetEnumerator();
             e.MoveNext();

@@ -18,12 +18,14 @@ namespace Tests.Backtester
         DateTime _fileTime = new DateTime(2022, 10, 05, 09, 30, 00, DateTimeKind.Local);
         BarCommandFactory _barCommandFactory;
         BidAskCommandFactory _bidAskCommandFactory;
+        LastCommandFactory _lastCommandFactory;
 
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
             _barCommandFactory = new BarCommandFactory(BarLength._1Sec);
             _bidAskCommandFactory = new BidAskCommandFactory();
+            _lastCommandFactory = new LastCommandFactory();
             await Task.CompletedTask;
         }
 
@@ -34,6 +36,7 @@ namespace Tests.Backtester
             {
                 Bars = _barCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
                 BidAsks = _bidAskCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
+                Lasts = _lastCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
             };
 
             var startTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
