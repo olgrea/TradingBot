@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using InteractiveBrokers.Orders;
 
-namespace TradingBot.Strategies.TestStrategies
+namespace TradingBot.Strategies
 {
     internal class NaiveStrategy : IOrderStrategy
     {
