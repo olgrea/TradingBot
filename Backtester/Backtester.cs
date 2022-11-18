@@ -6,6 +6,7 @@ using DataStorage.Db.DbCommandFactories;
 using InteractiveBrokers;
 using InteractiveBrokers.Accounts;
 using InteractiveBrokers.MarketData;
+using NLog;
 using TradingBot;
 using TradingBot.Strategies;
 
@@ -41,9 +42,10 @@ namespace Backtester
                 var marketData = LoadHistoricalData(_ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay));
                 var fakeClient = new BacktesterClientSocket(_ticker, day.Item1, day.Item2, marketData);
                 var client = new BacktesterClient(1337, fakeClient);
-                Trader trader = new Trader(_ticker, day.Item1, day.Item2, client, $"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
+                ILogger logger = LogManager.GetLogger($"{nameof(Backtester)}-{_ticker}_{_startTime.ToShortDateString()}");
+                Trader trader = new Trader(_ticker, client, logger);
 
-                trader.AddStrategyForTicker<RsiDivergenceStrategy>();
+                trader.AddStrategy<TestStrategy>();
                 
                 await trader.Start();
                 trader.Stop();

@@ -31,10 +31,7 @@ namespace TradingBot
         ILogger _csvLogger;
         IBClient _client;
         OrderManager _orderManager;
-
-        DateTime _startTime;
-        DateTime _endTime;
-        DateTime _currentTime;
+        TimeSpan _currentTime;
         
         CancellationTokenSource _cancellation;
         Task _monitoringTimeTask;
@@ -56,33 +53,36 @@ namespace TradingBot
         // TODO : investigate how to handle multiple strategies.
         // Do a weighted mean of trade signals?
         // Only allow multiple strategies if their start-end time dont overlap?
-        HashSet<IIndicatorStrategy> _indicatorStrategies = new HashSet<IIndicatorStrategy>();
+        List<IStrategy> _strategies = new List<IStrategy>();
+        IEnumerator<IStrategy> _strategyEnumerator;
+
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
-        IOrderStrategy _orderStrategy;
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
 
         // TODO : move start and end time in strategy?
-        public Trader(string ticker, DateTime startTime, DateTime endTime, int clientId) 
-            : this(ticker, startTime, endTime, new IBClient(clientId), $"{nameof(Trader)}-{ticker}_{startTime.ToShortDateString()}") {}
+        public Trader(string ticker) 
+            : this(ticker, new IBClient(), null) {}
 
-        internal Trader(string ticker, DateTime startTime, DateTime endTime, IBClient client, string loggerName)
+        internal Trader(string ticker, IBClient client, ILogger logger)
         {
             Trace.Assert(!string.IsNullOrEmpty(ticker));
             Trace.Assert(client != null);
 
             _ticker = ticker;
-            _startTime = startTime;
             _client = client;
+
+            string now = DateTime.Now.ToShortTimeString();
+            _logger = logger ?? LogManager.GetLogger($"{nameof(Trader)}-{ticker}")
+                .WithProperty("now", now);
+
             _orderManager = new OrderManager(_client, _logger);
 
             // We remove 5 minutes to have the time to sell remaining positions, if any, at the end of the day.
-            _endTime = endTime.AddMinutes(-5);
-
-            var now = DateTime.Now.ToShortTimeString();
-            _logger = LogManager.GetLogger(loggerName).WithProperty("now", now);
-            _csvLogger = LogManager.GetLogger($"{loggerName}_Report").WithProperty("now", now);
+            // _endTime = endTime.AddMinutes(-5);
+            
+            _csvLogger = LogManager.GetLogger($"{_logger.Name}_Report").WithProperty("now", now);
         }
 
         internal ILogger Logger => _logger;
@@ -102,16 +102,27 @@ namespace TradingBot
             }
         }
 
-        public void AddStrategyForTicker<TStrategy>() where TStrategy : IIndicatorStrategy
+        public void AddStrategy<TStrategy>() where TStrategy : IStrategy
         {
-            Debug.Assert(_indicatorStrategies.Count == 0, "Only one strategy is allowed for now.");
-            _indicatorStrategies.Add((IIndicatorStrategy)Activator.CreateInstance(typeof(TStrategy), this));
-            _orderStrategy = new ConservativeStrategy(this);
+            IStrategy newStrat = (IStrategy)Activator.CreateInstance(typeof(TStrategy), this);
+
+            foreach(IStrategy strat in _strategies)
+            {
+                if (AreOverlapping(strat, newStrat))
+                    throw new InvalidOperationException($"Multiple strategies cannot overlap during a trading day.");
+            }
+
+            _strategies.Add(newStrat);
+        }
+
+        bool AreOverlapping(IStrategy s1, IStrategy s2)
+        {
+            return s1.StartTime >= s2.EndTime || s1.EndTime <= s2.StartTime;
         }
 
         public async Task Start()
         {
-            if (!_indicatorStrategies.Any())
+            if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
 
             _accountCode = (await _client.ConnectAsync()).AccountCode;
@@ -127,19 +138,21 @@ namespace TradingBot
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
-            InitIndicators(_indicatorStrategies.SelectMany(s => s.Indicators));
+            _strategyEnumerator = _strategies.GetEnumerator();
+            _strategyEnumerator.MoveNext();
+
+            InitIndicators(_strategyEnumerator.Current.IndicatorStrategy.Indicators);
             SubscribeToData();
             
             _logger.Info($"Starting USD cash balance : {_account.USDCash:c}");
 
             string msg = $"This trader will monitor {_ticker} using strategies : ";
-            foreach (var strat in _indicatorStrategies)
+            foreach (var strat in _strategies)
                 msg += $"{strat.GetType().Name}, ";
             _logger.Info(msg);
 
-            _currentTime = await _client.GetCurrentTimeAsync();
+            _currentTime = (await _client.GetCurrentTimeAsync()).TimeOfDay;
             _logger.Info($"Current server time : {_currentTime}");
-            _logger.Info($"This trader will start trading at {_startTime} and end at {_endTime}");
 
             _cancellation = new CancellationTokenSource();
             _evaluationTask = StartEvaluationTask();
@@ -150,13 +163,15 @@ namespace TradingBot
         async Task StartMonitoringTimeTask()
         {
             _logger.Debug($"Started monitoring current time");
-            var progress = new Progress<DateTime>(t => _currentTime = t);
+            var progress = new Progress<TimeSpan>(t => _currentTime = t);
             try
             {
-
-                await _client.WaitUntil(_startTime, progress, _cancellation.Token);
-                _tradingStarted = true;
-                await _client.WaitUntil(_endTime, progress, _cancellation.Token);
+                foreach(IStrategy strat in _strategies.OrderBy(s => s.StartTime))
+                {
+                    await _client.WaitUntil(strat.StartTime, progress, _cancellation.Token);
+                    _tradingStarted = true;
+                    await _client.WaitUntil(strat.EndTime, progress, _cancellation.Token);
+                }
             }
             finally
             {
@@ -200,8 +215,8 @@ namespace TradingBot
 
         private async Task EvaluateStrategies()
         {
-            IEnumerable<TradeSignal> signals = _indicatorStrategies.Select(s => s.GenerateTradeSignal(_position));
-            await _orderStrategy.ManageOrders(signals);
+            TradeSignal signal = _strategyEnumerator.Current.IndicatorStrategy.GenerateTradeSignal(_position);
+            await _strategyEnumerator.Current.OrderStrategy.ManageOrders(signal);
         }
 
         void StopEvaluationTask()
@@ -218,7 +233,7 @@ namespace TradingBot
             _client.PnLReceived += OnPnLReceived;
 
             _client.RequestBarsUpdates(Contract);
-            foreach(BarLength barLength in _indicatorStrategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+            foreach(BarLength barLength in _strategyEnumerator.Current.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
                 _client.BarReceived[barLength] += OnBarReceived;
 
             _orderManager.OrderUpdated += OnOrderUpdated;
@@ -239,7 +254,7 @@ namespace TradingBot
             _orderManager.OrderExecuted -= OnOrderExecuted;
 
             Broker.CancelBarsUpdates(Contract);
-            foreach (BarLength barLength in _indicatorStrategies.SelectMany(s => s.Indicators).Select(i => i.BarLength).Distinct())
+            foreach (BarLength barLength in _strategyEnumerator.Current.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
                 _client.BarReceived[barLength] -= OnBarReceived;
 
             _client.CancelPositionsUpdates();
@@ -436,8 +451,7 @@ namespace TradingBot
         private void UpdateStrategies(IEnumerable<Bar> bars)
         {
             var quotes = bars.Select(b => (BarQuote)b);
-            foreach (IIndicatorStrategy strategy in _indicatorStrategies)
-                strategy.ComputeIndicators(quotes);
+            _strategyEnumerator.Current.IndicatorStrategy.ComputeIndicators(quotes);
         }
 
         void SetEvaluationEvent()

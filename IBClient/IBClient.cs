@@ -886,15 +886,15 @@ namespace InteractiveBrokers
             return tcs.Task;
         }
 
-        public virtual async Task WaitUntil(DateTime endTime, IProgress<DateTime> progress, CancellationToken token)
+        public virtual async Task WaitUntil(TimeSpan endTime, IProgress<TimeSpan> progress, CancellationToken token)
         {
-            var currentTime = await GetCurrentTimeAsync();
+            TimeSpan currentTime = (await GetCurrentTimeAsync()).TimeOfDay;
             progress?.Report(currentTime);
 
             while (!token.IsCancellationRequested && currentTime < endTime)
             {
                 await Task.Delay(500);
-                currentTime = await GetCurrentTimeAsync();
+                currentTime = (await GetCurrentTimeAsync()).TimeOfDay;
                 progress?.Report(currentTime);
             }
         }

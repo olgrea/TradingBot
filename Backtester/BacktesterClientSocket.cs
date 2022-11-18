@@ -133,7 +133,7 @@ namespace Backtester
 
         public IBCallbacks Callbacks { get; private set; }
 
-        internal event Action<DateTime> TimeProgress;
+        internal event Action<TimeSpan> TimeProgress;
         internal Task PassingTimeTask => _passingTimeTask;
         internal CancellationTokenSource Cancellation => _cancellation;
         internal int NextValidOrderId => _nextValidOrderId++;
@@ -230,7 +230,7 @@ namespace Backtester
             var mainToken = _cancellation.Token;
             _st.Start();
             _logger.Trace($"Passing time task started");
-            TimeProgress?.Invoke(_currentFakeTime);
+            TimeProgress?.Invoke(_currentFakeTime.TimeOfDay);
             while (!mainToken.IsCancellationRequested && _currentFakeTime < _end)
             {
                 try
@@ -243,7 +243,7 @@ namespace Backtester
                     if (TimeDelays.OneSecond > 0)
                         await Task.Delay(TimeDelays.OneSecond, mainToken);
                     _currentFakeTime = _currentFakeTime.AddSeconds(1);
-                    TimeProgress?.Invoke(_currentFakeTime);
+                    TimeProgress?.Invoke(_currentFakeTime.TimeOfDay);
                 }
                 catch (OperationCanceledException) {}
             }

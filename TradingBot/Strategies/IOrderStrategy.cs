@@ -5,6 +5,6 @@ namespace TradingBot.Strategies
 {
     public interface IOrderStrategy
     {
-        Task ManageOrders(IEnumerable<TradeSignal> signals);
+        Task ManageOrders(TradeSignal signal);
     }
 }
