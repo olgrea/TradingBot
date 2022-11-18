@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using InteractiveBrokers.Orders;
 
@@ -13,11 +10,11 @@ namespace TradingBot.Strategies
         {
             Trader = trader;
         }
+
         public Trader Trader { get; }
 
-        public async Task ManageOrders(IEnumerable<TradeSignal> signals)
+        public async Task ManageOrders(TradeSignal signal)
         {
-            var signal = signals.First();
             if (signal == TradeSignal.Neutral)
                 return;
 
