@@ -20,6 +20,7 @@ using TradingBot.Strategies;
 using TradingBot.Utils;
 
 [assembly: InternalsVisibleTo("Backtester")]
+[assembly: InternalsVisibleTo("TradingBot.Tests")]
 [assembly: Fody.ConfigureAwait(false)]
 
 namespace TradingBot
@@ -48,19 +49,14 @@ namespace TradingBot
 
         bool _tradingStarted = false;
 
-        // TODO : only allow a single strategy? 
-        // TODO : investigate how to handle multiple strategies.
-        // Do a weighted mean of trade signals?
-        // Only allow multiple strategies if their start-end time dont overlap?
         List<IStrategy> _strategies = new List<IStrategy>();
-        IEnumerator<IStrategy> _strategyEnumerator;
+        IStrategy _currentStrategy;
 
         HashSet<IIndicator> _indicatorsRequiringLastUpdates = new HashSet<IIndicator>();
 
         int _longestPeriod;
         Dictionary<BarLength, LinkedListWithMaxSize<Bar>> _bars = new Dictionary<BarLength, LinkedListWithMaxSize<Bar>>();
 
-        // TODO : move start and end time in strategy?
         public Trader(string ticker) 
             : this(ticker, new IBClient(), null) {}
 
@@ -84,8 +80,27 @@ namespace TradingBot
             _csvLogger = LogManager.GetLogger($"{_logger.Name}_Report").WithProperty("now", now);
         }
 
+        IStrategy CurrentStrategy
+        {
+            get { return _currentStrategy; }
+            set 
+            {
+                if(value != _currentStrategy)
+                {
+                    foreach (BarLength barLength in _currentStrategy.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
+                        _client.BarReceived[barLength] -= OnBarReceived;
+
+                    InitIndicators(value.IndicatorStrategy.Indicators);
+
+                    foreach (BarLength barLength in value.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
+                        _client.BarReceived[barLength] += OnBarReceived;
+                    
+                    _currentStrategy = value; 
+                }
+            }
+        }
+
         internal ILogger Logger => _logger;
-        internal IBClient Broker => _client;
         internal Contract Contract => _contract;
         internal IBClient Client => _client;
         internal Position Position => _position;
@@ -137,10 +152,6 @@ namespace TradingBot
             if (_contract == null)
                 throw new Exception($"Unable to find contract for ticker {_ticker}.");
 
-            _strategyEnumerator = _strategies.GetEnumerator();
-            _strategyEnumerator.MoveNext();
-
-            InitIndicators(_strategyEnumerator.Current.IndicatorStrategy.Indicators);
             SubscribeToData();
             
             _logger.Info($"Starting USD cash balance : {_account.USDCash:c}");
@@ -167,6 +178,7 @@ namespace TradingBot
             {
                 foreach(IStrategy strat in _strategies.OrderBy(s => s.StartTime))
                 {
+                    CurrentStrategy = strat;
                     await _client.WaitUntil(strat.StartTime, progress, _cancellation.Token);
                     _tradingStarted = true;
                     await _client.WaitUntil(strat.EndTime, progress, _cancellation.Token);
@@ -214,8 +226,8 @@ namespace TradingBot
 
         private async Task EvaluateStrategies()
         {
-            TradeSignal signal = _strategyEnumerator.Current.IndicatorStrategy.GenerateTradeSignal(_position);
-            await _strategyEnumerator.Current.OrderStrategy.ManageOrders(signal);
+            TradeSignal signal = _currentStrategy.IndicatorStrategy.GenerateTradeSignal(_position);
+            await _currentStrategy.OrderStrategy.ManageOrders(signal);
         }
 
         void StopEvaluationTask()
@@ -232,9 +244,6 @@ namespace TradingBot
             _client.PnLReceived += OnPnLReceived;
 
             _client.RequestBarsUpdates(Contract);
-            foreach(BarLength barLength in _strategyEnumerator.Current.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
-                _client.BarReceived[barLength] += OnBarReceived;
-
             _orderManager.OrderUpdated += OnOrderUpdated;
             _orderManager.OrderExecuted += OnOrderExecuted;
 
@@ -249,12 +258,9 @@ namespace TradingBot
             _client.PositionReceived -= OnPositionReceived;
             _client.PnLReceived -= OnPnLReceived;
 
+            _client.CancelBarsUpdates(Contract);
             _orderManager.OrderUpdated -= OnOrderUpdated;
             _orderManager.OrderExecuted -= OnOrderExecuted;
-
-            Broker.CancelBarsUpdates(Contract);
-            foreach (BarLength barLength in _strategyEnumerator.Current.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
-                _client.BarReceived[barLength] -= OnBarReceived;
 
             _client.CancelPositionsUpdates();
             _client.CancelPnLUpdates(_contract);
@@ -450,7 +456,7 @@ namespace TradingBot
         private void UpdateStrategies(IEnumerable<Bar> bars)
         {
             var quotes = bars.Select(b => (BarQuote)b);
-            _strategyEnumerator.Current.IndicatorStrategy.ComputeIndicators(quotes);
+            _currentStrategy.IndicatorStrategy.ComputeIndicators(quotes);
         }
 
         void SetEvaluationEvent()
