@@ -57,7 +57,7 @@ namespace HistoricalDataFetcherApp
             if (opts == MarketDataOptions.None)
                 throw new ArgumentException("No market data type specified", nameof(Options.MarketData));
 
-            await FetchEverything(ticker, startDate.AddTicks(Utils.MarketStartTime.Ticks), endDate.AddTicks(Utils.MarketEndTime.Ticks), opts);
+            await FetchEverything(ticker, startDate.AddTicks(MarketDataUtils.MarketStartTime.Ticks), endDate.AddTicks(MarketDataUtils.MarketEndTime.Ticks), opts);
         }
 
         public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate, MarketDataOptions marketDataOptions)
@@ -71,7 +71,7 @@ namespace HistoricalDataFetcherApp
             if (contract == null)
                 throw new ArgumentException($"can't find contract for ticker {ticker}");
 
-            var marketDays = Utils.GetMarketDays(startDate, endDate).ToList();
+            var marketDays = MarketDataUtils.GetMarketDays(startDate, endDate).ToList();
 
             bool fetchEverything = marketDataOptions.HasFlag(MarketDataOptions.All);
             if(fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.Bar))

@@ -27,8 +27,8 @@ namespace Backtester
         public Backtester(string ticker, DateTime startDate, DateTime endDate)
         {
             _ticker = ticker;
-            _startTime = new DateTime(startDate.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
-            _endTime = new DateTime(endDate.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
+            _startTime = new DateTime(startDate.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
+            _endTime = new DateTime(endDate.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
             _barCommandFactory = new BarCommandFactory(BarLength._1Sec);
             _bidAskCommandFactory = new BidAskCommandFactory();
             _lastCommandFactory = new LastCommandFactory();
@@ -37,7 +37,7 @@ namespace Backtester
         public async Task Start()
         {
 
-            foreach (var day in Utils.GetMarketDays(_startTime, _endTime))
+            foreach (var day in MarketDataUtils.GetMarketDays(_startTime, _endTime))
             {
                 var marketData = LoadHistoricalData(_ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay));
                 var fakeClient = new BacktesterClientSocket(_ticker, day.Item1, day.Item2, marketData);

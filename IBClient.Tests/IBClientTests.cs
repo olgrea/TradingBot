@@ -158,7 +158,7 @@ namespace Tests.IBClient
         [Test]
         public async Task PlaceOrder_WithValidOrderParams_ShouldSucceed()
         {
-            if (!Utils.IsMarketOpen())
+            if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
@@ -183,7 +183,7 @@ namespace Tests.IBClient
         [Test]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
-            if (!Utils.IsMarketOpen())
+            if (!MarketDataUtils.IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
