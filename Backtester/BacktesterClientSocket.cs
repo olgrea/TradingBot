@@ -192,7 +192,7 @@ namespace Backtester
             ClockTick += OnClockTick_UpdateBidAsk;
             ClockTick += OnClockTick_UpdateLast;
             ClockTick += OnClockTick_UpdateUnrealizedPNL;
-            _passingTimeTask = StartPassingTimeTask();
+            _passingTimeTask = Task.Run(() => StartPassingTimeTask());
         }
 
         internal void Stop()
@@ -668,13 +668,13 @@ namespace Backtester
             _logger.Debug($"Sending account updates...");
             _lastAccountUpdate = _currentFakeTime;
 
-            foreach(var balance in _fakeAccount.CashBalances)
+            foreach(var balance in _fakeAccount.CashBalances.ToList())
                 _responsesQueue.Add(() => Callbacks.updateAccountValue("CashBalance", balance.Value.ToString(CultureInfo.InvariantCulture), balance.Key, _fakeAccount.Code));
 
-            foreach (var pnl in _fakeAccount.RealizedPnL)
+            foreach (var pnl in _fakeAccount.RealizedPnL.ToList())
                 _responsesQueue.Add(() => Callbacks.updateAccountValue("RealizedPnL", pnl.Value.ToString(CultureInfo.InvariantCulture), pnl.Key, _fakeAccount.Code));
 
-            foreach (var pnl in _fakeAccount.UnrealizedPnL)
+            foreach (var pnl in _fakeAccount.UnrealizedPnL.ToList())
                 _responsesQueue.Add(() => Callbacks.updateAccountValue("UnrealizedPnL", pnl.Value.ToString(CultureInfo.InvariantCulture), pnl.Key, _fakeAccount.Code));
 
 

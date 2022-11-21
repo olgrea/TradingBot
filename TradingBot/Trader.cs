@@ -87,10 +87,14 @@ namespace TradingBot
             {
                 if(value != _currentStrategy)
                 {
-                    foreach (BarLength barLength in _currentStrategy.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
-                        _client.BarReceived[barLength] -= OnBarReceived;
+                    if(_currentStrategy != null)
+                    {
+                        foreach (BarLength barLength in _currentStrategy.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
+                            _client.BarReceived[barLength] -= OnBarReceived;
+                    }
 
                     InitIndicators(value.IndicatorStrategy.Indicators);
+                    _logger.Info($"Strategy \"{value.GetType().Name}\" initialized. Starts at : {value.StartTime}");
 
                     foreach (BarLength barLength in value.IndicatorStrategy.Indicators.Select(i => i.BarLength).Distinct())
                         _client.BarReceived[barLength] += OnBarReceived;
@@ -165,8 +169,8 @@ namespace TradingBot
             _logger.Info($"Current server time : {_currentTime}");
 
             _cancellation = new CancellationTokenSource();
-            _evaluationTask = StartEvaluationTask();
-            _monitoringTimeTask = StartMonitoringTimeTask();
+            _evaluationTask = Task.Run(() => StartEvaluationTask());
+            _monitoringTimeTask = Task.Run(() => StartMonitoringTimeTask());
             await Task.WhenAll(_evaluationTask, _monitoringTimeTask);
         }
 
@@ -450,7 +454,7 @@ namespace TradingBot
             _totalCommission += ci.Commission;
 
             _logger.Info($"OrderExecuted : {_contract} {oe.Action} {oe.Shares} at {oe.AvgPrice:c} (commission : {ci.Commission:c})");
-            Report(oe.Time.ToString(), _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares * oe.AvgPrice, ci.Commission, ci.RealizedPNL);
+            Report(oe.Time.ToString(), _currentStrategy, _contract.Symbol, oe.Action, oe.Shares, oe.AvgPrice, oe.Shares * oe.AvgPrice, ci.Commission, ci.RealizedPNL);
         }
 
         private void UpdateStrategies(IEnumerable<Bar> bars)
@@ -490,10 +494,11 @@ namespace TradingBot
             }
         }
 
-        void Report(string time, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission, double realizedPnL)
+        void Report(string time, IStrategy currentStrat, string ticker, OrderAction action, double qty, double avgPrice, double totalPrice, double commission, double realizedPnL)
         {
-            _csvLogger.Info("{time} {action} {qty} {price} {total} {commission} {realized}"
+            _csvLogger.Info("{time} {strat} {action} {qty} {price} {total} {commission} {realized}"
                 , time
+                , currentStrat.GetType().Name
                 , action
                 , qty
                 , avgPrice
