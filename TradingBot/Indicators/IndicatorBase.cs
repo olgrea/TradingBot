@@ -4,7 +4,6 @@ using System.Linq;
 using InteractiveBrokers.MarketData;
 using Skender.Stock.Indicators;
 using TradingBot.Indicators.Quotes;
-using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
 
 namespace TradingBot.Indicators
 {

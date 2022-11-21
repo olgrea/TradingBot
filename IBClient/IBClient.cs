@@ -510,7 +510,7 @@ namespace InteractiveBrokers
                     Bar barToUse = bar;
                     if (barLength > BarLength._5Sec)
                     {
-                        barToUse = Utils.CombineBars(list.TakeLast(nbBars), barLength);
+                        barToUse = MarketDataUtils.CombineBars(list.TakeLast(nbBars), barLength);
                     }
 
                     InvokeCallbacks(contract, barToUse);
@@ -584,7 +584,7 @@ namespace InteractiveBrokers
 
             var error = new Action<ErrorMessageException>(msg =>
             {
-                if (!Utils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
                     return;
 
                 tcs.TrySetException(msg);

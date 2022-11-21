@@ -39,8 +39,8 @@ namespace Tests.Backtester
                 Lasts = _lastCommandFactory.CreateSelectCommand(Symbol, _fileTime.Date).Execute(),
             };
 
-            var startTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketStartTime.Ticks, DateTimeKind.Local);
-            var endTime = new DateTime(_fileTime.Date.Ticks + Utils.MarketEndTime.Ticks, DateTimeKind.Local);
+            var startTime = new DateTime(_fileTime.Date.Ticks + MarketDataUtils.MarketStartTime.Ticks, DateTimeKind.Local);
+            var endTime = new DateTime(_fileTime.Date.Ticks + MarketDataUtils.MarketEndTime.Ticks, DateTimeKind.Local);
 
             var fakeSocket = new BacktesterClientSocket(Symbol, startTime, endTime, marketData);
             _client = new BacktesterClient(951, fakeSocket);

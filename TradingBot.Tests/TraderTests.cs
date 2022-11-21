@@ -5,7 +5,6 @@ using InteractiveBrokers.Messages;
 using InteractiveBrokers.Orders;
 using NUnit.Framework;
 using System.Threading.Tasks;
-using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
 
 namespace TradingBot.Tests
 {

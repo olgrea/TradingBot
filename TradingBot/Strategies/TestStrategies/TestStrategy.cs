@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using MarketDataUtils = InteractiveBrokers.MarketData.Utils;
+using InteractiveBrokers.MarketData;
 
 namespace TradingBot.Strategies
 {

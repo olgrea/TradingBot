@@ -320,7 +320,7 @@ namespace InteractiveBrokers.Backend
                 TradeAmount = bar.Count,
 
                 // non-standard date format...
-                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, Utils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
             HistoricalData?.Invoke(reqId, b);
             _logger.Trace($"historicalData : {bar}");

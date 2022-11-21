@@ -14,7 +14,7 @@ namespace DataStorage.Db.DbCommandFactories
 
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
         {
-            return new BidAskExistsCommand(symbol, date, Utils.MarketDayTimeRange, _connection);
+            return new BidAskExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
         }
 
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
@@ -24,7 +24,7 @@ namespace DataStorage.Db.DbCommandFactories
 
         public override DbCommand<IEnumerable<BidAsk>> CreateSelectCommand(string symbol, DateTime date)
         {
-            return new SelectBidAsksCommand(symbol, date, Utils.MarketDayTimeRange, _connection);
+            return new SelectBidAsksCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
         }
 
         public override DbCommand<IEnumerable<BidAsk>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
