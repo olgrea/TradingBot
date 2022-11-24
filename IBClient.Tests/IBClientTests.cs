@@ -44,40 +44,71 @@ namespace IBClient.Tests
         public async Task ConnectAsync_OnSuccess_ReturnsRelevantConnectionInfo()
         {
             // Setup
-            await _client.DisconnectAsync();
-            await Task.Delay(50);
+            var client = new InteractiveBrokers.IBClient();
+            try
+            {
+                // Test
+                var result = await client.ConnectAsync();
 
-            // Test
-            var msg = await _client.ConnectAsync();
-
-            // Assert
-            Assert.IsNotNull(msg);
-            Assert.IsTrue(msg.NextValidOrderId > 0);
-            Assert.IsNotNull(msg.AccountCode);
+                // Assert
+                Assert.IsNotNull(result);
+                Assert.IsTrue(result.NextValidOrderId > 0);
+                Assert.IsNotNull(result.AccountCode);
+            }
+            finally
+            {
+                await client.DisconnectAsync();
+            }
         }
 
         [Test]
         public async Task ConnectAsync_AlreadyConnected_ThrowsError()
         {
             // Setup
-            await _client.DisconnectAsync();
-            await Task.Delay(50);
-            await _client.ConnectAsync();
-            await Task.Delay(50);
-
-            // Test
-            Assert.ThrowsAsync<ErrorMessageException>(async () => await _client.ConnectAsync()); 
+            var client = new InteractiveBrokers.IBClient();
+            try
+            {
+                await client.ConnectAsync();
+                
+                // Test and Assert
+                Assert.ThrowsAsync<ErrorMessageException>(async () => await client.ConnectAsync()); 
+            }
+            finally
+            {
+                await client.DisconnectAsync();
+            }
         }
 
         [Test]
         public async Task ConnectAsync_CanBeCancelled()
         {
             // Setup
-            await _client.DisconnectAsync();
-            await Task.Delay(50);
+            var client = new InteractiveBrokers.IBClient();
+            try
+            {
+                // Test and Assert
+                Assert.ThrowsAsync<TaskCanceledException>(async () => await client.ConnectAsync(new CancellationToken(true)));
+            }
+            finally
+            {
+                await client.DisconnectAsync();
+            }
+        }
 
-            // Test
-            Assert.ThrowsAsync<TimeoutException>(async () => await _client.ConnectAsync(new CancellationToken(true)));
+        [Test]
+        public async Task ConnectAsync_TimesOutAfterAWhile()
+        {
+            // Setup
+            var client = new InteractiveBrokers.IBClient();
+            try
+            {
+                // Test and Assert
+                Assert.ThrowsAsync<TimeoutException>(async () => await client.ConnectAsync(new TimeSpan(1), CancellationToken.None));
+            }
+            finally
+            {
+                await client.DisconnectAsync();
+            }
         }
 
         [Test]

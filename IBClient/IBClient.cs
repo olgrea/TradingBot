@@ -155,16 +155,25 @@ namespace InteractiveBrokers
 
         public Task<ConnectResult> ConnectAsync()
         {
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
-            return ConnectAsync(source.Token);
+            return ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), CancellationToken.None);
+        }
+
+        public Task<ConnectResult> ConnectAsync(TimeSpan timeout)
+        {
+            return ConnectAsync(timeout, CancellationToken.None);
         }
 
         public Task<ConnectResult> ConnectAsync(CancellationToken token)
         {
+            return ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), token);
+        }
+
+        public Task<ConnectResult> ConnectAsync(TimeSpan timeout, CancellationToken token)
+        {
             //TODO: Handle IB server resets
             var result = new ConnectResult();
             var tcs = new TaskCompletionSource<ConnectResult>();
-            token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
+            token.Register(() => tcs.TrySetCanceled());
 
             var nextValidId = new Action<int>(id =>
             {
@@ -197,6 +206,7 @@ namespace InteractiveBrokers
                 _socket.Callbacks.Error -= error;
             });
 
+            Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
             _socket.Connect(DefaultIP, _port, _clientId);
 
             return tcs.Task;
