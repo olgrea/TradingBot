@@ -299,6 +299,15 @@ namespace IBClient.Tests
             }
         }
 
+        [Test]
+        public async Task GetCurrentTime_TimeIncrements()
+        {
+            var t1 = await _client.GetCurrentTimeAsync();
+            await Task.Delay(2000);
+            var t2 = await _client.GetCurrentTimeAsync();
+            Assert.Greater(t2, t1);
+        }
+
         Contract MakeDummyContract(string symbol)
         {
             return new Stock()
