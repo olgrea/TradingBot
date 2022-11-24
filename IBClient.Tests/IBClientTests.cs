@@ -8,7 +8,7 @@ using InteractiveBrokers.Orders;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Contracts;
 
-namespace Tests.IBClient
+namespace IBClient.Tests
 {
     [TestFixture]
     public class IBClientTests

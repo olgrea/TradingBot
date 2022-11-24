@@ -6,9 +6,9 @@ using DataStorage.Db.DbCommandFactories;
 using InteractiveBrokers;
 using InteractiveBrokers.MarketData;
 using NUnit.Framework;
-using Tests.IBClient;
+using IBClient.Tests;
 
-namespace Tests.Backtester
+namespace Backtester.Tests
 {
     [TestFixture]
     internal class BacktesterClientTests : IBClientTests
