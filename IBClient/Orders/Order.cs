@@ -26,6 +26,8 @@ namespace InteractiveBrokers.Orders
         public OcaType OcaType { get; set; }
     }
 
+    // TODO : implement order conditioning
+    // https://interactivebrokers.github.io/tws-api/order_conditions.html
     public abstract class Order
     {
         public RequestInfo Info { get; } = new RequestInfo();

@@ -53,27 +53,24 @@ namespace InteractiveBrokers.Backend
             NextValidId?.Invoke(orderId);
         }
 
-        public Action<string> UpdateAccountTime;
+        public Action<TimeSpan> UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
             _logger.Trace($"Getting account time : {timestamp}");
-            UpdateAccountTime?.Invoke(timestamp);
+            UpdateAccountTime?.Invoke(TimeSpan.Parse(timestamp, CultureInfo.InvariantCulture));
         }
 
-        public Action<string, string, string, string> UpdateAccountValue;
+        public Action<AccountValue> UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
             _logger.Trace($"account value : {key} {value} {currency}");
-            UpdateAccountValue?.Invoke(key, value, currency, accountName);
-
-            //TODO : handle "AccountReady"
-            //case "AccountReady":
-            //    if (!bool.Parse(value))
-            //    {
-            //        string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate. Try again later";
-            //        error(msg);
-            //    }
-            //    break;
+            UpdateAccountValue?.Invoke(new AccountValue() 
+            {
+                Key = key,
+                Value = value,
+                Currency = currency,
+                AccountName = accountName,
+            });
         }
 
         public Action<Position> UpdatePortfolio;

@@ -375,14 +375,14 @@ namespace TradingBot
             }
         }
 
-        void OnAccountValueUpdated(string key, string value, string currency, string account)
+        void OnAccountValueUpdated(AccountValue accountValue)
         {
-            switch (key)
+            switch (accountValue.Key)
             {
                 case "CashBalance":
-                    if(currency == "USD")
+                    if(accountValue.Currency == "USD")
                     {
-                        var newVal = double.Parse(value, CultureInfo.InvariantCulture);
+                        var newVal = double.Parse(accountValue.Value, CultureInfo.InvariantCulture);
                         if(newVal != _account.USDCash)
                         {
                             _logger.Info($"New Account Cash balance : {newVal:c} USD");

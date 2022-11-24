@@ -7,6 +7,7 @@ using InteractiveBrokers.Messages;
 using InteractiveBrokers.Orders;
 using InteractiveBrokers.MarketData;
 using InteractiveBrokers.Contracts;
+using InteractiveBrokers.Accounts;
 
 namespace IBClient.Tests
 {
@@ -112,12 +113,42 @@ namespace IBClient.Tests
         }
 
         [Test]
+        public async Task GetAccountAsync_WithValidAccountCode_GetsTheAccount()
+        {
+            Account account = await _client.GetAccountAsync(_connectMessage.AccountCode);
+            Assert.IsNotNull(account);
+            Assert.AreEqual(_connectMessage.AccountCode, account.Code);
+            Assert.AreNotEqual(account.Time, default(DateTime));
+            Assert.True(account.CashBalances.Any());
+        }
+
+        [Test]
+        public async Task GetAccountAsync_NoAccountCodeProvided_SingleAccountStructure_GetsTheDefaultAccount()
+        {
+            Account account = await _client.GetAccountAsync();
+            Assert.IsNotNull(account);
+            Assert.AreEqual(_connectMessage.AccountCode, account.Code);
+            Assert.AreNotEqual(account.Time, default(DateTime));
+            Assert.True(account.CashBalances.Any());
+        }
+
+        [Test]
+        public async Task GetAccountAsync_WithInvalidAccountCode_SingleAccountStructure_IgnoresItAndGetsTheDefaultAccount()
+        {
+            Account account = await _client.GetAccountAsync("INVALID_ACCOUNT");
+            Assert.IsNotNull(account);
+            Assert.AreEqual(_connectMessage.AccountCode, account.Code);
+            Assert.AreNotEqual(account.Time, default(DateTime));
+            Assert.True(account.CashBalances.Any());
+        }
+
+        [Test]
         public async Task RequestAccountUpdates_ReceivesAccount()
         {
             // Setup
             string accountReceived = null;
             var tcs = new TaskCompletionSource<string>();
-            var callback = new Action<string, string, string, string>( (key, value, currency, acc) => tcs.SetResult(acc));
+            var callback = new Action<AccountValue>( accVal => tcs.SetResult(accVal.AccountName));
             _client.AccountValueUpdated += callback;
 
             // Test

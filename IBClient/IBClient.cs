@@ -65,7 +65,7 @@ namespace InteractiveBrokers
         public event Action<Contract, BidAsk> BidAskReceived;
         public event Action<Contract, Last> LastReceived;
 
-        public event Action<string, string, string, string> AccountValueUpdated
+        public event Action<AccountValue> AccountValueUpdated
         {
             add => _socket.Callbacks.UpdateAccountValue += value;
             remove => _socket.Callbacks.UpdateAccountValue -= value;
@@ -278,32 +278,55 @@ namespace InteractiveBrokers
             return tcs.Task;
         }
 
-        public Task<Account> GetAccountAsync(string accountCode)
+        // In a single account structure, the account number is ignored.
+        public async Task<Account> GetAccountAsync(string accountCode = null)
         {
+            var accList = await GetManagedAccountsList();
+            if(accList.Count() == 1)
+            {
+                accountCode ??= accList.First();
+            }
+            else if(string.IsNullOrEmpty(accountCode))
+            {
+                throw new ArgumentException("A non-null account code must be specified for multiple-account structures.");
+            }
+            else if(!accList.Contains(accountCode))
+            {
+                throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
+            }
+
             var account = new Account();
 
             var tcs = new TaskCompletionSource<Account>();
 
-            var updateAccountTime = new Action<string>(time =>
+            var updateAccountTime = new Action<TimeSpan>(time =>
             {
                 _logger.Trace($"GetAccountAsync updateAccountTime : {time}");
-                account.Time = DateTime.Parse(time, CultureInfo.InvariantCulture);
+                account.Time = time;
             });
-            var updateAccountValue = new Action<string, string, string, string>((key, value, currency, acc) =>
+            var updateAccountValue = new Action<AccountValue>(accValue =>
             {
-                _logger.Trace($"GetAccountAsync updateAccountValue : key={key}, value={value}");
-                switch (key)
+                _logger.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
+                switch (accValue.Key)
                 {
+                    case "AccountReady":
+                        if (!bool.Parse(accValue.Value))
+                        {
+                            string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate.";
+                            _logger.Warn(msg);
+                        }
+                        break;
+
                     case "CashBalance":
-                        account.CashBalances[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        account.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                         break;
 
                     case "RealizedPnL":
-                        account.RealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        account.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                         break;
 
                     case "UnrealizedPnL":
-                        account.UnrealizedPnL[currency] = double.Parse(value, CultureInfo.InvariantCulture);
+                        account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                         break;
                 }
             });
@@ -326,17 +349,16 @@ namespace InteractiveBrokers
 
             _socket.RequestAccountUpdates(accountCode);
 
-            tcs.Task.ContinueWith(t =>
-            {
-                _socket.Callbacks.UpdateAccountTime -= updateAccountTime;
-                _socket.Callbacks.UpdateAccountValue -= updateAccountValue;
-                _socket.Callbacks.UpdatePortfolio -= updatePortfolio;
-                _socket.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
+            await tcs.Task;
 
-                _socket.CancelAccountUpdates(accountCode);
-            });
+            _socket.CancelAccountUpdates(accountCode);
 
-            return tcs.Task;
+            _socket.Callbacks.UpdateAccountTime -= updateAccountTime;
+            _socket.Callbacks.UpdateAccountValue -= updateAccountValue;
+            _socket.Callbacks.UpdatePortfolio -= updatePortfolio;
+            _socket.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
+
+            return tcs.Task.Result;
         }
 
         public async Task<Contract> GetContractAsync(string symbol, string exchange = "SMART")
