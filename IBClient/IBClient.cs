@@ -178,10 +178,13 @@ namespace InteractiveBrokers
                     tcs.TrySetResult(result);
             });
 
-            var managedAccounts = new Action<string>(acc =>
+            var managedAccounts = new Action<IEnumerable<string>>(accList =>
             {
-                _logger.Trace($"ConnectAsync : managedAccounts {acc} - set result");
-                result.AccountCode = acc;
+                if (accList.Count() > 1)
+                    tcs.SetException(new NotSupportedException("Only single account structures are supported."));
+
+                _logger.Trace($"ConnectAsync : managedAccounts {accList} - set result");
+                result.AccountCode = accList.First();
 
                 if (result.IsSet())
                     tcs.TrySetResult(result);
@@ -224,6 +227,24 @@ namespace InteractiveBrokers
 
             _socket.Disconnect();
 
+            return tcs.Task;
+        }
+
+        public Task<IEnumerable<string>> GetManagedAccountsList()
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<string>>();
+
+            var managedAccount = new Action<IEnumerable<string>>(list => tcs.SetResult(list));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
+
+            _socket.Callbacks.ManagedAccounts += managedAccount;
+            tcs.Task.ContinueWith(t =>
+            {
+                _socket.Callbacks.ManagedAccounts -= managedAccount;
+                _socket.Callbacks.Error -= error;
+            });
+
+            _socket.RequestManagedAccounts();
             return tcs.Task;
         }
 

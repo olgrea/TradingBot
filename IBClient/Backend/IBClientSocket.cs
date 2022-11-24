@@ -68,6 +68,12 @@ namespace InteractiveBrokers.Backend
             _clientSocket.reqIds(-1); // param is deprecated
         }
 
+        public void RequestManagedAccounts()
+        {
+            _logger.Debug($"Requesting managed accounts");
+            _clientSocket.reqManagedAccts();
+        }
+
         public void RequestAccountUpdates(string accountCode)
         {
             _logger.Debug($"Requesting account updates for {accountCode}");

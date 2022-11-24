@@ -10,6 +10,7 @@ namespace InteractiveBrokers.Backend
         void Connect(string host, int port, int clientId);
         void Disconnect();
         void RequestValidOrderIds();
+        void RequestManagedAccounts();
         void RequestAccountUpdates(string accountCode);
         void CancelAccountUpdates(string accountCode);
         void RequestContractDetails(int reqId, Contract contract);
