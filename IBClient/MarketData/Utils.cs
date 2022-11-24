@@ -13,7 +13,7 @@ namespace InteractiveBrokers.MarketData
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
-        // Doesn't take holidays into account
+        // TODO : get market holidays from a csv file or something
         public static bool IsMarketOpen()
         {
             var now = DateTime.Now;

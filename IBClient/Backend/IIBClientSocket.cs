@@ -5,6 +5,7 @@ namespace InteractiveBrokers.Backend
 {
     public interface IIBClientSocket
     {
+        //TODO : rename to Responses
         IBCallbacks Callbacks { get; }
         void Connect(string host, int port, int clientId);
         void Disconnect();
