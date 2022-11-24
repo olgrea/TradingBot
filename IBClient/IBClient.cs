@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -147,22 +148,22 @@ namespace InteractiveBrokers
             throw new ArgumentException("Neither TWS Workstation or IB Gateway is running.");
         }
 
-        public Task<ConnectResult> ConnectAsync()
+        public async Task<ConnectResult> ConnectAsync()
         {
-            return ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), CancellationToken.None);
+            return await ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), CancellationToken.None);
         }
 
-        public Task<ConnectResult> ConnectAsync(TimeSpan timeout)
+        public async Task<ConnectResult> ConnectAsync(TimeSpan timeout)
         {
-            return ConnectAsync(timeout, CancellationToken.None);
+            return await ConnectAsync(timeout, CancellationToken.None);
         }
 
-        public Task<ConnectResult> ConnectAsync(CancellationToken token)
+        public async Task<ConnectResult> ConnectAsync(CancellationToken token)
         {
-            return ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), token);
+            return await ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), token);
         }
 
-        public Task<ConnectResult> ConnectAsync(TimeSpan timeout, CancellationToken token)
+        public async Task<ConnectResult> ConnectAsync(TimeSpan timeout, CancellationToken token)
         {
             //TODO: Handle IB server resets
             var result = new ConnectResult();
@@ -196,20 +197,24 @@ namespace InteractiveBrokers
             _socket.Callbacks.ManagedAccounts += managedAccounts;
             _socket.Callbacks.Error += error;
 
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _ = Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
+                _socket.Connect(DefaultIP, _port, _clientId);
+                await tcs.Task;
+
+            }
+            finally
             {
                 _socket.Callbacks.NextValidId -= nextValidId;
                 _socket.Callbacks.ManagedAccounts -= managedAccounts;
                 _socket.Callbacks.Error -= error;
-            });
+            }
 
-            Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
-            _socket.Connect(DefaultIP, _port, _clientId);
-
-            return tcs.Task;
+            return tcs.Task.Result;
         }
 
-        public Task<bool> DisconnectAsync()
+        public async Task<bool> DisconnectAsync()
         {
             var tcs = new TaskCompletionSource<bool>();
             _logger.Debug($"Disconnecting from TWS");
@@ -219,18 +224,19 @@ namespace InteractiveBrokers
 
             _socket.Callbacks.ConnectionClosed += disconnect;
             _socket.Callbacks.Error += error;
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _socket.Disconnect();
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.ConnectionClosed -= disconnect;
                 _socket.Callbacks.Error -= error;
-            });
-
-            _socket.Disconnect();
-
-            return tcs.Task;
+            }
         }
 
-        public Task<IEnumerable<string>> GetManagedAccountsList()
+        public async Task<IEnumerable<string>> GetManagedAccountsList()
         {
             var tcs = new TaskCompletionSource<IEnumerable<string>>();
 
@@ -238,14 +244,16 @@ namespace InteractiveBrokers
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _socket.Callbacks.ManagedAccounts += managedAccount;
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _socket.RequestManagedAccounts();
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.ManagedAccounts -= managedAccount;
                 _socket.Callbacks.Error -= error;
-            });
-
-            _socket.RequestManagedAccounts();
-            return tcs.Task;
+            }
         }
 
         public async Task<int> GetNextValidOrderIdAsync()
@@ -254,28 +262,27 @@ namespace InteractiveBrokers
             return await GetNextValidOrderIdAsync(source.Token);
         }
 
-        public Task<int> GetNextValidOrderIdAsync(CancellationToken token)
+        public async Task<int> GetNextValidOrderIdAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<int>();
             token.Register(() => tcs.TrySetException(new TimeoutException($"{nameof(GetNextValidOrderIdAsync)}")));
 
-            var nextValidId = new Action<int>(id =>
-            {
-                tcs.SetResult(id);
-            });
+            var nextValidId = new Action<int>(id => tcs.SetResult(id));
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _socket.Callbacks.NextValidId += nextValidId;
             _socket.Callbacks.Error += error;
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _logger.Debug($"Requesting next valid order ids");
+                _socket.RequestValidOrderIds();
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.NextValidId -= nextValidId;
                 _socket.Callbacks.Error -= error;
-            });
-
-            _logger.Debug($"Requesting next valid order ids");
-            _socket.RequestValidOrderIds();
-            return tcs.Task;
+            }
         }
 
         // In a single account structure, the account number is ignored.
@@ -296,7 +303,6 @@ namespace InteractiveBrokers
             }
 
             var account = new Account();
-
             var tcs = new TaskCompletionSource<Account>();
 
             var updateAccountTime = new Action<TimeSpan>(time =>
@@ -347,18 +353,20 @@ namespace InteractiveBrokers
             _socket.Callbacks.UpdatePortfolio += updatePortfolio;
             _socket.Callbacks.AccountDownloadEnd += accountDownloadEnd;
 
-            _socket.RequestAccountUpdates(accountCode);
+            try
+            {
+                _socket.RequestAccountUpdates(accountCode);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _socket.CancelAccountUpdates(accountCode);
 
-            await tcs.Task;
-
-            _socket.CancelAccountUpdates(accountCode);
-
-            _socket.Callbacks.UpdateAccountTime -= updateAccountTime;
-            _socket.Callbacks.UpdateAccountValue -= updateAccountValue;
-            _socket.Callbacks.UpdatePortfolio -= updatePortfolio;
-            _socket.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
-
-            return tcs.Task.Result;
+                _socket.Callbacks.UpdateAccountTime -= updateAccountTime;
+                _socket.Callbacks.UpdateAccountValue -= updateAccountValue;
+                _socket.Callbacks.UpdatePortfolio -= updatePortfolio;
+                _socket.Callbacks.AccountDownloadEnd -= accountDownloadEnd;
+            }
         }
 
         public async Task<Contract> GetContractAsync(string symbol, string exchange = "SMART")
@@ -375,7 +383,7 @@ namespace InteractiveBrokers
             return contractDetails?.FirstOrDefault().Contract;
         }
 
-        public Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract)
+        public async Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract)
         {
             var reqId = NextRequestId;
 
@@ -403,20 +411,21 @@ namespace InteractiveBrokers
             _socket.Callbacks.ContractDetailsEnd += contractDetailsEnd;
             _socket.Callbacks.Error += error;
 
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _logger.Debug($"Requesting contract details for {contract} (reqId={reqId})");
+                _socket.RequestContractDetails(reqId, contract);
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.ContractDetails -= contractDetails;
                 _socket.Callbacks.ContractDetailsEnd -= contractDetailsEnd;
                 _socket.Callbacks.Error -= error;
-            });
-
-            _logger.Debug($"Requesting contract details for {contract} (reqId={reqId})");
-            _socket.RequestContractDetails(reqId, contract);
-
-            return tcs.Task;
+            }
         }
 
-        public Task<BidAsk> GetLatestBidAskAsync(Contract contract)
+        public async Task<BidAsk> GetLatestBidAskAsync(Contract contract)
         {
             var tcs = new TaskCompletionSource<BidAsk>();
             CancellationTokenSource source = new CancellationTokenSource();
@@ -435,17 +444,18 @@ namespace InteractiveBrokers
 
             _socket.Callbacks.TickByTickBidAsk += tickByTickBidAsk;
             _socket.Callbacks.Error += error;
-            tcs.Task.ContinueWith(t =>
+            try
             {
+                source.CancelAfter(timeoutInMs);
+                _socket.RequestTickByTickData(reqId, contract, "BidAsk");
+                return await tcs.Task;
+            }
+            finally
+            {
+                _socket.CancelTickByTickData(reqId);
                 _socket.Callbacks.TickByTickBidAsk -= tickByTickBidAsk;
                 _socket.Callbacks.Error -= error;
-                _socket.CancelTickByTickData(reqId);
-            });
-
-            source.CancelAfter(timeoutInMs);
-            _socket.RequestTickByTickData(reqId, contract, "BidAsk");
-
-            return tcs.Task;
+            }
         }
 
         public void RequestBidAskUpdates(Contract contract)
@@ -591,13 +601,13 @@ namespace InteractiveBrokers
             _socket.CancelFiveSecondsBarsUpdates(reqId);
         }
 
-        public Task<OrderResult> PlaceOrderAsync(Contract contract, Order order)
+        public async Task<OrderResult> PlaceOrderAsync(Contract contract, Order order)
         {
             var source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
-            return PlaceOrderAsync(contract, order, source.Token);
+            return await PlaceOrderAsync(contract, order, source.Token);
         }
 
-        public Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token)
+        public async Task<OrderResult> PlaceOrderAsync(Contract contract, Order order, CancellationToken token)
         {
             if (order?.Id <= 0)
                 throw new ArgumentException("Order id not set");
@@ -641,16 +651,17 @@ namespace InteractiveBrokers
             _socket.Callbacks.OrderStatus += orderStatus;
             _socket.Callbacks.Error += error;
 
-            _socket.PlaceOrder(contract, order);
-
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _socket.PlaceOrder(contract, order);
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.OpenOrder -= openOrder;
                 _socket.Callbacks.OrderStatus -= orderStatus;
                 _socket.Callbacks.Error -= error;
-            });
-
-            return tcs.Task;
+            }
         }
 
         public void PlaceOrder(Contract contract, Order order)
@@ -664,7 +675,7 @@ namespace InteractiveBrokers
             _socket.PlaceOrder(contract, order);
         }
 
-        public Task<OrderStatus> CancelOrderAsync(int orderId)
+        public async Task<OrderStatus> CancelOrderAsync(int orderId)
         {
             if (orderId <= 0)
                 throw new ArgumentException("Invalid order id");
@@ -687,18 +698,20 @@ namespace InteractiveBrokers
 
             _socket.Callbacks.OrderStatus += orderStatus;
             _socket.Callbacks.Error += error;
-            tcs.Task.ContinueWith(t =>
+            try
+            {
+                _logger.Debug($"Requesting order cancellation for order id : {orderId}");
+
+                source.CancelAfter(timeoutInMs);
+                _socket.CancelOrder(orderId);
+
+                return await tcs.Task;
+            }
+            finally
             {
                 _socket.Callbacks.OrderStatus -= orderStatus;
                 _socket.Callbacks.Error -= error;
-            });
-
-            _logger.Debug($"Requesting order cancellation for order id : {orderId}");
-
-            source.CancelAfter(timeoutInMs);
-            _socket.CancelOrder(orderId);
-
-            return tcs.Task;
+            }
         }
 
         public void CancelOrder(Order order)
@@ -853,18 +866,18 @@ namespace InteractiveBrokers
             });
         }
 
-        public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(Contract contract, DateTime time, int count)
+        public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(Contract contract, DateTime time, int count)
         {
             CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
-            return GetHistoricalTicksAsync<BidAsk>(contract, time, count, "BID_ASK", source.Token);
+            return await GetHistoricalTicksAsync<BidAsk>(contract, time, count, "BID_ASK", source.Token);
         }
-        public Task<IEnumerable<Last>> GetHistoricalLastsAsync(Contract contract, DateTime time, int count)
+        public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(Contract contract, DateTime time, int count)
         {
             CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
-            return GetHistoricalTicksAsync<Last>(contract, time, count, "TRADES", source.Token);
+            return await GetHistoricalTicksAsync<Last>(contract, time, count, "TRADES", source.Token);
         }
 
-        Task<IEnumerable<TData>> GetHistoricalTicksAsync<TData>(Contract contract, DateTime time, int count, string whatToShow, CancellationToken token) where TData : IMarketData, new()
+        async Task<IEnumerable<TData>> GetHistoricalTicksAsync<TData>(Contract contract, DateTime time, int count, string whatToShow, CancellationToken token) where TData : IMarketData, new()
         {
             var reqId = NextRequestId;
             var tmpList = new LinkedList<TData>();
@@ -888,35 +901,37 @@ namespace InteractiveBrokers
                 }
             });
 
+            Action unregisterAction;
             if (typeof(TData) == typeof(BidAsk))
             {
                 Action<int, IEnumerable<BidAsk>, bool> callback = (Action<int, IEnumerable<BidAsk>, bool>)historicalTicks;
 
                 _socket.Callbacks.HistoricalTicksBidAsk += callback;
-                tcs.Task.ContinueWith(t =>
-                {
-                    _socket.Callbacks.HistoricalTicksBidAsk -= callback;
-                });
+                unregisterAction = new Action(() => _socket.Callbacks.HistoricalTicksBidAsk -= callback);
             }
             else if (typeof(TData) == typeof(Last))
             {
                 Action<int, IEnumerable<Last>, bool> callback = (Action<int, IEnumerable<Last>, bool>)historicalTicks;
 
                 _socket.Callbacks.HistoricalTicksLast += callback;
-                tcs.Task.ContinueWith(t =>
-                {
-                    _socket.Callbacks.HistoricalTicksLast -= callback;
-                });
+                unregisterAction = new Action(() => _socket.Callbacks.HistoricalTicksLast -= callback);
             }
             else
                 throw new NotImplementedException();
 
-            _socket.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, whatToShow, false, true);
+            try
+            {
+                _socket.RequestHistoricalTicks(reqId, contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, whatToShow, false, true);
+                return await tcs.Task;
+            }
+            finally
+            {
+                unregisterAction.Invoke();
+            }
 
-            return tcs.Task;
         }
 
-        public Task<DateTime> GetCurrentTimeAsync()
+        public async Task<DateTime> GetCurrentTimeAsync()
         {
             var tcs = new TaskCompletionSource<DateTime>();
 
@@ -926,11 +941,16 @@ namespace InteractiveBrokers
             });
 
             _socket.Callbacks.CurrentTime += currentTime;
-            tcs.Task.ContinueWith(task => _socket.Callbacks.CurrentTime -= currentTime);
-
-            _logger.Debug("Requesting current time");
-            _socket.RequestCurrentTime();
-            return tcs.Task;
+            try
+            {
+                _logger.Debug("Requesting current time");
+                _socket.RequestCurrentTime();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _socket.Callbacks.CurrentTime -= currentTime;
+            }
         }
 
         public virtual async Task WaitUntil(TimeSpan endTime, IProgress<TimeSpan> progress, CancellationToken token)
