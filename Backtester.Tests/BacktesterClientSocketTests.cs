@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Backtester;
 using DataStorage.Db.DbCommandFactories;
 using InteractiveBrokers.Contracts;
 using InteractiveBrokers.MarketData;
@@ -13,7 +12,7 @@ using NUnit.Framework;
 
 [assembly: LevelOfParallelism(3)]
 
-namespace Tests.Backtester
+namespace Backtester.Tests
 {
     [TestFixture]
     public class BacktesterClientSocketTests
