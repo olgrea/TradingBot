@@ -58,6 +58,7 @@ namespace Backtester
         int _nextExecId = 0;
         double _totalCommission = 0;
 
+        // TODO : add the concept of pending Orders (i.e. Transmit = false, order conditions)
         List<Order> _openOrders = new List<Order>();
         List<Order> _executedOrders = new List<Order>();
 
@@ -617,6 +618,14 @@ namespace Backtester
             {
                 foreach (var o in _openOrders.ToList())
                     CancelOrderInternal(o.Id);
+            });
+        }
+
+        public void RequestManagedAccounts()
+        {
+            _requestsQueue.Add(() =>
+            {
+                _responsesQueue.Add(() => Callbacks.managedAccounts(_fakeAccount.Code));
             });
         }
 

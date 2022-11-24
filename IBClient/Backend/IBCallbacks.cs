@@ -38,11 +38,12 @@ namespace InteractiveBrokers.Backend
             ConnectionClosed?.Invoke();
         }
 
-        public Action<string> ManagedAccounts;
+        public Action<IEnumerable<string>> ManagedAccounts;
         public void managedAccounts(string accountsList)
         {
             _logger.Trace($"Account list : {accountsList}");
-            ManagedAccounts?.Invoke(accountsList);
+            var accounts = accountsList.Split(',');
+            ManagedAccounts?.Invoke(accounts);
         }
 
         public Action<int> NextValidId;
