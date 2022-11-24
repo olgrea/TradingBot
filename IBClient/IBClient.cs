@@ -109,12 +109,6 @@ namespace InteractiveBrokers
             remove => _socket.Callbacks.CurrentTime -= value;
         }
 
-        public IErrorHandler ErrorHandler
-        {
-            get => _socket.Callbacks.ErrorHandler;
-            set => _socket.Callbacks.ErrorHandler = value;
-        }
-
         #endregion Events
 
         public IBClient()
@@ -907,34 +901,6 @@ namespace InteractiveBrokers
                 currentTime = (await GetCurrentTimeAsync()).TimeOfDay;
                 progress?.Report(currentTime);
             }
-        }
-    }
-
-    public class IBClientErrorHandler : DefaultErrorHandler
-    {
-        IBClient _client;
-        public IBClientErrorHandler(IBClient client, ILogger logger) : base(logger)
-        {
-            _client = client;
-        }
-
-        public override bool IsHandled(ErrorMessageException msg)
-        {
-            switch (msg.ErrorCode)
-            {
-                //case 1011: // Connectivity between IB and TWS has been restored- data lost.*
-                //    RestoreSubscriptions();
-                //    break;
-
-                default:
-                    return base.IsHandled(msg);
-            }
-        }
-
-        void RestoreSubscriptions()
-        {
-            // TODO : RestoreSubscriptions
-            var subs = _client.Subscriptions;
         }
     }
 }

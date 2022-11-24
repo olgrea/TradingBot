@@ -31,32 +31,10 @@ namespace HistoricalDataFetcherApp
         public IBClient _client;
         public ILogger _logger;
 
-        internal class FetcherErrorHandler : IBClientErrorHandler
-        {
-            HistoricalDataFetcher _fetcher;
-            public FetcherErrorHandler(HistoricalDataFetcher fetcher, IBClient client, ILogger logger) : base(client, logger)
-            {
-                _fetcher = fetcher;
-            }
-
-            public override bool IsHandled(ErrorMessageException msg)
-            {
-                switch (msg.ErrorCode)
-                {
-                    // TODO : handle pacing violation for when the program has been started and restarted a lot
-                    default:
-                        //_fetcher.Wait10Minutes();
-                        return base.IsHandled(msg);
-                }
-            }
-        }
-
         public HistoricalDataFetcher(IBClient client, ILogger logger)
         {
             _client = client ?? new IBClient(321);
             _logger = logger;
-
-            _client.ErrorHandler = new FetcherErrorHandler(this, _client, _logger);
         }
 
         public async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, Contract contract, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()

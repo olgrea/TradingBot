@@ -22,7 +22,6 @@ namespace InteractiveBrokers.Backend
         public IBCallbacks(ILogger logger)
         {
             _logger = logger;
-            ErrorHandler = new DefaultErrorHandler(logger);
         }
 
         public Action ConnectAck;
@@ -370,27 +369,52 @@ namespace InteractiveBrokers.Backend
             CurrentTime?.Invoke(time);
         }
 
-        public IErrorHandler ErrorHandler;
+        public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
+
+        //// https://interactivebrokers.github.io/tws-api/message_codes.html
+        //// https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClientErrors.html
+        //public static bool IsSystemMessage(int code) => code >= 1100 && code <= 1300;
+        //public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
+        //public static bool IsClientErrorMessage(int code) => 
+        //    (code >= 501 && code <= 508 && code != 507) ||
+        //    (code >= 510 && code <= 549) ||
+        //    (code >= 551 && code <= 584) ||
+        //    code == 10038;
+
+        //public static bool IsTWSErrorMessage(int code) =>
+        //    (code >= 100 && code <= 168) ||
+        //    (code >= 200 && code <= 449) ||
+        //    code == 507 ||
+        //    (code >= 10000 && code <= 10027) ||
+        //    code == 10090 ||
+        //    (code >= 10148 && code <= 10284);
+
+
         public Action<ErrorMessageException> Error;
         public void error(Exception e)
         {
-            var msg = new ErrorMessageException(e);
-            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
-                Error?.Invoke(msg);
+            HandleError(new ErrorMessageException(e));
         }
 
         public void error(string str)
         {
-            ErrorMessageException msg = new ErrorMessageException(str);
-            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
-                Error?.Invoke(msg);
+            HandleError(new ErrorMessageException(str));
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
-            ErrorMessageException msg = new ErrorMessageException(id, errorCode, errorMsg);
-            if (ErrorHandler == null || !ErrorHandler.IsHandled(msg))
-                Error?.Invoke(msg);
+            HandleError(new ErrorMessageException(id, errorCode, errorMsg));
+        }
+
+        void HandleError(ErrorMessageException ex)
+        {
+            if (IsWarningMessage(ex.ErrorCode))
+            {
+                _logger.Warn($"{ex.Message} ({ex.ErrorCode})");
+                return;
+            }
+
+            throw ex;
         }
 
         #region Not Implemented
