@@ -1,0 +1,40 @@
+﻿using NUnit.Framework;
+using TradingBotV2.IBKR;
+
+namespace TradingBotV2.Tests
+{
+    [TestFixture]
+    public class IBBrokerTests
+    {
+        IBBroker _broker;
+
+        [SetUp]
+        public async Task SetUp()
+        {
+            _broker = new IBBroker();
+            await Task.CompletedTask;
+        }
+
+        [TearDown]
+        public async Task TearDown()
+        {
+            await Task.Delay(50);
+            await _broker.DisconnectAsync();
+            await Task.Delay(50);
+        }
+
+        [Test]
+        public async Task ConnectAsync_OnSuccess_ReturnsAccountCode()
+        {
+            var result = await _broker.ConnectAsync();
+            Assert.IsTrue(result == "DU5962304");
+        }
+
+        [Test]
+        public async Task ConnectAsync_AlreadyConnected_ThrowsError()
+        {
+            await _broker.ConnectAsync();
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.ConnectAsync());
+        }
+    }
+}

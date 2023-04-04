@@ -9,8 +9,8 @@ namespace TradingBotV2.Broker
         public IMarketDataProvider MarketDataProvider { get; }
         public IOrderManager OrderManager { get; }
 
-        public Task<bool> ConnectAsync();
-        public Task<bool> DisconnectAsync();
+        public Task<string> ConnectAsync();
+        public Task DisconnectAsync();
         public Task<Account> GetAccountAsync(string accountCode);
 
     }
