@@ -1,0 +1,16 @@
+﻿namespace TradingBotV2.Broker.MarketData
+{
+    public interface IMarketDataProvider
+    {
+        public event Action<string, BidAsk> BidAskReceived;
+        public event Action<string, Last> LastReceived;
+        public event Action<string, Bar> BarReceived;
+
+        public void RequestBidAskUpdates(string ticker);
+        public void CancelBidAskUpdates(string ticker);
+        public void RequestLastTradedPriceUpdates(string ticker);
+        public void CancelLastTradedPriceUpdates(string ticker);
+        public void RequestBarUpdates(string ticker);
+        public void CancelBarUpdates(string ticker);
+    }
+}
