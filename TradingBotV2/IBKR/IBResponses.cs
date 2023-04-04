@@ -1,8 +1,13 @@
-﻿using System.Diagnostics;
-using System.Drawing;
-using System.Globalization;
-using System.Runtime.InteropServices;
+﻿using System.Globalization;
 using IBApi;
+using TradingBotV2.Broker.Accounts;
+using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Broker.Orders;
+using Bar = TradingBotV2.Broker.MarketData.Bar;
+using Contract = TradingBotV2.Broker.Contracts.Contract;
+using ContractDetails = TradingBotV2.Broker.Contracts.ContractDetails;
+using Order = TradingBotV2.Broker.Orders.Order;
+using OrderState = TradingBotV2.Broker.Orders.OrderState;
 
 namespace TradingBotV2.IBKR
 {
@@ -11,18 +16,21 @@ namespace TradingBotV2.IBKR
         public Action ConnectAck;
         public void connectAck()
         {
+            //_logger.Trace($"Connecting client to TWS...");
             ConnectAck?.Invoke();
         }
 
         public Action ConnectionClosed;
         public void connectionClosed()
         {
+            //_logger.Trace($"Connection closed");
             ConnectionClosed?.Invoke();
         }
 
         public Action<IEnumerable<string>> ManagedAccounts;
         public void managedAccounts(string accountsList)
         {
+            //_logger.Trace($"Account list : {accountsList}");
             var accounts = accountsList.Split(',');
             ManagedAccounts?.Invoke(accounts);
         }
@@ -30,103 +38,174 @@ namespace TradingBotV2.IBKR
         public Action<int> NextValidId;
         public void nextValidId(int orderId)
         {
+            //_logger.Trace($"NextValidId : {orderId}");
             NextValidId?.Invoke(orderId);
         }
 
         public Action<TimeSpan> UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
+            //_logger.Trace($"Getting account time : {timestamp}");
             UpdateAccountTime?.Invoke(TimeSpan.Parse(timestamp, CultureInfo.InvariantCulture));
         }
 
-        public Action<string, string, string, string> UpdateAccountValue;
+        public Action<AccountValue> UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
-            UpdateAccountValue?.Invoke(key, value, currency, accountName);
+            //_logger.Trace($"account value : {key} {value} {currency}");
+            UpdateAccountValue?.Invoke(new AccountValue()
+            {
+                Key = key,
+                Value = value,
+                Currency = currency,
+                AccountName = accountName,
+            });
         }
 
-        public Action<Contract, double, double, double, double, double, double, string> UpdatePortfolio;
-        public void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
+        public Action<Position> UpdatePortfolio;
+        public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
-            UpdatePortfolio?.Invoke(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName);
+            var pos = new Position()
+            {
+                Contract = contract.ToTBContract(),
+                PositionAmount = position,
+                MarketPrice = marketPrice,
+                MarketValue = marketValue,
+                AverageCost = averageCost,
+                UnrealizedPNL = unrealizedPNL,
+                RealizedPNL = realizedPNL,
+            };
+
+            //_logger.Trace($"Getting portfolio : \n{pos}");
+            UpdatePortfolio?.Invoke(pos);
         }
 
         public Action<string> AccountDownloadEnd;
         public void accountDownloadEnd(string account)
         {
+            //_logger.Trace($"accountDownloadEnd ({account})");
             AccountDownloadEnd?.Invoke(account);
         }
 
         public Action<int, string, string, string, string> AccountSummary;
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
+            //_logger.Trace($"accountSummary reqId={reqId} account={account} tag={tag} value={value} currency={currency}");
             AccountSummary?.Invoke(reqId, account, tag, value, currency);
         }
 
         public Action<int> AccountSummaryEnd;
         public void accountSummaryEnd(int reqId)
         {
+            //_logger.Trace($"accountSummaryEnd ({reqId})");
             AccountSummaryEnd?.Invoke(reqId);
         }
 
-        public Action<string, Contract, double, double> Position;
-        public void position(string account, Contract contract, double pos, double avgCost)
+        public Action<Position> Position;
+        public void position(string account, IBApi.Contract contract, double pos, double avgCost)
         {
-            Position?.Invoke(account, contract, pos, avgCost);
+            var p = new Position()
+            {
+                Contract = contract.ToTBContract(),
+                PositionAmount = pos,
+                AverageCost = avgCost,
+            };
+
+            //_logger.Trace($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
+            Position?.Invoke(p);
         }
 
         public Action PositionEnd;
         public void positionEnd()
         {
+            //_logger.Trace($"positionEnd");
             PositionEnd?.Invoke();
         }
 
-        public Action<int, int, double, double, double, double> PnlSingle;
+        public Action<int, int , double , double , double , double > PnlSingle;
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
+            //_logger.Trace($"PnL ({reqId}): {pnl}");
             PnlSingle?.Invoke(reqId, pos, dailyPnL, unrealizedPnL, realizedPnL, value);
         }
 
         // called at 5 sec intervals
-        public Action<int, long, double, double, double, double, long, double, int> RealtimeBar;
+        public Action<int, Bar> RealtimeBar;
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
-            RealtimeBar?.Invoke(reqId, date, open, high, low, close, volume, WAP, count);
+            Bar bar = new Bar()
+            {
+                BarLength = BarLength._5Sec,
+                Open = open,
+                Close = close,
+                High = high,
+                Low = low,
+                Volume = volume,
+                TradeAmount = count,
+                Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime.ToLocalTime(),
+            };
+
+            //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
+            RealtimeBar?.Invoke(reqId, bar);
         }
 
-        public Action<int, long, double, double, int, int, TickAttribBidAsk> TickByTickBidAsk;
+        public Action<int, BidAsk> TickByTickBidAsk;
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            TickByTickBidAsk?.Invoke(reqId, time, bidPrice, askPrice, bidSize, askSize, tickAttribBidAsk);
+            var bidAsk = new BidAsk()
+            {
+                Bid = bidPrice,
+                BidSize = bidSize,
+                Ask = askPrice,
+                AskSize = askSize,
+                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
+            };
+
+            //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
+            TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
         // TODO : support 1 sec bars using tick by tick data?
-        public Action<int, int, long, double, int, TickAttribLast, string, string> TickByTickAllLast;
+        public Action<int, Last> TickByTickAllLast;
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
-            TickByTickAllLast?.Invoke(reqId, tickType, time, price, size, tickAttribLast, exchange, specialConditions);
+            var last = new Last()
+            {
+                Price = price,
+                Size = size,
+                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
+            };
+
+            //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
+            TickByTickAllLast?.Invoke(reqId, last);
         }
 
         public Action<int, ContractDetails> ContractDetails;
-        public void contractDetails(int reqId, ContractDetails contractDetails)
+        public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
         {
-            ContractDetails?.Invoke(reqId, contractDetails);
+            //_logger.Trace($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
+            ContractDetails?.Invoke(reqId, contractDetails.ToTBContractDetails());
         }
 
         public Action<int> ContractDetailsEnd;
         public void contractDetailsEnd(int reqId)
         {
+            //_logger.Trace($"contractDetailsEnd ({reqId})");
             ContractDetailsEnd?.Invoke(reqId);
         }
 
-        public Action<int, Contract, Order, OrderState> OpenOrder;
-        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
+        public Action<Contract, Order, OrderState> OpenOrder;
+        public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            // TODO : handle commented stuff
-            //if (!string.IsNullOrEmpty(os.WarningText))
-            //    _logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
+            Contract c = contract.ToTBContract();
+            Order o = order.ToTBOrder();
+            OrderState os = orderState.ToTBOrderState();
 
-            OpenOrder?.Invoke(orderId, contract, order, orderState);
+            //_logger.Trace($"openOrder {orderId} : {c}, {o}, {os.Status}");
+            // if (!string.IsNullOrEmpty(os.WarningText))
+                //_logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
+
+            OpenOrder?.Invoke(c, o, os);
         }
 
         public Action OpenOrderEnd;
@@ -134,113 +213,138 @@ namespace TradingBotV2.IBKR
         // This is not called when placing an order.
         public void openOrderEnd()
         {
+            //_logger.Trace($"openOrderEnd");
             OpenOrderEnd?.Invoke();
         }
 
-        public Action<int, string, double, double, double, int, int, double, int, string, double> OrderStatus;
+        public Action<OrderStatus> OrderStatus;
         public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
-            //var os = new OrderStatus()
-            //{
-            //    Info = new RequestInfo()
-            //    {
-            //        OrderId = orderId,
-            //        ParentId = parentId,
-            //        ClientId = clientId,
-            //        PermId = permId,
-            //    },
-            //    Status = !string.IsNullOrEmpty(status) ? (Status)Enum.Parse(typeof(Status), status) : Status.Unknown,
-            //    Filled = filled,
-            //    Remaining = remaining,
-            //    AvgFillPrice = avgFillPrice,
-            //    LastFillPrice = lastFillPrice,
-            //    MktCapPrice = mktCapPrice,
-            //};
+            var os = new OrderStatus()
+            {
+                Info = new RequestInfo()
+                {
+                    OrderId = orderId,
+                    ParentId = parentId,
+                    ClientId = clientId,
+                    PermId = permId,
+                },
+                Status = !string.IsNullOrEmpty(status) ? (Status)Enum.Parse(typeof(Status), status) : Status.Unknown,
+                Filled = filled,
+                Remaining = remaining,
+                AvgFillPrice = avgFillPrice,
+                LastFillPrice = lastFillPrice,
+                MktCapPrice = mktCapPrice,
+            };
 
-            OrderStatus?.Invoke(orderId, status, filled, remaining, avgFillPrice, permId, parentId, lastFillPrice, clientId, whyHeld, mktCapPrice);
+            //_logger.Trace($"orderStatus {orderId} : {os}");
+            OrderStatus?.Invoke(os);
         }
 
-        public Action<int, Contract, Execution> ExecDetails;
-        public void execDetails(int reqId, Contract contract, Execution execution)
+        public Action<Contract, OrderExecution> ExecDetails;
+        public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
-            ExecDetails?.Invoke(reqId, contract, execution);
+            OrderExecution ex = execution.ToTBExecution();
+            //_logger.Trace($"execDetails ({reqId}) : {ex}");
+            ExecDetails?.Invoke(contract.ToTBContract(), ex);
         }
 
         public Action<int> ExecDetailsEnd;
         public void execDetailsEnd(int reqId)
         {
+            //_logger.Trace($"execDetailsEnd : reqId={reqId}");
             ExecDetailsEnd?.Invoke(reqId);
         }
 
-        public Action<CommissionReport> CommissionReport;
+        public Action<CommissionInfo> CommissionReport;
         public void commissionReport(CommissionReport commissionReport)
         {
-            CommissionReport?.Invoke(commissionReport);
+            //_logger.Trace($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+            CommissionReport?.Invoke(commissionReport.ToTBCommission());
         }
 
         public Action<Contract, Order, OrderState> CompletedOrder;
-        public void completedOrder(Contract contract, Order order, OrderState orderState)
+        public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            //if (!string.IsNullOrEmpty(os.WarningText))
-            //    _logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
+            OrderState os = orderState.ToTBOrderState();
+            Order o = order.ToTBOrder();
+            Contract c = contract.ToTBContract();
 
-            CompletedOrder?.Invoke(contract, order, orderState);
+            //_logger.Trace($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
+            if (!string.IsNullOrEmpty(os.WarningText))
+                //_logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
+
+                CompletedOrder?.Invoke(c, o, os);
         }
 
         public Action CompletedOrdersEnd;
         public void completedOrdersEnd()
         {
+            //_logger.Trace($"completedOrdersEnd");
             CompletedOrdersEnd?.Invoke();
         }
 
         public Action<int, Bar> HistoricalData;
-        public void historicalData(int reqId, Bar bar)
+        public void historicalData(int reqId, IBApi.Bar bar)
         {
-            //var b = new MarketData.Bar()
-            //{
-            //    Open = bar.Open,
-            //    Close = bar.Close,
-            //    High = bar.High,
-            //    Low = bar.Low,
-            //    Volume = bar.Volume,
-            //    TradeAmount = bar.Count,
+            var b = new Bar()
+            {
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                TradeAmount = bar.Count,
 
-            //    // non-standard date format...
-            //    Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
-            //};
-            HistoricalData?.Invoke(reqId, bar);
+                // non-standard date format...
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
+            };
+            HistoricalData?.Invoke(reqId, b);
+            //_logger.Trace($"historicalData : {bar}");
         }
 
         public Action<int, string, string> HistoricalDataEnd;
         public void historicalDataEnd(int reqId, string start, string end)
         {
             HistoricalDataEnd?.Invoke(reqId, start, end);
+            //_logger.Trace($"historicalDataEnd");
         }
 
-        public Action<int, HistoricalTickBidAsk[], bool> HistoricalTicksBidAsk;
+        public Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
-            HistoricalTicksBidAsk?.Invoke(reqId, ticks, done);
+            IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk()
+            {
+                Bid = t.PriceBid,
+                BidSize = Convert.ToInt32(t.SizeBid),
+                Ask = t.PriceAsk,
+                AskSize = Convert.ToInt32(t.SizeAsk),
+                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
+            });
+
+            HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
+            //_logger.Trace($"historicalTicksBidAsk");
         }
 
-        public Action<int, HistoricalTickLast[], bool> HistoricalTicksLast;
+        public Action<int, IEnumerable<Last>, bool> HistoricalTicksLast;
         public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
         {
-            //IEnumerable<Last> lasts = ticks.Select(t => new Last()
-            //{
-            //    Price = t.Price,
-            //    Size = Convert.ToInt32(t.Size),
-            //    Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
-            //});
+            IEnumerable<Last> lasts = ticks.Select(t => new Last()
+            {
+                Price = t.Price,
+                Size = Convert.ToInt32(t.Size),
+                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
+            });
 
-            HistoricalTicksLast?.Invoke(reqId, ticks, done);
+            HistoricalTicksLast?.Invoke(reqId, lasts, done);
+            //_logger.Trace($"historicalTicksLast");
         }
 
-        public Action<DateTime> CurrentTime;
+        public Action<long> CurrentTime;
         public void currentTime(long time)
         {
-            var datetime = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime();
-            CurrentTime?.Invoke(datetime);
+            //_logger.Trace($"currentTime");
+            CurrentTime?.Invoke(time);
         }
 
         public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
@@ -284,10 +388,11 @@ namespace TradingBotV2.IBKR
         {
             if (IsWarningMessage(ex.ErrorCode))
             {
+                //_logger.Warn($"{ex.Message} ({ex.ErrorCode})");
                 return;
             }
 
-            Error?.Invoke(ex);
+            throw ex;
         }
 
         #region Not Implemented
@@ -302,7 +407,7 @@ namespace TradingBotV2.IBKR
             throw new NotImplementedException();
         }
 
-        public void bondContractDetails(int reqId, ContractDetails contract)
+        public void bondContractDetails(int reqId, IBApi.ContractDetails contract)
         {
             throw new NotImplementedException();
         }
@@ -342,7 +447,7 @@ namespace TradingBotV2.IBKR
             throw new NotImplementedException();
         }
 
-        public void historicalDataUpdate(int reqId, Bar bar)
+        public void historicalDataUpdate(int reqId, IBApi.Bar bar)
         {
             throw new NotImplementedException();
         }
@@ -397,7 +502,7 @@ namespace TradingBotV2.IBKR
             throw new NotImplementedException();
         }
 
-        public void positionMulti(int requestId, string account, string modelCode, Contract contract, double pos, double avgCost)
+        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, double pos, double avgCost)
         {
             throw new NotImplementedException();
         }
@@ -427,7 +532,7 @@ namespace TradingBotV2.IBKR
             throw new NotImplementedException();
         }
 
-        public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
+        public void scannerData(int reqId, int rank, IBApi.ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
             throw new NotImplementedException();
         }

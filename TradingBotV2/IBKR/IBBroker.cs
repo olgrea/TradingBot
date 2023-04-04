@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
@@ -24,11 +25,6 @@ namespace TradingBotV2.IBKR
         public IMarketDataProvider MarketDataProvider => throw new NotImplementedException();
 
         public IOrderManager OrderManager => throw new NotImplementedException();
-
-        void Init(int clientId)
-        {
-
-        }
 
         int GetPort()
         {
@@ -113,9 +109,108 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        public Task<Account> GetAccountAsync(string accountCode)
+        public async Task<IEnumerable<string>> GetManagedAccountsList()
         {
-            throw new NotImplementedException();
+            var tcs = new TaskCompletionSource<IEnumerable<string>>();
+
+            var managedAccount = new Action<IEnumerable<string>>(list => tcs.SetResult(list));
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+
+            _client.Responses.ManagedAccounts += managedAccount;
+            try
+            {
+                _client.RequestManagedAccounts();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.ManagedAccounts -= managedAccount;
+                _client.Responses.Error -= error;
+            }
+        }
+
+        // In a single account structure, the account number is ignored.
+        public async Task<Account> GetAccountAsync(string accountCode = null)
+        {
+            var accList = await GetManagedAccountsList();
+            if(string.IsNullOrEmpty(accountCode))
+            {
+                if (accList.Count() > 1)
+                {
+                    throw new ArgumentException("An account code must be specified for multiple-account structures.");
+                }
+                accountCode = accList.First();
+            }
+            else if (!accList.Contains(accountCode))
+            {
+                throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
+            }
+
+            var account = new Account();
+            var tcs = new TaskCompletionSource<Account>();
+
+            var updateAccountTime = new Action<TimeSpan>(time =>
+            {
+                //_logger.Trace($"GetAccountAsync updateAccountTime : {time}");
+                account.Time = time;
+            });
+            var updateAccountValue = new Action<AccountValue>(accValue =>
+            {
+                //_logger.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
+                switch (accValue.Key)
+                {
+                    case "AccountReady":
+                        if (!bool.Parse(accValue.Value))
+                        {
+                            string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate.";
+                            //_logger.Warn(msg);
+                        }
+                        break;
+
+                    case "CashBalance":
+                        account.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "RealizedPnL":
+                        account.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                        break;
+
+                    case "UnrealizedPnL":
+                        account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                        break;
+                }
+            });
+            var updatePortfolio = new Action<Position>(pos =>
+            {
+                //_logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
+                account.Positions.Add(pos);
+            });
+            var accountDownloadEnd = new Action<string>(accountCode =>
+            {
+                //_logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
+                account.Code = accountCode;
+                tcs.SetResult(account);
+            });
+
+            _client.Responses.UpdateAccountTime += updateAccountTime;
+            _client.Responses.UpdateAccountValue += updateAccountValue;
+            _client.Responses.UpdatePortfolio += updatePortfolio;
+            _client.Responses.AccountDownloadEnd += accountDownloadEnd;
+
+            try
+            {
+                _client.RequestAccountUpdates(accountCode);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.CancelAccountUpdates(accountCode);
+
+                _client.Responses.UpdateAccountTime -= updateAccountTime;
+                _client.Responses.UpdateAccountValue -= updateAccountValue;
+                _client.Responses.UpdatePortfolio -= updatePortfolio;
+                _client.Responses.AccountDownloadEnd -= accountDownloadEnd;
+            }
         }
     }
 }

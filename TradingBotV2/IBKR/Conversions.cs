@@ -1,9 +1,10 @@
 ﻿using System.Globalization;
+using TradingBotV2.Broker.Contracts;
+using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 
 namespace TradingBotV2.IBKR
 {
-    /*
     internal static class Conversions
     {
         internal static Contract ToTBContract(this IBApi.Contract ibc)
@@ -230,5 +231,4 @@ namespace TradingBotV2.IBKR
             };
         }
     }
-    */
 }
