@@ -21,7 +21,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataStorage", "DataStorage\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester.Tests", "Backtester.Tests\Backtester.Tests.csproj", "{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBot.Tests", "TradingBot.Tests\TradingBot.Tests.csproj", "{C9DB210E-D440-4D17-948A-F936839EA7B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot.Tests", "TradingBot.Tests\TradingBot.Tests.csproj", "{C9DB210E-D440-4D17-948A-F936839EA7B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBotV2", "TradingBotV2\TradingBotV2.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -69,6 +71,10 @@ Global
 		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
