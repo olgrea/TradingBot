@@ -1,4 +1,6 @@
-﻿namespace TradingBotV2.Broker.Accounts
+﻿using TradingBotV2.Broker.Contracts;
+
+namespace TradingBotV2.Broker.Accounts
 {
     public class Position
     {
@@ -6,7 +8,7 @@
 
         public Position(Position pos)
         {
-            Ticker = pos.Ticker;
+            Contract = pos.Contract;
             PositionAmount = pos.PositionAmount;
             MarketPrice = pos.MarketPrice;
             MarketValue = pos.MarketValue;
@@ -15,7 +17,7 @@
             RealizedPNL = pos.RealizedPNL;
         }
 
-        public string Ticker { get; set; }
+        public Contract Contract { get; set; }
         public double PositionAmount { get; set; }
         public double MarketPrice { get; set; }
         public double MarketValue { get; set; }
