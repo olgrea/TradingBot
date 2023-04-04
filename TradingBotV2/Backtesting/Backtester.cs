@@ -16,12 +16,12 @@ namespace TradingBotV2.Backtesting
 
         public IOrderManager OrderManager => throw new NotImplementedException();
 
-        public Task<bool> ConnectAsync()
+        public Task<string> ConnectAsync()
         {
             throw new NotImplementedException();
         }
 
-        public Task<bool> DisconnectAsync()
+        public Task DisconnectAsync()
         {
             throw new NotImplementedException();
         }

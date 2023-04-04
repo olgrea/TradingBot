@@ -4,21 +4,29 @@ namespace TradingBotV2.IBKR
 {
     internal class IBClient
     {
+        public const int DefaultTWSPort = 7496;
+        public const int DefaultIBGatewayPort = 4002;
+        public const string DefaultIP = "127.0.0.1";
+
         EClientSocket _clientSocket;
         EReaderSignal _signal;
         EReader _reader;
-        IBResponses _responses;
         Task _processMsgTask;
         string _accountCode = null;
 
         public IBClient()
         {
-            _responses = new IBResponses();
+            Responses = new IBResponses();
             _signal = new EReaderMonitorSignal();
-            _clientSocket = new EClientSocket(_responses, _signal);
+            _clientSocket = new EClientSocket(Responses, _signal);
         }
 
+        public IBResponses Responses { get; }
+
         // TODO : need to handle market data connection losses if the bot trades for multiple days. It seems to happen everyday at around 8pm
+
+        public void Connect() => Connect(DefaultIP, DefaultTWSPort, new Random().Next());
+
         public void Connect(string host, int port, int clientId)
         {
             _clientSocket.eConnect(host, port, clientId);
