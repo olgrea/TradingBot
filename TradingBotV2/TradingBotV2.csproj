@@ -10,4 +10,12 @@
     <ProjectReference Include="C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="DataStorage\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.10" />
+  </ItemGroup>
+
 </Project>
