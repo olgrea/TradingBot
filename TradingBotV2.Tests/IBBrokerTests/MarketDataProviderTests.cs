@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Diagnostics;
+using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 
@@ -187,10 +188,200 @@ namespace IBBrokerTests
             }
 
             Assert.IsNotEmpty(barList);
-            Assert.IsTrue(barList.Count == 3);
+            Assert.AreEqual(3, barList.Count);
             foreach(Bar bar in barList)
             {
-                Assert.IsTrue((bar.Time.Second % 5) == 0);
+                Assert.AreEqual(0, bar.Time.Second % 5);
+            }
+        }
+
+        [Test]
+        public async Task RequestBarUpdates_SingleTickerSubscription_MultipleBarLengths()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore("Market is not open.");
+
+            string expectedTicker = "SPY";
+            var fiveSecBars = new List<Bar>();
+            var oneMinBars = new List<Bar>();
+
+            var tcs = new TaskCompletionSource<bool>();
+            var barReceived = new Action<string, Bar>((ticker, bar) =>
+            {
+                if (expectedTicker == ticker)
+                {
+                    if(bar.BarLength == BarLength._5Sec)
+                    {
+                        fiveSecBars.Add(bar);
+                    }
+
+                    if (bar.BarLength == BarLength._1Min)
+                    {
+                        if (oneMinBars.Count == 1)
+                            tcs.TrySetResult(true);
+                    }
+                }
+            });
+
+            _broker.MarketDataProvider.BarReceived += barReceived;
+            try
+            {
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTicker, BarLength._1Min);
+                await tcs.Task;
+            }
+            finally
+            {
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTicker, BarLength._1Min);
+                _broker.MarketDataProvider.BarReceived -= barReceived;
+            }
+
+            Assert.IsNotEmpty(fiveSecBars);
+            Assert.GreaterOrEqual(60/5, fiveSecBars.Count);
+            foreach (Bar bar in fiveSecBars)
+            {
+                Assert.AreEqual(0, bar.Time.Second % 5);
+            }
+
+            Assert.IsNotEmpty(oneMinBars);
+            Assert.AreEqual(1, oneMinBars.Count);
+            Assert.AreEqual(0, oneMinBars.First().Time.Second % 60);
+        }
+
+        [Test]
+        public async Task RequestBarUpdates_MultipleTickerSubscriptions_SingleBarLengths()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore("Market is not open.");
+
+            string[] expectedTickers = { "SPY", "QQQ" };
+            List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
+
+            var tcs = new TaskCompletionSource<bool>();
+            var barReceived = new Action<string, Bar>((ticker, bar) =>
+            {
+                if (expectedTickers[0] == ticker)
+                {
+                    if (bar.BarLength == BarLength._5Sec && fiveSecBars[0].Count < 3)
+                    {
+                        fiveSecBars[0].Add(bar);
+                    }
+                }
+
+                if (expectedTickers[1] == ticker)
+                {
+                    if (bar.BarLength == BarLength._5Sec && fiveSecBars[1].Count < 3)
+                    {
+                        fiveSecBars[1].Add(bar);
+                    }
+                }
+
+                if (fiveSecBars[0].Count == 3 && fiveSecBars[1].Count == 3)
+                    tcs.TrySetResult(true);
+            });
+
+            _broker.MarketDataProvider.BarReceived += barReceived;
+            try
+            {
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
+                await tcs.Task;
+            }
+            finally
+            {
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.MarketDataProvider.BarReceived -= barReceived;
+            }
+
+            foreach(var bars in fiveSecBars)
+            {
+                Assert.IsNotEmpty(bars);
+                Assert.AreEqual(3, bars.Count);
+                foreach (Bar bar in bars)
+                {
+                    Assert.AreEqual(0, bar.Time.Second % 5);
+                }
+            }
+        }
+
+        [Test]
+        public async Task RequestBarUpdates_MultipleTickerSubscriptions_MultipleBarLengths()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore("Market is not open.");
+
+            string[] expectedTickers = { "SPY", "QQQ" };
+            List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
+            List<Bar>[] oneMinuteBars = { new List<Bar>(), new List<Bar>() };
+
+            var tcs = new TaskCompletionSource<bool>();
+            var barReceived = new Action<string, Bar>((ticker, bar) =>
+            {
+                if (expectedTickers[0] == ticker)
+                {
+                    if (bar.BarLength == BarLength._5Sec && fiveSecBars[0].Count < 3)
+                    {
+                        fiveSecBars[0].Add(bar);
+                    }
+
+                    if (bar.BarLength == BarLength._1Min && oneMinuteBars[0].Count == 0)
+                    {
+                        oneMinuteBars[0].Add(bar);
+                    }
+                }
+
+                if (expectedTickers[1] == ticker)
+                {
+                    if (bar.BarLength == BarLength._5Sec && fiveSecBars[1].Count < 3)
+                    {
+                        fiveSecBars[1].Add(bar);
+                    }
+
+                    if (bar.BarLength == BarLength._1Min && oneMinuteBars[1].Count == 0)
+                    {
+                        oneMinuteBars[1].Add(bar);
+                    }
+                }
+
+                if (oneMinuteBars[0].Count == 1 && oneMinuteBars[1].Count == 1)
+                    tcs.TrySetResult(true);
+            });
+
+            _broker.MarketDataProvider.BarReceived += barReceived;
+            try
+            {
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._1Min);
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._1Min);
+                await tcs.Task;
+            }
+            finally
+            {
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._1Min);
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._1Min);
+                _broker.MarketDataProvider.BarReceived -= barReceived;
+            }
+
+            foreach (var bars in fiveSecBars)
+            {
+                Assert.IsNotEmpty(bars);
+                Assert.GreaterOrEqual(60/5, bars.Count);
+                foreach (Bar bar in bars)
+                {
+                    Assert.AreEqual(0, bar.Time.Second % 5);
+                }
+            }
+
+            foreach (var bars in oneMinuteBars)
+            {
+                Assert.IsNotEmpty(bars);
+                Assert.AreEqual(1, bars.Count);
+                Assert.AreEqual(0, bars[0].Time.Second % 60);
             }
         }
     }
