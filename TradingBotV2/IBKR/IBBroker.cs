@@ -12,10 +12,8 @@ namespace TradingBotV2.IBKR
         IBClient _client;
         int _port;
         int _clientId;
-        int _reqId = 0;
-        int _nextValidOrderId = 0;
-
-        public IBBroker(int clientId = 1337)
+        
+        public IBBroker(int clientId)
         {
             _port = GetPort();
             _clientId = clientId;
@@ -52,7 +50,7 @@ namespace TradingBotV2.IBKR
             var nextValidId = new Action<int>(id =>
             {
                 //_logger.Trace($"ConnectAsync : next valid id {id}");
-                _nextValidOrderId = id;
+                Debug.Assert(id > 0);
             });
 
             var managedAccounts = new Action<IEnumerable<string>>(accList =>
