@@ -178,10 +178,10 @@ namespace TradingBotV2.IBKR
                         break;
                 }
             });
-            var updatePortfolio = new Action<Position>(pos =>
+            var updatePortfolio = new Action<IBApi.Position>(pos =>
             {
                 //_logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
-                account.Positions.Add(pos);
+                account.Positions.Add(pos.ToTBPosition());
             });
             var accountDownloadEnd = new Action<string>(accountCode =>
             {
