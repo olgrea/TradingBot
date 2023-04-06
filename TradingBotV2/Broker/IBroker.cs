@@ -4,7 +4,7 @@ using TradingBotV2.Broker.Orders;
 
 namespace TradingBotV2.Broker
 {
-    internal interface IBroker
+    public interface IBroker
     {
         public IMarketDataProvider MarketDataProvider { get; }
         public IOrderManager OrderManager { get; }

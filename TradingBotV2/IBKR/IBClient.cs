@@ -1,4 +1,5 @@
 ﻿using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Net.Sockets;
 using IBApi;
 
@@ -25,16 +26,19 @@ namespace TradingBotV2.IBKR
         EReader _reader;
         Task _processMsgTask;
 
-        int _clientId;
+        int _clientId = -1;
         string _accountCode = null;
         int _nextValidId = -1;
         Dictionary<int, ContractIdToRequestId> _contractIdToRequestId = new Dictionary<int, ContractIdToRequestId>();
+        ContractsCache _contractsCache;
 
         public IBClient()
         {
             _signal = new EReaderMonitorSignal();
             Responses = new IBResponses();
             _clientSocket = new EClientSocket(Responses, _signal);
+
+            _contractsCache = new ContractsCache(this);
 
             Responses.NextValidId += new Action<int>(id =>
             {
@@ -44,11 +48,22 @@ namespace TradingBotV2.IBKR
             {
                 _accountCode = accList.First();
             });
+            Responses.ConnectAck += new Action(() =>
+            {
+                Debug.Assert(_clientId > 0);
+                Debug.Assert(!_contractIdToRequestId.ContainsKey(_clientId));
+                _contractIdToRequestId[_clientId] = new ContractIdToRequestId();
+            });
+            Responses.ConnectionClosed += new Action(() =>
+            {
+                _contractIdToRequestId.Remove(_clientId);
+            });
         }
 
         int NextValidId => _nextValidId++;
 
         public IBResponses Responses { get; }
+        internal ContractsCache ContractsCache => _contractsCache;
 
         // TODO : need to handle market data connection losses if the bot trades for multiple days. It seems to happen everyday at around 8pm
 

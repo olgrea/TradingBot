@@ -1,14 +1,16 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using IBApi;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
+using TradingBotV2.Broker.Contracts;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 
 namespace TradingBotV2.IBKR
 {
     internal class IBBroker : IBroker
-    {
+    {        
         IBClient _client;
         int _port;
         int _clientId;
@@ -18,9 +20,11 @@ namespace TradingBotV2.IBKR
             _port = GetPort();
             _clientId = clientId;
             _client = new IBClient();
+
+            MarketDataProvider = new IBMarketDataProvider(_client);
         }
 
-        public IMarketDataProvider MarketDataProvider => throw new NotImplementedException();
+        public IMarketDataProvider MarketDataProvider { get; init; }
 
         public IOrderManager OrderManager => throw new NotImplementedException();
 
@@ -107,7 +111,7 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        public async Task<IEnumerable<string>> GetManagedAccountsList()
+        async Task<IEnumerable<string>> GetManagedAccountsList()
         {
             var tcs = new TaskCompletionSource<IEnumerable<string>>();
 
