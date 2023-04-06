@@ -1,0 +1,22 @@
+﻿using NUnit.Framework;
+using IBBrokerTests;
+using TradingBotV2.Backtesting;
+
+namespace BacktesterTests
+{
+    internal class BacktesterTests : IBBrokerTests.IBBrokerTests
+    {
+        [SetUp]
+        public override async Task SetUp()
+        {
+            _broker = new Backtester();
+            await Task.CompletedTask;
+        }
+
+        [TearDown]
+        public override async Task TearDown()
+        {
+            await _broker.DisconnectAsync();
+        }
+    }
+}

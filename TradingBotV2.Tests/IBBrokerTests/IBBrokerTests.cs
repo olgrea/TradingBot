@@ -1,23 +1,24 @@
 ﻿using NUnit.Framework;
+using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.IBKR;
 
-namespace TradingBotV2.Tests
+namespace IBBrokerTests
 {
     [TestFixture]
     public class IBBrokerTests
     {
-        IBBroker _broker;
+        protected IBroker _broker;
 
         [SetUp]
-        public async Task SetUp()
+        public virtual async Task SetUp()
         {
             _broker = new IBBroker(9001);
             await Task.CompletedTask;
         }
 
         [TearDown]
-        public async Task TearDown()
+        public virtual async Task TearDown()
         {
             await Task.Delay(50);
             await _broker.DisconnectAsync();
@@ -28,7 +29,7 @@ namespace TradingBotV2.Tests
         public async Task ConnectAsync_OnSuccess_ReturnsAccountCode()
         {
             var result = await _broker.ConnectAsync();
-            Assert.IsTrue(result == "DU5962304");
+            Assert.NotNull(result);
         }
 
         [Test]
@@ -54,7 +55,7 @@ namespace TradingBotV2.Tests
         {
             string accountCode = await _broker.ConnectAsync();
 
-            Account account = await _broker.GetAccountAsync();
+            Account account = await _broker.GetAccountAsync(accountCode);
             Assert.IsNotNull(account);
             Assert.AreEqual(accountCode, account.Code);
             Assert.AreNotEqual(account.Time, default(DateTime));
