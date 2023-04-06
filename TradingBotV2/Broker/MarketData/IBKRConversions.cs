@@ -1,20 +1,19 @@
 ﻿using System.Globalization;
-using IBApi;
 using TradingBotV2.Broker.Contracts;
-using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Orders;
 using OrderState = TradingBotV2.Broker.Orders.OrderState;
 using Contract = TradingBotV2.Broker.Contracts.Contract;
 using ContractDetails = TradingBotV2.Broker.Contracts.ContractDetails;
 using Order = TradingBotV2.Broker.Orders.Order;
 using Position = TradingBotV2.Broker.Accounts.Position;
-using System.Runtime.InteropServices;
 using OrderStatus = TradingBotV2.Broker.Orders.OrderStatus;
 
 namespace TradingBotV2.Broker.MarketData
 {
     internal static class IBKRConversions
     {
+        //TODO : rename all ToTB... to FromIBKR()
+
         internal static Contract ToTBContract(this IBApi.Contract ibc)
         {
             Contract contract = null;
@@ -307,6 +306,7 @@ namespace TradingBotV2.Broker.MarketData
                 High = bar.High,
                 Low = bar.Low,
                 Volume = bar.Volume,
+                VWAP = bar.WAP,
                 TradeAmount = bar.TradeAmount,
                 Time = DateTimeOffset.FromUnixTimeSeconds(bar.Date).DateTime.ToLocalTime(),
             };

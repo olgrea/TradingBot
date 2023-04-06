@@ -29,6 +29,7 @@
         public long Volume { get; set; }
         public int TradeAmount { get; set; }
         public long Date { get; set; }
+        public double WAP { get; set; }
     }
 
     public class AccountValue

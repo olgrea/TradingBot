@@ -7,8 +7,7 @@ namespace TradingBotV2.Broker.MarketData
         _1Sec = 1,
         _5Sec = 5,
         _1Min = 60,
-        _1Hour = 3600,
-        _1Day = 3600 * 24,
+        _5min = 5*60,
     }
 
     public class Bar : IMarketData
@@ -19,23 +18,11 @@ namespace TradingBotV2.Broker.MarketData
         public double Low { get; set; }
         public long Volume { get; set; }
         public int TradeAmount { get; set; }
+        public double VWAP { get; set; }
         public DateTime Time { get; set; }
         public BarLength BarLength { get; set; }
 
         public DateTime Date => Time;
-
-        public override bool Equals(object obj)
-        {
-            var bar = obj as Bar;
-            if (bar == null)
-                return false;
-            return Time.Equals(bar.Time);
-        }
-
-        public override int GetHashCode()
-        {
-            return Time.GetHashCode();
-        }
 
         public override string ToString()
         {
