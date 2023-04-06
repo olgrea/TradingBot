@@ -12,7 +12,7 @@ namespace TradingBotV2.Tests
         [SetUp]
         public async Task SetUp()
         {
-            _broker = new IBBroker();
+            _broker = new IBBroker(9001);
             await Task.CompletedTask;
         }
 
