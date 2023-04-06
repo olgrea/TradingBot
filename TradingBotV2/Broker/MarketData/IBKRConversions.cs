@@ -1,11 +1,19 @@
 ﻿using System.Globalization;
+using IBApi;
 using TradingBotV2.Broker.Contracts;
+using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Orders;
-using TradingBotV2.IBKR;
+using OrderState = TradingBotV2.Broker.Orders.OrderState;
+using Contract = TradingBotV2.Broker.Contracts.Contract;
+using ContractDetails = TradingBotV2.Broker.Contracts.ContractDetails;
+using Order = TradingBotV2.Broker.Orders.Order;
+using Position = TradingBotV2.Broker.Accounts.Position;
+using System.Runtime.InteropServices;
+using OrderStatus = TradingBotV2.Broker.Orders.OrderStatus;
 
-namespace TradingBotV2.IBKR
+namespace TradingBotV2.Broker.MarketData
 {
-    internal static class Conversions
+    internal static class IBKRConversions
     {
         internal static Contract ToTBContract(this IBApi.Contract ibc)
         {
@@ -230,5 +238,114 @@ namespace TradingBotV2.IBKR
                 RealizedPNL = report.RealizedPNL,
             };
         }
+
+        internal static Last ToTBLast(this IBApi.Last last)
+        {
+            return new Last()
+            {
+                Price = last.Price,
+                Size = last.Size,
+                Time = DateTimeOffset.FromUnixTimeSeconds(last.Time).DateTime.ToLocalTime(),
+            };
+        }
+
+        internal static Last ToTBLast(this IBApi.HistoricalTickLast last)
+        {
+            return new Last()
+            {
+                Price = last.Price,
+                Size = Convert.ToInt32(last.Size),
+                Time = DateTimeOffset.FromUnixTimeSeconds(last.Time).DateTime.ToLocalTime(),
+            };
+        }
+
+        internal static BidAsk ToTBBidAsk(this IBApi.BidAsk ba)
+        {
+            return new BidAsk()
+            {
+                Bid = ba.Bid,
+                BidSize = ba.BidSize,
+                Ask = ba.Ask,
+                AskSize = ba.AskSize,
+                Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
+            };
+        }
+
+        internal static BidAsk ToTBBidAsk(this IBApi.HistoricalTickBidAsk ba)
+        {
+            return new BidAsk()
+            {
+                Bid = ba.PriceBid,
+                BidSize = Convert.ToInt32(ba.SizeBid),
+                Ask = ba.PriceAsk,
+                AskSize = Convert.ToInt32(ba.SizeAsk),
+                Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
+            };
+        }
+
+        internal static Position ToTBPosition(this IBApi.Position position)
+        {
+            return new Position()
+            {
+                Contract = position.Contract.ToTBContract(),
+                PositionAmount = position.PositionAmount,
+                MarketPrice = position.MarketPrice,
+                MarketValue = position.MarketValue,
+                AverageCost = position.AverageCost,
+                UnrealizedPNL = position.UnrealizedPNL,
+                RealizedPNL = position.RealizedPNL,
+            };
+        }
+
+        internal static Bar ToTBBar(this IBApi.FiveSecBar bar)
+        {
+            return new Bar()
+            {
+                BarLength = BarLength._5Sec,
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                TradeAmount = bar.TradeAmount,
+                Time = DateTimeOffset.FromUnixTimeSeconds(bar.Date).DateTime.ToLocalTime(),
+            };
+        }
+
+        internal static Bar ToTBBar(this IBApi.Bar bar)
+        {
+            return new Bar()
+            {
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                TradeAmount = bar.Count,
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
+            };
+        }
+
+        internal static OrderStatus ToTBOrderStatus(this IBApi.OrderStatus status)
+        {
+            return new OrderStatus()
+            {
+                Info = new RequestInfo()
+                {
+                    OrderId = status.OrderId,
+                    ParentId = status.ParentId,
+                    ClientId = status.ClientId,
+                    PermId = status.PermId,
+                },
+                Status = !string.IsNullOrEmpty(status.Status) ? (Status)Enum.Parse(typeof(Status), status.Status) : Status.Unknown,
+                Filled = status.Filled,
+                Remaining = status.Remaining,
+                AvgFillPrice = status.AvgFillPrice,
+                LastFillPrice = status.LastFillPrice,
+                MktCapPrice = status.MktCapPrice,
+            };
+        }
+
+        
     }
 }

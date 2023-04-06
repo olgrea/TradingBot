@@ -1,13 +1,5 @@
 ﻿using System.Globalization;
 using IBApi;
-using TradingBotV2.Broker.Accounts;
-using TradingBotV2.Broker.MarketData;
-using TradingBotV2.Broker.Orders;
-using Bar = TradingBotV2.Broker.MarketData.Bar;
-using Contract = TradingBotV2.Broker.Contracts.Contract;
-using ContractDetails = TradingBotV2.Broker.Contracts.ContractDetails;
-using Order = TradingBotV2.Broker.Orders.Order;
-using OrderState = TradingBotV2.Broker.Orders.OrderState;
 
 namespace TradingBotV2.IBKR
 {
@@ -67,7 +59,7 @@ namespace TradingBotV2.IBKR
         {
             var pos = new Position()
             {
-                Contract = contract.ToTBContract(),
+                Contract = contract,
                 PositionAmount = position,
                 MarketPrice = marketPrice,
                 MarketValue = marketValue,
@@ -106,7 +98,7 @@ namespace TradingBotV2.IBKR
         {
             var p = new Position()
             {
-                Contract = contract.ToTBContract(),
+                Contract = contract,
                 PositionAmount = pos,
                 AverageCost = avgCost,
             };
@@ -130,19 +122,18 @@ namespace TradingBotV2.IBKR
         }
 
         // called at 5 sec intervals
-        public Action<int, Bar> RealtimeBar;
+        public Action<int, FiveSecBar> RealtimeBar;
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
-            Bar bar = new Bar()
+            FiveSecBar bar = new FiveSecBar()
             {
-                BarLength = BarLength._5Sec,
                 Open = open,
                 Close = close,
                 High = high,
                 Low = low,
                 Volume = volume,
                 TradeAmount = count,
-                Time = DateTimeOffset.FromUnixTimeSeconds(date).DateTime.ToLocalTime(),
+                Date = date
             };
 
             //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
@@ -154,37 +145,40 @@ namespace TradingBotV2.IBKR
         {
             var bidAsk = new BidAsk()
             {
+                Time = time,
                 Bid = bidPrice,
                 BidSize = bidSize,
                 Ask = askPrice,
                 AskSize = askSize,
-                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
+                TickAttribBidAsk = tickAttribBidAsk
             };
 
             //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
             TickByTickBidAsk?.Invoke(reqId, bidAsk);
         }
 
-        // TODO : support 1 sec bars using tick by tick data?
         public Action<int, Last> TickByTickAllLast;
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
             var last = new Last()
             {
+                Time = time,
                 Price = price,
                 Size = size,
-                Time = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime(),
+                TickAttribLast = tickAttribLast,
+                Exchange = exchange,
+                SpecialConditions = specialConditions,
             };
 
             //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
             TickByTickAllLast?.Invoke(reqId, last);
         }
 
-        public Action<int, ContractDetails> ContractDetails;
+        public Action<int, IBApi.ContractDetails> ContractDetails;
         public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
         {
             //_logger.Trace($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
-            ContractDetails?.Invoke(reqId, contractDetails.ToTBContractDetails());
+            ContractDetails?.Invoke(reqId, contractDetails);
         }
 
         public Action<int> ContractDetailsEnd;
@@ -197,15 +191,11 @@ namespace TradingBotV2.IBKR
         public Action<Contract, Order, OrderState> OpenOrder;
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            Contract c = contract.ToTBContract();
-            Order o = order.ToTBOrder();
-            OrderState os = orderState.ToTBOrderState();
-
             //_logger.Trace($"openOrder {orderId} : {c}, {o}, {os.Status}");
             // if (!string.IsNullOrEmpty(os.WarningText))
                 //_logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
 
-            OpenOrder?.Invoke(c, o, os);
+            OpenOrder?.Invoke(contract, order, orderState);
         }
 
         public Action OpenOrderEnd;
@@ -222,18 +212,15 @@ namespace TradingBotV2.IBKR
         {
             var os = new OrderStatus()
             {
-                Info = new RequestInfo()
-                {
-                    OrderId = orderId,
-                    ParentId = parentId,
-                    ClientId = clientId,
-                    PermId = permId,
-                },
-                Status = !string.IsNullOrEmpty(status) ? (Status)Enum.Parse(typeof(Status), status) : Status.Unknown,
+                OrderId = orderId,
+                Status = status,
                 Filled = filled,
                 Remaining = remaining,
                 AvgFillPrice = avgFillPrice,
+                PermId = permId,
+                ParentId = parentId,
                 LastFillPrice = lastFillPrice,
+                ClientId = clientId,
                 MktCapPrice = mktCapPrice,
             };
 
@@ -241,12 +228,11 @@ namespace TradingBotV2.IBKR
             OrderStatus?.Invoke(os);
         }
 
-        public Action<Contract, OrderExecution> ExecDetails;
+        public Action<Contract, Execution> ExecDetails;
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
-            OrderExecution ex = execution.ToTBExecution();
             //_logger.Trace($"execDetails ({reqId}) : {ex}");
-            ExecDetails?.Invoke(contract.ToTBContract(), ex);
+            ExecDetails?.Invoke(contract, execution);
         }
 
         public Action<int> ExecDetailsEnd;
@@ -256,25 +242,21 @@ namespace TradingBotV2.IBKR
             ExecDetailsEnd?.Invoke(reqId);
         }
 
-        public Action<CommissionInfo> CommissionReport;
+        public Action<CommissionReport> CommissionReport;
         public void commissionReport(CommissionReport commissionReport)
         {
             //_logger.Trace($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
-            CommissionReport?.Invoke(commissionReport.ToTBCommission());
+            CommissionReport?.Invoke(commissionReport);
         }
 
         public Action<Contract, Order, OrderState> CompletedOrder;
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            OrderState os = orderState.ToTBOrderState();
-            Order o = order.ToTBOrder();
-            Contract c = contract.ToTBContract();
-
             //_logger.Trace($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
-            if (!string.IsNullOrEmpty(os.WarningText))
+            // if (!string.IsNullOrEmpty(os.WarningText))
                 //_logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
 
-                CompletedOrder?.Invoke(c, o, os);
+            CompletedOrder?.Invoke(contract, order, orderState);
         }
 
         public Action CompletedOrdersEnd;
@@ -287,19 +269,7 @@ namespace TradingBotV2.IBKR
         public Action<int, Bar> HistoricalData;
         public void historicalData(int reqId, IBApi.Bar bar)
         {
-            var b = new Bar()
-            {
-                Open = bar.Open,
-                Close = bar.Close,
-                High = bar.High,
-                Low = bar.Low,
-                Volume = bar.Volume,
-                TradeAmount = bar.Count,
-
-                // non-standard date format...
-                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
-            };
-            HistoricalData?.Invoke(reqId, b);
+            HistoricalData?.Invoke(reqId, bar);
             //_logger.Trace($"historicalData : {bar}");
         }
 
@@ -310,33 +280,17 @@ namespace TradingBotV2.IBKR
             //_logger.Trace($"historicalDataEnd");
         }
 
-        public Action<int, IEnumerable<BidAsk>, bool> HistoricalTicksBidAsk;
+        public Action<int, IEnumerable<HistoricalTickBidAsk>, bool> HistoricalTicksBidAsk;
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
-            IEnumerable<BidAsk> bas = ticks.Select(t => new BidAsk()
-            {
-                Bid = t.PriceBid,
-                BidSize = Convert.ToInt32(t.SizeBid),
-                Ask = t.PriceAsk,
-                AskSize = Convert.ToInt32(t.SizeAsk),
-                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
-            });
-
-            HistoricalTicksBidAsk?.Invoke(reqId, bas, done);
+            HistoricalTicksBidAsk?.Invoke(reqId, ticks, done);
             //_logger.Trace($"historicalTicksBidAsk");
         }
 
-        public Action<int, IEnumerable<Last>, bool> HistoricalTicksLast;
+        public Action<int, IEnumerable<HistoricalTickLast>, bool> HistoricalTicksLast;
         public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
         {
-            IEnumerable<Last> lasts = ticks.Select(t => new Last()
-            {
-                Price = t.Price,
-                Size = Convert.ToInt32(t.Size),
-                Time = DateTimeOffset.FromUnixTimeSeconds(t.Time).DateTime.ToLocalTime(),
-            });
-
-            HistoricalTicksLast?.Invoke(reqId, lasts, done);
+            HistoricalTicksLast?.Invoke(reqId, ticks, done);
             //_logger.Trace($"historicalTicksLast");
         }
 
