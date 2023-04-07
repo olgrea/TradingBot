@@ -2,11 +2,11 @@
 {
     internal interface IHistoricalDataProvider
     {
-        internal interface IHistoricalDataProvider
-        {
-            public Task<IEnumerable<Bar>> GetHistoricalBarsAsync(string ticker, BarLength barLength, DateTime endDateTime, int count);
-            public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime time, int count);
-            public Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime time, int count);
-        }
+        public Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date);
+        public Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime from, DateTime to);
+        public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime date);
+        public Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime from, DateTime to);
+        public Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime date);
+        public Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime from, DateTime to);
     }
 }
