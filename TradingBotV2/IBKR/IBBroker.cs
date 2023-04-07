@@ -5,6 +5,7 @@ using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
 using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 
 namespace TradingBotV2.IBKR
@@ -21,10 +22,11 @@ namespace TradingBotV2.IBKR
             _clientId = clientId;
             _client = new IBClient();
 
-            MarketDataProvider = new IBMarketDataProvider(_client);
+            LiveDataProvider = new IBLiveDataProvider(_client);
         }
 
-        public IMarketDataProvider MarketDataProvider { get; init; }
+        public ILiveDataProvider LiveDataProvider { get; init; }
+        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
 
         public IOrderManager OrderManager => throw new NotImplementedException();
 

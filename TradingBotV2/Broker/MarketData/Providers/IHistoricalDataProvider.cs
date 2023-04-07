@@ -1,6 +1,6 @@
-﻿namespace TradingBotV2.Broker.MarketData
+﻿namespace TradingBotV2.Broker.MarketData.Providers
 {
-    internal interface IHistoricalDataProvider
+    public interface IHistoricalDataProvider
     {
         public Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date);
         public Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime from, DateTime to);

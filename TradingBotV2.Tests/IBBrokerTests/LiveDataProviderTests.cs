@@ -1,12 +1,11 @@
-﻿using System.Diagnostics;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 
 namespace IBBrokerTests
 {
     [TestFixture]
-    public class MarketDataProviderTests
+    public class LiveDataProviderTests
     {
         IBBroker _broker;
 
@@ -45,16 +44,16 @@ namespace IBBrokerTests
                 }
             });
 
-            _broker.MarketDataProvider.BidAskReceived += bidAskReceived;
+            _broker.LiveDataProvider.BidAskReceived += bidAskReceived;
             try
             {
-                _broker.MarketDataProvider.RequestBidAskUpdates(expectedTicker);
+                _broker.LiveDataProvider.RequestBidAskUpdates(expectedTicker);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBidAskUpdates(expectedTicker);
-                _broker.MarketDataProvider.BidAskReceived -= bidAskReceived;
+                _broker.LiveDataProvider.CancelBidAskUpdates(expectedTicker);
+                _broker.LiveDataProvider.BidAskReceived -= bidAskReceived;
             }
 
             Assert.IsNotEmpty(baList);
@@ -81,16 +80,16 @@ namespace IBBrokerTests
                 }
             });
 
-            _broker.MarketDataProvider.LastReceived += lastReceived;
+            _broker.LiveDataProvider.LastReceived += lastReceived;
             try
             {
-                _broker.MarketDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
+                _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
-                _broker.MarketDataProvider.LastReceived -= lastReceived;
+                _broker.LiveDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
+                _broker.LiveDataProvider.LastReceived -= lastReceived;
             }
 
             Assert.IsNotEmpty(lastList);
@@ -111,14 +110,14 @@ namespace IBBrokerTests
 
             try
             {
-                _broker.MarketDataProvider.RequestBidAskUpdates(expectedTicker);
+                _broker.LiveDataProvider.RequestBidAskUpdates(expectedTicker);
                 //_broker.MarketDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
-                Assert.Throws<ErrorMessage>(() => _broker.MarketDataProvider.RequestLastTradedPriceUpdates(expectedTicker));
+                Assert.Throws<ErrorMessage>(() => _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker));
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBidAskUpdates(expectedTicker);
-                _broker.MarketDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
+                _broker.LiveDataProvider.CancelBidAskUpdates(expectedTicker);
+                _broker.LiveDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
             }
         }
 
@@ -141,16 +140,16 @@ namespace IBBrokerTests
                 for (int i = 0; i < tickers.Length; i++)
                 {
                     if (i < tickers.Length - 1)
-                        _broker.MarketDataProvider.RequestBidAskUpdates(tickers[i]);
+                        _broker.LiveDataProvider.RequestBidAskUpdates(tickers[i]);
                     else
-                        Assert.Throws<ErrorMessage>(() => _broker.MarketDataProvider.RequestBidAskUpdates(tickers[i]));
+                        Assert.Throws<ErrorMessage>(() => _broker.LiveDataProvider.RequestBidAskUpdates(tickers[i]));
                 }
             }
             finally
             {
                 foreach (string ticker in tickers)
                 {
-                    _broker.MarketDataProvider.CancelBidAskUpdates(ticker);
+                    _broker.LiveDataProvider.CancelBidAskUpdates(ticker);
                 }
             }
         }
@@ -175,16 +174,16 @@ namespace IBBrokerTests
                 }
             });
 
-            _broker.MarketDataProvider.BarReceived += barReceived;
+            _broker.LiveDataProvider.BarReceived += barReceived;
             try
             {
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
-                _broker.MarketDataProvider.BarReceived -= barReceived;
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             Assert.IsNotEmpty(barList);
@@ -223,18 +222,18 @@ namespace IBBrokerTests
                 }
             });
 
-            _broker.MarketDataProvider.BarReceived += barReceived;
+            _broker.LiveDataProvider.BarReceived += barReceived;
             try
             {
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTicker, BarLength._1Min);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._1Min);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTicker, BarLength._1Min);
-                _broker.MarketDataProvider.BarReceived -= barReceived;
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._1Min);
+                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             Assert.IsNotEmpty(fiveSecBars);
@@ -281,18 +280,18 @@ namespace IBBrokerTests
                     tcs.TrySetResult(true);
             });
 
-            _broker.MarketDataProvider.BarReceived += barReceived;
+            _broker.LiveDataProvider.BarReceived += barReceived;
             try
             {
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
-                _broker.MarketDataProvider.BarReceived -= barReceived;
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             foreach(var bars in fiveSecBars)
@@ -349,22 +348,22 @@ namespace IBBrokerTests
                     tcs.TrySetResult(true);
             });
 
-            _broker.MarketDataProvider.BarReceived += barReceived;
+            _broker.LiveDataProvider.BarReceived += barReceived;
             try
             {
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._1Min);
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
-                _broker.MarketDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._1Min);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._1Min);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._1Min);
                 await tcs.Task;
             }
             finally
             {
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._1Min);
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
-                _broker.MarketDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._1Min);
-                _broker.MarketDataProvider.BarReceived -= barReceived;
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._1Min);
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._1Min);
+                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             foreach (var bars in fiveSecBars)

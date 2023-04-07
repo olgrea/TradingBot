@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using NLog;
 using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
 
@@ -22,6 +23,8 @@ namespace TradingBotV2.IBKR
         IBClient _client;
         ILogger _logger;
         string _dbPath;
+
+        public IBHistoricalDataProvider(IBClient client, string dbPath = null) : this(client, null, dbPath) {}
 
         public IBHistoricalDataProvider(IBClient client, ILogger logger, string dbPath = null)
         {
