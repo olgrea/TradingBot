@@ -9,6 +9,8 @@ namespace TradingBotV2.IBKR
 {
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
+        public const string DefaultDbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
+
         int _nbRequest = 0;
         int NbRequest
         {
@@ -30,61 +32,40 @@ namespace TradingBotV2.IBKR
         {
             _client = client;
             _logger = logger;
-            _dbPath = dbPath;
+            _dbPath = dbPath ?? DefaultDbPath;
         }
+
+        internal string DbPath { get => _dbPath; set => _dbPath = value; }
+        internal bool EnableDb { get; set; } = true;
 
         public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date)
         {
-            BarCommandFactory commandFactory = null;
-            if(File.Exists(_dbPath))
-                commandFactory = new BarCommandFactory(BarLength._1Sec, _dbPath);
-
-            return await GetHistoricalData(ticker, date, commandFactory);
+            return await GetHistoricalData(ticker, date, new BarCommandFactory(BarLength._1Sec, _dbPath));
         }
 
         public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime from, DateTime to)
         {
-            BarCommandFactory commandFactory = null;
-            if (File.Exists(_dbPath))
-                commandFactory = new BarCommandFactory(BarLength._1Sec, _dbPath);
-
-            return await GetHistoricalData(ticker, from, to, commandFactory);
+            return await GetHistoricalData(ticker, from, to, new BarCommandFactory(BarLength._1Sec, _dbPath));
         }
 
         public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime date)
         {
-            BidAskCommandFactory commandFactory = null;
-            if (File.Exists(_dbPath))
-                commandFactory = new BidAskCommandFactory(_dbPath);
-
-            return await GetHistoricalData(ticker, date, commandFactory);
+            return await GetHistoricalData(ticker, date, new BidAskCommandFactory(_dbPath));
         }
 
         public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime from, DateTime to)
         {
-            BidAskCommandFactory commandFactory = null;
-            if (File.Exists(_dbPath))
-                commandFactory = new BidAskCommandFactory(_dbPath);
-
-            return await GetHistoricalData(ticker, from, to, commandFactory);
+            return await GetHistoricalData(ticker, from, to, new BidAskCommandFactory(_dbPath));
         }
 
         public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime date)
         {
-            LastCommandFactory commandFactory = null;
-            if (File.Exists(_dbPath))
-                commandFactory = new LastCommandFactory(_dbPath);
-
-            return await GetHistoricalData(ticker, date, commandFactory);
+            return await GetHistoricalData(ticker, date, new LastCommandFactory(_dbPath));
         }
 
         public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime from, DateTime to)
         {
-            LastCommandFactory commandFactory = null;
-            if (File.Exists(_dbPath))
-                commandFactory = new LastCommandFactory(_dbPath);
-
-            return await GetHistoricalData(ticker, from, to, commandFactory);
+            return await GetHistoricalData(ticker, from, to, new LastCommandFactory(_dbPath));
         }
 
         private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime date, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
@@ -119,8 +100,6 @@ namespace TradingBotV2.IBKR
             DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
             DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
-            bool isDbEnabled = commandFactory != null;
-
             _logger?.Info($"Getting {datatype.Name} for {ticker} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             // In order to respect TWS limitations, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
@@ -134,7 +113,7 @@ namespace TradingBotV2.IBKR
                 var end = current;
 
                 bool exists = false;
-                if (isDbEnabled)
+                if (EnableDb)
                 {
                     DbCommand<bool> existsCmd = commandFactory.CreateExistsCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                     exists = existsCmd.Execute();
@@ -156,7 +135,7 @@ namespace TradingBotV2.IBKR
                     var dateStr = current.Date.ToShortDateString();
                     _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS.");
 
-                    if(isDbEnabled)
+                    if(EnableDb)
                     {
                         _logger?.Info($"Inserting`in db.");
                         var insertCmd = commandFactory.CreateInsertCommand(ticker, data);

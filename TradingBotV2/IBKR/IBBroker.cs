@@ -23,6 +23,7 @@ namespace TradingBotV2.IBKR
             _client = new IBClient();
 
             LiveDataProvider = new IBLiveDataProvider(_client);
+            HistoricalDataProvider = new IBHistoricalDataProvider(_client);
         }
 
         public ILiveDataProvider LiveDataProvider { get; init; }
