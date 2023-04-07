@@ -71,7 +71,7 @@ namespace TradingBotV2.IBKR
             var list = new List<TData>();
             foreach ((DateTime, DateTime) day in MarketDataUtils.GetMarketDays(from, to))
             {
-                list.AddRange(await GetHistoricalData(ticker, day.Item1.Date, commandFactory));
+                list.AddRange(await GetDataForDay(day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), ticker, commandFactory));
             }
             return list;
         }

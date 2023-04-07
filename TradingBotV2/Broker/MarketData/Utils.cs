@@ -22,7 +22,7 @@ namespace TradingBotV2.Broker.MarketData
         public static bool WasMarketOpen(DateTime date)
         {
             var timeOfday = date.TimeOfDay;
-            return !date.IsWeekend() && timeOfday > MarketStartTime && timeOfday < MarketEndTime;
+            return !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday < MarketEndTime;
         }
 
         public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
@@ -30,36 +30,22 @@ namespace TradingBotV2.Broker.MarketData
             if (end <= start)
                 yield break;
 
-            DateTime marketStartTime = new DateTime(start.Date.Ticks + MarketStartTime.Ticks);
-            DateTime marketEndTime = new DateTime(start.Date.Ticks + MarketEndTime.Ticks);
+            if (start.TimeOfDay < MarketStartTime)
+                start = new DateTime(start.Date.Ticks + MarketStartTime.Ticks);
 
-            if (start < marketStartTime)
-                start = marketStartTime;
-
-            int i = 0;
             DateTime current = start;
-            while (current < end)
+            while (end - current > TimeSpan.FromDays(1)) 
             {
-                if (!current.IsWeekend())
+                if (WasMarketOpen(current))
                 {
-                    if (i == 0 && start < marketEndTime)
-                        yield return (start, marketEndTime);
-                    else if (i > 0)
-                        yield return (marketStartTime, marketEndTime);
+                    yield return (current, new DateTime(current.Date.Ticks + MarketEndTime.Ticks));
                 }
-
-                current = current.AddDays(1);
-                marketStartTime = marketStartTime.AddDays(1);
-                marketEndTime = marketEndTime.AddDays(1);
-                i++;
+                current = new DateTime(current.AddDays(1).Date.Ticks + MarketStartTime.Ticks);
             }
 
-            if (!end.IsWeekend() && end > marketStartTime)
+            if(current < end & WasMarketOpen(current) && end.TimeOfDay > MarketStartTime)
             {
-                if (end > marketEndTime)
-                    end = marketEndTime;
-
-                yield return (marketStartTime, end);
+                yield return (current, new DateTime(current.Date.Ticks + Math.Min(MarketEndTime.Ticks, end.TimeOfDay.Ticks)));
             }
         }
 
