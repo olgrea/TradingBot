@@ -1,8 +1,9 @@
 ﻿using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Broker.MarketData.Providers;
 
 namespace TradingBotV2.IBKR
 {
-    internal class IBMarketDataProvider : IMarketDataProvider
+    internal class IBLiveDataProvider : ILiveDataProvider
     {
         class BarSubscription
         {
@@ -14,7 +15,7 @@ namespace TradingBotV2.IBKR
         Dictionary<int, string> _reqIdsToTicker = new Dictionary<int, string>();
         Dictionary<string, BarSubscription> _barSubscriptions = new Dictionary<string, BarSubscription>();
 
-        public IBMarketDataProvider(IBClient client)
+        public IBLiveDataProvider(IBClient client)
         {
             _client = client;
         }
