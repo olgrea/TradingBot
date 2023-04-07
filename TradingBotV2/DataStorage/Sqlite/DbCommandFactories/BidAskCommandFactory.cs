@@ -8,7 +8,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 {
     public class BidAskCommandFactory : DbCommandFactory<BidAsk>
     {
-        public BidAskCommandFactory(SqliteConnection connection = null) : base(connection)
+        public BidAskCommandFactory(string dbPath) : base(dbPath)
         {
         }
 

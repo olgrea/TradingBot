@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
-using TradingBotV2.DataStorage.Sqlite;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
@@ -11,15 +8,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
     {
         protected SqliteConnection _connection;
 
-        protected DbCommandFactory(SqliteConnection connection = null)
+        protected DbCommandFactory(string dbPath)
         {
-            if (connection == null)
+            if (!File.Exists(dbPath))
             {
-                connection = new SqliteConnection(Constants.DbConnectionString);
-                connection.Open();
+                throw new FileNotFoundException(dbPath);
             }
 
-            _connection = connection;
+            _connection = new SqliteConnection("Data Source=" + dbPath);
+            _connection.Open();
         }
 
         ~DbCommandFactory()

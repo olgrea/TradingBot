@@ -19,7 +19,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         public abstract TResult Execute();
 
-        protected virtual string Sanitize(object value)
+        protected string Sanitize(object value)
         {
             if (value is string)
             {
