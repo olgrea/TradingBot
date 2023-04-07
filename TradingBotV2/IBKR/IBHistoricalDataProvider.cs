@@ -1,0 +1,383 @@
+﻿using System.Diagnostics;
+using TradingBotV2.Broker.MarketData;
+using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
+
+namespace TradingBotV2.IBKR
+{
+    internal class IBHistoricalDataProvider : IHistoricalDataProvider
+    {
+        int _nbRequest = 0;
+        int NbRequest
+        {
+            get => _nbRequest;
+            set
+            {
+                _nbRequest = value;
+                CheckForPacingViolations();
+            }
+        }
+
+        IBClient _client;
+
+        public IBHistoricalDataProvider(IBClient client)
+        {
+            _client = client;
+        }
+
+        public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date)
+        {
+            return await GetHistoricalData(ticker, date, new BarCommandFactory(BarLength._1Sec));
+        }
+
+        public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime from, DateTime to)
+        {
+            return await GetHistoricalData(ticker, from, to, new BarCommandFactory(BarLength._1Sec));
+        }
+
+        public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime date)
+        {
+            return await GetHistoricalData(ticker, date, new BidAskCommandFactory());
+        }
+
+        public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime from, DateTime to)
+        {
+            return await GetHistoricalData(ticker, from, to, new BidAskCommandFactory());
+        }
+
+        public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime date)
+        {
+            return await GetHistoricalData(ticker, date, new LastCommandFactory());
+        }
+
+        public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime from, DateTime to)
+        {
+            return await GetHistoricalData(ticker, from, to, new LastCommandFactory());
+        }
+
+        private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime date, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
+        {
+            if (!MarketDataUtils.WasMarketOpen(date))
+                throw new ArgumentException($"The market was closed on {date}");
+
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+            if (DateTime.Now - date > TimeSpan.FromDays(6 * 30))
+                throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {date}");
+
+            return await GetDataForDay(date, MarketDataUtils.MarketDayTimeRange, ticker, commandFactory);
+        }
+
+        private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime from, DateTime to, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
+        {
+            var list = new List<TData>();
+            foreach ((DateTime, DateTime) day in MarketDataUtils.GetMarketDays(from, to))
+            {
+                list.AddRange(await GetHistoricalData(ticker, day.Item1.Date, commandFactory));
+            }
+            return list;
+        }
+
+        async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, string ticker, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
+        {
+            Type datatype = typeof(TData);
+            DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
+            DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
+
+            //_logger?.Info($"Getting {datatype.Name} for {ticker} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+
+            // In order to respect TWS limitations, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
+            // time range to the beginning. 
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+
+            IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
+            while (current > morning)
+            {
+                var begin = current.AddMinutes(-30);
+                var end = current;
+                var existsCmd = commandFactory.CreateExistsCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+
+                IEnumerable<TData> data;
+                if (existsCmd.Execute())
+                {
+                    // If the data exists in the database, retrieve it
+                    var selectCmd = commandFactory.CreateSelectCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+                    data = selectCmd.Execute();
+                    var dateStr = current.Date.ToShortDateString();
+                    //_logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
+                }
+                else
+                {
+                    // Otherwise get it from the server and insert it in the db
+                    data = await FetchHistoricalDataFromServer<TData>(ticker, current);
+                    var dateStr = current.Date.ToShortDateString();
+                    //_logger?.Info($"{datatype.Name} for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS. Inserting.");
+
+                    var insertCmd = commandFactory.CreateInsertCommand(ticker, data);
+                    insertCmd.Execute();
+                }
+
+                dailyData = data.Concat(dailyData);
+                current = current.AddMinutes(-30);
+            }
+
+            return dailyData;
+        }
+
+        async Task<IEnumerable<TData>> FetchHistoricalDataFromServer<TData>(string ticker, DateTime time) where TData : IMarketData, new()
+        {
+            if (typeof(TData) == typeof(Bar))
+            {
+                return await FetchBars<TData>(ticker, time);
+            }
+            else
+            {
+                return await FetchTooMuchData<TData>(ticker, time);
+            }
+        }
+
+        private async Task<IEnumerable<TData>> FetchTooMuchData<TData>(string ticker, DateTime time) where TData : IMarketData, new()
+        {
+            Type datatype = typeof(TData);
+            //_logger?.Info($"Retrieving {datatype.Name} from TWS for '{ticker} {time}'.");
+
+            // Max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes.
+            // For BidAsk and Last, we can't convert a number of ticks to seconds since there can be multiple BidAsk per seconds.
+            // So we just do requests as long as we don't have 30 minutes.
+            // Innefficient because we're potentially wasting requests but it works...
+            IEnumerable<TData> data = new LinkedList<TData>();
+            DateTime current = time;
+            TimeSpan _30min = TimeSpan.FromMinutes(30);
+            var diff = time - current;
+            int tickCount = 1000;
+            while (diff <= _30min)
+            {
+                IEnumerable<TData> ticks = Enumerable.Empty<TData>();
+                if (datatype == typeof(BidAsk))
+                {
+                    ticks = (await GetHistoricalBidAsksAsync(ticker, current, tickCount)).Cast<TData>();
+                    // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc
+                    NbRequest++; NbRequest++;
+                }
+                else if (datatype == typeof(Last))
+                {
+                    ticks = (await GetHistoricalLastsAsync(ticker, current, tickCount)).Cast<TData>();
+                    NbRequest++;
+                }
+
+                if (MarketDataUtils.WasMarketOpen(current))
+                    return Enumerable.Empty<TData>();
+
+                data = ticks.Concat(data);
+                current = ticks.First().Time;
+
+                diff = time - current;
+            }
+
+            // Remove out of range data.
+            var timeOfDay = (time - _30min).TimeOfDay;
+            return data.SkipWhile(d => d.Time.TimeOfDay < timeOfDay);
+        }
+
+        private async Task<IEnumerable<TData>> FetchBars<TData>(string ticker, DateTime time) where TData : IMarketData, new()
+        {
+            //_logger?.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
+            var bars = await GetHistoricalBarsAsync(ticker, BarLength._1Sec, time, 1800);
+            NbRequest++;
+            return bars.Cast<TData>();
+        }
+
+        async Task<IEnumerable<Bar>> GetHistoricalBarsAsync(string ticker, BarLength barLength, DateTime endDateTime, int count)
+        {
+            var tmpList = new LinkedList<Bar>();
+            var tcs = new TaskCompletionSource<IEnumerable<Bar>>();
+            var reqId = -1;
+
+            var historicalData = new Action<int, IBApi.Bar>((rId, IBApiBar) =>
+            {
+                if (rId == reqId)
+                {
+                    //_logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
+                    var bar = IBApiBar.ToTBBar();
+                    bar.BarLength = barLength;
+                    tmpList.AddLast(bar);
+                }
+            });
+
+            var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
+            {
+                if (rId == reqId)
+                {
+                    //_logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
+                    tcs.SetResult(tmpList);
+                }
+            });
+
+            //string timeFormat = "yyyyMMdd-HH:mm:ss";
+
+            // Duration         : Allowed Bar Sizes
+            // 60 S             : 1 sec - 1 mins
+            // 120 S            : 1 sec - 2 mins
+            // 1800 S (30 mins) : 1 sec - 30 mins
+            // 3600 S (1 hr)    : 5 secs - 1 hr
+            // 14400 S (4hr)	: 10 secs - 3 hrs
+            // 28800 S (8 hrs)  : 30 secs - 8 hrs
+            // 1 D              : 1 min - 1 day
+            // 2 D              : 2 mins - 1 day
+            // 1 W              : 3 mins - 1 week
+            // 1 M              : 30 mins - 1 month
+            // 1 Y              : 1 day - 1 month
+
+            string durationStr = null;
+            string barSizeStr = null;
+            switch (barLength)
+            {
+                case BarLength._1Sec:
+                    durationStr = $"{count} S";
+                    barSizeStr = "1 secs";
+                    break;
+
+                case BarLength._5Sec:
+                    durationStr = $"{5 * count} S";
+                    barSizeStr = "5 secs";
+                    break;
+
+                case BarLength._1Min:
+                    durationStr = $"{60 * count} S";
+                    barSizeStr = "1 min";
+                    break;
+
+                default:
+                    throw new NotImplementedException($"Unable to retrieve historical data for bar lenght {barLength}");
+            }
+
+            string edt = endDateTime == DateTime.MinValue ? string.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
+
+            _client.Responses.HistoricalData += historicalData;
+            _client.Responses.HistoricalDataEnd += historicalDataEnd;
+            try
+            {
+                var contract = _client.ContractsCache.Get(ticker);
+                reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, true);
+                await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.HistoricalData -= historicalData;
+                _client.Responses.HistoricalDataEnd -= historicalDataEnd;
+            }
+
+
+            return tcs.Task.Result;
+        }
+
+        async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime time, int count)
+        {
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+
+            int reqId = -1;
+            var tmpList = new LinkedList<BidAsk>();
+
+            var tcs = new TaskCompletionSource<IEnumerable<BidAsk>>();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
+            var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickBidAsk>, bool>((rId, data, isDone) =>
+            {
+                if (rId == reqId)
+                {
+                    //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - adding {data.Count()}");
+
+                    foreach (var d in data)
+                        tmpList.AddLast(d.ToTBBidAsk());
+
+                    if (isDone)
+                    {
+                        //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - SetResult");
+                        tcs.SetResult(tmpList);
+                    }
+                }
+            });
+
+            _client.Responses.HistoricalTicksBidAsk += historicalTicks;
+            try
+            {
+                var contract = _client.ContractsCache.Get(ticker);
+                reqId = _client.RequestHistoricalTicks(contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.HistoricalTicksBidAsk -= historicalTicks;
+            }
+        }
+
+        async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime time, int count)
+        {
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+
+            int reqId = -1;
+            var tmpList = new LinkedList<Last>();
+
+            var tcs = new TaskCompletionSource<IEnumerable<Last>>();
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
+            var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
+            {
+                if (rId == reqId)
+                {
+                    //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - adding {data.Count()}");
+
+                    foreach (var d in data)
+                        tmpList.AddLast(d.ToTBLast());
+
+                    if (isDone)
+                    {
+                        //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - SetResult");
+                        tcs.SetResult(tmpList);
+                    }
+                }
+            });
+
+            _client.Responses.HistoricalTicksLast += historicalTicks;
+            try
+            {
+                var contract = _client.ContractsCache.Get(ticker);
+                reqId = _client.RequestHistoricalTicks(contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.HistoricalTicksLast -= historicalTicks;
+            }
+        }
+        
+        private void CheckForPacingViolations()
+        {
+            // TWS API limitations. Pacing violation occurs when : 
+            // - Making identical historical data requests within 15 seconds.
+            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
+            // - Making more than 60 requests within any ten minute period.
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+
+            if (_nbRequest == 60)
+            {
+                //_logger?.Info($"60 requests made : waiting 10 minutes...");
+                Wait10Minutes();
+                //_logger?.Info($"Resuming.");
+                _nbRequest = 0;
+            }
+            else if (_nbRequest != 0 && _nbRequest % 5 == 0)
+            {
+                //_logger?.Info($"{NbRequest} requests made : waiting 2 seconds...");
+                Task.Delay(2000).Wait();
+                //_logger?.Info($"Resuming.");
+            }
+        }
+
+        void Wait10Minutes()
+        {
+            for (int i = 0; i < 10; ++i)
+            {
+                Task.Delay(60 * 1000).Wait();
+                //if (i < 9)
+                //    _logger?.Info($"{9 - i} minutes left...");
+            }
+        }
+    }
+}

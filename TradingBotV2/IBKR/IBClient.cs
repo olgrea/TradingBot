@@ -260,7 +260,7 @@ namespace TradingBotV2.IBKR
             return reqId;
         }
 
-        public int RequestHistoricalTicks( Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
+        public int RequestHistoricalTicks(Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
             int reqId = NextValidId;
             _clientSocket.reqHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, Convert.ToInt32(onlyRTH), ignoreSize, null);

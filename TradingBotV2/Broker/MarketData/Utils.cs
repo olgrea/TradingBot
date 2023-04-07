@@ -16,9 +16,13 @@ namespace TradingBotV2.Broker.MarketData
         // TODO : get yearly market holidays from a csv file or something
         public static bool IsMarketOpen()
         {
-            var now = DateTime.Now;
-            var timeOfday = now.TimeOfDay;
-            return !now.IsWeekend() && timeOfday > MarketStartTime && timeOfday < MarketEndTime;
+            return WasMarketOpen(DateTime.Now);
+        }
+
+        public static bool WasMarketOpen(DateTime date)
+        {
+            var timeOfday = date.TimeOfDay;
+            return !date.IsWeekend() && timeOfday > MarketStartTime && timeOfday < MarketEndTime;
         }
 
         public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
