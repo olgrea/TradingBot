@@ -10,7 +10,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
     {
         BarLength _barLength;
 
-        public BarCommandFactory(BarLength barLength, SqliteConnection connection = null) : base(connection)
+        public BarCommandFactory(BarLength barLength, string dbPath) : base(dbPath)
         {
             _barLength = barLength;
         }

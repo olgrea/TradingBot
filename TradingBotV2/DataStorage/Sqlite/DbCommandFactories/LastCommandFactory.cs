@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.Data.Sqlite;
-using TradingBotV2.Broker.MarketData;
+﻿using TradingBotV2.Broker.MarketData;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 {
     public class LastCommandFactory : DbCommandFactory<Last>
     {
-        public LastCommandFactory(SqliteConnection connection = null) : base(connection)
+        public LastCommandFactory(string dbPath) : base(dbPath)
         {
         }
 

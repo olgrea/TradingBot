@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
+using NLog;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
+using TradingBotV2.DataStorage.Sqlite.DbCommands;
 
 namespace TradingBotV2.IBKR
 {
@@ -18,62 +20,94 @@ namespace TradingBotV2.IBKR
         }
 
         IBClient _client;
+        ILogger _logger;
+        string _dbPath;
 
-        public IBHistoricalDataProvider(IBClient client)
+        public IBHistoricalDataProvider(IBClient client, ILogger logger, string dbPath = null)
         {
             _client = client;
+            _logger = logger;
+            _dbPath = dbPath;
         }
 
         public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date)
         {
-            return await GetHistoricalData(ticker, date, new BarCommandFactory(BarLength._1Sec));
+            BarCommandFactory commandFactory = null;
+            if(File.Exists(_dbPath))
+                commandFactory = new BarCommandFactory(BarLength._1Sec, _dbPath);
+
+            return await GetHistoricalData(ticker, date, commandFactory);
         }
 
         public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime from, DateTime to)
         {
-            return await GetHistoricalData(ticker, from, to, new BarCommandFactory(BarLength._1Sec));
+            BarCommandFactory commandFactory = null;
+            if (File.Exists(_dbPath))
+                commandFactory = new BarCommandFactory(BarLength._1Sec, _dbPath);
+
+            return await GetHistoricalData(ticker, from, to, commandFactory);
         }
 
         public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime date)
         {
-            return await GetHistoricalData(ticker, date, new BidAskCommandFactory());
+            BidAskCommandFactory commandFactory = null;
+            if (File.Exists(_dbPath))
+                commandFactory = new BidAskCommandFactory(_dbPath);
+
+            return await GetHistoricalData(ticker, date, commandFactory);
         }
 
         public async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime from, DateTime to)
         {
-            return await GetHistoricalData(ticker, from, to, new BidAskCommandFactory());
+            BidAskCommandFactory commandFactory = null;
+            if (File.Exists(_dbPath))
+                commandFactory = new BidAskCommandFactory(_dbPath);
+
+            return await GetHistoricalData(ticker, from, to, commandFactory);
         }
 
         public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime date)
         {
-            return await GetHistoricalData(ticker, date, new LastCommandFactory());
+            LastCommandFactory commandFactory = null;
+            if (File.Exists(_dbPath))
+                commandFactory = new LastCommandFactory(_dbPath);
+
+            return await GetHistoricalData(ticker, date, commandFactory);
         }
 
         public async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime from, DateTime to)
         {
-            return await GetHistoricalData(ticker, from, to, new LastCommandFactory());
+            LastCommandFactory commandFactory = null;
+            if (File.Exists(_dbPath))
+                commandFactory = new LastCommandFactory(_dbPath);
+
+            return await GetHistoricalData(ticker, from, to, commandFactory);
         }
 
         private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime date, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
         {
+            ValidateDate(date);
+
             if (!MarketDataUtils.WasMarketOpen(date))
                 throw new ArgumentException($"The market was closed on {date}");
-
-            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
-            if (DateTime.Now - date > TimeSpan.FromDays(6 * 30))
-                throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {date}");
 
             return await GetDataForDay(date, MarketDataUtils.MarketDayTimeRange, ticker, commandFactory);
         }
 
         private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime from, DateTime to, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
         {
-            var list = new List<TData>();
-            foreach ((DateTime, DateTime) day in MarketDataUtils.GetMarketDays(from, to))
+            ValidateDate(from);
+
+            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to).ToList();
+            if(!days.Any())
+                throw new ArgumentException($"Market was closed from {from} to {to}");
+
+            var data = new List<TData>();
+            foreach ((DateTime, DateTime) day in days)
             {
-                list.AddRange(await GetDataForDay(day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), ticker, commandFactory));
+                data.AddRange(await GetDataForDay(day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), ticker, commandFactory));
             }
-            return list;
+            return data;
         }
 
         async Task<IEnumerable<TData>> GetDataForDay<TData>(DateTime date, (TimeSpan, TimeSpan) timeRange, string ticker, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
@@ -82,7 +116,9 @@ namespace TradingBotV2.IBKR
             DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
             DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
 
-            //_logger?.Info($"Getting {datatype.Name} for {ticker} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
+            bool isDbEnabled = commandFactory != null;
+
+            _logger?.Info($"Getting {datatype.Name} for {ticker} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
 
             // In order to respect TWS limitations, data is retrieved in chunks of 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
             // time range to the beginning. 
@@ -93,26 +129,36 @@ namespace TradingBotV2.IBKR
             {
                 var begin = current.AddMinutes(-30);
                 var end = current;
-                var existsCmd = commandFactory.CreateExistsCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+
+                bool exists = false;
+                if (isDbEnabled)
+                {
+                    DbCommand<bool> existsCmd = commandFactory.CreateExistsCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
+                    exists = existsCmd.Execute();
+                }
 
                 IEnumerable<TData> data;
-                if (existsCmd.Execute())
+                if (exists)
                 {
                     // If the data exists in the database, retrieve it
                     var selectCmd = commandFactory.CreateSelectCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                     data = selectCmd.Execute();
                     var dateStr = current.Date.ToShortDateString();
-                    //_logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
+                    _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                 }
                 else
                 {
                     // Otherwise get it from the server and insert it in the db
                     data = await FetchHistoricalDataFromServer<TData>(ticker, current);
                     var dateStr = current.Date.ToShortDateString();
-                    //_logger?.Info($"{datatype.Name} for {contract.Symbol} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS. Inserting.");
+                    _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS.");
 
-                    var insertCmd = commandFactory.CreateInsertCommand(ticker, data);
-                    insertCmd.Execute();
+                    if(isDbEnabled)
+                    {
+                        _logger?.Info($"Inserting`in db.");
+                        var insertCmd = commandFactory.CreateInsertCommand(ticker, data);
+                        insertCmd.Execute();
+                    }
                 }
 
                 dailyData = data.Concat(dailyData);
@@ -137,7 +183,7 @@ namespace TradingBotV2.IBKR
         private async Task<IEnumerable<TData>> FetchTooMuchData<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
             Type datatype = typeof(TData);
-            //_logger?.Info($"Retrieving {datatype.Name} from TWS for '{ticker} {time}'.");
+            _logger?.Info($"Retrieving {datatype.Name} from TWS for '{ticker} {time}'.");
 
             // Max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes.
             // For BidAsk and Last, we can't convert a number of ticks to seconds since there can be multiple BidAsk per seconds.
@@ -179,7 +225,7 @@ namespace TradingBotV2.IBKR
 
         private async Task<IEnumerable<TData>> FetchBars<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
-            //_logger?.Info($"Retrieving bars from TWS for '{contract.Symbol} {time}'.");
+            _logger?.Info($"Retrieving bars from TWS for '{ticker} {time}'.");
             var bars = await GetHistoricalBarsAsync(ticker, BarLength._1Sec, time, 1800);
             NbRequest++;
             return bars.Cast<TData>();
@@ -195,8 +241,8 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    //_logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
                     var bar = IBApiBar.ToTBBar();
+                    _logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
                     bar.BarLength = barLength;
                     tmpList.AddLast(bar);
                 }
@@ -206,7 +252,7 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    //_logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
+                    _logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
                     tcs.SetResult(tmpList);
                 }
             });
@@ -282,14 +328,14 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - adding {data.Count()}");
+                    _logger.Trace($"GetHistoricalBidAsksAsync - adding {data.Count()}");
 
                     foreach (var d in data)
                         tmpList.AddLast(d.ToTBBidAsk());
 
                     if (isDone)
                     {
-                        //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - SetResult");
+                        _logger.Trace($"GetHistoricalBidAsksAsync - SetResult");
                         tcs.SetResult(tmpList);
                     }
                 }
@@ -321,14 +367,14 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - adding {data.Count()}");
+                    _logger.Trace($"GetHistoricalLastsAsync - adding {data.Count()}");
 
                     foreach (var d in data)
                         tmpList.AddLast(d.ToTBLast());
 
                     if (isDone)
                     {
-                        //_logger.Trace($"RequestHistoricalTicks {typeof(TData).Name} - SetResult");
+                        _logger.Trace($"GetHistoricalLastsAsync - SetResult");
                         tcs.SetResult(tmpList);
                     }
                 }
@@ -357,16 +403,16 @@ namespace TradingBotV2.IBKR
 
             if (_nbRequest == 60)
             {
-                //_logger?.Info($"60 requests made : waiting 10 minutes...");
+                _logger?.Info($"60 requests made : waiting 10 minutes...");
                 Wait10Minutes();
-                //_logger?.Info($"Resuming.");
+                _logger?.Info($"Resuming.");
                 _nbRequest = 0;
             }
             else if (_nbRequest != 0 && _nbRequest % 5 == 0)
             {
-                //_logger?.Info($"{NbRequest} requests made : waiting 2 seconds...");
+                _logger?.Info($"{NbRequest} requests made : waiting 2 seconds...");
                 Task.Delay(2000).Wait();
-                //_logger?.Info($"Resuming.");
+                _logger?.Info($"Resuming.");
             }
         }
 
@@ -375,9 +421,16 @@ namespace TradingBotV2.IBKR
             for (int i = 0; i < 10; ++i)
             {
                 Task.Delay(60 * 1000).Wait();
-                //if (i < 9)
-                //    _logger?.Info($"{9 - i} minutes left...");
+                if (i < 9)
+                    _logger?.Info($"{9 - i} minutes left...");
             }
+        }
+
+        private static void ValidateDate(DateTime date)
+        {
+            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+            if (DateTime.Now - date > TimeSpan.FromDays(6 * 30))
+                throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {date}");
         }
     }
 }
