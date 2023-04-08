@@ -4,7 +4,7 @@ using TradingBotV2.Backtesting;
 
 namespace BacktesterTests
 {
-    internal class BacktesterTests : IBBrokerTests.IBBrokerTests
+    internal class BacktesterTests : IBBrokerTests.BrokerTests
     {
         [SetUp]
         public override async Task SetUp()

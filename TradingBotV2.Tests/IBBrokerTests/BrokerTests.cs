@@ -6,7 +6,7 @@ using TradingBotV2.IBKR;
 namespace IBBrokerTests
 {
     [TestFixture]
-    public class IBBrokerTests
+    public class BrokerTests
     {
         protected IBroker _broker;
 
