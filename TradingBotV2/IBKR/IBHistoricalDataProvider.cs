@@ -11,6 +11,11 @@ namespace TradingBotV2.IBKR
     {
         public const string DefaultDbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
 
+        // for unit tests
+        internal int _nbRetrievedFromDb = 0;
+        internal int _nbRetrievedFromIBKR = 0;
+        internal int _nbInsertedInDb = 0;
+
         int _nbRequest = 0;
         int NbRequest
         {
@@ -35,8 +40,8 @@ namespace TradingBotV2.IBKR
             _dbPath = dbPath ?? DefaultDbPath;
         }
 
-        internal string DbPath { get => _dbPath; set => _dbPath = value; }
-        internal bool EnableDb { get; set; } = true;
+        public string DbPath { get => _dbPath; internal set => _dbPath = value; }
+        public bool EnableDb { get; set; } = true;
 
         public async Task<IEnumerable<Bar>> GetHistoricalOneSecBarsAsync(string ticker, DateTime date)
         {
@@ -70,6 +75,9 @@ namespace TradingBotV2.IBKR
 
         private async Task<IEnumerable<TData>> GetHistoricalData<TData>(string ticker, DateTime date, DbCommandFactory<TData> commandFactory) where TData : IMarketData, new()
         {
+            // TODO : use new DateOnly struct?
+            date = new DateTime(date.Date.Ticks + MarketDataUtils.MarketStartTime.Ticks);
+
             ValidateDate(date);
 
             if (!MarketDataUtils.WasMarketOpen(date))
@@ -86,10 +94,10 @@ namespace TradingBotV2.IBKR
             if(!days.Any())
                 throw new ArgumentException($"Market was closed from {from} to {to}");
 
-            var data = new List<TData>();
+            IEnumerable<TData> data = new LinkedList<TData>();
             foreach ((DateTime, DateTime) day in days)
             {
-                data.AddRange(await GetDataForDay(day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), ticker, commandFactory));
+                data = data.Concat(await GetDataForDay(day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), ticker, commandFactory));
             }
             return data;
         }
@@ -106,6 +114,9 @@ namespace TradingBotV2.IBKR
             // time range to the beginning. 
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
+            _nbRetrievedFromDb = 0;
+            _nbRetrievedFromIBKR = 0;
+            _nbInsertedInDb = 0;
             IEnumerable<TData> dailyData = Enumerable.Empty<TData>();
             while (current > morning)
             {
@@ -125,6 +136,8 @@ namespace TradingBotV2.IBKR
                     // If the data exists in the database, retrieve it
                     var selectCmd = commandFactory.CreateSelectCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
                     data = selectCmd.Execute();
+                    _nbRetrievedFromDb += data.Count();
+
                     var dateStr = current.Date.ToShortDateString();
                     _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
                 }
@@ -132,14 +145,17 @@ namespace TradingBotV2.IBKR
                 {
                     // Otherwise get it from the server and insert it in the db
                     data = await FetchHistoricalDataFromServer<TData>(ticker, current);
+                    _nbRetrievedFromIBKR += data.Count();
+
                     var dateStr = current.Date.ToShortDateString();
                     _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS.");
 
                     if(EnableDb)
                     {
                         _logger?.Info($"Inserting`in db.");
-                        var insertCmd = commandFactory.CreateInsertCommand(ticker, data);
-                        insertCmd.Execute();
+                        DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
+                        if(insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
+                            _nbInsertedInDb += iCmd.NbInserted;
                     }
                 }
 
@@ -224,7 +240,7 @@ namespace TradingBotV2.IBKR
                 if (rId == reqId)
                 {
                     var bar = IBApiBar.ToTBBar();
-                    _logger.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
+                    _logger?.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
                     bar.BarLength = barLength;
                     tmpList.AddLast(bar);
                 }
@@ -234,7 +250,7 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    _logger.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
+                    _logger?.Trace($"GetHistoricalDataAsync - historicalDataEnd - setting result");
                     tcs.SetResult(tmpList);
                 }
             });
@@ -310,14 +326,14 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    _logger.Trace($"GetHistoricalBidAsksAsync - adding {data.Count()}");
+                    _logger?.Trace($"GetHistoricalBidAsksAsync - adding {data.Count()}");
 
                     foreach (var d in data)
                         tmpList.AddLast(d.ToTBBidAsk());
 
                     if (isDone)
                     {
-                        _logger.Trace($"GetHistoricalBidAsksAsync - SetResult");
+                        _logger?.Trace($"GetHistoricalBidAsksAsync - SetResult");
                         tcs.SetResult(tmpList);
                     }
                 }
@@ -349,14 +365,14 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    _logger.Trace($"GetHistoricalLastsAsync - adding {data.Count()}");
+                    _logger?.Trace($"GetHistoricalLastsAsync - adding {data.Count()}");
 
                     foreach (var d in data)
                         tmpList.AddLast(d.ToTBLast());
 
                     if (isDone)
                     {
-                        _logger.Trace($"GetHistoricalLastsAsync - SetResult");
+                        _logger?.Trace($"GetHistoricalLastsAsync - SetResult");
                         tcs.SetResult(tmpList);
                     }
                 }

@@ -129,6 +129,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         protected string _symbol;
         IEnumerable<TMarketData> _dataCollection;
         protected string _marketDataName;
+        internal int NbInserted = 0;
 
         public InsertCommand(string symbol, IEnumerable<TMarketData> dataCollection, SqliteConnection connection) : base(connection)
         {
@@ -143,12 +144,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
             SqliteCommand insertCmd = _connection.CreateCommand();
             Insert(insertCmd, "Stock", "Symbol", _symbol);
+
+            int nbInserted = 0;
             foreach (TMarketData data in _dataCollection)
             {
-                InsertMarketData(insertCmd, data);
+                nbInserted += InsertMarketData(insertCmd, data);
             }
 
             transaction.Commit();
+            NbInserted = nbInserted;
 
             return true;
         }
@@ -175,6 +179,6 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             return command.ExecuteNonQuery();
         }
 
-        protected abstract void InsertMarketData(SqliteCommand command, TMarketData data);
+        protected abstract int InsertMarketData(SqliteCommand command, TMarketData data);
     }
 }
