@@ -25,6 +25,11 @@ namespace TradingBotV2.Broker.MarketData
             return !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday < MarketEndTime;
         }
 
+        public static (DateTime, DateTime) ToMarketHours(this DateTime date)
+        {
+            return (new DateTime(date.Date.Ticks + MarketStartTime.Ticks), new DateTime(date.Date.Ticks + MarketEndTime.Ticks));
+        }
+
         public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
         {
             if (end <= start)

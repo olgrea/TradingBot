@@ -79,12 +79,12 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
-        protected override void InsertMarketData(SqliteCommand command, Bar data)
+        protected override int InsertMarketData(SqliteCommand command, Bar data)
         {
             var columns = new string[] { "Open", "Close", "High", "Low", "Volume" };
             var values = new object[] { data.Open, data.Close, data.High, data.Low, data.Volume };
             Insert(command, "Bar", columns, values);
-            InsertFromSelect(command, data);
+            return InsertFromSelect(command, data);
         }
 
         protected int InsertFromSelect(SqliteCommand command, Bar data)

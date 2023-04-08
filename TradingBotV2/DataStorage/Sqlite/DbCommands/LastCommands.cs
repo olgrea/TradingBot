@@ -41,15 +41,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
-        protected override void InsertMarketData(SqliteCommand command, Last data)
+        protected override int InsertMarketData(SqliteCommand command, Last data)
         {
             var columns = new string[] { "Price", "Size" };
             var values = new object[] { data.Price, data.Size };
             Insert(command, "Last", columns, values);
-            InsertFromSelect(command, data);
+            return InsertFromSelect(command, data);
         }
 
-        protected void InsertFromSelect(SqliteCommand command, Last data)
+        protected int InsertFromSelect(SqliteCommand command, Last data)
         {
             command.CommandText =
             $@"
@@ -64,7 +64,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 AND Size = {Sanitize(data.Size)}
             ";
 
-            command.ExecuteNonQuery();
+            return command.ExecuteNonQuery();
         }
     }
 }
