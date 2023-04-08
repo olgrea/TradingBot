@@ -1,9 +1,9 @@
 ﻿using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 
-namespace TradingBotV2.Tests
+namespace UtilsTests
 {
-    internal class UtilsTests
+    internal class MarketDataUtilsTests
     {
         [Test]
         public void GetMarketDays_SameDay_DuringMarketHours_ReturnsInputs()
@@ -54,7 +54,7 @@ namespace TradingBotV2.Tests
                 (new DateTime(start.AddDays(2).Date.Ticks + marketStartTime), end),
             };
 
-            foreach(var e in expected)
+            foreach (var e in expected)
                 Assert.Contains(e, results);
         }
 
