@@ -1,4 +1,5 @@
-﻿using TradingBotV2.Broker.MarketData;
+﻿using System.Diagnostics;
+using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 
 namespace TradingBotV2.IBKR
@@ -41,9 +42,10 @@ namespace TradingBotV2.IBKR
             }
             
             _barSubscriptions[ticker].BarLengthsWanted.Add(barLength);
-            if(_barSubscriptions[ticker].BarLengthsWanted.Count == 1)
+            if(_barSubscriptions.Count == 1 && _barSubscriptions.First().Value.BarLengthsWanted.Count == 1)
             {
                 _client.Responses.RealtimeBar += OnFiveSecondsBarReceived;
+                Debug.Assert(_client.Responses.RealtimeBar.GetInvocationList().Length == 1);
             }
         }
 
@@ -57,8 +59,8 @@ namespace TradingBotV2.IBKR
 
             LinkedList<Bar> list = _barSubscriptions[ticker].FiveSecBars;
             list.AddLast(bar);
-            // arbitrarily keeping 5 minutes of bars
-            if (list.Count > 60)
+            // arbitrarily keeping 10 minutes of bars
+            if (list.Count > 5*12*10)
                 list.RemoveFirst();
 
             foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
@@ -76,7 +78,7 @@ namespace TradingBotV2.IBKR
                         barToUse = MarketDataUtils.CombineBars(list.TakeLast(nbBars), barLength);
                     }
 
-                    BarReceived?.Invoke(ticker, bar);
+                    BarReceived?.Invoke(ticker, barToUse);
                 }
             }
         }
@@ -91,12 +93,13 @@ namespace TradingBotV2.IBKR
             {
                 var contract = _client.ContractsCache.Get(ticker);
                 var reqId = _client.CancelFiveSecondsBarsUpdates(contract);
-                if(_reqIdsToTicker.ContainsKey(reqId))
-                {
-                    _client.Responses.RealtimeBar -= OnFiveSecondsBarReceived;
-                    _reqIdsToTicker.Remove(reqId);
-                    _barSubscriptions.Remove(ticker);
-                }
+                _reqIdsToTicker.Remove(reqId);
+                _barSubscriptions.Remove(ticker);
+            }
+
+            if(_barSubscriptions.Count == 0)
+            {
+                _client.Responses.RealtimeBar -= OnFiveSecondsBarReceived;
             }
         }
 
