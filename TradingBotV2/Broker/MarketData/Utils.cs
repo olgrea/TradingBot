@@ -37,7 +37,7 @@
         public static bool WasMarketOpen(DateTime date)
         {
             var timeOfday = date.TimeOfDay;
-            return !IsMarketHoliday(date) && !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday < MarketEndTime;
+            return !IsMarketHoliday(date) && !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday <= MarketEndTime;
         }
 
         public static (DateTime, DateTime) ToMarketHours(this DateTime date)
