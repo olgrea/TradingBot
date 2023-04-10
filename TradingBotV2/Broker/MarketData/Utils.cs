@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace TradingBotV2.Broker.MarketData
+﻿namespace TradingBotV2.Broker.MarketData
 {
     public static class MarketDataUtils
     {
@@ -11,9 +7,28 @@ namespace TradingBotV2.Broker.MarketData
         public static (TimeSpan, TimeSpan) MarketDayTimeRange = (MarketStartTime, MarketEndTime);
         public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
 
+        // https://www.nyse.com/markets/hours-calendars
+        static HashSet<DateTime> MarketHolidays = new HashSet<DateTime>()
+        {
+            new DateTime(2023, 01, 02), new DateTime(2024, 01, 01), new DateTime(2025, 01, 01),
+            new DateTime(2023, 01, 16), new DateTime(2024, 01, 15), new DateTime(2025, 01, 20),
+            new DateTime(2023, 02, 20), new DateTime(2024, 02, 19), new DateTime(2025, 02, 17),
+            new DateTime(2023, 04, 07), new DateTime(2024, 03, 29), new DateTime(2025, 04, 18),
+            new DateTime(2023, 05, 29), new DateTime(2024, 05, 27), new DateTime(2025, 05, 26),
+            new DateTime(2023, 06, 19), new DateTime(2024, 06, 19), new DateTime(2025, 06, 19),
+            new DateTime(2023, 07, 04), new DateTime(2024, 07, 04), new DateTime(2025, 07, 04),
+            new DateTime(2023, 09, 04), new DateTime(2024, 09, 02), new DateTime(2025, 09, 01),
+            new DateTime(2023, 11, 23), new DateTime(2024, 11, 28), new DateTime(2025, 11, 27),
+            new DateTime(2023, 12, 25), new DateTime(2024, 12, 25), new DateTime(2025, 12, 25),
+        };
+
+        public static bool IsMarketHoliday(DateTime date)
+        {
+            return MarketHolidays.Contains(date.Date);
+        }
+
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
-        // TODO : get yearly market holidays from a csv file or something
         public static bool IsMarketOpen()
         {
             return WasMarketOpen(DateTime.Now);
@@ -22,7 +37,7 @@ namespace TradingBotV2.Broker.MarketData
         public static bool WasMarketOpen(DateTime date)
         {
             var timeOfday = date.TimeOfDay;
-            return !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday < MarketEndTime;
+            return !IsMarketHoliday(date) && !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday < MarketEndTime;
         }
 
         public static (DateTime, DateTime) ToMarketHours(this DateTime date)

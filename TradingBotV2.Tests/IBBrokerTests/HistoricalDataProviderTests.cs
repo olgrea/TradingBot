@@ -171,8 +171,8 @@ namespace IBBrokerTests
         public async Task GetHistoricalOneSecBars_DbDisabled_DataNotInDb_DoesntInsertsIt()
         {
             string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 07, 13, 0, 0);
-            DateTime to = new DateTime(2023, 04, 07, 14, 0, 0);
+            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
+            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
             DeleteData(ticker, from, to);
             _historicalProvider.EnableDb = false;
 
