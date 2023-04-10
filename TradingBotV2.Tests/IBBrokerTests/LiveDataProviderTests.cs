@@ -216,6 +216,7 @@ namespace IBBrokerTests
 
                     if (bar.BarLength == BarLength._1Min)
                     {
+                        oneMinBars.Add(bar);
                         if (oneMinBars.Count == 1)
                             tcs.TrySetResult(true);
                     }
@@ -237,7 +238,7 @@ namespace IBBrokerTests
             }
 
             Assert.IsNotEmpty(fiveSecBars);
-            Assert.GreaterOrEqual(60/5, fiveSecBars.Count);
+            Assert.GreaterOrEqual(fiveSecBars.Count, 60 / 5);
             foreach (Bar bar in fiveSecBars)
             {
                 Assert.AreEqual(0, bar.Time.Second % 5);
