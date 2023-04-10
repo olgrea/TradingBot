@@ -180,13 +180,15 @@ namespace TradingBotV2.IBKR
 
         private async Task<IEnumerable<TData>> FetchTooMuchData<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
+            Debug.Assert(MarketDataUtils.WasMarketOpen(time));
+
             Type datatype = typeof(TData);
             _logger?.Info($"Retrieving {datatype.Name} from TWS for '{ticker} {time}'.");
 
-            // Max nb of ticks per request is 1000 so we need to do multiple requests for 30 minutes.
-            // For BidAsk and Last, we can't convert a number of ticks to seconds since there can be multiple BidAsk per seconds.
+            // Max nb of ticks per request is 1000, but since there can be multiple BidAsk per second it's not possible to know how many
+            // ticks are needed for 30 minutes.
             // So we just do requests as long as we don't have 30 minutes.
-            // Innefficient because we're potentially wasting requests but it works...
+            // Inefficient because we're retrieving more data than we need but it works...
             IEnumerable<TData> data = new LinkedList<TData>();
             DateTime current = time;
             TimeSpan _30min = TimeSpan.FromMinutes(30);
@@ -207,9 +209,6 @@ namespace TradingBotV2.IBKR
                     NbRequest++;
                 }
 
-                if (MarketDataUtils.WasMarketOpen(current))
-                    return Enumerable.Empty<TData>();
-
                 data = ticks.Concat(data);
                 current = ticks.First().Time;
 
@@ -223,6 +222,7 @@ namespace TradingBotV2.IBKR
 
         private async Task<IEnumerable<TData>> FetchBars<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
+            Debug.Assert(MarketDataUtils.WasMarketOpen(time));
             _logger?.Info($"Retrieving bars from TWS for '{ticker} {time}'.");
             var bars = await GetHistoricalBarsAsync(ticker, BarLength._1Sec, time, 1800);
             NbRequest++;
@@ -315,7 +315,7 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime time, int count)
         {
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 15000);
 
             int reqId = -1;
             var tmpList = new LinkedList<BidAsk>();
@@ -354,13 +354,13 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime time, int count)
         {
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 5000);
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 15000);
 
             int reqId = -1;
             var tmpList = new LinkedList<Last>();
 
             var tcs = new TaskCompletionSource<IEnumerable<Last>>();
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
+            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalLastsAsync")));
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
             {
                 if (rId == reqId)
