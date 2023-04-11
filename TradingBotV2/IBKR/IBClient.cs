@@ -193,7 +193,6 @@ namespace TradingBotV2.IBKR
             return cToId[contract.ConId];
         }
 
-
         public int CancelTickByTickData(Contract contract, string tickType)
         {
             int reqId = -1;

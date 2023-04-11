@@ -16,6 +16,16 @@
             };
         }
 
+        public static explicit operator IBApi.Last(Last last)
+        {
+            return new IBApi.Last()
+            {
+                Price = last.Price,
+                Size = last.Size,
+                Time = new DateTimeOffset(last.Time).ToUnixTimeSeconds(),
+            };
+        }
+
         public static explicit operator Last(IBApi.HistoricalTickLast last)
         {
             return new Last()
@@ -24,6 +34,18 @@
                 Size = Convert.ToInt32(last.Size),
                 Time = DateTimeOffset.FromUnixTimeSeconds(last.Time).DateTime.ToLocalTime(),
             };
+        }
+
+        public static explicit operator IBApi.HistoricalTickLast(Last last)
+        {
+            return new IBApi.HistoricalTickLast(
+                new DateTimeOffset(last.Time).ToUnixTimeSeconds(),
+                new IBApi.TickAttribLast(),
+                last.Price,
+                last.Size,
+                "",
+                ""
+            );
         }
     }
 }

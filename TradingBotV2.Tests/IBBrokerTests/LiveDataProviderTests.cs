@@ -1,4 +1,5 @@
 ﻿using NUnit.Framework;
+using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 
@@ -7,16 +8,21 @@ namespace IBBrokerTests
     [TestFixture]
     public class LiveDataProviderTests
     {
-        IBBroker _broker;
+        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
 
-        [SetUp]
-        public async Task OneTimeSetUp()
+        internal IBroker _broker;
+
+        [OneTimeSetUp]
+        public virtual async Task OneTimeSetUp()
         {
             _broker = new IBBroker(9001);
             await _broker.ConnectAsync();
+
+            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
+            hdp.DbPath = TestDbPath;
         }
 
-        [TearDown]
+        [OneTimeTearDown]
         public async Task OneTimeTearDown()
         {
             await Task.Delay(50);
@@ -27,7 +33,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBidAskUpdates_SingleTickerSubscription()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string expectedTicker = "SPY";
@@ -383,6 +389,11 @@ namespace IBBrokerTests
                 Assert.AreEqual(1, bars.Count);
                 Assert.AreEqual(0, bars[0].Time.Second % 60);
             }
+        }
+
+        protected virtual bool IsMarketOpen()
+        {
+            return MarketDataUtils.IsMarketOpen();
         }
     }
 }

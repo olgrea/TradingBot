@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
@@ -10,6 +11,12 @@ namespace TradingBotV2.Backtesting
 {
     internal class Backtester : IBroker
     {
+        static class TimeDelays
+        {
+            public static double TimeScale = 0.001;
+            public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
+        }
+
         private const string FakeAccountCode = "FAKEACCOUNT123";
 
         bool _isConnected = false;
@@ -33,16 +40,15 @@ namespace TradingBotV2.Backtesting
                 }
         };
 
-        IBClient _client;
+        IBBroker _broker;
 
-        BlockingCollection<Action> _requestsQueue;
+        ConcurrentQueue<Action> _requestsQueue;
 
         Task _consumerTask;
         CancellationTokenSource _cancellation;
 
         DateTime _start;
         DateTime _end;
-
         DateTime _currentTime;
 
         public Backtester(DateTime date) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime) { }
@@ -56,19 +62,51 @@ namespace TradingBotV2.Backtesting
             if (date.Date == DateTime.Now.Date)
                 throw new ArgumentException("Can't backtest the current day.");
 
-            _client = new IBClient();
-            HistoricalDataProvider = new IBHistoricalDataProvider(_client);
+            _broker = new IBBroker(191919);
+            _broker.ConnectAsync().Wait();
+            LiveDataProvider = new BacktesterLiveDataProvider(this);
+            HistoricalDataProvider = new IBHistoricalDataProvider(_broker.Client);
         }
 
+        internal ConcurrentQueue<Action> RequestsQueue => _requestsQueue;
+        internal DateTime StartTime => _start;
+        internal DateTime EndTime => _end;
         internal (DateTime, DateTime) TimeRange => (_start, _end);
         
         internal event Action<DateTime> ClockTick;
                 
-        public ILiveDataProvider LiveDataProvider => throw new NotImplementedException();
+        public ILiveDataProvider LiveDataProvider { get; init; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager => throw new NotImplementedException();
 
-        async Task StartConsumerTask()
+        public Task Start()
+        {
+            if(_consumerTask == null)
+            {
+                _requestsQueue = new ConcurrentQueue<Action>();
+                _cancellation = new CancellationTokenSource();
+                _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token);
+            }
+
+            return _consumerTask;
+        }
+
+        public void Stop()
+        {
+            _cancellation?.Cancel();
+            _cancellation?.Dispose();
+            _cancellation = null;
+            _consumerTask = null;
+        }
+
+        public void Reset()
+        {
+            Stop();
+            _currentTime = _start;
+            (LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
+        }
+
+        void PassTime()
         {
             var mainToken = _cancellation.Token;
 
@@ -78,10 +116,12 @@ namespace TradingBotV2.Backtesting
                 mainToken.ThrowIfCancellationRequested();
 
                 // Let's process the requests first 
-                while(_requestsQueue.TryTake(out Action action))
+                while(_requestsQueue.TryDequeue(out Action action))
                     action();
 
                 ClockTick?.Invoke(_currentTime);
+                if (TimeDelays.OneSecond > 0)
+                    Task.Delay(TimeDelays.OneSecond).Wait(mainToken);
                 _currentTime = _currentTime.AddSeconds(1);
             }
         }

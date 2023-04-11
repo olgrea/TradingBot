@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace TradingBotV2.Broker.MarketData
+﻿namespace TradingBotV2.Broker.MarketData
 {
     public class BidAsk : IMarketData
     {
@@ -27,6 +25,18 @@ namespace TradingBotV2.Broker.MarketData
             };
         }
 
+        public static explicit operator IBApi.BidAsk(BidAsk ba)
+        {
+            return new IBApi.BidAsk()
+            {
+                Bid = ba.Bid,
+                BidSize = ba.BidSize,
+                Ask = ba.Ask,
+                AskSize = ba.AskSize,
+                Time = new DateTimeOffset(ba.Time).ToUnixTimeSeconds(),
+            };
+        }
+
         public static explicit operator BidAsk(IBApi.HistoricalTickBidAsk ba)
         {
             return new BidAsk()
@@ -37,6 +47,18 @@ namespace TradingBotV2.Broker.MarketData
                 AskSize = Convert.ToInt32(ba.SizeAsk),
                 Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
             };
+        }
+
+        public static explicit operator IBApi.HistoricalTickBidAsk(BidAsk ba)
+        {
+            return new IBApi.HistoricalTickBidAsk(
+                new DateTimeOffset(ba.Time).ToUnixTimeSeconds(),
+                new IBApi.TickAttribBidAsk(),
+                ba.Bid,
+                ba.Ask,
+                ba.BidSize,
+                ba.AskSize
+            );
         }
     }
 }
