@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Globalization;
 
 namespace TradingBotV2.Broker.MarketData
 {
@@ -7,7 +7,7 @@ namespace TradingBotV2.Broker.MarketData
         _1Sec = 1,
         _5Sec = 5,
         _1Min = 60,
-        _5min = 5*60,
+        _5min = 5 * 60,
     }
 
     public class Bar : IMarketData
@@ -27,6 +27,51 @@ namespace TradingBotV2.Broker.MarketData
         public override string ToString()
         {
             return $"{Time} : O={Open:c} H={High:c} L={Low:c} C={Close:c}";
+        }
+
+        public static implicit operator IBApi.FiveSecBar(Bar bar)
+        {
+            return new IBApi.FiveSecBar()
+            {
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                WAP = bar.VWAP,
+                TradeAmount = bar.TradeAmount,
+                Date = new DateTimeOffset(bar.Time).ToUnixTimeSeconds()
+            };
+        }
+
+        public static implicit operator Bar(IBApi.FiveSecBar bar)
+        {
+            return new Bar()
+            {
+                BarLength = BarLength._5Sec,
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                VWAP = bar.WAP,
+                TradeAmount = bar.TradeAmount,
+                Time = DateTimeOffset.FromUnixTimeSeconds(bar.Date).DateTime.ToLocalTime(),
+            };
+        }
+
+        public static implicit operator Bar(IBApi.Bar bar)
+        {
+            return new Bar()
+            {
+                Open = bar.Open,
+                Close = bar.Close,
+                High = bar.High,
+                Low = bar.Low,
+                Volume = bar.Volume,
+                TradeAmount = bar.Count,
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(bar.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
+            };
         }
     }
 }

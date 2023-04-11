@@ -1,6 +1,4 @@
-﻿using System.Data.SqlTypes;
-using System.Diagnostics;
-using System.Net.Sockets;
+﻿using System.Diagnostics;
 using IBApi;
 
 namespace TradingBotV2.IBKR

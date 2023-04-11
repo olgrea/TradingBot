@@ -12,7 +12,7 @@ namespace TradingBotV2.Broker.MarketData
 {
     internal static class IBKRConversions
     {
-        //TODO : rename all ToTB... to FromIBKR()
+        //TODO : use explicit conversion operators
 
         internal static Contract ToTBContract(this IBApi.Contract ibc)
         {

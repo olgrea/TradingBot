@@ -9,7 +9,7 @@ namespace BacktesterTests
         [SetUp]
         public override async Task SetUp()
         {
-            _broker = new Backtester();
+            _broker = new Backtester(DateTime.Now);
             await Task.CompletedTask;
         }
 

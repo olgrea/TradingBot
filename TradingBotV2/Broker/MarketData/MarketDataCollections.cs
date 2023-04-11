@@ -1,12 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace TradingBotV2.Broker.MarketData
+﻿namespace TradingBotV2.Broker.MarketData
 {
     public class MarketDataCollections
     {
-        public IEnumerable<Bar> Bars { get; set; } = Enumerable.Empty<Bar>();
-        public IEnumerable<BidAsk> BidAsks { get; set; } = Enumerable.Empty<BidAsk>();
-        public IEnumerable<Last> Lasts { get; set; } = Enumerable.Empty<Last>();
+        public IDictionary<DateTime, Bar> Bars { get; set; } = new Dictionary<DateTime, Bar>();
+        public IDictionary<DateTime, IEnumerable<BidAsk>> BidAsks { get; set; } = new Dictionary<DateTime, IEnumerable<BidAsk>>();
+        public IDictionary<DateTime, IEnumerable<Last>> Lasts { get; set; } = new Dictionary<DateTime, IEnumerable<Last>>();
     }
 }
