@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 
 namespace TradingBotV2.Broker.Orders
 {
@@ -17,6 +18,23 @@ namespace TradingBotV2.Broker.Orders
         public override string ToString()
         {
             return $"execId={ExecId} {Time} : orderId={OrderId} {Action} shares={Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange}";
+        }
+
+        public static explicit operator OrderExecution(IBApi.Execution exec)
+        {
+            return new OrderExecution()
+            {
+                ExecId = exec.ExecId,
+                OrderId = exec.OrderId,
+                Exchange = exec.Exchange,
+                Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
+                Shares = exec.Shares,
+                Price = exec.Price,
+                AvgPrice = exec.AvgPrice,
+
+                // non-standard date format...
+                Time = DateTime.ParseExact(exec.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+            };
         }
     }
 }

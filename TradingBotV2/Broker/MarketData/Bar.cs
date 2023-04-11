@@ -29,7 +29,7 @@ namespace TradingBotV2.Broker.MarketData
             return $"{Time} : O={Open:c} H={High:c} L={Low:c} C={Close:c}";
         }
 
-        public static implicit operator IBApi.FiveSecBar(Bar bar)
+        public static explicit operator IBApi.FiveSecBar(Bar bar)
         {
             return new IBApi.FiveSecBar()
             {
@@ -44,7 +44,7 @@ namespace TradingBotV2.Broker.MarketData
             };
         }
 
-        public static implicit operator Bar(IBApi.FiveSecBar bar)
+        public static explicit operator Bar(IBApi.FiveSecBar bar)
         {
             return new Bar()
             {
@@ -60,7 +60,7 @@ namespace TradingBotV2.Broker.MarketData
             };
         }
 
-        public static implicit operator Bar(IBApi.Bar bar)
+        public static explicit operator Bar(IBApi.Bar bar)
         {
             return new Bar()
             {

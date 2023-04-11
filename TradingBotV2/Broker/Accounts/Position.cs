@@ -26,5 +26,19 @@ namespace TradingBotV2.Broker.Accounts
         public double RealizedPNL { get; set; }
 
         public bool InAny() => PositionAmount > 0;
+
+        public static explicit operator Position(IBApi.Position position)
+        {
+            return new Position()
+            {
+                Contract = (Contract)position.Contract,
+                PositionAmount = position.PositionAmount,
+                MarketPrice = position.MarketPrice,
+                MarketValue = position.MarketValue,
+                AverageCost = position.AverageCost,
+                UnrealizedPNL = position.UnrealizedPNL,
+                RealizedPNL = position.RealizedPNL,
+            };
+        }
     }
 }

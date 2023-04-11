@@ -14,5 +14,25 @@
         {
             return $"{Info.OrderId} {Status} : filled={Filled:c} remaining={Remaining:c} avgFillprice={AvgFillPrice:c} lastFillPrice={LastFillPrice:c}";
         }
+
+        public static explicit operator OrderStatus(IBApi.OrderStatus status)
+        {
+            return new OrderStatus()
+            {
+                Info = new RequestInfo()
+                {
+                    OrderId = status.OrderId,
+                    ParentId = status.ParentId,
+                    ClientId = status.ClientId,
+                    PermId = status.PermId,
+                },
+                Status = !string.IsNullOrEmpty(status.Status) ? (Status)Enum.Parse(typeof(Status), status.Status) : Status.Unknown,
+                Filled = status.Filled,
+                Remaining = status.Remaining,
+                AvgFillPrice = status.AvgFillPrice,
+                LastFillPrice = status.LastFillPrice,
+                MktCapPrice = status.MktCapPrice,
+            };
+        }
     }
 }

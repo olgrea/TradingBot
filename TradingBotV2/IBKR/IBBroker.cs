@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
-using IBApi;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
@@ -159,7 +158,7 @@ namespace TradingBotV2.IBKR
                 //_logger.Trace($"GetAccountAsync updateAccountTime : {time}");
                 account.Time = time;
             });
-            var updateAccountValue = new Action<AccountValue>(accValue =>
+            var updateAccountValue = new Action<IBApi.AccountValue>(accValue =>
             {
                 //_logger.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
                 switch (accValue.Key)
@@ -188,7 +187,7 @@ namespace TradingBotV2.IBKR
             var updatePortfolio = new Action<IBApi.Position>(pos =>
             {
                 //_logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
-                account.Positions.Add(pos.ToTBPosition());
+                account.Positions.Add((Position)pos);
             });
             var accountDownloadEnd = new Action<string>(accountCode =>
             {

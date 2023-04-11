@@ -14,5 +14,29 @@ namespace TradingBotV2.Broker.MarketData
         {
             return $"{Time} : Bid={Bid:c}, Ask={Ask:c}";
         }
+
+        public static explicit operator BidAsk(IBApi.BidAsk ba)
+        {
+            return new BidAsk()
+            {
+                Bid = ba.Bid,
+                BidSize = ba.BidSize,
+                Ask = ba.Ask,
+                AskSize = ba.AskSize,
+                Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
+            };
+        }
+
+        public static explicit operator BidAsk(IBApi.HistoricalTickBidAsk ba)
+        {
+            return new BidAsk()
+            {
+                Bid = ba.PriceBid,
+                BidSize = Convert.ToInt32(ba.SizeBid),
+                Ask = ba.PriceAsk,
+                AskSize = Convert.ToInt32(ba.SizeAsk),
+                Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
+            };
+        }
     }
 }

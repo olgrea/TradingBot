@@ -68,7 +68,7 @@ namespace TradingBotV2.Backtesting
 
                 Bar bar = MarketDataUtils.CombineBars(list, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(bar.Time.ToUniversalTime());
-                RealtimeBar?.Invoke(kvp.Value, bar);
+                RealtimeBar?.Invoke(kvp.Value, (IBApi.FiveSecBar)bar);
             }
         }
 
