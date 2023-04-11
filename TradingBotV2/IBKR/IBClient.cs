@@ -5,14 +5,14 @@ namespace TradingBotV2.IBKR
 {
     internal class IBClient
     {
-        internal class ContractIdToRequestId
+        internal class RequestIdsToContracts
         {
-            public Dictionary<int, int> FiveSecBars { get; set; } = new Dictionary<int, int>();
-            public Dictionary<int, int> AllLast { get; set; } = new Dictionary<int, int>();
-            public Dictionary<int, int> Last { get; set; } = new Dictionary<int, int>();
-            public Dictionary<int, int> BidAsk { get; set; } = new Dictionary<int, int>();
-            public Dictionary<int, int> MidPoint { get; set; } = new Dictionary<int, int>();
-            public Dictionary<int, int> Pnl { get; set; } = new Dictionary<int, int>();
+            public Dictionary<int, Contract> FiveSecBars { get; set; } = new Dictionary<int, Contract>();
+            public Dictionary<int, Contract> AllLast { get; set; } = new Dictionary<int, Contract>();
+            public Dictionary<int, Contract> Last { get; set; } = new Dictionary<int, Contract>();
+            public Dictionary<int, Contract> BidAsk { get; set; } = new Dictionary<int, Contract>();
+            public Dictionary<int, Contract> MidPoint { get; set; } = new Dictionary<int, Contract>();
+            public Dictionary<int, Contract> Pnl { get; set; } = new Dictionary<int, Contract>();
         }
 
         public const int DefaultTWSPort = 7496;
@@ -27,13 +27,14 @@ namespace TradingBotV2.IBKR
         int _clientId = -1;
         string _accountCode = null;
         int _nextValidId = -1;
-        Dictionary<int, ContractIdToRequestId> _contractIdToRequestId = new Dictionary<int, ContractIdToRequestId>();
+        RequestIdsToContracts _requestIdsToContracts = new RequestIdsToContracts();
+        
         ContractsCache _contractsCache;
 
         public IBClient()
         {
             _signal = new EReaderMonitorSignal();
-            Responses = new IBResponses();
+            Responses = new IBResponses(_requestIdsToContracts);
             _clientSocket = new EClientSocket(Responses, _signal);
 
             _contractsCache = new ContractsCache(this);
@@ -49,12 +50,6 @@ namespace TradingBotV2.IBKR
             Responses.ConnectAck += new Action(() =>
             {
                 Debug.Assert(_clientId > 0);
-                Debug.Assert(!_contractIdToRequestId.ContainsKey(_clientId));
-                _contractIdToRequestId[_clientId] = new ContractIdToRequestId();
-            });
-            Responses.ConnectionClosed += new Action(() =>
-            {
-                _contractIdToRequestId.Remove(_clientId);
             });
         }
 
@@ -127,107 +122,99 @@ namespace TradingBotV2.IBKR
             _clientSocket.cancelPositions();
         }
 
-        public int RequestPnLUpdates(int contractId)
+        public void RequestPnLUpdates(string ticker)
         {
-            if (!_contractIdToRequestId[_clientId].Pnl.ContainsKey(contractId))
+            var contract = ContractsCache.Get(ticker);
+            if (!_requestIdsToContracts.Pnl.ContainsValue(contract))
             {
                 int reqId = NextValidId;
-                _contractIdToRequestId[_clientId].Pnl[contractId] = reqId;
-                _clientSocket.reqPnLSingle(reqId, _accountCode, "", contractId);
-            }
+                _requestIdsToContracts.Pnl[reqId] = contract;
 
-            return _contractIdToRequestId[_clientId].Pnl[contractId];
+                // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
+                _clientSocket.reqPnLSingle(reqId, _accountCode, "", contract.ConId);
+            }
         }
 
-        public int CancelPnLUpdates(int contractId)
+        public void CancelPnLUpdates(string ticker)
         {
-            int reqId = -1;
-            if (_contractIdToRequestId[_clientId].Pnl.ContainsKey(contractId))
+            var contract = ContractsCache.Get(ticker);
+            if (_requestIdsToContracts.Pnl.ContainsValue(contract))
             {
-                reqId = _contractIdToRequestId[_clientId].Pnl[contractId];
-                _contractIdToRequestId[_clientId].Pnl.Remove(contractId);
+                var reqId = _requestIdsToContracts.Pnl.First(kvp => kvp.Value == contract).Key;
+                _requestIdsToContracts.Pnl.Remove(reqId);
                 _clientSocket.cancelPnLSingle(reqId);
             }
-
-            return reqId;
         }
 
-        public int RequestFiveSecondsBarUpdates(Contract contract)
+        public void RequestFiveSecondsBarUpdates(string ticker)
         {
-            if (!_contractIdToRequestId[_clientId].FiveSecBars.ContainsKey(contract.ConId))
+            var contract = ContractsCache.Get(ticker);
+            if(!_requestIdsToContracts.FiveSecBars.ContainsValue(contract))
             {
                 int reqId = NextValidId;
-                _contractIdToRequestId[_clientId].FiveSecBars[contract.ConId] = reqId;
+                _requestIdsToContracts.FiveSecBars[reqId] = contract;
 
                 // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
                 _clientSocket.reqRealTimeBars(reqId, contract, 5, "TRADES", true, null);
             }
-
-            return _contractIdToRequestId[_clientId].FiveSecBars[contract.ConId];
         }
 
-        public int CancelFiveSecondsBarsUpdates(Contract contract)
+        public void CancelFiveSecondsBarsUpdates(string ticker)
         {
-            int reqId = -1;
-            if (_contractIdToRequestId[_clientId].FiveSecBars.ContainsKey(contract.ConId))
+            var contract = ContractsCache.Get(ticker);
+            if (_requestIdsToContracts.FiveSecBars.ContainsValue(contract))
             {
-                reqId = _contractIdToRequestId[_clientId].FiveSecBars[contract.ConId];
-                _contractIdToRequestId[_clientId].FiveSecBars.Remove(contract.ConId);
+                var reqId = _requestIdsToContracts.FiveSecBars.First(kvp => kvp.Value == contract).Key;
+                _requestIdsToContracts.FiveSecBars.Remove(reqId);
                 _clientSocket.cancelRealTimeBars(reqId);
             }
-
-            return reqId;
         }
 
-        public int RequestTickByTickData(Contract contract, string tickType)
+        public void RequestTickByTickData(string ticker, string tickType)
         {
-            Dictionary<int, int> cToId = ValidateTickType(tickType);
-
-            if (!cToId.ContainsKey(contract.ConId))
+            var contract = ContractsCache.Get(ticker);
+            var idToC = ValidateTickType(tickType);
+            if (!idToC.ContainsValue(contract))
             {
                 int reqId = NextValidId;
-                cToId[contract.ConId] = reqId;
+                idToC[reqId] = contract;
                 _clientSocket.reqTickByTickData(reqId, contract, tickType, 0, false);
             }
-
-            return cToId[contract.ConId];
         }
 
-        public int CancelTickByTickData(Contract contract, string tickType)
+        public void CancelTickByTickData(string ticker, string tickType)
         {
-            int reqId = -1;
-            Dictionary<int, int> cToId = ValidateTickType(tickType);
-            if (cToId.ContainsKey(contract.ConId))
+            var contract = ContractsCache.Get(ticker);
+            var idToC = ValidateTickType(tickType);
+            if (idToC.ContainsValue(contract))
             {
-                reqId = cToId[contract.ConId];
-                cToId.Remove(contract.ConId);
+                var reqId = idToC.First(kvp => kvp.Value == contract).Key;
+                idToC.Remove(reqId);
                 _clientSocket.cancelTickByTickData(reqId);
             }
-
-            return reqId;
         }
 
-        private Dictionary<int, int> ValidateTickType(string tickType)
+        private Dictionary<int, Contract> ValidateTickType(string tickType)
         {
-            Dictionary<int, int> cToId;
+            Dictionary<int, Contract> idToC;
             switch (tickType)
             {
                 case "Last":
-                    cToId = _contractIdToRequestId[_clientId].Last;
+                    idToC = _requestIdsToContracts.Last;
                     break;
                 case "AllLast":
-                    cToId = _contractIdToRequestId[_clientId].AllLast;
+                    idToC = _requestIdsToContracts.AllLast;
                     break;
                 case "BidAsk":
-                    cToId = _contractIdToRequestId[_clientId].BidAsk;
+                    idToC = _requestIdsToContracts.BidAsk;
                     break;
                 case "MidPoint":
-                    cToId = _contractIdToRequestId[_clientId].MidPoint;
+                    idToC = _requestIdsToContracts.MidPoint;
                     break;
                 default:
                     throw new ArgumentException($"Invalid tick type \"{tickType}\"");
             };
-            return cToId;
+            return idToC;
         }
 
         public void RequestOpenOrders()

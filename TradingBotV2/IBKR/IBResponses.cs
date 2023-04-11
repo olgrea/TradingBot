@@ -1,10 +1,18 @@
 ﻿using System.Globalization;
 using IBApi;
+using static TradingBotV2.IBKR.IBClient;
 
 namespace TradingBotV2.IBKR
 {
     public class IBResponses : EWrapper
     {
+        RequestIdsToContracts _requestIdsToContracts;
+
+        internal IBResponses(RequestIdsToContracts requestIdsToContracts) 
+        {
+            _requestIdsToContracts = requestIdsToContracts;
+        }
+
         public Action ConnectAck;
         public void connectAck()
         {
@@ -114,15 +122,15 @@ namespace TradingBotV2.IBKR
             PositionEnd?.Invoke();
         }
 
-        public Action<int, int , double , double , double , double > PnlSingle;
+        public Action<string, int , double , double , double , double > PnlSingle;
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             //_logger.Trace($"PnL ({reqId}): {pnl}");
-            PnlSingle?.Invoke(reqId, pos, dailyPnL, unrealizedPnL, realizedPnL, value);
+            PnlSingle?.Invoke(_requestIdsToContracts.Pnl[reqId].Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value);
         }
 
         // called at 5 sec intervals
-        public Action<int, FiveSecBar> RealtimeBar;
+        public Action<string, FiveSecBar> RealtimeBar;
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
             FiveSecBar bar = new FiveSecBar()
@@ -137,10 +145,10 @@ namespace TradingBotV2.IBKR
             };
 
             //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
-            RealtimeBar?.Invoke(reqId, bar);
+            RealtimeBar?.Invoke(_requestIdsToContracts.FiveSecBars[reqId].Symbol, bar);
         }
 
-        public Action<int, BidAsk> TickByTickBidAsk;
+        public Action<string, BidAsk> TickByTickBidAsk;
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
             var bidAsk = new BidAsk()
@@ -154,10 +162,10 @@ namespace TradingBotV2.IBKR
             };
 
             //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
-            TickByTickBidAsk?.Invoke(reqId, bidAsk);
+            TickByTickBidAsk?.Invoke(_requestIdsToContracts.BidAsk[reqId].Symbol, bidAsk);
         }
 
-        public Action<int, Last> TickByTickAllLast;
+        public Action<string, Last> TickByTickAllLast;
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
             var last = new Last()
@@ -171,7 +179,7 @@ namespace TradingBotV2.IBKR
             };
 
             //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
-            TickByTickAllLast?.Invoke(reqId, last);
+            TickByTickAllLast?.Invoke(_requestIdsToContracts.Last[reqId].Symbol, last);
         }
 
         public Action<int, IBApi.ContractDetails> ContractDetails;
