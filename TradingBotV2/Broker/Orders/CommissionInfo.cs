@@ -11,5 +11,16 @@
         {
             return $"execId={ExecId} commission={Commission} {Currency} : realizedPnL={RealizedPNL}";
         }
+
+        public static explicit operator CommissionInfo(IBApi.CommissionReport report)
+        {
+            return new CommissionInfo()
+            {
+                Commission = report.Commission,
+                ExecId = report.ExecId,
+                Currency = report.Currency,
+                RealizedPNL = report.RealizedPNL,
+            };
+        }
     }
 }

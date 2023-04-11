@@ -66,7 +66,7 @@ namespace TradingBotV2.IBKR
 
             //_logger.Debug($"FiveSecondsBarReceived for {contract}");
 
-            var bar = IBApiBar.ToTBBar();
+            var bar = (Bar)IBApiBar;
 
             LinkedList<Bar> list = _barSubscriptions[ticker].FiveSecBars;
             list.AddLast(bar);
@@ -151,7 +151,7 @@ namespace TradingBotV2.IBKR
         {
             if(_reqIdsToTicker.ContainsKey(reqId))
             {
-                BidAskReceived?.Invoke(_reqIdsToTicker[reqId], bidAsk.ToTBBidAsk());
+                BidAskReceived?.Invoke(_reqIdsToTicker[reqId], (BidAsk)bidAsk);
             }
         }
 
@@ -203,7 +203,7 @@ namespace TradingBotV2.IBKR
         {
             if (_reqIdsToTicker.ContainsKey(reqId))
             {
-                LastReceived?.Invoke(_reqIdsToTicker[reqId], last.ToTBLast());
+                LastReceived?.Invoke(_reqIdsToTicker[reqId], (Last)last);
             }
         }
 

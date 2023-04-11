@@ -239,7 +239,7 @@ namespace TradingBotV2.IBKR
             {
                 if (rId == reqId)
                 {
-                    var bar = IBApiBar.ToTBBar();
+                    var bar = (Bar)IBApiBar;
                     _logger?.Trace($"GetHistoricalDataAsync - historicalData - adding bar {bar.Time}");
                     bar.BarLength = barLength;
                     tmpList.AddLast(bar);
@@ -329,7 +329,7 @@ namespace TradingBotV2.IBKR
                     _logger?.Trace($"GetHistoricalBidAsksAsync - adding {data.Count()}");
 
                     foreach (var d in data)
-                        tmpList.AddLast(d.ToTBBidAsk());
+                        tmpList.AddLast((BidAsk)d);
 
                     if (isDone)
                     {
@@ -368,7 +368,7 @@ namespace TradingBotV2.IBKR
                     _logger?.Trace($"GetHistoricalLastsAsync - adding {data.Count()}");
 
                     foreach (var d in data)
-                        tmpList.AddLast(d.ToTBLast());
+                        tmpList.AddLast((Last)d);
 
                     if (isDone)
                     {
