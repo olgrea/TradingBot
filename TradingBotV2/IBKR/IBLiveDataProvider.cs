@@ -13,8 +13,10 @@ namespace TradingBotV2.IBKR
         }
 
         IBClient _client;
-        Dictionary<int, string> _reqIdsToTicker = new Dictionary<int, string>();
+
         Dictionary<string, BarSubscription> _barSubscriptions = new Dictionary<string, BarSubscription>();
+        HashSet<string> _bidAskSubscriptions = new HashSet<string>();
+        HashSet<string> _lastsSubscriptions = new HashSet<string>();
 
         public IBLiveDataProvider(IBClient client)
         {
@@ -33,10 +35,9 @@ namespace TradingBotV2.IBKR
                 throw new NotImplementedException("The lowest resolution for live bars is 5 secs in Interactive Broker");
             }
 
-            int reqId = RequestFiveSecondsBarUpdates(ticker);
-            if (!_reqIdsToTicker.ContainsKey(reqId))
+            RequestFiveSecondsBarUpdates(ticker);
+            if (!_barSubscriptions.ContainsKey(ticker))
             {
-                _reqIdsToTicker[reqId] = ticker;
                 _barSubscriptions[ticker] = new BarSubscription();
             }
 
@@ -47,11 +48,9 @@ namespace TradingBotV2.IBKR
             }
         }
         
-        protected virtual int RequestFiveSecondsBarUpdates(string ticker)
+        protected virtual void RequestFiveSecondsBarUpdates(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.RequestFiveSecondsBarUpdates(contract);
-            return reqId;
+            _client.RequestFiveSecondsBarUpdates(ticker);
         }
 
         protected virtual void SubscribeToRealtimeBarCallback()
@@ -60,10 +59,8 @@ namespace TradingBotV2.IBKR
             Debug.Assert(_client.Responses.RealtimeBar.GetInvocationList().Length == 1);
         }
 
-        protected void OnFiveSecondsBarReceived(int reqId, IBApi.FiveSecBar IBApiBar)
+        protected void OnFiveSecondsBarReceived(string ticker, IBApi.FiveSecBar IBApiBar)
         {
-            string ticker = _reqIdsToTicker[reqId];
-
             //_logger.Debug($"FiveSecondsBarReceived for {contract}");
 
             var bar = (Bar)IBApiBar;
@@ -102,8 +99,7 @@ namespace TradingBotV2.IBKR
             _barSubscriptions[ticker].BarLengthsWanted.Remove(barLength);
             if(_barSubscriptions[ticker].BarLengthsWanted.Count == 0)
             {
-                int reqId = CancelFiveSecondsBarsUpdates(ticker);
-                _reqIdsToTicker.Remove(reqId);
+                CancelFiveSecondsBarsUpdates(ticker);
                 _barSubscriptions.Remove(ticker);
             }
 
@@ -113,11 +109,9 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        protected virtual int CancelFiveSecondsBarsUpdates(string ticker)
+        protected virtual void CancelFiveSecondsBarsUpdates(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.CancelFiveSecondsBarsUpdates(contract);
-            return reqId;
+            _client.CancelFiveSecondsBarsUpdates(ticker);
         }
 
         protected virtual void UnsubscribeFromRealtimeBarCallback()
@@ -127,19 +121,17 @@ namespace TradingBotV2.IBKR
 
         public void RequestBidAskUpdates(string ticker)
         {
-            int reqId = RequestBidAskData(ticker);
-            if (!_reqIdsToTicker.ContainsKey(reqId))
+            RequestBidAskData(ticker);
+            if (!_bidAskSubscriptions.Contains(ticker))
             {
-                _reqIdsToTicker[reqId] = ticker;
+                _bidAskSubscriptions.Add(ticker);
                 SubscribeToBidAskCallback();
             }
         }
 
-        protected virtual int RequestBidAskData(string ticker)
+        protected virtual void RequestBidAskData(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.RequestTickByTickData(contract, "BidAsk");
-            return reqId;
+            _client.RequestTickByTickData(ticker, "BidAsk");
         }
 
         protected virtual void SubscribeToBidAskCallback()
@@ -147,29 +139,27 @@ namespace TradingBotV2.IBKR
             _client.Responses.TickByTickBidAsk += TickByTickBidAsk;
         }
 
-        protected void TickByTickBidAsk(int reqId, IBApi.BidAsk bidAsk)
+        protected void TickByTickBidAsk(string ticker, IBApi.BidAsk bidAsk)
         {
-            if(_reqIdsToTicker.ContainsKey(reqId))
+            if(_bidAskSubscriptions.Contains(ticker))
             {
-                BidAskReceived?.Invoke(_reqIdsToTicker[reqId], (BidAsk)bidAsk);
+                BidAskReceived?.Invoke(ticker, (BidAsk)bidAsk);
             }
         }
 
         public void CancelBidAskUpdates(string ticker)
         {
-            int reqId = CancelBidAskData(ticker);
-            if (_reqIdsToTicker.ContainsKey(reqId))
+            CancelBidAskData(ticker);
+            if (_bidAskSubscriptions.Contains(ticker))
             {
-                _reqIdsToTicker.Remove(reqId);
+                _bidAskSubscriptions.Remove(ticker);
                 UnsubscribeFromBidAskDataCallback();
             }
         }
 
-        protected virtual int CancelBidAskData(string ticker)
+        protected virtual void CancelBidAskData(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.CancelTickByTickData(contract, "BidAsk");
-            return reqId;
+            _client.CancelTickByTickData(ticker, "BidAsk");
         }
 
         protected virtual void UnsubscribeFromBidAskDataCallback()
@@ -179,19 +169,17 @@ namespace TradingBotV2.IBKR
 
         public void RequestLastTradedPriceUpdates(string ticker)
         {
-            int reqId = RequestLastData(ticker);
-            if (!_reqIdsToTicker.ContainsKey(reqId))
+            RequestLastData(ticker);
+            if (!_lastsSubscriptions.Contains(ticker))
             {
-                _reqIdsToTicker[reqId] = ticker;
+                _lastsSubscriptions.Add(ticker);
                 SubscribeToLastDataCallback();
             }
         }
 
-        protected virtual int RequestLastData(string ticker)
+        protected virtual void RequestLastData(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.RequestTickByTickData(contract, "Last");
-            return reqId;
+            _client.RequestTickByTickData(ticker, "Last");
         }
 
         protected virtual void SubscribeToLastDataCallback()
@@ -199,29 +187,27 @@ namespace TradingBotV2.IBKR
             _client.Responses.TickByTickAllLast += TickByTickLast;
         }
 
-        protected void TickByTickLast(int reqId, IBApi.Last last)
+        protected void TickByTickLast(string ticker, IBApi.Last last)
         {
-            if (_reqIdsToTicker.ContainsKey(reqId))
+            if (_lastsSubscriptions.Contains(ticker))
             {
-                LastReceived?.Invoke(_reqIdsToTicker[reqId], (Last)last);
+                LastReceived?.Invoke(ticker, (Last)last);
             }
         }
 
         public void CancelLastTradedPriceUpdates(string ticker)
         {
-            int reqId = CancelLastData(ticker);
-            if (_reqIdsToTicker.ContainsKey(reqId))
+            CancelLastData(ticker);
+            if (_lastsSubscriptions.Contains(ticker))
             {
-                _reqIdsToTicker.Remove(reqId);
+                _lastsSubscriptions.Remove(ticker);
                 UnsubscribeFromLastDataCallback();
             }
         }
 
-        protected virtual int CancelLastData(string ticker)
+        protected virtual void CancelLastData(string ticker)
         {
-            var contract = _client.ContractsCache.Get(ticker);
-            var reqId = _client.CancelTickByTickData(contract, "Last");
-            return reqId;
+            _client.CancelTickByTickData(ticker, "Last");
         }
 
         protected virtual void UnsubscribeFromLastDataCallback()
