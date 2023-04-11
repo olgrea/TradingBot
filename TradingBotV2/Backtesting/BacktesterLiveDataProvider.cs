@@ -21,6 +21,8 @@ namespace TradingBotV2.Backtesting
         {
             _backtester = backtester;
             _backtester.ClockTick += OnClockTick_UpdateBar;
+            _backtester.ClockTick += OnClockTick_UpdateBidAsk;
+            _backtester.ClockTick += OnClockTick_UpdateLast;
         }
 
         event Action<int, IBApi.FiveSecBar> RealtimeBar;
@@ -28,6 +30,15 @@ namespace TradingBotV2.Backtesting
         event Action<int, IBApi.Last> Last;
 
         internal Dictionary<string, MarketDataCollections> MarketData { get; set; } = new Dictionary<string, MarketDataCollections>();
+
+        internal void Reset()
+        {
+            _tickerToReqIds = new TickerToRequestId();
+            RealtimeBar = null;
+            BidAsk = null;
+            Last = null;
+            MarketData = new Dictionary<string, MarketDataCollections>();
+        }
 
         protected override int RequestFiveSecondsBarUpdates(string ticker)
         {
@@ -58,6 +69,9 @@ namespace TradingBotV2.Backtesting
 
             foreach(KeyValuePair<string, int> kvp in _tickerToReqIds.FiveSecBars)
             {
+                //if (!MarketData.ContainsKey(kvp.Key))
+                //    continue;
+
                 var list = new List<Bar>(5);
                 DateTime current = newTime;
                 for (int i = 0; i < 5; i++)
@@ -106,6 +120,17 @@ namespace TradingBotV2.Backtesting
             return _tickerToReqIds.BidAsk[ticker];
         }
 
+        void OnClockTick_UpdateBidAsk(DateTime newTime)
+        {
+            foreach (KeyValuePair<string, int> kvp in _tickerToReqIds.BidAsk)
+            {
+                foreach(BidAsk ba in MarketData[kvp.Key].BidAsks[newTime])
+                {
+                    BidAsk?.Invoke(kvp.Value, (IBApi.BidAsk)ba);
+                }
+            }
+        }
+
         protected override int CancelBidAskData(string ticker)
         {
             _tickerToReqIds.BidAsk.Remove(ticker, out int value);
@@ -138,6 +163,17 @@ namespace TradingBotV2.Backtesting
             }
 
             return _tickerToReqIds.BidAsk[ticker];
+        }
+
+        void OnClockTick_UpdateLast(DateTime newTime)
+        {
+            foreach (KeyValuePair<string, int> kvp in _tickerToReqIds.Last)
+            {
+                foreach (Last last in MarketData[kvp.Key].Lasts[newTime])
+                {
+                    Last?.Invoke(kvp.Value, (IBApi.Last)last);
+                }
+            }
         }
 
         protected override int CancelLastData(string ticker)

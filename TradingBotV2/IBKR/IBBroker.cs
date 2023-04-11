@@ -25,6 +25,7 @@ namespace TradingBotV2.IBKR
             HistoricalDataProvider = new IBHistoricalDataProvider(_client);
         }
 
+        internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
 
@@ -76,7 +77,9 @@ namespace TradingBotV2.IBKR
 
             try
             {
-                _ = Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
+                if(timeout.Milliseconds > 0)
+                    _ = Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
+                
                 _client.Connect(IBClient.DefaultIP, _port, _clientId);
                 await tcs.Task;
 

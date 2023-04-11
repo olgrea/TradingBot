@@ -9,7 +9,7 @@ namespace IBBrokerTests
 {
     internal class HistoricalDataProviderTests
     {
-        const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
+        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
 
         // There are 23400 one sec bars between 9:30 and 16:00
         const int NbOfOneSecBarsInADay = 23400;
@@ -70,6 +70,7 @@ namespace IBBrokerTests
             //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 05));
             //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
             //DeleteData(ticker, new DateTime(2023, 04, 07));
+            await Task.CompletedTask;
         }
 
         [Test]
