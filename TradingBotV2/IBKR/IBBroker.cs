@@ -51,7 +51,9 @@ namespace TradingBotV2.IBKR
 
         async Task<string> ConnectAsync(TimeSpan timeout, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<string>();
+            // awaiting a TaskCompletionSource's task doesn't return on the main thread without this flag.
+
+            var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             var nextValidId = new Action<int>(id =>
@@ -96,7 +98,7 @@ namespace TradingBotV2.IBKR
 
         public async Task DisconnectAsync()
         {
-            var tcs = new TaskCompletionSource();
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             //_logger.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.TrySetResult());
@@ -118,7 +120,7 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<string>> GetManagedAccountsList()
         {
-            var tcs = new TaskCompletionSource<IEnumerable<string>>();
+            var tcs = new TaskCompletionSource<IEnumerable<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var managedAccount = new Action<IEnumerable<string>>(list => tcs.SetResult(list));
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -154,7 +156,7 @@ namespace TradingBotV2.IBKR
             }
 
             var account = new Account();
-            var tcs = new TaskCompletionSource<Account>();
+            var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var updateAccountTime = new Action<TimeSpan>(time =>
             {
