@@ -3,8 +3,6 @@ using System.Globalization;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
-using TradingBotV2.Broker.Contracts;
-using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 
@@ -16,9 +14,7 @@ namespace TradingBotV2.IBKR
         int _port;
         int _clientId;
 
-        public IBBroker(int clientId) : this(clientId, null) {}
-
-        public IBBroker(int clientId, ILogger logger)
+        public IBBroker(int clientId, ILogger logger = null)
         {
             _port = GetPort();
             _clientId = clientId;
@@ -46,6 +42,8 @@ namespace TradingBotV2.IBKR
 
             throw new ArgumentException("Neither TWS Workstation or IB Gateway is running.");
         }
+
+        public bool IsConnected() => _client.IsConnected();
 
         public async Task<string> ConnectAsync()
         {

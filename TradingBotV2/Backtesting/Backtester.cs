@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
@@ -41,7 +42,7 @@ namespace TradingBotV2.Backtesting
         };
 
         IBBroker _broker;
-
+        IHistoricalDataProvider _historicalDataProvider;
         ConcurrentQueue<Action> _requestsQueue;
 
         Task _consumerTask;
@@ -51,9 +52,9 @@ namespace TradingBotV2.Backtesting
         DateTime _end;
         DateTime _currentTime;
 
-        public Backtester(DateTime date) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime) { }
-        
-        public Backtester(DateTime date, TimeSpan startTime, TimeSpan endTime)
+        public Backtester(DateTime date, ILogger logger = null) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, logger) { }
+
+        public Backtester(DateTime date, TimeSpan startTime, TimeSpan endTime, ILogger logger = null)
         {
             _start = new DateTime(date.Date.Ticks + startTime.Ticks);
             _end = new DateTime(date.Date.Ticks + endTime.Ticks);
@@ -62,10 +63,14 @@ namespace TradingBotV2.Backtesting
             if (date.Date == DateTime.Now.Date)
                 throw new ArgumentException("Can't backtest the current day.");
 
-            _broker = new IBBroker(191919);
-            _broker.ConnectAsync().Wait();
+            _broker = new IBBroker(191919, logger);
             LiveDataProvider = new BacktesterLiveDataProvider(this);
-            HistoricalDataProvider = new IBHistoricalDataProvider(_broker.Client);
+            _historicalDataProvider = new IBHistoricalDataProvider(_broker.Client, logger);
+        }
+
+        ~Backtester()
+        {
+            _broker?.DisconnectAsync().Wait();
         }
 
         internal ConcurrentQueue<Action> RequestsQueue => _requestsQueue;
@@ -76,7 +81,15 @@ namespace TradingBotV2.Backtesting
         internal event Action<DateTime> ClockTick;
                 
         public ILiveDataProvider LiveDataProvider { get; init; }
-        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
+        public IHistoricalDataProvider HistoricalDataProvider 
+        {
+            get
+            {
+                if (!_broker.IsConnected())
+                    _broker.ConnectAsync().Wait();
+                return _historicalDataProvider;
+            } 
+        }
         public IOrderManager OrderManager => throw new NotImplementedException();
 
         public Task Start()

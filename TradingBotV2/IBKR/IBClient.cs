@@ -80,6 +80,11 @@ namespace TradingBotV2.IBKR
             }
         }
 
+        internal bool IsConnected()
+        {
+            return _clientSocket.IsConnected();
+        }
+
         public void Disconnect()
         {
             _clientSocket.eDisconnect();
