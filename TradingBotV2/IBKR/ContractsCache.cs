@@ -50,7 +50,7 @@ namespace TradingBotV2.IBKR
         {
             int reqId = -1;
 
-            var tcs = new TaskCompletionSource<List<ContractDetails>>();
+            var tcs = new TaskCompletionSource<List<ContractDetails>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var tmpDetails = new List<ContractDetails>();
             var contractDetails = new Action<int, ContractDetails>((rId, c) =>
             {

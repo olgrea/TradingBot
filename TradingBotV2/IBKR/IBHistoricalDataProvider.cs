@@ -232,7 +232,7 @@ namespace TradingBotV2.IBKR
         async Task<IEnumerable<Bar>> GetHistoricalBarsAsync(string ticker, BarLength barLength, DateTime endDateTime, int count)
         {
             var tmpList = new LinkedList<Bar>();
-            var tcs = new TaskCompletionSource<IEnumerable<Bar>>();
+            var tcs = new TaskCompletionSource<IEnumerable<Bar>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var reqId = -1;
 
             var historicalData = new Action<int, IBApi.Bar>((rId, IBApiBar) =>
@@ -320,7 +320,7 @@ namespace TradingBotV2.IBKR
             int reqId = -1;
             var tmpList = new LinkedList<BidAsk>();
 
-            var tcs = new TaskCompletionSource<IEnumerable<BidAsk>>();
+            var tcs = new TaskCompletionSource<IEnumerable<BidAsk>>(TaskCreationOptions.RunContinuationsAsynchronously);
             source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickBidAsk>, bool>((rId, data, isDone) =>
             {
@@ -359,7 +359,7 @@ namespace TradingBotV2.IBKR
             int reqId = -1;
             var tmpList = new LinkedList<Last>();
 
-            var tcs = new TaskCompletionSource<IEnumerable<Last>>();
+            var tcs = new TaskCompletionSource<IEnumerable<Last>>(TaskCreationOptions.RunContinuationsAsynchronously);
             source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalLastsAsync")));
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
             {

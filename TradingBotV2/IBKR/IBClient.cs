@@ -68,7 +68,7 @@ namespace TradingBotV2.IBKR
             _clientSocket.eConnect(host, port, clientId);
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
-            _processMsgTask = Task.Run(ProcessMsg);
+            _processMsgTask = Task.Factory.StartNew(ProcessMsg, TaskCreationOptions.LongRunning);
         }
 
         void ProcessMsg()
