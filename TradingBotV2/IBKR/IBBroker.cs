@@ -56,10 +56,16 @@ namespace TradingBotV2.IBKR
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
+            int nextId = -1;
+            string account = string.Empty;
+
             var nextValidId = new Action<int>(id =>
             {
                 //_logger.Trace($"ConnectAsync : next valid id {id}");
                 Debug.Assert(id > 0);
+                nextId = id;
+                if(nextId > 0 && !string.IsNullOrEmpty(account))
+                    tcs.TrySetResult(account);
             });
 
             var managedAccounts = new Action<IEnumerable<string>>(accList =>
@@ -68,7 +74,9 @@ namespace TradingBotV2.IBKR
                     tcs.SetException(new NotSupportedException("Only single account structures are supported."));
 
                 //_logger.Trace($"ConnectAsync : managedAccounts {accList} - set result");
-                tcs.TrySetResult(accList.First());
+                account = accList.First();
+                if (nextId > 0 && !string.IsNullOrEmpty(account))
+                    tcs.TrySetResult(account);
             });
 
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
