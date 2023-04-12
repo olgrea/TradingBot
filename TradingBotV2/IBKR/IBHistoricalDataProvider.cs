@@ -152,7 +152,7 @@ namespace TradingBotV2.IBKR
 
                     if(EnableDb)
                     {
-                        _logger?.Info($"Inserting`in db.");
+                        _logger?.Info($"Inserting in db.");
                         DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
                         if(insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
                             _nbInsertedInDb += iCmd.NbInserted;
@@ -396,13 +396,15 @@ namespace TradingBotV2.IBKR
             // TWS API limitations. Pacing violation occurs when : 
             // - Making identical historical data requests within 15 seconds.
             // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
-            // - Making more than 60 requests within any ten minute period.
+            // - Making more than 60 requests within any 10 minute period.
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
             if (_nbRequest == 60)
             {
-                _logger?.Info($"60 requests made : waiting 10 minutes...");
-                Wait10Minutes();
+                // I am not getting any pacing violations if I set the wait time at 1 minute instead of 10...
+                int minutes = 1;
+                _logger?.Info($"60 requests made : waiting {minutes} minutes...");
+                WaitFor(minutes);
                 _logger?.Info($"Resuming.");
                 _nbRequest = 0;
             }
@@ -414,12 +416,12 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        void Wait10Minutes()
+        void WaitFor(int minutes)
         {
-            for (int i = 0; i < 10; ++i)
+            for (int i = 0; i < minutes; ++i)
             {
                 Task.Delay(60 * 1000).Wait();
-                if (i < 9)
+                if (i < minutes-1)
                     _logger?.Info($"{9 - i} minutes left...");
             }
         }
