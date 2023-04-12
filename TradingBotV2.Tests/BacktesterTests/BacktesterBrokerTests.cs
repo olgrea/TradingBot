@@ -9,14 +9,8 @@ namespace BacktesterTests
         [SetUp]
         public override async Task SetUp()
         {
-            _broker = new Backtester(DateTime.Now);
+            _broker = new Backtester(DateTime.Now.AddDays(-1));
             await Task.CompletedTask;
-        }
-
-        [TearDown]
-        public override async Task TearDown()
-        {
-            await _broker.DisconnectAsync();
         }
     }
 }

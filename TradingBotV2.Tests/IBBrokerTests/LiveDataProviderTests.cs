@@ -10,6 +10,7 @@ namespace IBBrokerTests
     {
         public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
 
+        protected TaskCompletionSource<bool> _tcs;
         internal IBroker _broker;
 
         [OneTimeSetUp]
@@ -39,14 +40,14 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var baList = new List<BidAsk>();
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var bidAskReceived = new Action<string, BidAsk>((ticker, bidAsk) =>
             {
                 if (expectedTicker == ticker)
                 {
                     baList.Add(bidAsk);
                     if (baList.Count == 3)
-                        tcs.TrySetResult(true);
+                        _tcs.TrySetResult(true);
                 }
             });
 
@@ -54,7 +55,7 @@ namespace IBBrokerTests
             try
             {
                 _broker.LiveDataProvider.RequestBidAskUpdates(expectedTicker);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {
@@ -69,20 +70,20 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestLastUpdates_SingleTickerSubscription()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string expectedTicker = "SPY";
             var lastList = new List<Last>();
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var lastReceived = new Action<string, Last>((ticker, last) =>
             {
                 if (expectedTicker == ticker)
                 {
                     lastList.Add(last);
                     if (lastList.Count == 3)
-                        tcs.TrySetResult(true);
+                        _tcs.TrySetResult(true);
                 }
             });
 
@@ -90,7 +91,7 @@ namespace IBBrokerTests
             try
             {
                 _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {
@@ -109,7 +110,7 @@ namespace IBBrokerTests
         [Ignore("It seems to be working fine. Not sure why the doc is saying that.")]
         public void RequestTickByTickData_SameTicker_Under15seconds_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string expectedTicker = "SPY";
@@ -137,7 +138,7 @@ namespace IBBrokerTests
         [Ignore("It seems to be working fine. Not sure why the doc is saying that.")]
         public void RequestTickByTickData_NbOfRequestsOver3_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string[] tickers = { "SPY", "QQQ", "GME", "AMC" };
@@ -163,20 +164,20 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_SingleTickerSubscription_SingleBarLength()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string expectedTicker = "SPY";
             var barList = new List<Bar>();
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker && bar.BarLength == BarLength._5Sec)
                 {
                     barList.Add(bar);
                     if (barList.Count == 3)
-                        tcs.TrySetResult(true);
+                        _tcs.TrySetResult(true);
                 }
             });
 
@@ -184,7 +185,7 @@ namespace IBBrokerTests
             try
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {
@@ -203,14 +204,14 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_SingleTickerSubscription_MultipleBarLengths()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string expectedTicker = "SPY";
             var fiveSecBars = new List<Bar>();
             var oneMinBars = new List<Bar>();
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker)
@@ -224,7 +225,7 @@ namespace IBBrokerTests
                     {
                         oneMinBars.Add(bar);
                         if (oneMinBars.Count == 1)
-                            tcs.TrySetResult(true);
+                            _tcs.TrySetResult(true);
                     }
                 }
             });
@@ -234,7 +235,7 @@ namespace IBBrokerTests
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._1Min);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {
@@ -258,13 +259,13 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_SingleBarLengths()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -284,7 +285,7 @@ namespace IBBrokerTests
                 }
 
                 if (fiveSecBars[0].Count == 3 && fiveSecBars[1].Count == 3)
-                    tcs.TrySetResult(true);
+                    _tcs.TrySetResult(true);
             });
 
             _broker.LiveDataProvider.BarReceived += barReceived;
@@ -292,7 +293,7 @@ namespace IBBrokerTests
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {
@@ -315,14 +316,14 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_MultipleBarLengths()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore("Market is not open.");
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
             List<Bar>[] oneMinuteBars = { new List<Bar>(), new List<Bar>() };
 
-            var tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource<bool>();
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -352,7 +353,7 @@ namespace IBBrokerTests
                 }
 
                 if (oneMinuteBars[0].Count == 1 && oneMinuteBars[1].Count == 1)
-                    tcs.TrySetResult(true);
+                    _tcs.TrySetResult(true);
             });
 
             _broker.LiveDataProvider.BarReceived += barReceived;
@@ -362,7 +363,7 @@ namespace IBBrokerTests
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._1Min);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._1Min);
-                await tcs.Task;
+                await _tcs.Task;
             }
             finally
             {

@@ -41,22 +41,25 @@ namespace TradingBotV2.Backtesting
 
         protected override void RequestFiveSecondsBarUpdates(string ticker)
         {
-            if(!_subscriptions.FiveSecBars.Contains(ticker))
+            _backtester.RequestsQueue.Enqueue(() => 
             {
-                _subscriptions.FiveSecBars.Add(ticker);
-            }
+                if(!_subscriptions.FiveSecBars.Contains(ticker))
+                {
+                    _subscriptions.FiveSecBars.Add(ticker);
+                }
 
-            if(!MarketData.ContainsKey(ticker))
-            {
-                MarketData[ticker] = new MarketDataCollections();
-            }
+                if(!MarketData.ContainsKey(ticker))
+                {
+                    MarketData[ticker] = new MarketDataCollections();
+                }
 
-            if (MarketData[ticker].Bars.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var bars = _backtester.HistoricalDataProvider.GetHistoricalOneSecBarsAsync(ticker, timerange.Item1, timerange.Item2).Result;
-                MarketData[ticker].Bars = bars.ToDictionary(b => b.Time);
-            }
+                if (MarketData[ticker].Bars.Count == 0)
+                {
+                    var timerange = _backtester.TimeRange;
+                    var bars = _backtester.HistoricalDataProvider.GetHistoricalOneSecBarsAsync(ticker, timerange.Item1, timerange.Item2).Result;
+                    MarketData[ticker].Bars = bars.ToDictionary(b => b.Time);
+                }
+            });
         }
 
         void OnClockTick_UpdateBar(DateTime newTime)
@@ -66,18 +69,15 @@ namespace TradingBotV2.Backtesting
 
             foreach(string ticker in _subscriptions.FiveSecBars)
             {
-                //if (!MarketData.ContainsKey(kvp.Key))
-                //    continue;
-
-                var list = new List<Bar>(5);
+                var bars = new Bar[5];
                 DateTime current = newTime;
                 for (int i = 0; i < 5; i++)
                 {
-                    list[i] = MarketData[ticker].Bars[current];
+                    bars[i] = MarketData[ticker].Bars[current];
                     current = current.AddSeconds(1);
                 }
 
-                Bar bar = MarketDataUtils.CombineBars(list, BarLength._5Sec);
+                Bar bar = MarketDataUtils.CombineBars(bars, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(bar.Time.ToUniversalTime());
                 RealtimeBar?.Invoke(ticker, (IBApi.FiveSecBar)bar);
             }
@@ -85,7 +85,10 @@ namespace TradingBotV2.Backtesting
 
         protected override void CancelFiveSecondsBarsUpdates(string ticker)
         {
-            _subscriptions.FiveSecBars.Remove(ticker);
+            _backtester.RequestsQueue.Enqueue(() =>
+            {
+                _subscriptions.FiveSecBars.Remove(ticker);
+            });
         }
 
         protected override void SubscribeToRealtimeBarCallback() => RealtimeBar += OnFiveSecondsBarReceived;
@@ -94,24 +97,27 @@ namespace TradingBotV2.Backtesting
 
         protected override void RequestBidAskData(string ticker)
         {
-            if (!_subscriptions.BidAsk.Contains(ticker))
+            _backtester.RequestsQueue.Enqueue(() =>
             {
-                _subscriptions.BidAsk.Add(ticker);
-            }
+                if (!_subscriptions.BidAsk.Contains(ticker))
+                {
+                    _subscriptions.BidAsk.Add(ticker);
+                }
 
-            if (!MarketData.ContainsKey(ticker))
-            {
-                MarketData[ticker] = new MarketDataCollections();
-            }
+                if (!MarketData.ContainsKey(ticker))
+                {
+                    MarketData[ticker] = new MarketDataCollections();
+                }
 
-            if (MarketData[ticker].BidAsks.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var bidAsks = _backtester.HistoricalDataProvider.GetHistoricalBidAsksAsync(ticker, timerange.Item1, timerange.Item2).Result;
-                MarketData[ticker].BidAsks = bidAsks
-                    .GroupBy(ba => ba.Time)
-                    .ToDictionary<IGrouping<DateTime, BidAsk>, DateTime, IEnumerable<BidAsk>>(g => g.Key, g => g);
-            }
+                if (MarketData[ticker].BidAsks.Count == 0)
+                {
+                    var timerange = _backtester.TimeRange;
+                    var bidAsks = _backtester.HistoricalDataProvider.GetHistoricalBidAsksAsync(ticker, timerange.Item1, timerange.Item2).Result;
+                    MarketData[ticker].BidAsks = bidAsks
+                        .GroupBy(ba => ba.Time)
+                        .ToDictionary<IGrouping<DateTime, BidAsk>, DateTime, IEnumerable<BidAsk>>(g => g.Key, g => g);
+                }
+            });
         }
 
         void OnClockTick_UpdateBidAsk(DateTime newTime)
@@ -127,7 +133,10 @@ namespace TradingBotV2.Backtesting
 
         protected override void CancelBidAskData(string ticker)
         {
-            _subscriptions.BidAsk.Remove(ticker);
+            _backtester.RequestsQueue.Enqueue(() =>
+            {
+                _subscriptions.BidAsk.Remove(ticker);
+            });
         }
 
         protected override void SubscribeToBidAskCallback() => BidAsk += TickByTickBidAsk;
@@ -136,24 +145,27 @@ namespace TradingBotV2.Backtesting
 
         protected override void RequestLastData(string ticker)
         {
-            if (!_subscriptions.Last.Contains(ticker))
+            _backtester.RequestsQueue.Enqueue(() =>
             {
-                _subscriptions.Last.Add(ticker);
-            }
+                if (!_subscriptions.Last.Contains(ticker))
+                {
+                    _subscriptions.Last.Add(ticker);
+                }
 
-            if (!MarketData.ContainsKey(ticker))
-            {
-                MarketData[ticker] = new MarketDataCollections();
-            }
+                if (!MarketData.ContainsKey(ticker))
+                {
+                    MarketData[ticker] = new MarketDataCollections();
+                }
 
-            if (MarketData[ticker].Lasts.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var lasts = _backtester.HistoricalDataProvider.GetHistoricalLastsAsync(ticker, timerange.Item1, timerange.Item2).Result;
-                MarketData[ticker].Lasts = lasts
-                    .GroupBy(ba => ba.Time)
-                    .ToDictionary<IGrouping<DateTime, Last>, DateTime, IEnumerable<Last>>(g => g.Key, g => g);
-            }
+                if (MarketData[ticker].Lasts.Count == 0)
+                {
+                    var timerange = _backtester.TimeRange;
+                    var lasts = _backtester.HistoricalDataProvider.GetHistoricalLastsAsync(ticker, timerange.Item1, timerange.Item2).Result;
+                    MarketData[ticker].Lasts = lasts
+                        .GroupBy(ba => ba.Time)
+                        .ToDictionary<IGrouping<DateTime, Last>, DateTime, IEnumerable<Last>>(g => g.Key, g => g);
+                }
+            });
         }
 
         void OnClockTick_UpdateLast(DateTime newTime)
@@ -169,7 +181,10 @@ namespace TradingBotV2.Backtesting
 
         protected override void CancelLastData(string ticker)
         {
-            _subscriptions.Last.Remove(ticker);
+            _backtester.RequestsQueue.Enqueue(() => 
+            {
+                _subscriptions.Last.Remove(ticker); 
+            });
         }
 
         protected override void SubscribeToLastDataCallback() => Last += TickByTickLast;
