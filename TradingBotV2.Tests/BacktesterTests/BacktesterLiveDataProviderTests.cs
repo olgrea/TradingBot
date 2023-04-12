@@ -27,7 +27,8 @@ namespace BacktesterTests
             _backtestingTask = _backtester.Start();
             _backtestingTask.ContinueWith(t =>
             {
-                Debugger.Break();
+                if(t.IsFaulted)
+                    _tcs?.TrySetException(t.Exception);
             });
         }
 
