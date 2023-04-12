@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HistoricalDataGetterApp": {
+      "commandName": "Project",
+      "commandLineArgs": "-t SPY -s 2023-04-03"
+    }
+  }
+}

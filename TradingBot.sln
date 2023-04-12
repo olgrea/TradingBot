@@ -23,9 +23,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester.Tests", "Backtes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot.Tests", "TradingBot.Tests\TradingBot.Tests.csproj", "{C9DB210E-D440-4D17-948A-F936839EA7B5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBotV2", "TradingBotV2\TradingBotV2.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBotV2", "TradingBotV2\TradingBotV2.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBotV2.Tests", "TradingBotV2.Tests\TradingBotV2.Tests.csproj", "{70A524DB-BDE5-4B5E-A223-65575CECA0B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBotV2.Tests", "TradingBotV2.Tests\TradingBotV2.Tests.csproj", "{70A524DB-BDE5-4B5E-A223-65575CECA0B5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HistoricalDataGetterApp", "HistoricalDataGetterApp\HistoricalDataGetterApp.csproj", "{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -81,6 +83,10 @@ Global
 		{70A524DB-BDE5-4B5E-A223-65575CECA0B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{70A524DB-BDE5-4B5E-A223-65575CECA0B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{70A524DB-BDE5-4B5E-A223-65575CECA0B5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
@@ -9,20 +10,22 @@ using TradingBotV2.Broker.Orders;
 
 namespace TradingBotV2.IBKR
 {
-    internal class IBBroker : IBroker
+    public class IBBroker : IBroker
     {        
         IBClient _client;
         int _port;
         int _clientId;
-        
-        public IBBroker(int clientId)
+
+        public IBBroker(int clientId) : this(clientId, null) {}
+
+        public IBBroker(int clientId, ILogger logger)
         {
             _port = GetPort();
             _clientId = clientId;
             _client = new IBClient();
 
             LiveDataProvider = new IBLiveDataProvider(_client);
-            HistoricalDataProvider = new IBHistoricalDataProvider(_client);
+            HistoricalDataProvider = new IBHistoricalDataProvider(_client, logger);
         }
 
         internal IBClient Client => _client;
