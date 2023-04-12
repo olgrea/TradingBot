@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using NLog;
+using NLog.Config;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
 using TradingBotV2.IBKR;
@@ -13,7 +14,10 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            _backtester = new Backtester(new DateTime(2023, 04, 03));
+            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(TradingBotV2.Tests.NunitTargetLogger));
+
+            var logger = LogManager.GetLogger($"{nameof(BacktesterLiveDataProviderTests)}", typeof(TradingBotV2.Tests.NunitTargetLogger));
+            _backtester = new Backtester(new DateTime(2023, 04, 03), logger);
             _broker = _backtester;
             await _broker.ConnectAsync();
 
