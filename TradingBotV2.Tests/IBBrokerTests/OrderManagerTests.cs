@@ -1,0 +1,180 @@
+﻿using System.Diagnostics;
+using System.Net.Sockets;
+using NUnit.Framework;
+using TradingBotV2.Broker;
+using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Broker.Orders;
+using TradingBotV2.IBKR;
+
+namespace TradingBotV2.Tests.IBBrokerTests
+{
+    internal class OrderManagerTests
+    {
+        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
+
+        string _accountCode;
+        internal IBroker _broker;
+
+        [OneTimeSetUp]
+        public virtual async Task OneTimeSetUp()
+        {
+            _broker = new IBBroker(9001);
+            _accountCode = await _broker.ConnectAsync();
+            Assert.NotNull(_accountCode);
+
+            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
+            hdp.DbPath = TestDbPath;
+        }
+
+        [OneTimeTearDown]
+        public async Task OneTimeTearDown()
+        {
+            await Task.Delay(50);
+            await _broker.DisconnectAsync();
+            await Task.Delay(50);
+        }
+
+        [Test]
+        public async Task PlaceOrder_ShouldSucceed()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            string ticker = "GME";
+            int randomQty = new Random().Next(3, 10);
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
+
+            // Test
+            OrderResult result = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+
+            // Assert
+            var orderPlacedResult = result as OrderPlacedResult;
+            Assert.NotNull(orderPlacedResult);
+            Assert.NotNull(orderPlacedResult.OrderStatus);
+
+            Assert.IsTrue(orderPlacedResult.OrderStatus.Status == Status.PreSubmitted || orderPlacedResult.OrderStatus.Status == Status.Submitted);
+        }
+
+        [Test]
+        public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            string ticker = "GME";
+            var account = await _broker.GetAccountAsync(_accountCode);
+            var balance = account.CashBalances["BASE"];
+            var bidAsk = await GetLatestBidAskAsync(ticker);
+            var qty = (int)Math.Round(balance/ bidAsk.Ask + 500);
+
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
+
+            // Test
+            // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync() ?? related to ConfigureAwait() maybe ?
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, order));
+
+            //Exception ex = null;
+            //OrderResult result = null;
+            //try
+            //{
+            //    result = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            //}
+            //catch (Exception e)
+            //{
+            //    ex = e;
+            //}
+            //finally
+            //{
+            //    var r = result as OrderPlacedResult;
+            //    Assert.IsNull(r);
+            //    Assert.IsInstanceOf<ErrorMessageException>(ex);
+            //}
+        }
+
+        [Test]
+        public async Task ModifyOrder_ValidOrderParams_ShouldSucceed()
+        {
+
+        }
+
+        [Test]
+        public async Task CancelOrder_ShouldSucceed()
+        {
+            // Setup
+            string ticker = "GME";
+            int randomQty = new Random().Next(3, 10);
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
+            OrderPlacedResult openOrderMsg = (OrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            Assert.NotNull(openOrderMsg);
+            Assert.NotNull(openOrderMsg.OrderStatus);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
+
+            // Test
+            OrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
+
+            // Assert
+            Assert.NotNull(orderStatus);
+            Assert.IsTrue(orderStatus.Status == Status.Cancelled);
+        }
+
+        [Test]
+        public async Task CancelOrder_AlreadyCanceled_Throws()
+        {
+            // Setup
+            string ticker = "GME";
+            int randomQty = new Random().Next(3, 10);
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
+            OrderPlacedResult openOrderMsg = (OrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            Assert.NotNull(openOrderMsg);
+            Assert.NotNull(openOrderMsg.OrderStatus);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
+
+            // Test
+            OrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
+            Assert.NotNull(orderStatus);
+            Assert.IsTrue(orderStatus.Status == Status.Cancelled);
+
+            // Assert
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id));
+
+            //Exception ex = null;
+            //OrderStatus os2 = null;
+            //try
+            //{
+            //    os2 = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
+            //}
+            //catch (Exception e)
+            //{
+            //    ex = e;
+            //}
+            //finally
+            //{
+            //    Assert.IsInstanceOf<ErrorMessageException>(ex);
+            //}
+        }
+
+        async Task<BidAsk> GetLatestBidAskAsync(string ticker)
+        {
+            var tcs = new TaskCompletionSource<BidAsk>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var callback = new Action<string , BidAsk>((t, ba) =>
+            {
+                if (t == ticker)
+                    tcs.TrySetResult(ba);
+            });
+
+            _broker.LiveDataProvider.BidAskReceived += callback;
+            try
+            {
+                _broker.LiveDataProvider.RequestBidAskUpdates(ticker);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _broker.LiveDataProvider.CancelBidAskUpdates(ticker);
+                _broker.LiveDataProvider.BidAskReceived -= callback;
+            }
+        }
+    }
+}
