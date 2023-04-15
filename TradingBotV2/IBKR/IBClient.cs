@@ -229,11 +229,13 @@ namespace TradingBotV2.IBKR
 
         public void PlaceOrder(Contract contract, Order order)
         {
+            Debug.Assert(order.OrderId > 0);
             _clientSocket.placeOrder(order.OrderId, contract, order);
         }
 
         public void CancelOrder(int orderId)
         {
+            Debug.Assert(orderId > 0);
             _clientSocket.cancelOrder(orderId);
         }
 

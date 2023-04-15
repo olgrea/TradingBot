@@ -15,9 +15,9 @@ namespace TradingBotV2.Broker.Orders
         REDUCE_NON_BLOCK = 3,
     }
 
-    public class RequestInfo
+    internal class RequestInfo
     {
-        public int OrderId { get; set; }
+        public int OrderId { get; set; } = -1;
         public int ClientId { get; set; }
         public int ParentId { get; set; }
         public int PermId { get; set; }
@@ -26,12 +26,14 @@ namespace TradingBotV2.Broker.Orders
         public OcaType OcaType { get; set; }
     }
 
-    // TODO : implement order conditioning
-    // https://interactivebrokers.github.io/tws-api/order_conditions.html
+    // TODO : to investigate/implement : 
+    // Order conditioning
+    // order algos
+    // "One cancels all" groups
     public abstract class Order
     {
-        public RequestInfo Info { get; set; } = new RequestInfo();
-        public int Id
+        internal RequestInfo Info { get; set; } = new RequestInfo();
+        internal int Id
         {
             get => Info.OrderId;
             set => Info.OrderId = value;
@@ -121,7 +123,7 @@ namespace TradingBotV2.Broker.Orders
                 OcaGroup = order.Info.OcaGroup,
                 OcaType = (int)order.Info.OcaType,
 
-                OutsideRth = true,
+                OutsideRth = false,
                 Tif = "DAY"
             };
         }
@@ -172,7 +174,7 @@ namespace TradingBotV2.Broker.Orders
                 OcaGroup = order.Info.OcaGroup,
                 OcaType = (int)order.Info.OcaType,
 
-                OutsideRth = true,
+                OutsideRth = false,
                 Tif = "DAY",
 
                 AuxPrice = order.TouchPrice,
@@ -227,7 +229,7 @@ namespace TradingBotV2.Broker.Orders
                 OcaGroup = order.Info.OcaGroup,
                 OcaType = (int)order.Info.OcaType,
 
-                OutsideRth = true,
+                OutsideRth = false,
                 Tif = "DAY",
 
                 LmtPrice = order.LmtPrice,
@@ -282,7 +284,7 @@ namespace TradingBotV2.Broker.Orders
                 OcaGroup = order.Info.OcaGroup,
                 OcaType = (int)order.Info.OcaType,
 
-                OutsideRth = true,
+                OutsideRth = false,
                 Tif = "DAY",
 
                 AuxPrice = order.StopPrice,
@@ -346,7 +348,7 @@ namespace TradingBotV2.Broker.Orders
                 OcaGroup = order.Info.OcaGroup,
                 OcaType = (int)order.Info.OcaType,
 
-                OutsideRth = true,
+                OutsideRth = false,
                 Tif = "DAY",
 
                 AuxPrice = order.StopPrice,
