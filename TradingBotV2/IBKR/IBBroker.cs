@@ -201,7 +201,7 @@ namespace TradingBotV2.IBKR
             var updatePortfolio = new Action<IBApi.Position>(pos =>
             {
                 //_logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
-                account.Positions.Add((Position)pos);
+                account.Positions[pos.Contract.Symbol] = (Position)pos;
             });
             var accountDownloadEnd = new Action<string>(accountCode =>
             {

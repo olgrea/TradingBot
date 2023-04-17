@@ -25,7 +25,7 @@ namespace TradingBotV2.IBKR
         }
 
         public event Action<string, Order, OrderStatus> OrderUpdated;
-        public event Action<string, OrderExecution, CommissionInfo> OrderExecuted;
+        public event Action<string, OrderExecution> OrderExecuted;
 
         public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
         {
@@ -225,7 +225,8 @@ namespace TradingBotV2.IBKR
         {
             var ci = (CommissionInfo)cr;
             var exec = _orderTracker.Executions[ci.ExecId];
-            OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec, ci);
+            exec.CommissionInfo = ci;
+            OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec);
         }
 
         async Task<int> GetNextValidOrderIdAsync()
