@@ -9,12 +9,14 @@ namespace TradingBotV2.IBKR
         ILogger _logger;
         IBClient _client;
         OrderTracker _orderTracker;
+        OrderValidator _validator;
 
         public IBOrderManager(IBClient client, ILogger logger)
         {
             _logger = logger;
             _client = client;
             _orderTracker = new OrderTracker();
+            _validator = new OrderValidator(_orderTracker);
 
             _client.Responses.OpenOrder += OnOrderOpened;
             _client.Responses.OrderStatus += OnOrderStatus;
@@ -27,19 +29,19 @@ namespace TradingBotV2.IBKR
 
         public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
         {
-            _orderTracker.ValidateOrderPlacement(order);
+            _validator.ValidateOrderPlacement(order);
             return await PlaceOrderInternalAsync(ticker, order);
         }
 
         public async Task<OrderResult> ModifyOrderAsync(Order order)
         {
-            _orderTracker.ValidateOrderModification(order);
+            _validator.ValidateOrderModification(order);
             return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order);
         }
 
         public async Task<OrderStatus> CancelOrderAsync(int orderId)
         {
-            _orderTracker.ValidateOrderCancellation(orderId);
+            _validator.ValidateOrderCancellation(orderId);
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             var orderStatus = new Action<IBApi.OrderStatus>(os =>
             {
@@ -161,8 +163,7 @@ namespace TradingBotV2.IBKR
 
             try
             {
-                _orderTracker.OrderIdsToTicker[order.Id] = ticker;
-                _orderTracker.OrdersRequested[order.Id] = order;
+                _orderTracker.TrackRequest(ticker, order);
                 _client.PlaceOrder(contract, (IBApi.Order)order);
                 return await tcs.Task;
             }
@@ -185,14 +186,13 @@ namespace TradingBotV2.IBKR
                 if (!_orderTracker.OrdersOpened.ContainsKey(order.Id)) // new order submitted
                 {
                     _logger?.Debug($"New order placed : {order}");
-                    _orderTracker.OrdersOpened[order.Id] = order;
+                    _orderTracker.TrackOpening(order);
                 }
                 else // modified order?
                 {
                     _logger?.Debug($"Order with id {order.Id} modified to : {order}.");
-                    _orderTracker.OrdersOpened[order.Id] = order;
+                    _orderTracker.TrackOpening(order);
                 }
-
             }
 
             var os = new OrderStatus()
@@ -209,7 +209,7 @@ namespace TradingBotV2.IBKR
             _orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out Order order);
             if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
             {
-                _orderTracker.OrdersCancelled.TryAdd(os.Info.OrderId, order);
+                _orderTracker.TrackCancellation(order);
             }
 
             OrderUpdated?.Invoke(_orderTracker.OrderIdsToTicker[order.Id], order, os);
@@ -218,8 +218,7 @@ namespace TradingBotV2.IBKR
         void OnOrderExecuted(IBApi.Contract contract, IBApi.Execution e)
         {
             var execution = (OrderExecution)e;
-            _orderTracker.OrdersExecuted.TryAdd(execution.OrderId, execution);
-            _orderTracker.Executions.TryAdd(execution.ExecId, execution);
+            _orderTracker.TrackExecution(execution);
         }
 
         void OnCommissionInfo(IBApi.CommissionReport cr)
