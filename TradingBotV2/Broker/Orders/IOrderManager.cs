@@ -5,5 +5,6 @@
         public Task<OrderResult> PlaceOrderAsync(string ticker, Order order);
         public Task<OrderResult> ModifyOrderAsync(Order order);
         public Task<OrderStatus> CancelOrderAsync(int orderId);
+        public Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync();
     }
 }
