@@ -354,7 +354,9 @@ namespace TradingBotV2.IBKR
                 return;
             }
 
-            throw ex;
+            // TODO : investigate which is better. Ideally it would be nice if I could just throw
+            //throw ex;
+            Error?.Invoke(ex);
         }
 
         #region Not Implemented

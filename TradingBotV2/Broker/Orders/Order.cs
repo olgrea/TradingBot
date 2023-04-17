@@ -134,9 +134,9 @@ namespace TradingBotV2.Broker.Orders
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
-                Id = ibo.OrderId,
                 Info = new RequestInfo()
                 {
+                    OrderId = ibo.OrderId,
                     ClientId = ibo.ClientId,
                     Transmit = ibo.Transmit,
                     ParentId = ibo.ParentId,
@@ -187,9 +187,9 @@ namespace TradingBotV2.Broker.Orders
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
-                Id = ibo.OrderId,
                 Info = new RequestInfo()
                 {
+                    OrderId = ibo.OrderId,
                     ClientId = ibo.ClientId,
                     Transmit = ibo.Transmit,
                     ParentId = ibo.ParentId,
@@ -242,9 +242,9 @@ namespace TradingBotV2.Broker.Orders
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
-                Id = ibo.OrderId,
                 Info = new RequestInfo()
                 {
+                    OrderId = ibo.OrderId,
                     ClientId = ibo.ClientId,
                     Transmit = ibo.Transmit,
                     ParentId = ibo.ParentId,
@@ -297,9 +297,9 @@ namespace TradingBotV2.Broker.Orders
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
-                Id = ibo.OrderId,
                 Info = new RequestInfo()
                 {
+                    OrderId = ibo.OrderId,
                     ClientId = ibo.ClientId,
                     Transmit = ibo.Transmit,
                     ParentId = ibo.ParentId,
@@ -362,9 +362,9 @@ namespace TradingBotV2.Broker.Orders
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
-                Id = ibo.OrderId,
                 Info = new RequestInfo()
                 {
+                    OrderId = ibo.OrderId,
                     ClientId = ibo.ClientId,
                     Transmit = ibo.Transmit,
                     ParentId = ibo.ParentId,

@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net.Sockets;
-using NLog;
+﻿using NLog;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 
@@ -10,18 +8,13 @@ namespace TradingBotV2.IBKR
     {
         ILogger _logger;
         IBClient _client;
-
-        IDictionary<int, string> _orderIdsToTicker = new Dictionary<int, string>(); 
-        IDictionary<int, Order> _ordersRequested = new Dictionary<int, Order>();
-        IDictionary<int, Order> _ordersOpened = new Dictionary<int, Order>();
-        IDictionary<int, OrderExecution> _ordersExecuted = new Dictionary<int, OrderExecution>();
-        IDictionary<int, Order> _ordersCancelled = new Dictionary<int, Order>();
-        IDictionary<string, OrderExecution> _executions = new Dictionary<string, OrderExecution>();
+        OrderTracker _orderTracker;
 
         public IBOrderManager(IBClient client, ILogger logger)
         {
             _logger = logger;
             _client = client;
+            _orderTracker = new OrderTracker();
 
             _client.Responses.OpenOrder += OnOrderOpened;
             _client.Responses.OrderStatus += OnOrderStatus;
@@ -32,63 +25,21 @@ namespace TradingBotV2.IBKR
         public event Action<string, Order, OrderStatus> OrderUpdated;
         public event Action<string, OrderExecution, CommissionInfo> OrderExecuted;
 
-        public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && _ordersRequested.ContainsKey(order.Id);
-        public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && _ordersOpened.ContainsKey(order.Id);
-        public bool IsCancelled(Order order) => order != null && order.Id > 0 && _ordersCancelled.ContainsKey(order.Id);
-        public bool IsExecuted(Order order, out OrderExecution orderExecution)
-        {
-            orderExecution = null;
-            if (order != null && order.Id > 0 && _ordersExecuted.ContainsKey(order.Id))
-            {
-                orderExecution = _ordersExecuted[order.Id];
-                return true;
-            }
-
-            return false;
-        }
-
         public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
         {
-            if (order.Id > 0)
-            {
-                if (_ordersExecuted.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been executed.");
-                else if (_ordersCancelled.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been cancelled.");
-                else if (_ordersOpened.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) is already opened.");
-                else if (_ordersRequested.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been requested.");
-            }
-
+            _orderTracker.ValidateOrderPlacement(order);
             return await PlaceOrderInternalAsync(ticker, order);
         }
 
         public async Task<OrderResult> ModifyOrderAsync(Order order)
         {
-            if (order.Id < 0)
-                throw new ArgumentException("Invalid order (order id not set).");
-            else if (!_ordersOpened.ContainsKey(order.Id))
-                throw new ArgumentException($"No opened order with id {order.Id} to modify.");
-            if (_ordersExecuted.ContainsKey(order.Id))
-                throw new ArgumentException($"This order ({order.Id}) has already been executed.");
-            else if (_ordersCancelled.ContainsKey(order.Id))
-                throw new ArgumentException($"This order ({order.Id}) has already been cancelled.");
-
-            return await PlaceOrderInternalAsync(_orderIdsToTicker[order.Id], order);
+            _orderTracker.ValidateOrderModification(order);
+            return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order);
         }
 
         public async Task<OrderStatus> CancelOrderAsync(int orderId)
         {
-            if (orderId < 0)
-                throw new ArgumentException("Invalid order Id (order id not set).");
-            else if (!_ordersOpened.ContainsKey(orderId))
-                throw new ArgumentException($"No opened order with id {orderId} to modify.");
-            if (_ordersExecuted.ContainsKey(orderId))
-                throw new ArgumentException($"This order ({orderId}) has already been executed.");
-            else if (_ordersCancelled.ContainsKey(orderId))
-                throw new ArgumentException($"This order ({orderId}) has already been cancelled.");
-
+            _orderTracker.ValidateOrderCancellation(orderId);
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             var orderStatus = new Action<IBApi.OrderStatus>(os =>
             {
@@ -115,6 +66,52 @@ namespace TradingBotV2.IBKR
                 _client.Responses.Error -= error;
             }
         }
+
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cancelledOrders = new List<OrderStatus>();
+
+            var openOrdersCount = (await GetOpenOrdersAsync()).Count();
+            if (openOrdersCount == 0)
+                return Enumerable.Empty<OrderStatus>();
+
+            var orderStatus = new Action<IBApi.OrderStatus>(os =>
+            {
+                var oStatus = (OrderStatus)os;
+                if (oStatus.Status == Status.Cancelled || oStatus.Status == Status.ApiCancelled)
+                {
+                    cancelledOrders.Add(oStatus);
+                }
+
+                if (cancelledOrders.Count == openOrdersCount)
+                    tcs.TrySetResult(cancelledOrders);
+            });
+
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (msg.ErrorCode == 202) // Order cancelled
+                    return;
+
+                tcs.TrySetException(msg);
+            });
+
+            _client.Responses.OrderStatus += orderStatus;
+            _client.Responses.Error += error;
+
+            try
+            {
+                _client.CancelAllOrders();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.OrderStatus -= orderStatus;
+                _client.Responses.Error -= error;
+            }
+        }
+
+        // TODO : investigate/implement/test partially filled orders
 
         async Task<OrderResult> PlaceOrderInternalAsync(string ticker, Order order)
         {
@@ -164,8 +161,8 @@ namespace TradingBotV2.IBKR
 
             try
             {
-                _orderIdsToTicker[order.Id] = ticker;
-                _ordersRequested[order.Id] = order;
+                _orderTracker.OrderIdsToTicker[order.Id] = ticker;
+                _orderTracker.OrdersRequested[order.Id] = order;
                 _client.PlaceOrder(contract, (IBApi.Order)order);
                 return await tcs.Task;
             }
@@ -185,15 +182,15 @@ namespace TradingBotV2.IBKR
 
             if (state.Status == Status.Submitted || state.Status == Status.PreSubmitted /*for paper trading accounts*/)
             {
-                if (!_ordersOpened.ContainsKey(order.Id)) // new order submitted
+                if (!_orderTracker.OrdersOpened.ContainsKey(order.Id)) // new order submitted
                 {
-                    _logger.Debug($"New order placed : {order}");
-                    _ordersOpened[order.Id] = order;
+                    _logger?.Debug($"New order placed : {order}");
+                    _orderTracker.OrdersOpened[order.Id] = order;
                 }
                 else // modified order?
                 {
-                    _logger.Debug($"Order with id {order.Id} modified to : {order}.");
-                    _ordersOpened[order.Id] = order;
+                    _logger?.Debug($"Order with id {order.Id} modified to : {order}.");
+                    _orderTracker.OrdersOpened[order.Id] = order;
                 }
 
             }
@@ -209,27 +206,27 @@ namespace TradingBotV2.IBKR
         void OnOrderStatus(IBApi.OrderStatus status)
         {
             OrderStatus os = (OrderStatus)status;
-            _ordersOpened.TryGetValue(os.Info.OrderId, out Order order);
+            _orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out Order order);
             if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
             {
-                _ordersCancelled.TryAdd(os.Info.OrderId, order);
+                _orderTracker.OrdersCancelled.TryAdd(os.Info.OrderId, order);
             }
 
-            OrderUpdated?.Invoke(_orderIdsToTicker[order.Id], order, os);
+            OrderUpdated?.Invoke(_orderTracker.OrderIdsToTicker[order.Id], order, os);
         }
 
         void OnOrderExecuted(IBApi.Contract contract, IBApi.Execution e)
         {
             var execution = (OrderExecution)e;
-            _ordersExecuted.TryAdd(execution.OrderId, execution);
-            _executions.TryAdd(execution.ExecId, execution);
+            _orderTracker.OrdersExecuted.TryAdd(execution.OrderId, execution);
+            _orderTracker.Executions.TryAdd(execution.ExecId, execution);
         }
 
         void OnCommissionInfo(IBApi.CommissionReport cr)
         {
             var ci = (CommissionInfo)cr;
-            var exec = _executions[ci.ExecId];
-            OrderExecuted?.Invoke(_orderIdsToTicker[exec.OrderId], exec, ci);
+            var exec = _orderTracker.Executions[ci.ExecId];
+            OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec, ci);
         }
 
         async Task<int> GetNextValidOrderIdAsync()
@@ -243,13 +240,70 @@ namespace TradingBotV2.IBKR
             _client.Responses.Error += error;
             try
             {
-                _logger.Debug($"Requesting next valid order ids");
+                _logger?.Debug($"Requesting next valid order ids");
                 _client.RequestValidOrderIds();
                 return await tcs.Task;
             }
             finally
             {
                 _client.Responses.NextValidId -= nextValidId;
+                _client.Responses.Error -= error;
+            }
+        }
+
+        internal async Task<IEnumerable<OrderResult>> GetOpenOrdersAsync()
+        {
+            var orderPlacedResults = new Dictionary<int, OrderPlacedResult>();
+            var tcs = new TaskCompletionSource<IEnumerable<OrderResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var openOrder = new Action<IBApi.Contract, IBApi.Order, IBApi.OrderState>((c, o, oState) =>
+            {
+                if(!orderPlacedResults.ContainsKey(o.OrderId))
+                    orderPlacedResults[o.OrderId] = new OrderPlacedResult();
+
+                orderPlacedResults[o.OrderId].Ticker = c.Symbol;
+                orderPlacedResults[o.OrderId].Order = (Order)o;
+                orderPlacedResults[o.OrderId].OrderState = (OrderState)oState;
+            });
+
+            var orderStatus = new Action<IBApi.OrderStatus>(os =>
+            {
+                var oStatus = (OrderStatus)os;
+                if (!orderPlacedResults.ContainsKey(oStatus.Info.OrderId))
+                    orderPlacedResults[oStatus.Info.OrderId] = new OrderPlacedResult();
+
+                orderPlacedResults[oStatus.Info.OrderId].OrderStatus = oStatus;
+            });
+
+            var openOrderEnd = new Action(() =>
+            {
+                IEnumerable<OrderResult> results = orderPlacedResults.Values.ToList();
+                tcs.TrySetResult(results);
+            });
+
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                    return;
+
+                tcs.TrySetException(msg);
+            });
+
+            _client.Responses.OpenOrder += openOrder;
+            _client.Responses.OrderStatus += orderStatus;
+            _client.Responses.OpenOrderEnd += openOrderEnd;
+            _client.Responses.Error += error;
+
+            try
+            {
+                _client.RequestOpenOrders();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.OpenOrder -= openOrder;
+                _client.Responses.OrderStatus -= orderStatus;
+                _client.Responses.OpenOrderEnd -= openOrderEnd;
                 _client.Responses.Error -= error;
             }
         }

@@ -22,13 +22,13 @@ namespace TradingBotV2.IBKR
 
             LiveDataProvider = new IBLiveDataProvider(_client);
             HistoricalDataProvider = new IBHistoricalDataProvider(_client, logger);
+            OrderManager = new IBOrderManager(_client, logger);
         }
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
-
-        public IOrderManager OrderManager => throw new NotImplementedException();
+        public IOrderManager OrderManager { get; init; }
 
         int GetPort()
         {

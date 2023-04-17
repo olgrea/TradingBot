@@ -1,12 +1,10 @@
-﻿using System.Diagnostics;
-using System.Net.Sockets;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 
-namespace TradingBotV2.Tests.IBBrokerTests
+namespace IBBrokerTests
 {
     internal class OrderManagerTests
     {
@@ -29,6 +27,8 @@ namespace TradingBotV2.Tests.IBBrokerTests
         [OneTimeTearDown]
         public async Task OneTimeTearDown()
         {
+            await _broker.OrderManager.CancelAllOrdersAsync();
+            //await _broker.SellAllPositions();
             await Task.Delay(50);
             await _broker.DisconnectAsync();
             await Task.Delay(50);
@@ -42,8 +42,7 @@ namespace TradingBotV2.Tests.IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            int randomQty = new Random().Next(3, 10);
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             // Test
             OrderResult result = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -51,9 +50,11 @@ namespace TradingBotV2.Tests.IBBrokerTests
             // Assert
             var orderPlacedResult = result as OrderPlacedResult;
             Assert.NotNull(orderPlacedResult);
-            Assert.NotNull(orderPlacedResult.OrderStatus);
-
-            Assert.IsTrue(orderPlacedResult.OrderStatus.Status == Status.PreSubmitted || orderPlacedResult.OrderStatus.Status == Status.Submitted);
+            if(orderPlacedResult != null)
+            {
+                Assert.NotNull(orderPlacedResult.OrderStatus);
+                Assert.IsTrue(orderPlacedResult.OrderStatus.Status == Status.PreSubmitted || orderPlacedResult.OrderStatus.Status == Status.Submitted);
+            }
         }
 
         [Test]
@@ -72,31 +73,29 @@ namespace TradingBotV2.Tests.IBBrokerTests
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
 
             // Test
-            // TODO : for some reason I'm receiving expected error 201 ONLY when out of Assert.ThrowsAsync() ?? related to ConfigureAwait() maybe ?
             Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, order));
-
-            //Exception ex = null;
-            //OrderResult result = null;
-            //try
-            //{
-            //    result = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
-            //}
-            //catch (Exception e)
-            //{
-            //    ex = e;
-            //}
-            //finally
-            //{
-            //    var r = result as OrderPlacedResult;
-            //    Assert.IsNull(r);
-            //    Assert.IsInstanceOf<ErrorMessageException>(ex);
-            //}
         }
 
         [Test]
         public async Task ModifyOrder_ValidOrderParams_ShouldSucceed()
         {
+            // Setup
+            string ticker = "GME";
+            int randomQty = new Random().Next(3, 10);
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
+            OrderPlacedResult openOrderMsg = (OrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            Assert.NotNull(openOrderMsg);
+            Assert.NotNull(openOrderMsg.OrderStatus);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
+            // Test
+            order.LmtPrice = 6;
+            OrderPlacedResult result = (OrderPlacedResult) await _broker.OrderManager.ModifyOrderAsync(order);
+
+            // Assert
+            Assert.NotNull(result?.OrderStatus);
+            if(result != null)
+                Assert.IsTrue(result.OrderStatus.Status == Status.PreSubmitted || result.OrderStatus.Status == Status.Submitted);
         }
 
         [Test]
@@ -137,22 +136,7 @@ namespace TradingBotV2.Tests.IBBrokerTests
             Assert.IsTrue(orderStatus.Status == Status.Cancelled);
 
             // Assert
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id));
-
-            //Exception ex = null;
-            //OrderStatus os2 = null;
-            //try
-            //{
-            //    os2 = await _client.CancelOrderAsync(openOrderMsg.Order.Id);
-            //}
-            //catch (Exception e)
-            //{
-            //    ex = e;
-            //}
-            //finally
-            //{
-            //    Assert.IsInstanceOf<ErrorMessageException>(ex);
-            //}
+            Assert.ThrowsAsync<ArgumentException>(async () => await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id));
         }
 
         async Task<BidAsk> GetLatestBidAskAsync(string ticker)
