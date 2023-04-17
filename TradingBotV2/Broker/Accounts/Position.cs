@@ -1,6 +1,4 @@
-﻿using TradingBotV2.Broker.Contracts;
-
-namespace TradingBotV2.Broker.Accounts
+﻿namespace TradingBotV2.Broker.Accounts
 {
     public class Position
     {
@@ -8,7 +6,7 @@ namespace TradingBotV2.Broker.Accounts
 
         public Position(Position pos)
         {
-            Contract = pos.Contract;
+            Ticker = pos.Ticker;
             PositionAmount = pos.PositionAmount;
             MarketPrice = pos.MarketPrice;
             MarketValue = pos.MarketValue;
@@ -17,7 +15,7 @@ namespace TradingBotV2.Broker.Accounts
             RealizedPNL = pos.RealizedPNL;
         }
 
-        public Contract Contract { get; set; }
+        public string Ticker { get; set; }
         public double PositionAmount { get; set; }
         public double MarketPrice { get; set; }
         public double MarketValue { get; set; }
@@ -31,7 +29,7 @@ namespace TradingBotV2.Broker.Accounts
         {
             return new Position()
             {
-                Contract = (Contract)position.Contract,
+                Ticker = position.Contract.Symbol,
                 PositionAmount = position.PositionAmount,
                 MarketPrice = position.MarketPrice,
                 MarketValue = position.MarketValue,

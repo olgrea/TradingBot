@@ -5,7 +5,7 @@ namespace TradingBotV2.Broker.Orders
 {
     public class OrderExecution
     {
-        public string ExecId { get; set; }
+        internal string ExecId { get; set; }
         public int OrderId { get; set; }
         public DateTime Time { get; set; }
         public string AcctNumber { get; set; }
@@ -14,6 +14,7 @@ namespace TradingBotV2.Broker.Orders
         public double Shares { get; set; }
         public double Price { get; set; }
         public double AvgPrice { get; set; }
+        public CommissionInfo CommissionInfo { get; set; }
 
         public override string ToString()
         {

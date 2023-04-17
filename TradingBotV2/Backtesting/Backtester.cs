@@ -19,8 +19,6 @@ namespace TradingBotV2.Backtesting
         }
 
         private const string FakeAccountCode = "FAKEACCOUNT123";
-
-        bool _isConnected = false;
         Account _fakeAccount = new Account()
         {
             Code = FakeAccountCode,
@@ -41,7 +39,11 @@ namespace TradingBotV2.Backtesting
                 }
         };
 
+        bool _isConnected = false;
+        double _totalCommission = 0.0;
+
         IBBroker _broker;
+        ILogger _logger;
         IHistoricalDataProvider _historicalDataProvider;
         ConcurrentQueue<Action> _requestsQueue;
 
@@ -59,6 +61,7 @@ namespace TradingBotV2.Backtesting
             _start = new DateTime(date.Date.Ticks + startTime.Ticks);
             _end = new DateTime(date.Date.Ticks + endTime.Ticks);
             _currentTime = _start;
+            _logger = logger;
 
             if (date.Date == DateTime.Now.Date)
                 throw new ArgumentException("Can't backtest the current day.");
@@ -73,11 +76,14 @@ namespace TradingBotV2.Backtesting
             _broker?.DisconnectAsync().Wait();
         }
 
-        internal ConcurrentQueue<Action> RequestsQueue => _requestsQueue;
         internal DateTime StartTime => _start;
         internal DateTime EndTime => _end;
+        internal DateTime CurrentTime => _currentTime;
         internal (DateTime, DateTime) TimeRange => (_start, _end);
-        
+        internal ILogger Logger => _logger;
+        internal ConcurrentQueue<Action> RequestsQueue => _requestsQueue;
+        internal Account Account => _fakeAccount;
+
         internal event Action<DateTime> ClockTick;
                 
         public ILiveDataProvider LiveDataProvider { get; init; }
@@ -157,6 +163,63 @@ namespace TradingBotV2.Backtesting
         public Task<Account> GetAccountAsync(string accountCode)
         {
             return Task.FromResult(_fakeAccount);
+        }
+
+        internal double UpdateCommissions(Order order, double price)
+        {
+            double commission = GetCommission(order, price);
+            _logger.Debug($"{order} : commission : {commission:c}");
+
+            UpdateCashBalance(-commission);
+            _totalCommission += commission;
+            return commission;
+        }
+
+        internal void UpdateCashBalance(double total)
+        {
+            _fakeAccount.CashBalances["BASE"] += total;
+            _fakeAccount.CashBalances["USD"] += total;
+        }
+
+        internal void UpdateRealizedPNL(string ticker, double totalQty, double price)
+        {
+            Position position = Account.Positions[ticker];
+            var realized = totalQty * (price - position.AverageCost);
+
+            position.RealizedPNL += realized;
+            _fakeAccount.RealizedPnL["BASE"] += realized;
+            _fakeAccount.RealizedPnL["USD"] += realized;
+
+            _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
+        }
+
+        internal void UpdateUnrealizedPNL(string ticker, double currentPrice)
+        {
+            Position position = Account.Positions[ticker];
+
+            position.MarketPrice = currentPrice;
+            position.MarketValue = currentPrice * position.PositionAmount;
+
+            var positionValue = position.PositionAmount * position.AverageCost;
+            var unrealizedPnL = position.MarketValue - positionValue;
+
+            position.UnrealizedPNL = unrealizedPnL;
+            _fakeAccount.UnrealizedPnL["USD"] = unrealizedPnL;
+            _fakeAccount.UnrealizedPnL["BASE"] = unrealizedPnL;
+
+            //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
+        }
+
+        double GetCommission(Order order, double price)
+        {
+            //https://www.interactivebrokers.ca/en/index.php?f=1590
+
+            // fixed rates
+            double @fixed = 0.005;
+            double min = 1.0;
+            double max = order.TotalQuantity * price * 0.01; // 1% of trade value
+
+            return Math.Min(Math.Max(@fixed * order.TotalQuantity, min), max);
         }
     }
 }

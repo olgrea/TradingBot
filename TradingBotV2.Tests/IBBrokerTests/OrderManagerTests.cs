@@ -77,6 +77,23 @@ namespace IBBrokerTests
         }
 
         [Test]
+        public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
+        {
+            if (!MarketDataUtils.IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            string ticker = "GME";
+            var account = await _broker.GetAccountAsync(_accountCode);
+            var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
+            await _broker.OrderManager.PlaceOrderAsync(ticker, buyOrder);
+
+            // Test
+            var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 10 };
+            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, sellOrder));
+        }
+
+        [Test]
         public async Task ModifyOrder_ValidOrderParams_ShouldSucceed()
         {
             // Setup
