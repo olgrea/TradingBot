@@ -15,10 +15,12 @@ namespace TradingBotV2.Backtesting
 
         int _nextOrderId = 1;
 
+        // TODO : use a dependency injecton framework
+
         public BacktesterOrderManager(Backtester backtester)
         {
             _orderTracker = new OrderTracker();
-            _validator = new OrderValidator(_orderTracker);
+            _validator = new OrderValidator(backtester, _orderTracker);
             
             _backtester = backtester;
             _dataProvider = _backtester.LiveDataProvider as BacktesterLiveDataProvider;
@@ -41,9 +43,15 @@ namespace TradingBotV2.Backtesting
             foreach(Order o in _orderTracker.OpenOrders.Values)
             {
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
-                IEnumerable<BidAsk> bidAsks = _dataProvider.MarketData[ticker].BidAsks[newTime];
+                var marketData = _dataProvider.GetMarketData(ticker);
 
-                foreach(BidAsk bidAsk in bidAsks)
+                IEnumerable<BidAsk> latestBidAsks = null;
+                var current = newTime;
+                while (!marketData.BidAsks.ContainsKey(current))
+                    current = current.AddSeconds(-1);
+                latestBidAsks = marketData.BidAsks[current];
+
+                foreach(BidAsk bidAsk in latestBidAsks)
                     _orderEvaluator.EvaluateOrder(ticker, o, bidAsk);
             }
         }
@@ -51,7 +59,7 @@ namespace TradingBotV2.Backtesting
         public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
         {
             var tcs = new TaskCompletionSource<OrderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _backtester.RequestsQueue.Enqueue(() =>
+            Action request = new Action(() =>
             {
                 try
                 {
@@ -87,13 +95,15 @@ namespace TradingBotV2.Backtesting
                 }
             });
 
+            EnqueueRequest(tcs, request);
+
             return await tcs.Task;
         }
 
         public async Task<OrderResult> ModifyOrderAsync(Order order)
         {
             var tcs = new TaskCompletionSource<OrderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _backtester.RequestsQueue.Enqueue(() =>
+            Action request = () =>
             {
                 try
                 {
@@ -126,7 +136,9 @@ namespace TradingBotV2.Backtesting
                 {
                     tcs.TrySetException(e);
                 }
-            });
+            };
+
+            EnqueueRequest(tcs, request);
 
             return await tcs.Task;
         }
@@ -134,7 +146,7 @@ namespace TradingBotV2.Backtesting
         public async Task<OrderStatus> CancelOrderAsync(int orderId)
         {
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _backtester.RequestsQueue.Enqueue(() =>
+            Action request = () =>
             {
                 try
                 {
@@ -161,7 +173,9 @@ namespace TradingBotV2.Backtesting
                 {
                     tcs.TrySetException(e);
                 }
-            });
+            };
+
+            EnqueueRequest(tcs, request);
 
             return await tcs.Task;
         }
@@ -169,10 +183,10 @@ namespace TradingBotV2.Backtesting
         public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
         {
             var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _backtester.RequestsQueue.Enqueue(() =>
+            Action request = () =>
             {
-                var list = new List<OrderStatus>(); 
-                foreach(Order order in _orderTracker.OpenOrders.Values)
+                var list = new List<OrderStatus>();
+                foreach (Order order in _orderTracker.OpenOrders.Values)
                 {
                     var os = new OrderStatus()
                     {
@@ -191,9 +205,26 @@ namespace TradingBotV2.Backtesting
                 }
 
                 tcs.TrySetResult(list);
-            });
+            };
+
+            EnqueueRequest(tcs, request);
 
             return await tcs.Task;
+        }
+
+        private void EnqueueRequest<TResult>(TaskCompletionSource<TResult> tcs, Action request)
+        {
+            try
+            {
+                _backtester.EnqueueRequest(request);
+            }
+            catch (Exception ex)
+            {
+                if (ex is OperationCanceledException)
+                    tcs.TrySetCanceled();
+                else
+                    tcs.TrySetException(ex);
+            }
         }
     }
 }

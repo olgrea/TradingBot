@@ -45,11 +45,11 @@ namespace TradingBotV2.Backtesting
         IBBroker _broker;
         ILogger _logger;
         IHistoricalDataProvider _historicalDataProvider;
-        ConcurrentQueue<Action> _requestsQueue;
+        ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
         Task _consumerTask;
         CancellationTokenSource _cancellation;
-
+        
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
@@ -69,6 +69,7 @@ namespace TradingBotV2.Backtesting
             _broker = new IBBroker(191919, logger);
             LiveDataProvider = new BacktesterLiveDataProvider(this);
             _historicalDataProvider = new IBHistoricalDataProvider(_broker.Client, logger);
+            OrderManager = new BacktesterOrderManager(this);
         }
 
         ~Backtester()
@@ -81,7 +82,6 @@ namespace TradingBotV2.Backtesting
         internal DateTime CurrentTime => _currentTime;
         internal (DateTime, DateTime) TimeRange => (_start, _end);
         internal ILogger Logger => _logger;
-        internal ConcurrentQueue<Action> RequestsQueue => _requestsQueue;
         internal Account Account => _fakeAccount;
 
         internal event Action<DateTime> ClockTick;
@@ -96,13 +96,62 @@ namespace TradingBotV2.Backtesting
                 return _historicalDataProvider;
             } 
         }
-        public IOrderManager OrderManager => throw new NotImplementedException();
+        public IOrderManager OrderManager { get; init; }
+
+        public IProgress<BacktesterProgress> ProgressHandler { get; set; }
+
+        internal MarketDataCollections GetMarketData(string ticker)
+        {
+            MarketDataCollections data = null;
+            if(LiveDataProvider is BacktesterLiveDataProvider backtesterProvider)
+            {
+                data = backtesterProvider.GetMarketData(ticker);
+            }
+            return data;
+        }
+
+        internal void EnqueueRequest(Action action)
+        {
+            if (_consumerTask == null)
+                throw new InvalidOperationException($"Consumer task not started.");
+
+            if (_consumerTask.IsFaulted)
+                _consumerTask.Wait();
+            else
+                _cancellation.Token.ThrowIfCancellationRequested();
+
+            _requestsQueue.Enqueue(action);
+        }
+
+        internal void SetTimeRange(DateTime start, DateTime end)
+        {
+            if (_consumerTask != null)
+                throw new InvalidOperationException("Backtesting task is already started. Stop it to be abel to change the time range.");
+
+            DateTime date = _start.Date;
+            _start = new DateTime(date.Date.Ticks + start.Ticks);
+            _end = new DateTime(date.Date.Ticks + end.Ticks);
+            _currentTime = _start;
+        }
 
         public Task Start()
         {
+            if (IsDayOver())
+                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is completed.");
+
             if(_consumerTask == null)
             {
-                _requestsQueue = new ConcurrentQueue<Action>();
+                _cancellation = new CancellationTokenSource();
+                _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token);
+            }
+            else if(_consumerTask.IsFaulted)
+            {
+                _consumerTask.Wait();
+            }
+            else if (_consumerTask.IsCanceled)
+            {
+                _cancellation.Dispose();
+                _consumerTask.Dispose();
                 _cancellation = new CancellationTokenSource();
                 _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token);
             }
@@ -113,14 +162,18 @@ namespace TradingBotV2.Backtesting
         public void Stop()
         {
             _cancellation?.Cancel();
-            _cancellation?.Dispose();
-            _cancellation = null;
-            _consumerTask = null;
         }
 
         public void Reset()
         {
             Stop();
+
+            _cancellation?.Dispose();
+            _cancellation = null;
+            _consumerTask?.Dispose();
+            _consumerTask = null;
+            _requestsQueue.Clear();
+
             _currentTime = _start;
             (LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
         }
@@ -128,22 +181,31 @@ namespace TradingBotV2.Backtesting
         void PassTime()
         {
             var mainToken = _cancellation.Token;
+            var bp = new BacktesterProgress();
 
             //_logger.Trace($"Passing time task started");
-            while (!mainToken.IsCancellationRequested && _currentTime < _end)
+            while (!mainToken.IsCancellationRequested && !IsDayOver())
             {
-                mainToken.ThrowIfCancellationRequested();
-
                 // Let's process the requests first 
                 while(_requestsQueue.TryDequeue(out Action action))
                     action();
 
+                mainToken.ThrowIfCancellationRequested();
+
                 ClockTick?.Invoke(_currentTime);
                 if (TimeDelays.OneSecond > 0)
                     Task.Delay(TimeDelays.OneSecond).Wait(mainToken);
+
                 _currentTime = _currentTime.AddSeconds(1);
+                
+                bp.CurrentTime = _currentTime;
+
+                mainToken.ThrowIfCancellationRequested();
+                ProgressHandler?.Report(bp);
             }
         }
+
+        bool IsDayOver() => _currentTime >= _end;
 
         public Task<string> ConnectAsync()
         {

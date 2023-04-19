@@ -10,9 +10,11 @@ namespace TradingBotV2.Broker.Orders
     internal class OrderValidator
     {
         OrderTracker _orderTracker;
+        IBroker _broker;
 
-        public OrderValidator(OrderTracker orderTracker)
+        public OrderValidator(IBroker broker, OrderTracker orderTracker)
         {
+            _broker = broker;
             _orderTracker = orderTracker;
         }
 
