@@ -3,7 +3,7 @@ using TradingBotV2.DataStorage.Sqlite.DbCommands;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 {
-    public class LastCommandFactory : DbCommandFactory<Last>
+    public class LastCommandFactory : DbCommandFactory
     {
         public LastCommandFactory(string dbPath) : base(dbPath)
         {
@@ -19,19 +19,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             return new LastExistsCommand(symbol, date, timeRange, _connection);
         }
 
-        public override DbCommand<IEnumerable<Last>> CreateSelectCommand(string symbol, DateTime date)
+        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date)
         {
             return new SelectLastsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
         }
 
-        public override DbCommand<IEnumerable<Last>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
         {
             return new SelectLastsCommand(symbol, date, timeRange, _connection);
         }
 
-        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<Last> dataCollection)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<IMarketData> dataCollection)
         {
-            return new InsertLastsCommand(symbol, dataCollection, _connection);
+            return new InsertLastsCommand(symbol, dataCollection.Cast<Last>(), _connection);
         }
     }
 }

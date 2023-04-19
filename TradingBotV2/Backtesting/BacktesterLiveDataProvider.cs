@@ -74,8 +74,8 @@ namespace TradingBotV2.Backtesting
             if (_marketData[ticker].Bars.Count == 0)
             {
                 var timerange = _backtester.TimeRange;
-                var bars = _backtester.HistoricalDataProvider.GetHistoricalOneSecBarsAsync(ticker, timerange.Item1, timerange.Item2).Result;
-                _marketData[ticker].Bars = bars.ToDictionary(b => b.Time);
+                var bars = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(ticker, timerange.Item1, timerange.Item2).Result;
+                _marketData[ticker].Bars = bars.ToDictionary(b => b.Time, b => (Bar)b);
             }
         }
 
@@ -135,9 +135,9 @@ namespace TradingBotV2.Backtesting
             if (_marketData[ticker].BidAsks.Count == 0)
             {
                 var timerange = _backtester.TimeRange;
-                var bidAsks = _backtester.HistoricalDataProvider.GetHistoricalBidAsksAsync(ticker, timerange.Item1, timerange.Item2).Result;
+                var bidAsks = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<BidAsk>(ticker, timerange.Item1, timerange.Item2).Result;
                 _marketData[ticker].BidAsks = bidAsks
-                    .GroupBy(ba => ba.Time)
+                    .GroupBy(ba => ba.Time, ba => (BidAsk)ba)
                     .ToDictionary<IGrouping<DateTime, BidAsk>, DateTime, IEnumerable<BidAsk>>(g => g.Key, g => g);
             }
         }
@@ -188,9 +188,9 @@ namespace TradingBotV2.Backtesting
             if (_marketData[ticker].Lasts.Count == 0)
             {
                 var timerange = _backtester.TimeRange;
-                var lasts = _backtester.HistoricalDataProvider.GetHistoricalLastsAsync(ticker, timerange.Item1, timerange.Item2).Result;
+                var lasts = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<Last>(ticker, timerange.Item1, timerange.Item2).Result;
                 _marketData[ticker].Lasts = lasts
-                    .GroupBy(ba => ba.Time)
+                    .GroupBy(md => md.Time, md => (Last)md)
                     .ToDictionary<IGrouping<DateTime, Last>, DateTime, IEnumerable<Last>>(g => g.Key, g => g);
             }
         }

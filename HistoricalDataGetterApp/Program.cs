@@ -63,17 +63,17 @@ namespace HistoricalDataGetterApp
             bool fetchEverything = marketDataOptions.HasFlag(MarketDataOptions.All);
             if (fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.Bar))
             {
-                await broker.HistoricalDataProvider.GetHistoricalOneSecBarsAsync(ticker, startDate, endDate);
+                await broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(ticker, startDate, endDate);
             }
 
             if (fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.BidAsk))
             {
-                await broker.HistoricalDataProvider.GetHistoricalBidAsksAsync(ticker, startDate, endDate);
+                await broker.HistoricalDataProvider.GetHistoricalDataAsync<BidAsk>(ticker, startDate, endDate);
             }
 
             if (fetchEverything || marketDataOptions.HasFlag(MarketDataOptions.Last))
             {
-                await broker.HistoricalDataProvider.GetHistoricalLastsAsync(ticker, startDate, endDate);
+                await broker.HistoricalDataProvider.GetHistoricalDataAsync<Last>(ticker, startDate, endDate);
             }
 
             logger.Info($"\nComplete!\n");
