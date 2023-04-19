@@ -11,12 +11,12 @@ namespace TradingBotV2.IBKR
         OrderTracker _orderTracker;
         OrderValidator _validator;
 
-        public IBOrderManager(IBClient client, ILogger logger)
+        public IBOrderManager(IBBroker broker, ILogger logger)
         {
             _logger = logger;
-            _client = client;
+            _client = broker.Client;
             _orderTracker = new OrderTracker();
-            _validator = new OrderValidator(_orderTracker);
+            _validator = new OrderValidator(broker, _orderTracker);
 
             _client.Responses.OpenOrder += OnOrderOpened;
             _client.Responses.OrderStatus += OnOrderStatus;

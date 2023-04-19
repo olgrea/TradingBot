@@ -22,7 +22,7 @@ namespace TradingBotV2.IBKR
 
             LiveDataProvider = new IBLiveDataProvider(_client);
             HistoricalDataProvider = new IBHistoricalDataProvider(_client, logger);
-            OrderManager = new IBOrderManager(_client, logger);
+            OrderManager = new IBOrderManager(this, logger);
         }
 
         internal IBClient Client => _client;

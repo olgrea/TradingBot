@@ -1,24 +1,23 @@
-﻿using NLog;
-using NLog.Config;
+﻿using NLog.Config;
+using NLog;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
+using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 
 namespace BacktesterTests
 {
-    internal class BacktesterLiveDataProviderTests : IBBrokerTests.LiveDataProviderTests
+    internal class BacktesterOrderManagerTests : IBBrokerTests.OrderManagerTests
     {
         Backtester _backtester;
-        Task _backtestingTask;
 
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            // TODO : need to move that elsewhere, or create an assembly
             ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(TradingBotV2.Tests.NunitTargetLogger));
 
-            var logger = LogManager.GetLogger($"{nameof(BacktesterLiveDataProviderTests)}", typeof(TradingBotV2.Tests.NunitTargetLogger));
-            _backtester = new Backtester(new DateTime(2023, 04, 03), logger);
+            var logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(TradingBotV2.Tests.NunitTargetLogger));
+            _backtester = new Backtester(new DateTime(2023, 04, 10), logger);
             _broker = _backtester;
             await _broker.ConnectAsync();
 
@@ -29,20 +28,14 @@ namespace BacktesterTests
         [SetUp]
         public void SetUp()
         {
-            // TODO : Is there a better way?
-
-            _backtestingTask = _backtester.Start();
-            _backtestingTask.ContinueWith(t =>
-            {
-                if(t.IsFaulted)
-                    _tcs?.TrySetException(t.Exception);
-            });
+            _backtester.Reset();
+            _backtester.Start();
         }
 
         [TearDown]
         public void TearDown()
         {
-            _backtester.Reset();
+            _backtester.Stop();
         }
 
         protected override bool IsMarketOpen()

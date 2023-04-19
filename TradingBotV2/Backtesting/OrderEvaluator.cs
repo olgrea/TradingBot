@@ -179,16 +179,19 @@ namespace TradingBotV2.Backtesting
             _logger?.Info($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
-            Position position = _backtester.Account.Positions[ticker];
             Account account = _backtester.Account;
+            if(!_backtester.Account.Positions.TryGetValue(ticker, out Position position))
+            {
+                position = _backtester.Account.Positions[ticker] = new Position() { Ticker = ticker};
+            }
 
             if (order.Action == OrderAction.BUY)
             {
+                // TODO implement on client-side
                 if (total > _backtester.Account.CashBalances["USD"])
                 {
                     _logger?.Error($"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {account.CashBalances["USD"]}");
 
-                    // TODO : was this really necessary? Should be checked when order is placed?
                     //CancelOrder(order.Id);
                     return;
                 }
@@ -203,10 +206,10 @@ namespace TradingBotV2.Backtesting
             }
             else if (order.Action == OrderAction.SELL)
             {
+                // TODO implement on client-side
                 if (position.PositionAmount < order.TotalQuantity)
                 {
                     _logger?.Error($"{order} Cannot execute SELL order! Not enough position (required : {order.TotalQuantity}, actual : {position.PositionAmount}");
-                    // TODO : was this really necessary? Should be checked when order is placed?
                     //CancelOrderInternal(order.Id);
                     return;
                 }

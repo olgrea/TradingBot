@@ -34,10 +34,12 @@ namespace IBBrokerTests
             await Task.Delay(50);
         }
 
+        // TODO : add more tests
+
         [Test]
         public async Task PlaceOrder_ShouldSucceed()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
@@ -60,7 +62,7 @@ namespace IBBrokerTests
         [Test]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
@@ -77,9 +79,10 @@ namespace IBBrokerTests
         }
 
         [Test]
+        [Ignore("IB paper trading accounts allow shorting. Need to implement client-side validation.")]
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
-            if (!MarketDataUtils.IsMarketOpen())
+            if (!IsMarketOpen())
                 Assert.Ignore();
 
             // Setup
@@ -96,6 +99,9 @@ namespace IBBrokerTests
         [Test]
         public async Task ModifyOrder_ValidOrderParams_ShouldSucceed()
         {
+            if (!IsMarketOpen())
+                Assert.Ignore();
+
             // Setup
             string ticker = "GME";
             int randomQty = new Random().Next(3, 10);
@@ -118,6 +124,9 @@ namespace IBBrokerTests
         [Test]
         public async Task CancelOrder_ShouldSucceed()
         {
+            if (!IsMarketOpen())
+                Assert.Ignore();
+
             // Setup
             string ticker = "GME";
             int randomQty = new Random().Next(3, 10);
@@ -138,6 +147,9 @@ namespace IBBrokerTests
         [Test]
         public async Task CancelOrder_AlreadyCanceled_Throws()
         {
+            if (!IsMarketOpen())
+                Assert.Ignore();
+
             // Setup
             string ticker = "GME";
             int randomQty = new Random().Next(3, 10);
@@ -176,6 +188,11 @@ namespace IBBrokerTests
                 _broker.LiveDataProvider.CancelBidAskUpdates(ticker);
                 _broker.LiveDataProvider.BidAskReceived -= callback;
             }
+        }
+
+        protected virtual bool IsMarketOpen()
+        {
+            return MarketDataUtils.IsMarketOpen();
         }
     }
 }
