@@ -85,7 +85,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         }
     }
 
-    internal abstract class SelectCommand<TMarketData> : DbCommand<IEnumerable<TMarketData>>
+    internal abstract class SelectCommand<TMarketData> : DbCommand<IEnumerable<IMarketData>>
     {
         protected string _symbol;
         protected DateTime _date;
@@ -100,12 +100,12 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             _marketDataName = typeof(TMarketData).Name;
         }
 
-        public override IEnumerable<TMarketData> Execute()
+        public override IEnumerable<IMarketData> Execute()
         {
             SqliteCommand command = _connection.CreateCommand();
             command.CommandText = MakeSelectCommandText();
             using SqliteDataReader reader = command.ExecuteReader();
-            return new LinkedList<TMarketData>(reader.Cast<IDataRecord>().Select(MakeDataFromResults));
+            return new LinkedList<IMarketData>(reader.Cast<IDataRecord>().Select(MakeDataFromResults));
         }
 
         protected virtual string MakeSelectCommandText()
@@ -121,7 +121,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             ";
         }
 
-        protected abstract TMarketData MakeDataFromResults(IDataRecord record);
+        protected abstract IMarketData MakeDataFromResults(IDataRecord record);
     }
 
     internal abstract class InsertCommand<TMarketData> : DbCommand<bool>
