@@ -31,7 +31,7 @@ namespace TradingBotV2.Broker.Orders
                 else if (_orderTracker.OrdersRequested.ContainsKey(order.Id))
                     throw new ArgumentException($"This order ({order.Id}) has already been requested.");
 
-                // TODO : add these client-side verifications : 
+                // TODO : add these client-side verifications? For Trader only? 
                 // not enough funds when buying
                 // not enough positions when selling
             }
