@@ -60,6 +60,7 @@ namespace IBBrokerTests
         }
 
         [Test]
+        [Ignore("Move that to Trader tests.")]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
             if (!IsMarketOpen())
@@ -79,7 +80,7 @@ namespace IBBrokerTests
         }
 
         [Test]
-        [Ignore("IB paper trading accounts allow shorting. Need to implement client-side validation.")]
+        [Ignore("IB allow shorting for paper trading accounts but not for cash accounts. Need to implement client-side validation. Move that to Trader tests.")]
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
             if (!IsMarketOpen())
