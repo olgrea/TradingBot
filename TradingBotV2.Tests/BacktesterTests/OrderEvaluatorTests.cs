@@ -48,7 +48,7 @@ namespace BacktesterTests
             };
 
             DateTime timeOfOrderPlacement = _upwardTimeRange.Item1.AddMinutes(5);
-            var expectedPrice = backtester.GetMarketData(Ticker).BidAsks[timeOfOrderPlacement].First().Ask;
+            var expectedPrice = (await backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement)).First().Ask;
 
             var tcs = new TaskCompletionSource();
             backtester.ProgressHandler = new Progress<BacktesterProgress>(bp =>

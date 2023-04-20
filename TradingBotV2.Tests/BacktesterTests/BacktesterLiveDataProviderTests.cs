@@ -30,19 +30,15 @@ namespace BacktesterTests
         public void SetUp()
         {
             // TODO : Is there a better way?
-
+            _backtester.Reset();
             _backtestingTask = _backtester.Start();
-            _backtestingTask.ContinueWith(t =>
-            {
-                if(t.IsFaulted)
-                    _tcs?.TrySetException(t.Exception);
-            });
+            _backtestingTask.ContinueWith(t => _tcs?.TrySetException(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
         }
 
         [TearDown]
         public void TearDown()
         {
-            _backtester.Reset();
+            _backtester.Stop();
         }
 
         protected override bool IsMarketOpen()

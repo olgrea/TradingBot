@@ -70,6 +70,7 @@ namespace TradingBotV2.Backtesting
             LiveDataProvider = new BacktesterLiveDataProvider(this);
             _historicalDataProvider = new IBHistoricalDataProvider(_broker.Client, logger);
             OrderManager = new BacktesterOrderManager(this);
+            MarketData = new MarketDataCollections(this);
         }
 
         ~Backtester()
@@ -83,9 +84,12 @@ namespace TradingBotV2.Backtesting
         internal (DateTime, DateTime) TimeRange => (_start, _end);
         internal ILogger Logger => _logger;
         internal Account Account => _fakeAccount;
+        internal CancellationToken CancellationToken => _cancellation != null ? _cancellation.Token : CancellationToken.None;
 
         internal event Action<DateTime> ClockTick;
                 
+        internal MarketDataCollections MarketData { get; init; }
+
         public ILiveDataProvider LiveDataProvider { get; init; }
         public IHistoricalDataProvider HistoricalDataProvider 
         {
@@ -100,16 +104,6 @@ namespace TradingBotV2.Backtesting
 
         public IProgress<BacktesterProgress> ProgressHandler { get; set; }
 
-        internal MarketDataCollections GetMarketData(string ticker)
-        {
-            MarketDataCollections data = null;
-            if(LiveDataProvider is BacktesterLiveDataProvider backtesterProvider)
-            {
-                data = backtesterProvider.GetMarketData(ticker);
-            }
-            return data;
-        }
-
         internal void EnqueueRequest(Action action)
         {
             if (_consumerTask == null)
@@ -121,17 +115,6 @@ namespace TradingBotV2.Backtesting
                 _cancellation.Token.ThrowIfCancellationRequested();
 
             _requestsQueue.Enqueue(action);
-        }
-
-        internal void SetTimeRange(DateTime start, DateTime end)
-        {
-            if (_consumerTask != null)
-                throw new InvalidOperationException("Backtesting task is already started. Stop it to be abel to change the time range.");
-
-            DateTime date = _start.Date;
-            _start = new DateTime(date.Date.Ticks + start.Ticks);
-            _end = new DateTime(date.Date.Ticks + end.Ticks);
-            _currentTime = _start;
         }
 
         public Task Start()
@@ -175,7 +158,7 @@ namespace TradingBotV2.Backtesting
             _requestsQueue.Clear();
 
             _currentTime = _start;
-            (LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
+            //(LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
         }
 
         void PassTime()

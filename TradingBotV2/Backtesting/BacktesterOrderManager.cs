@@ -11,7 +11,6 @@ namespace TradingBotV2.Backtesting
         OrderTracker _orderTracker;
         OrderValidator _validator;
         Backtester _backtester;
-        BacktesterLiveDataProvider _dataProvider;
 
         int _nextOrderId = 1;
 
@@ -23,10 +22,7 @@ namespace TradingBotV2.Backtesting
             _validator = new OrderValidator(backtester, _orderTracker);
             
             _backtester = backtester;
-            _dataProvider = _backtester.LiveDataProvider as BacktesterLiveDataProvider;
-            _backtester.ClockTick += OnClockTick_EvaluateOrders;
-
-            _orderEvaluator = new OrderEvaluator(_backtester, this);
+            _orderEvaluator = new OrderEvaluator(_backtester, _orderTracker);
         }
 
         public event Action<string, Order, OrderStatus> OrderUpdated;
@@ -37,24 +33,6 @@ namespace TradingBotV2.Backtesting
         }
 
         int NextOrderId => _nextOrderId++;
-
-        private void OnClockTick_EvaluateOrders(DateTime newTime)
-        {
-            foreach(Order o in _orderTracker.OpenOrders.Values)
-            {
-                var ticker = _orderTracker.OrderIdsToTicker[o.Id];
-                var marketData = _dataProvider.GetMarketData(ticker);
-
-                IEnumerable<BidAsk> latestBidAsks = null;
-                var current = newTime;
-                while (!marketData.BidAsks.ContainsKey(current))
-                    current = current.AddSeconds(-1);
-                latestBidAsks = marketData.BidAsks[current];
-
-                foreach(BidAsk bidAsk in latestBidAsks)
-                    _orderEvaluator.EvaluateOrder(ticker, o, bidAsk);
-            }
-        }
 
         public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
         {
