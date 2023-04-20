@@ -1,4 +1,5 @@
-﻿using TradingBotV2.Broker.MarketData;
+﻿using System.Collections.Concurrent;
+using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 
 namespace TradingBotV2.Backtesting
@@ -13,7 +14,6 @@ namespace TradingBotV2.Backtesting
         }
         
         Subscriptions _subscriptions = new Subscriptions();
-        Dictionary<string, MarketDataCollections> _marketData = new Dictionary<string, MarketDataCollections>();
         Backtester _backtester;
 
         public BacktesterLiveDataProvider(Backtester backtester)
@@ -29,28 +29,6 @@ namespace TradingBotV2.Backtesting
         event Action<string, IBApi.BidAsk> BidAsk;
         event Action<string, IBApi.Last> Last;
 
-        internal MarketDataCollections GetMarketData(string ticker)
-        {
-            // TODO : retrieve only what is needed instead of everything for the day...
-            if(!_marketData.ContainsKey(ticker))
-            {
-                GetHistoricalOneSecBars(ticker);
-                GetHistoricalBidAsk(ticker);
-                GetHistoricalLasts(ticker);
-            }
-
-            return _marketData[ticker];
-        }
-
-        internal void Reset()
-        {
-            _subscriptions = new Subscriptions();
-            RealtimeBar = null;
-            BidAsk = null;
-            Last = null;
-            _marketData.Clear();
-        }
-
         protected override void RequestFiveSecondsBarUpdates(string ticker)
         {
             _backtester.EnqueueRequest(() =>
@@ -59,24 +37,7 @@ namespace TradingBotV2.Backtesting
                 {
                     _subscriptions.FiveSecBars.Add(ticker);
                 }
-
-                GetHistoricalOneSecBars(ticker);
             });
-        }
-
-        private void GetHistoricalOneSecBars(string ticker)
-        {
-            if (!_marketData.ContainsKey(ticker))
-            {
-                _marketData[ticker] = new MarketDataCollections();
-            }
-
-            if (_marketData[ticker].Bars.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var bars = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(ticker, timerange.Item1, timerange.Item2).Result;
-                _marketData[ticker].Bars = bars.ToDictionary(b => b.Time, b => (Bar)b);
-            }
         }
 
         void OnClockTick_UpdateBar(DateTime newTime)
@@ -90,7 +51,7 @@ namespace TradingBotV2.Backtesting
                 DateTime current = newTime;
                 for (int i = 0; i < 5; i++)
                 {
-                    bars[i] = _marketData[ticker].Bars[current];
+                    bars[i] = _backtester.MarketData.Bars.GetAsync(ticker, current).Result.First();
                     current = current.AddSeconds(1);
                 }
 
@@ -120,33 +81,14 @@ namespace TradingBotV2.Backtesting
                 {
                     _subscriptions.BidAsk.Add(ticker);
                 }
-
-                GetHistoricalBidAsk(ticker);
             });
-        }
-
-        private void GetHistoricalBidAsk(string ticker)
-        {
-            if (!_marketData.ContainsKey(ticker))
-            {
-                _marketData[ticker] = new MarketDataCollections();
-            }
-
-            if (_marketData[ticker].BidAsks.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var bidAsks = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<BidAsk>(ticker, timerange.Item1, timerange.Item2).Result;
-                _marketData[ticker].BidAsks = bidAsks
-                    .GroupBy(ba => ba.Time, ba => (BidAsk)ba)
-                    .ToDictionary<IGrouping<DateTime, BidAsk>, DateTime, IEnumerable<BidAsk>>(g => g.Key, g => g);
-            }
         }
 
         void OnClockTick_UpdateBidAsk(DateTime newTime)
         {
             foreach (string ticker in _subscriptions.BidAsk)
             {
-                foreach(BidAsk ba in _marketData[ticker].BidAsks[newTime])
+                foreach(BidAsk ba in _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result)
                 {
                     BidAsk?.Invoke(ticker, (IBApi.BidAsk)ba);
                 }
@@ -173,33 +115,14 @@ namespace TradingBotV2.Backtesting
                 {
                     _subscriptions.Last.Add(ticker);
                 }
-
-                GetHistoricalLasts(ticker);
             });
-        }
-
-        private void GetHistoricalLasts(string ticker)
-        {
-            if (!_marketData.ContainsKey(ticker))
-            {
-                _marketData[ticker] = new MarketDataCollections();
-            }
-
-            if (_marketData[ticker].Lasts.Count == 0)
-            {
-                var timerange = _backtester.TimeRange;
-                var lasts = _backtester.HistoricalDataProvider.GetHistoricalDataAsync<Last>(ticker, timerange.Item1, timerange.Item2).Result;
-                _marketData[ticker].Lasts = lasts
-                    .GroupBy(md => md.Time, md => (Last)md)
-                    .ToDictionary<IGrouping<DateTime, Last>, DateTime, IEnumerable<Last>>(g => g.Key, g => g);
-            }
         }
 
         void OnClockTick_UpdateLast(DateTime newTime)
         {
             foreach (string ticker in _subscriptions.Last)
             {
-                foreach (Last last in _marketData[ticker].Lasts[newTime])
+                foreach (Last last in _backtester.MarketData.Lasts.GetAsync(ticker, newTime).Result)
                 {
                     Last?.Invoke(ticker, (IBApi.Last)last);
                 }

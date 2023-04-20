@@ -8,19 +8,40 @@ namespace TradingBotV2.Backtesting
     internal class OrderEvaluator
     {
         Backtester _backtester;
-        BacktesterOrderManager _orderManager;
+        OrderTracker _orderTracker;
         ILogger _logger;
 
         public event Action<string, OrderExecution> OrderExecuted;
 
-        public OrderEvaluator(Backtester backtester, BacktesterOrderManager orderManager)
+        public OrderEvaluator(Backtester backtester, OrderTracker orderTracker)
         {
             _backtester = backtester;
-            _orderManager = orderManager;
             _logger = backtester.Logger;
+            _orderTracker = orderTracker;
+
+            _backtester.ClockTick += OnClockTick_EvaluateOrders;
         }
 
-        public void EvaluateOrder(string ticker, Order order, BidAsk bidAsk)
+        void OnClockTick_EvaluateOrders(DateTime newTime)
+        {
+            foreach (Order o in _orderTracker.OpenOrders.Values)
+            {
+                var ticker = _orderTracker.OrderIdsToTicker[o.Id];
+                
+                var current = newTime;
+                IEnumerable<BidAsk> latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, current).Result;
+                while (current >= _backtester.StartTime && !latestBidAsks.Any())
+                {
+                    current = current.AddSeconds(-1);
+                    latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, current).Result;
+                }
+
+                foreach (BidAsk bidAsk in latestBidAsks)
+                    EvaluateOrder(ticker, o, bidAsk);
+            }
+        }
+
+        void EvaluateOrder(string ticker, Order order, BidAsk bidAsk)
         {
             _logger?.Debug($"Evaluating Order {order} at BidAsk : {bidAsk}");
 
