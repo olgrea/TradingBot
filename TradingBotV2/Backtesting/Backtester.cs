@@ -82,6 +82,7 @@ namespace TradingBotV2.Backtesting
         internal DateTime EndTime => _end;
         internal DateTime CurrentTime => _currentTime;
         internal (DateTime, DateTime) TimeRange => (_start, _end);
+
         internal ILogger Logger => _logger;
         internal Account Account => _fakeAccount;
         internal CancellationToken CancellationToken => _cancellation != null ? _cancellation.Token : CancellationToken.None;
@@ -90,7 +91,7 @@ namespace TradingBotV2.Backtesting
                 
         internal MarketDataCollections MarketData { get; init; }
 
-        public ILiveDataProvider LiveDataProvider { get; init; }
+        public ILiveDataProvider LiveDataProvider { get; private set; }
         public IHistoricalDataProvider HistoricalDataProvider 
         {
             get
@@ -122,42 +123,45 @@ namespace TradingBotV2.Backtesting
             if (IsDayOver())
                 throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is completed.");
 
-            if(_consumerTask == null)
-            {
-                _cancellation = new CancellationTokenSource();
-                _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token);
-            }
-            else if(_consumerTask.IsFaulted)
-            {
-                _consumerTask.Wait();
-            }
-            else if (_consumerTask.IsCanceled)
-            {
-                _cancellation.Dispose();
-                _consumerTask.Dispose();
-                _cancellation = new CancellationTokenSource();
-                _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token);
-            }
+            if(_cancellation != null || _consumerTask != null)
+                throw new InvalidOperationException($"Backtester needs to be reset before being started again.");
+
+            _cancellation = new CancellationTokenSource();
+            _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
 
             return _consumerTask;
         }
 
-        public void Stop()
+        public async Task Stop()
         {
-            _cancellation?.Cancel();
+            if (_cancellation != null && !_cancellation.IsCancellationRequested)
+            {
+                _cancellation.Cancel();
+                try
+                {
+                    await _consumerTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.Debug("Task stopped");
+                }
+            }
         }
 
-        public void Reset()
+        public async Task Reset()
         {
-            Stop();
+            await Stop();
 
             _cancellation?.Dispose();
             _cancellation = null;
             _consumerTask?.Dispose();
             _consumerTask = null;
-            _requestsQueue.Clear();
 
+            _requestsQueue.Clear();
             _currentTime = _start;
+
+            LiveDataProvider.Dispose();
+            LiveDataProvider = new BacktesterLiveDataProvider(this);
             //(LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
         }
 
@@ -169,13 +173,19 @@ namespace TradingBotV2.Backtesting
             //_logger.Trace($"Passing time task started");
             while (!mainToken.IsCancellationRequested && !IsDayOver())
             {
-                // Let's process the requests first 
-                while(_requestsQueue.TryDequeue(out Action action))
-                    action();
-
                 mainToken.ThrowIfCancellationRequested();
 
+                // Let's process the requests first 
+                while (_requestsQueue.TryDequeue(out Action action))
+                {
+                    mainToken.ThrowIfCancellationRequested();
+                    action();
+                }
+
+                mainToken.ThrowIfCancellationRequested();
                 ClockTick?.Invoke(_currentTime);
+                mainToken.ThrowIfCancellationRequested();
+
                 if (TimeDelays.OneSecond > 0)
                     Task.Delay(TimeDelays.OneSecond).Wait(mainToken);
 

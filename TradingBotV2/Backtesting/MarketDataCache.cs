@@ -16,6 +16,10 @@ namespace TradingBotV2.Backtesting
 
         ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>> _marketData { get; set; } = new ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>>();
 
+        public IDictionary<DateTime, IEnumerable<TData>> this[string ticker] => _marketData[ticker];
+
+        public IEnumerable<TData> this[string ticker, DateTime dateTime] => _marketData[ticker][dateTime];
+
         public async Task<IEnumerable<TData>> GetAsync(string ticker, DateTime dateTime)
         {
             var timeDict = _marketData.GetOrAdd(ticker, new ConcurrentDictionary<DateTime, IEnumerable<TData>>()); 

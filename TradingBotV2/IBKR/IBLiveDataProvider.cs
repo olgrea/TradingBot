@@ -27,6 +27,8 @@ namespace TradingBotV2.IBKR
         public event Action<string, Last> LastReceived;
         public event Action<string, Bar> BarReceived;
 
+        public virtual void Dispose() { }
+
         public void RequestBarUpdates(string ticker, BarLength barLength)
         {
             if (barLength == BarLength._1Sec)

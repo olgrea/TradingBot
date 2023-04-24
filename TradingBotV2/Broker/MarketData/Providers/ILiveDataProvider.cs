@@ -1,6 +1,6 @@
 ﻿namespace TradingBotV2.Broker.MarketData.Providers
 {
-    public interface ILiveDataProvider
+    public interface ILiveDataProvider : IDisposable
     {
         public event Action<string, BidAsk> BidAskReceived;
         public event Action<string, Last> LastReceived;

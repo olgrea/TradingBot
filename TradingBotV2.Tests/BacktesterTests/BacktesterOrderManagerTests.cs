@@ -26,16 +26,16 @@ namespace BacktesterTests
         }
 
         [SetUp]
-        public void SetUp()
+        public async Task SetUp()
         {
-            _backtester.Reset();
-            _backtester.Start();
+            await _backtester.Reset();
+            _ = _backtester.Start();
         }
 
         [TearDown]
-        public void TearDown()
+        public async Task TearDown()
         {
-            _backtester.Stop();
+            await _backtester.Stop();
         }
 
         protected override bool IsMarketOpen()

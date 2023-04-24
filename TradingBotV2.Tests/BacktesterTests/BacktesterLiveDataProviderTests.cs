@@ -1,4 +1,5 @@
-﻿using NLog;
+﻿using System.ComponentModel.DataAnnotations;
+using NLog;
 using NLog.Config;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
@@ -27,18 +28,22 @@ namespace BacktesterTests
         }
 
         [SetUp]
-        public void SetUp()
+        public async Task SetUp()
         {
             // TODO : Is there a better way?
-            _backtester.Reset();
+            await _backtester.Reset();
             _backtestingTask = _backtester.Start();
-            _backtestingTask.ContinueWith(t => _tcs?.TrySetException(t.Exception), TaskContinuationOptions.OnlyOnFaulted);
+            _ = _backtestingTask.ContinueWith(t =>
+            {
+                var e = t.Exception ?? new Exception("Backtesting task faulted.");
+                _tcs?.TrySetException(e);
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         [TearDown]
-        public void TearDown()
+        public async Task TearDown()
         {
-            _backtester.Stop();
+            await _backtester.Stop();
         }
 
         protected override bool IsMarketOpen()
