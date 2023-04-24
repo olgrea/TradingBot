@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 
@@ -6,14 +7,18 @@ namespace TradingBotV2.Backtesting
 {
     internal class BacktesterLiveDataProvider : IBLiveDataProvider
     {
-        internal class Subscriptions
+        class ServerSideSubscriptions
         {
             public HashSet<string> FiveSecBars { get; set; } = new HashSet<string>();
             public HashSet<string> BidAsk { get; set; } = new HashSet<string>();
             public HashSet<string> Last { get; set; } = new HashSet<string>();
+            
+            public Action<string, IBApi.FiveSecBar> RealtimeBarCallback;
+            public Action<string, IBApi.BidAsk> TickByTickBidAskCallback;
+            public Action<string, IBApi.Last> TickByTickLastCallback;
         }
         
-        Subscriptions _subscriptions = new Subscriptions();
+        ServerSideSubscriptions _subscriptions = new ServerSideSubscriptions();
         Backtester _backtester;
 
         public BacktesterLiveDataProvider(Backtester backtester)
@@ -25,9 +30,12 @@ namespace TradingBotV2.Backtesting
             _backtester.ClockTick += OnClockTick_UpdateLast;
         }
 
-        event Action<string, IBApi.FiveSecBar> RealtimeBar;
-        event Action<string, IBApi.BidAsk> BidAsk;
-        event Action<string, IBApi.Last> Last;
+        public override void Dispose()
+        {
+            _backtester.ClockTick -= OnClockTick_UpdateBar;
+            _backtester.ClockTick -= OnClockTick_UpdateBidAsk;
+            _backtester.ClockTick -= OnClockTick_UpdateLast;
+        }
 
         protected override void RequestFiveSecondsBarUpdates(string ticker)
         {
@@ -57,7 +65,7 @@ namespace TradingBotV2.Backtesting
 
                 Bar bar = MarketDataUtils.CombineBars(bars, BarLength._5Sec);
                 DateTimeOffset dto = new DateTimeOffset(bar.Time.ToUniversalTime());
-                RealtimeBar?.Invoke(ticker, (IBApi.FiveSecBar)bar);
+                _subscriptions.RealtimeBarCallback?.Invoke(ticker, (IBApi.FiveSecBar)bar);
             }
         }
 
@@ -69,9 +77,22 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        protected override void SubscribeToRealtimeBarCallback() => RealtimeBar += OnFiveSecondsBarReceived;
+        protected override void SubscribeToRealtimeBarCallback()
+        {
+            Debug.Assert(_subscriptions.RealtimeBarCallback == null);
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.RealtimeBarCallback += OnFiveSecondsBarReceived;
+            });
+        }
 
-        protected override void UnsubscribeFromRealtimeBarCallback() => RealtimeBar -= OnFiveSecondsBarReceived;
+        protected override void UnsubscribeFromRealtimeBarCallback()
+        {
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.RealtimeBarCallback -= OnFiveSecondsBarReceived;
+            });
+        } 
 
         protected override void RequestBidAskData(string ticker)
         {
@@ -90,7 +111,7 @@ namespace TradingBotV2.Backtesting
             {
                 foreach(BidAsk ba in _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result)
                 {
-                    BidAsk?.Invoke(ticker, (IBApi.BidAsk)ba);
+                    _subscriptions.TickByTickBidAskCallback?.Invoke(ticker, (IBApi.BidAsk)ba);
                 }
             }
         }
@@ -103,9 +124,22 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        protected override void SubscribeToBidAskCallback() => BidAsk += TickByTickBidAsk;
+        protected override void SubscribeToBidAskCallback()
+        {
+            Debug.Assert(_subscriptions.TickByTickBidAskCallback == null);
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.TickByTickBidAskCallback += TickByTickBidAsk;
+            });
+        }
         
-        protected override void UnsubscribeFromBidAskDataCallback() => BidAsk -= TickByTickBidAsk;
+        protected override void UnsubscribeFromBidAskDataCallback()
+        {
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.TickByTickBidAskCallback -= TickByTickBidAsk;
+            });
+        } 
 
         protected override void RequestLastData(string ticker)
         {
@@ -124,7 +158,7 @@ namespace TradingBotV2.Backtesting
             {
                 foreach (Last last in _backtester.MarketData.Lasts.GetAsync(ticker, newTime).Result)
                 {
-                    Last?.Invoke(ticker, (IBApi.Last)last);
+                    _subscriptions.TickByTickLastCallback?.Invoke(ticker, (IBApi.Last)last);
                 }
             }
         }
@@ -137,8 +171,21 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        protected override void SubscribeToLastDataCallback() => Last += TickByTickLast;
+        protected override void SubscribeToLastDataCallback() 
+        {
+            Debug.Assert(_subscriptions.TickByTickLastCallback == null);
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.TickByTickLastCallback += TickByTickLast;
+            });
+        }
         
-        protected override void UnsubscribeFromLastDataCallback() => Last -= TickByTickLast;
+        protected override void UnsubscribeFromLastDataCallback()
+        {
+            _backtester.EnqueueRequest(() =>
+            {
+                _subscriptions.TickByTickLastCallback -= TickByTickLast;
+            });
+        }
     }
 }

@@ -10,7 +10,7 @@ namespace IBBrokerTests
     {
         public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
 
-        protected TaskCompletionSource<bool> _tcs;
+        protected TaskCompletionSource _tcs;
         internal IBroker _broker;
 
         [OneTimeSetUp]
@@ -40,14 +40,17 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var baList = new List<BidAsk>();
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var bidAskReceived = new Action<string, BidAsk>((ticker, bidAsk) =>
             {
                 if (expectedTicker == ticker)
                 {
-                    baList.Add(bidAsk);
-                    if (baList.Count == 3)
-                        _tcs.TrySetResult(true);
+                    if (baList.Count < 3)
+                    {
+                        baList.Add(bidAsk);
+                        if (baList.Count == 3)
+                            _tcs.TrySetResult();
+                    }
                 }
             });
 
@@ -64,7 +67,7 @@ namespace IBBrokerTests
             }
 
             Assert.IsNotEmpty(baList);
-            Assert.IsTrue(baList.Count == 3);
+            Assert.AreEqual(3, baList.Count);
         }
 
         [Test]
@@ -76,14 +79,17 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var lastList = new List<Last>();
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var lastReceived = new Action<string, Last>((ticker, last) =>
             {
                 if (expectedTicker == ticker)
                 {
-                    lastList.Add(last);
-                    if (lastList.Count == 3)
-                        _tcs.TrySetResult(true);
+                    if (lastList.Count < 3)
+                    {
+                        lastList.Add(last);
+                        if (lastList.Count == 3)
+                            _tcs.TrySetResult();
+                    }
                 }
             });
 
@@ -100,7 +106,7 @@ namespace IBBrokerTests
             }
 
             Assert.IsNotEmpty(lastList);
-            Assert.IsTrue(lastList.Count == 3);
+            Assert.AreEqual(3, lastList.Count);
         }
 
 
@@ -170,14 +176,14 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var barList = new List<Bar>();
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker && bar.BarLength == BarLength._5Sec)
                 {
                     barList.Add(bar);
                     if (barList.Count == 3)
-                        _tcs.TrySetResult(true);
+                        _tcs.TrySetResult();
                 }
             });
 
@@ -211,7 +217,7 @@ namespace IBBrokerTests
             var fiveSecBars = new List<Bar>();
             var oneMinBars = new List<Bar>();
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker)
@@ -225,7 +231,7 @@ namespace IBBrokerTests
                     {
                         oneMinBars.Add(bar);
                         if (oneMinBars.Count == 1)
-                            _tcs.TrySetResult(true);
+                            _tcs.TrySetResult();
                     }
                 }
             });
@@ -265,7 +271,7 @@ namespace IBBrokerTests
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -285,7 +291,7 @@ namespace IBBrokerTests
                 }
 
                 if (fiveSecBars[0].Count == 3 && fiveSecBars[1].Count == 3)
-                    _tcs.TrySetResult(true);
+                    _tcs.TrySetResult();
             });
 
             _broker.LiveDataProvider.BarReceived += barReceived;
@@ -323,7 +329,7 @@ namespace IBBrokerTests
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
             List<Bar>[] oneMinuteBars = { new List<Bar>(), new List<Bar>() };
 
-            _tcs = new TaskCompletionSource<bool>();
+            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -353,7 +359,7 @@ namespace IBBrokerTests
                 }
 
                 if (oneMinuteBars[0].Count == 1 && oneMinuteBars[1].Count == 1)
-                    _tcs.TrySetResult(true);
+                    _tcs.TrySetResult();
             });
 
             _broker.LiveDataProvider.BarReceived += barReceived;
