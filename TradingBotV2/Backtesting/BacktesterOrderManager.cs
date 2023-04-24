@@ -23,20 +23,17 @@ namespace TradingBotV2.Backtesting
             
             _backtester = backtester;
             _orderEvaluator = new OrderEvaluator(_backtester, _orderTracker);
+            _orderEvaluator.OrderExecuted += OnOrderExecuted;
         }
 
         public event Action<string, Order, OrderStatus> OrderUpdated;
-        public event Action<string, OrderExecution> OrderExecuted
-        {
-            add => _orderEvaluator.OrderExecuted += value;
-            remove => _orderEvaluator.OrderExecuted -= value;
-        }
+        public event Action<string, OrderExecution> OrderExecuted;
 
         int NextOrderId => _nextOrderId++;
 
-        public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order)
         {
-            var tcs = new TaskCompletionSource<OrderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             Action request = new Action(() =>
             {
                 try
@@ -78,9 +75,9 @@ namespace TradingBotV2.Backtesting
             return await tcs.Task;
         }
 
-        public async Task<OrderResult> ModifyOrderAsync(Order order)
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order)
         {
-            var tcs = new TaskCompletionSource<OrderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             Action request = () =>
             {
                 try
@@ -190,6 +187,63 @@ namespace TradingBotV2.Backtesting
             return await tcs.Task;
         }
 
+        public async Task<OrderExecutedResult> AwaitExecution(Order order)
+        {
+            var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Action request = () =>
+            {
+                try
+                {
+                    _validator.ValidateExecutionAwaiting(order.Id);
+                    if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
+                    {
+                        tcs.TrySetResult(new OrderExecutedResult()
+                        {
+                            Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                            Order = order,
+                            OrderExecution = _orderTracker.OrdersExecuted[order.Id],
+                        });
+                    }
+                }
+                catch(Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            };
+
+            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            {
+                if (oe.OrderId == order.Id)
+                {
+                    tcs.TrySetResult(new OrderExecutedResult()
+                    {
+                        Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                        Order = order,
+                        OrderExecution = oe,
+                    });
+                }
+            });
+
+            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) =>
+            {
+                if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
+                    tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
+            });
+
+            OrderExecuted += orderExecuted;
+            OrderUpdated += orderUpdated;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                OrderExecuted -= orderExecuted;
+                OrderUpdated -= orderUpdated;
+            }
+        }
+
         private void EnqueueRequest<TResult>(TaskCompletionSource<TResult> tcs, Action request)
         {
             try
@@ -203,6 +257,12 @@ namespace TradingBotV2.Backtesting
                 else
                     tcs.TrySetException(ex);
             }
+        }
+
+        void OnOrderExecuted(string ticker, OrderExecution execution)
+        {
+            _orderTracker.TrackExecution(execution);
+            OrderExecuted?.Invoke(ticker, execution);
         }
     }
 }

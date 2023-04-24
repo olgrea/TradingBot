@@ -84,7 +84,7 @@ namespace TradingBotV2.IBKR
                 await GetDataForDayInChunks<TData>(ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), progress);
             }
 
-            // TODO : fix this
+            // TODO : fix this. "from" and "to" time of day are not respected
             return data.SkipWhile(d => d.Time < from);
         }
 

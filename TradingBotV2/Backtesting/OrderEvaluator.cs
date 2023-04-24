@@ -10,8 +10,7 @@ namespace TradingBotV2.Backtesting
         Backtester _backtester;
         OrderTracker _orderTracker;
         ILogger _logger;
-
-        public event Action<string, OrderExecution> OrderExecuted;
+        int _execId = 1;
 
         public OrderEvaluator(Backtester backtester, OrderTracker orderTracker)
         {
@@ -22,22 +21,21 @@ namespace TradingBotV2.Backtesting
             _backtester.ClockTick += OnClockTick_EvaluateOrders;
         }
 
+        int NextExecId => _execId++;
+        internal event Action<string, OrderExecution> OrderExecuted;
+
         void OnClockTick_EvaluateOrders(DateTime newTime)
         {
             foreach (Order o in _orderTracker.OpenOrders.Values)
             {
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
                 
-                var current = newTime;
-                IEnumerable<BidAsk> latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, current).Result;
-                while (current >= _backtester.StartTime && !latestBidAsks.Any())
-                {
-                    current = current.AddSeconds(-1);
-                    latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, current).Result;
-                }
-
+                IEnumerable<BidAsk> latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result;
                 foreach (BidAsk bidAsk in latestBidAsks)
-                    EvaluateOrder(ticker, o, bidAsk);
+                {
+                    if(_orderTracker.OpenOrders.ContainsKey(o.Id))
+                        EvaluateOrder(ticker, o, bidAsk);
+                }
             }
         }
 
@@ -251,6 +249,7 @@ namespace TradingBotV2.Backtesting
             {
                 AcctNumber = account.Code,
                 OrderId = order.Id,
+                ExecId = NextExecId.ToString(),
                 Time = _backtester.CurrentTime,
                 Action = order.Action,
                 Shares = order.TotalQuantity,

@@ -109,7 +109,8 @@ namespace TradingBotV2.Backtesting
         {
             foreach (string ticker in _subscriptions.BidAsk)
             {
-                foreach(BidAsk ba in _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result)
+                IEnumerable<BidAsk> bidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result;
+                foreach (BidAsk ba in bidAsks)
                 {
                     _subscriptions.TickByTickBidAskCallback?.Invoke(ticker, (IBApi.BidAsk)ba);
                 }
@@ -156,7 +157,8 @@ namespace TradingBotV2.Backtesting
         {
             foreach (string ticker in _subscriptions.Last)
             {
-                foreach (Last last in _backtester.MarketData.Lasts.GetAsync(ticker, newTime).Result)
+                IEnumerable<Last> lasts = _backtester.MarketData.Lasts.GetAsync(ticker, newTime).Result;
+                foreach (Last last in lasts)
                 {
                     _subscriptions.TickByTickLastCallback?.Invoke(ticker, (IBApi.Last)last);
                 }

@@ -61,7 +61,8 @@ namespace BacktesterTests
             _ = backtester.Start();
 
             await tcs.Task;
-            var result = (await backtester.OrderManager.PlaceOrderAsync(Ticker, order)) as OrderExecutedResult;
+            await backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var result = await backtester.OrderManager.AwaitExecution(order);
 
             // Assert
             Assert.NotNull(result);
