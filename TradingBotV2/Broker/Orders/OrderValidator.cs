@@ -60,5 +60,15 @@ namespace TradingBotV2.Broker.Orders
             else if (!_orderTracker.OpenOrders.ContainsKey(orderId))
                 throw new ArgumentException($"No opened order with id {orderId} to modify.");
         }
+
+        internal void ValidateExecutionAwaiting(int orderId)
+        {
+            if (orderId < 0)
+                throw new ArgumentException("Invalid order Id (order id not set).");
+            else if (!_orderTracker.OpenOrders.ContainsKey(orderId))
+                throw new ArgumentException($"No opened order with id {orderId} to await.");
+            else if (_orderTracker.OrdersCancelled.ContainsKey(orderId))
+                throw new ArgumentException($"This order ({orderId}) has already been cancelled.");
+        }
     }
 }
