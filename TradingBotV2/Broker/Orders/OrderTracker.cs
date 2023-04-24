@@ -8,7 +8,7 @@
         public IDictionary<int, Order> OpenOrders { get; private set; } = new Dictionary<int, Order>();
         public IDictionary<int, OrderExecution> OrdersExecuted { get; private set; } = new Dictionary<int, OrderExecution>();
         public IDictionary<int, Order> OrdersCancelled { get; private set; } = new Dictionary<int, Order>();
-        public IDictionary<string, OrderExecution> Executions { get; private set; } = new Dictionary<string, OrderExecution>();
+        public IDictionary<string, OrderExecution> ExecIdsToExecutions { get; private set; } = new Dictionary<string, OrderExecution>();
 
         public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && OrdersRequested.ContainsKey(order.Id);
         public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && OrdersOpened.ContainsKey(order.Id);
@@ -46,7 +46,7 @@
         public void TrackExecution(OrderExecution execution)
         {
             OrdersExecuted[execution.OrderId] = execution;
-            Executions[execution.ExecId] = execution;
+            ExecIdsToExecutions[execution.ExecId] = execution;
             OpenOrders.Remove(execution.OrderId);
         }
     }

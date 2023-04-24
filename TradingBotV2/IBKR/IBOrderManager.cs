@@ -27,13 +27,13 @@ namespace TradingBotV2.IBKR
         public event Action<string, Order, OrderStatus> OrderUpdated;
         public event Action<string, OrderExecution> OrderExecuted;
 
-        public async Task<OrderResult> PlaceOrderAsync(string ticker, Order order)
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order)
         {
             _validator.ValidateOrderPlacement(order);
             return await PlaceOrderInternalAsync(ticker, order);
         }
 
-        public async Task<OrderResult> ModifyOrderAsync(Order order)
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order)
         {
             _validator.ValidateOrderModification(order);
             return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order);
@@ -113,12 +113,58 @@ namespace TradingBotV2.IBKR
             }
         }
 
+        public async Task<OrderExecutedResult> AwaitExecution(Order order)
+        {
+            _validator.ValidateExecutionAwaiting(order.Id);
+            if(_orderTracker.OrdersExecuted.ContainsKey(order.Id))
+            {
+                return new OrderExecutedResult()
+                {
+                    Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                    Order = order,
+                    OrderExecution = _orderTracker.OrdersExecuted[order.Id],
+                };
+            }
+
+            var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            {
+                if (oe.OrderId == order.Id)
+                {
+                    tcs.TrySetResult(new OrderExecutedResult()
+                    {
+                        Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                        Order = order,
+                        OrderExecution = _orderTracker.OrdersExecuted[order.Id],
+                    });
+                }
+            });
+
+            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) => 
+            { 
+                if(o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
+                    tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
+            });
+
+            OrderExecuted += orderExecuted;
+            OrderUpdated += orderUpdated;
+            try
+            {
+                return await tcs.Task;
+            }
+            finally
+            {
+                OrderExecuted -= orderExecuted;
+                OrderUpdated -= orderUpdated;
+            }
+        }
+
         // TODO : investigate/implement/test partially filled orders
 
-        async Task<OrderResult> PlaceOrderInternalAsync(string ticker, Order order)
+        async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, Order order)
         {
             var orderPlacedResult = new OrderPlacedResult();
-            var tcs = new TaskCompletionSource<OrderResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var contract = await _client.ContractsCache.GetAsync(ticker);
 
@@ -224,7 +270,7 @@ namespace TradingBotV2.IBKR
         void OnCommissionInfo(IBApi.CommissionReport cr)
         {
             var ci = (CommissionInfo)cr;
-            var exec = _orderTracker.Executions[ci.ExecId];
+            var exec = _orderTracker.ExecIdsToExecutions[ci.ExecId];
             exec.CommissionInfo = ci;
             OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec);
         }
@@ -251,10 +297,10 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        internal async Task<IEnumerable<OrderResult>> GetOpenOrdersAsync()
+        internal async Task<IEnumerable<OrderPlacedResult>> GetOpenOrdersAsync()
         {
             var orderPlacedResults = new Dictionary<int, OrderPlacedResult>();
-            var tcs = new TaskCompletionSource<IEnumerable<OrderResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IEnumerable<OrderPlacedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var openOrder = new Action<IBApi.Contract, IBApi.Order, IBApi.OrderState>((c, o, oState) =>
             {
@@ -277,7 +323,7 @@ namespace TradingBotV2.IBKR
 
             var openOrderEnd = new Action(() =>
             {
-                IEnumerable<OrderResult> results = orderPlacedResults.Values.ToList();
+                IEnumerable<OrderPlacedResult> results = orderPlacedResults.Values.ToList();
                 tcs.TrySetResult(results);
             });
 
