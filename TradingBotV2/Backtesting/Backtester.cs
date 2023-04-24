@@ -162,7 +162,6 @@ namespace TradingBotV2.Backtesting
 
             LiveDataProvider.Dispose();
             LiveDataProvider = new BacktesterLiveDataProvider(this);
-            //(LiveDataProvider as BacktesterLiveDataProvider)?.Reset();
         }
 
         void PassTime()
