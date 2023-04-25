@@ -10,7 +10,7 @@ using TradingBotV2.IBKR;
 
 namespace TradingBotV2.Backtesting
 {
-    internal class Backtester : IBroker
+    internal class Backtester : IBroker, IAsyncDisposable
     {
         static class TimeDelays
         {
@@ -73,9 +73,12 @@ namespace TradingBotV2.Backtesting
             MarketData = new MarketDataCollections(this);
         }
 
-        ~Backtester()
+        public async ValueTask DisposeAsync()
         {
-            _broker?.DisconnectAsync().Wait();
+            await Stop();
+            _cancellation?.Dispose();
+            _consumerTask?.Dispose();
+            await _broker?.DisconnectAsync();
         }
 
         internal DateTime StartTime => _start;
