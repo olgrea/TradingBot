@@ -44,7 +44,6 @@ namespace TradingBotV2.Backtesting
 
         IBBroker _broker;
         ILogger _logger;
-        IHistoricalDataProvider _historicalDataProvider;
         ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
         Task _consumerTask;
@@ -68,7 +67,7 @@ namespace TradingBotV2.Backtesting
 
             _broker = new IBBroker(191919, logger);
             LiveDataProvider = new BacktesterLiveDataProvider(this);
-            _historicalDataProvider = new IBHistoricalDataProvider(_broker.Client, logger);
+            HistoricalDataProvider = new IBHistoricalDataProvider(_broker, logger);
             OrderManager = new BacktesterOrderManager(this);
             MarketData = new MarketDataCollections(this);
         }
@@ -95,18 +94,10 @@ namespace TradingBotV2.Backtesting
         internal MarketDataCollections MarketData { get; init; }
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
-        public IHistoricalDataProvider HistoricalDataProvider 
-        {
-            get
-            {
-                if (!_broker.IsConnected())
-                    _broker.ConnectAsync().Wait();
-                return _historicalDataProvider;
-            } 
-        }
+        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
 
-        public IProgress<BacktesterProgress> ProgressHandler { get; set; }
+        public Action<BacktesterProgress> ProgressHandler { get; set; }
 
         internal void EnqueueRequest(Action action)
         {
@@ -196,7 +187,7 @@ namespace TradingBotV2.Backtesting
                 bp.CurrentTime = _currentTime;
 
                 mainToken.ThrowIfCancellationRequested();
-                ProgressHandler?.Report(bp);
+                ProgressHandler?.Invoke(bp);
             }
         }
 

@@ -30,14 +30,16 @@ namespace TradingBotV2.IBKR
         }
 
         IBClient _client;
+        IBBroker _broker;
         ILogger _logger;
         string _dbPath;
 
-        public IBHistoricalDataProvider(IBClient client, string dbPath = null) : this(client, null, dbPath) {}
+        public IBHistoricalDataProvider(IBBroker broker, string dbPath = null) : this(broker, null, dbPath) {}
 
-        public IBHistoricalDataProvider(IBClient client, ILogger logger, string dbPath = null)
+        public IBHistoricalDataProvider(IBBroker broker, ILogger logger, string dbPath = null)
         {
-            _client = client;
+            _broker = broker;
+            _client = broker.Client;
             _logger = logger;
             _dbPath = dbPath ?? DefaultDbPath;
         }
@@ -153,6 +155,9 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<IMarketData>> FetchHistoricalDataFromServer<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
+            if (!_broker.IsConnected())
+                await _broker.ConnectAsync();
+
             if (typeof(TData) == typeof(Bar))
             {
                 return await FetchBars<TData>(ticker, time);
