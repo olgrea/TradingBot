@@ -5,7 +5,7 @@ using TradingBotV2.IBKR;
 
 namespace TradingBotV2.Backtesting
 {
-    internal class BacktesterLiveDataProvider : IBLiveDataProvider
+    internal class BacktesterLiveDataProvider : LiveDataProviderBase
     {
         class ServerSideSubscriptions
         {
@@ -22,7 +22,6 @@ namespace TradingBotV2.Backtesting
         Backtester _backtester;
 
         public BacktesterLiveDataProvider(Backtester backtester)
-            : base(null)
         {
             _backtester = backtester;
             _backtester.ClockTick += OnClockTick_UpdateBar;
