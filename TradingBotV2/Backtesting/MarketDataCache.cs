@@ -22,6 +22,25 @@ namespace TradingBotV2.Backtesting
         //debug
         List<DateTime> KeysDebug => _marketData.Values.First().Keys.OrderBy(k => k).ToList();
 
+        // TODO : add GetLatest ?
+
+        public async Task<IEnumerable<TData>> GetAsync(string ticker, DateTime from, DateTime to)
+        {
+            if (from > to)
+                throw new ArgumentException($"'from' is greater than 'to'");
+
+            DateTime current = from;
+            IEnumerable<TData> results = Enumerable.Empty<TData>();
+            while (current < to)
+            {
+                var data = await GetAsync(ticker, current);
+                results = results.Concat(data);
+                current = current.AddSeconds(1);
+            }
+
+            return results;
+        }
+
         public async Task<IEnumerable<TData>> GetAsync(string ticker, DateTime dateTime)
         {
             var timeDict = _marketData.GetOrAdd(ticker, new ConcurrentDictionary<DateTime, IEnumerable<TData>>()); 

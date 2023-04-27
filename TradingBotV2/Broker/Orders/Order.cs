@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using TradingBotV2.Broker.Accounts;
 
 namespace TradingBotV2.Broker.Orders
 {
@@ -309,24 +310,53 @@ namespace TradingBotV2.Broker.Orders
                 },
 
                 StopPrice = ibo.AuxPrice,
-        };
+            };
         }
+    }
+
+    public enum TrailingAmountUnits
+    {
+        Absolute,
+        Percent
     }
 
     public class TrailingStopOrder : Order
     {
-        public TrailingStopOrder() : base("TRAIL") { }
-        public double StopPrice { get; set; } = double.MaxValue;
+        double? _trailingAmount;
+        TrailingAmountUnits? _units;
 
-        public double TrailingAmount { get; set; } = double.MaxValue;
-        // Takes priority over TrailingAmount if set
-        public double TrailingPercent { get; set; } = double.MaxValue;
+        public TrailingStopOrder() : base("TRAIL") { }
+        
+        public double? StopPrice { get; set; }
+        public double? TrailingAmount
+        {
+            get => _trailingAmount;
+            set
+            {
+                if (value is not null && _units == Orders.TrailingAmountUnits.Percent)
+                    value = Math.Clamp(value.Value, 0.0, 1.0);
+
+                _trailingAmount = value;
+            }
+        }
+
+        public TrailingAmountUnits? TrailingAmountUnits
+        {
+            get => _units;
+            set
+            {
+                if (value is not null && value == Orders.TrailingAmountUnits.Percent)
+                    _trailingAmount = Math.Clamp(_trailingAmount.Value, 0.0, 1.0);
+
+                _units = value;
+            }
+        }
 
         public override string ToString()
         {
-            if (TrailingPercent != double.MaxValue)
-                return $"{base.ToString()} TrailingPercent : {TrailingPercent}";
-            else if (TrailingAmount != double.MaxValue)
+            if (_units == Orders.TrailingAmountUnits.Percent)
+                return $"{base.ToString()} TrailingAmount : {_trailingAmount * 100} %";
+            else if (_units == Orders.TrailingAmountUnits.Absolute)
                 return $"{base.ToString()} TrailingAmount : {TrailingAmount:c}";
             else
                 return base.ToString();
@@ -334,7 +364,7 @@ namespace TradingBotV2.Broker.Orders
 
         public static explicit operator IBApi.Order(TrailingStopOrder order)
         {
-            return new IBApi.Order()
+            var o = new IBApi.Order()
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
@@ -350,15 +380,24 @@ namespace TradingBotV2.Broker.Orders
 
                 OutsideRth = false,
                 Tif = "DAY",
-
-                AuxPrice = order.StopPrice,
-                TrailingPercent = order.TrailingPercent,
+                TrailStopPrice = order.StopPrice is null ? double.MaxValue : order.StopPrice.Value,
             };
+
+            if (order.TrailingAmountUnits is null)
+                throw new ArgumentNullException(nameof(order.TrailingAmountUnits));
+            else if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Absolute)
+                o.AuxPrice = order.TrailingAmount.Value;
+            else if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Percent)
+                o.TrailingPercent = order.TrailingAmount.Value;
+            else
+                throw new NotImplementedException($"{order.TrailingAmountUnits}");
+
+            return o;
         }
 
         public static explicit operator TrailingStopOrder(IBApi.Order ibo)
         {
-            return new TrailingStopOrder()
+            var o = new TrailingStopOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
                 TotalQuantity = ibo.TotalQuantity,
@@ -373,9 +412,22 @@ namespace TradingBotV2.Broker.Orders
                     OcaType = (OcaType)ibo.OcaType,
                 },
 
-                StopPrice = ibo.AuxPrice,
-                TrailingPercent = ibo.TrailingPercent,
+                StopPrice = ibo.TrailStopPrice,
             };
+
+            // TrailingPercent takes precedence apparently. See comments of IBApi.Order.TrailingPercent 
+            if (ibo.TrailingPercent != double.MaxValue)
+            {
+                o.TrailingAmount = ibo.TrailingPercent;
+                o.TrailingAmountUnits = Orders.TrailingAmountUnits.Percent;
+            }
+            else if(ibo.AuxPrice != double.MaxValue)
+            {
+                o.TrailingAmount = ibo.AuxPrice;
+                o.TrailingAmountUnits = Orders.TrailingAmountUnits.Absolute;
+            }
+
+            return o;
         }
     }
 }

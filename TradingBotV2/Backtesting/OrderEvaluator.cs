@@ -93,13 +93,19 @@ namespace TradingBotV2.Backtesting
 
         private void EvaluateTrailingStopOrder(string ticker, BidAsk bidAsk, TrailingStopOrder o)
         {
+            if (o.TrailingAmount is null)
+                throw new ArgumentNullException(nameof(o.TrailingAmount));
+            if (o.TrailingAmountUnits is null)
+                throw new ArgumentNullException(nameof(o.TrailingAmountUnits));
+
             if (o.Action == OrderAction.BUY)
             {
-                if (o.StopPrice == double.MaxValue)
+                if (o.StopPrice is null)
                 {
-                    o.StopPrice = o.TrailingPercent != double.MaxValue ?
-                        bidAsk.Ask + o.TrailingPercent * bidAsk.Ask :
-                        bidAsk.Ask + o.TrailingAmount;
+                    if (o.TrailingAmountUnits == TrailingAmountUnits.Percent)
+                        o.StopPrice = bidAsk.Ask * (1 + o.TrailingAmount);
+                    else if (o.TrailingAmountUnits == TrailingAmountUnits.Absolute)
+                        o.StopPrice = bidAsk.Ask  + o.TrailingAmount;
                 }
 
                 if (o.StopPrice <= bidAsk.Ask)
@@ -107,17 +113,17 @@ namespace TradingBotV2.Backtesting
                     _logger?.Debug($"{o} : stop price of {o.StopPrice:c} reached. Ask : {bidAsk.Ask:c}");
                     ExecuteOrder(ticker, o, bidAsk.Ask);
                 }
-                else if (o.TrailingPercent != double.MaxValue)
+                else if (o.TrailingAmountUnits == TrailingAmountUnits.Percent)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Ask) / bidAsk.Ask;
-                    if (currentPercent > o.TrailingPercent)
+                    if (currentPercent > o.TrailingAmount)
                     {
-                        var newVal = bidAsk.Ask + o.TrailingPercent * bidAsk.Ask;
-                        _logger?.Trace($"{o} : current%={currentPercent} trail%={o.TrailingPercent} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
+                        var newVal = bidAsk.Ask + o.TrailingAmount * bidAsk.Ask;
+                        _logger?.Trace($"{o} : current%={currentPercent} trail%={o.TrailingAmount} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
                         o.StopPrice = newVal;
                     }
                 }
-                else
+                else if (o.TrailingAmountUnits == TrailingAmountUnits.Absolute)
                 {
                     // The price must be updated if the ask falls
                     var currentStopPrice = bidAsk.Ask + o.TrailingAmount;
@@ -130,11 +136,12 @@ namespace TradingBotV2.Backtesting
             }
             else if (o.Action == OrderAction.SELL)
             {
-                if (o.StopPrice == double.MaxValue)
+                if (o.StopPrice is null)
                 {
-                    o.StopPrice = o.TrailingPercent != double.MaxValue ?
-                        bidAsk.Bid - o.TrailingPercent * bidAsk.Bid :
-                        bidAsk.Bid - o.TrailingAmount;
+                    if (o.TrailingAmountUnits == TrailingAmountUnits.Percent)
+                        o.StopPrice = bidAsk.Bid * (1 - o.TrailingAmount);
+                    else if (o.TrailingAmountUnits == TrailingAmountUnits.Absolute)
+                        o.StopPrice = bidAsk.Bid - o.TrailingAmount;
                 }
 
                 if (o.StopPrice >= bidAsk.Bid)
@@ -142,17 +149,17 @@ namespace TradingBotV2.Backtesting
                     _logger?.Debug($"{o} : stop price of {o.StopPrice:c} reached. Bid: {bidAsk.Bid:c}");
                     ExecuteOrder(ticker, o, bidAsk.Bid);
                 }
-                else if (o.TrailingPercent != double.MaxValue)
+                else if (o.TrailingAmountUnits == TrailingAmountUnits.Percent)
                 {
                     var currentPercent = (o.StopPrice - bidAsk.Bid) / -bidAsk.Bid;
-                    if (currentPercent > o.TrailingPercent)
+                    if (currentPercent > o.TrailingAmount)
                     {
-                        var newVal = bidAsk.Bid - o.TrailingPercent * bidAsk.Bid;
-                        _logger?.Trace($"{o} : current%={currentPercent} trail%={o.TrailingPercent} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
+                        var newVal = bidAsk.Bid - o.TrailingAmount * bidAsk.Bid;
+                        _logger?.Trace($"{o} : current%={currentPercent} trail%={o.TrailingAmount} : adjusting stop price of {o.StopPrice:c} to {newVal:c}");
                         o.StopPrice = newVal;
                     }
                 }
-                else
+                else if (o.TrailingAmountUnits == TrailingAmountUnits.Absolute)
                 {
                     // The price must be updated if the bid rises
                     var currentStopPrice = bidAsk.Bid - o.TrailingAmount;

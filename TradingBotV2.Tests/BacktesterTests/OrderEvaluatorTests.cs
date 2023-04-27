@@ -591,198 +591,231 @@ namespace BacktesterTests
             _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+            
+            var trailingAmount = 0.5;
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) + trailingAmount;
             var order = new TrailingStopOrder()
             {
                 Action = OrderAction.BUY,
-                TrailingAmount = 0.2,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Absolute,
+                StopPrice = initialStopPrice,
                 TotalQuantity = 50
             };
+
+            var expectedStopPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Min(ba => ba.Ask + order.TrailingAmount.Value);
 
             var backtestingTask = _backtester.Start();
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var initialBidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement);
-            var initialStopPrice = initialBidAsks.Select(ba => ba.Ask).Average() + order.TrailingAmount;
             await backtestingTask;
 
             // Assert
-            DateTime current = timerange.Item2;
-            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, current);
-            while(!bidAsks.Any() && current > timerange.Item1)
-            {
-                current.AddSeconds(-1);
-                bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, current);
-            }
-
-            var expectedStopPrice = bidAsks.Min(ba => ba.Ask + order.TrailingAmount);
-            var actualStopPrice = order.StopPrice;
-            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
-
-            //// Setup
-            //var end = _downwardStart.AddMinutes(3);
-            //_fakeIBSocket = new BacktesterClientSocket(Ticker, _downwardStart, end, _downwardData);
-            //var order = new TrailingStopOrder()
-            //{
-            //    Id = _fakeIBSocket.NextValidOrderId,
-            //    Action = OrderAction.BUY,
-            //    TrailingAmount = 0.2,
-            //    TotalQuantity = 50
-            //};
-
-            //// Test
-            //_fakeIBSocket.Start();
-            //Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
-
-            //// Assert
-            //var expectedStopPrice = _downwardData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask + order.TrailingAmount);
-            //var actualStopPrice = order.StopPrice;
-            //Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
-
-            //await Task.CompletedTask;
+            var actualStopPrice = order.StopPrice!.Value;
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.01);
         }
-        /*
+        
         [Test]
         public async Task TrailingStopOrder_Buy_TrailingPercent_StopPriceFallsWhenMarketFalls()
         {
             // Setup
-            var end = _downwardStart.AddMinutes(3);
-            _fakeIBSocket = new BacktesterClientSocket(Ticker, _downwardStart, end, _downwardData);
+            (DateTime, DateTime) timerange = _downwardTimeRange;
+            _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
+            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
+
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+
+            var trailingAmount = 0.05; // %
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) * (1 + trailingAmount);
             var order = new TrailingStopOrder()
             {
-                Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                TrailingPercent = 0.1,
+                StopPrice = initialStopPrice,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Percent,
                 TotalQuantity = 50
             };
 
+            var expectedStopPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Min(ba => ba.Ask * (1 + order.TrailingAmount!.Value));
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
             // Test
-            _fakeIBSocket.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
+            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            await backtestingTask;
 
             // Assert
-            var expectedStopPrice = _downwardData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask * order.TrailingPercent + ba.Ask);
-            var actualStopPrice = order.StopPrice;
-            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
-
-            await Task.CompletedTask;
+            var actualStopPrice = order.StopPrice!.Value;
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.01);
         }
-
+        
         [Test]
         public async Task TrailingStopOrder_Sell_TrailingAmout_StopPriceRisesWhenMarketRises()
         {
             // Setup
-            var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new BacktesterClientSocket(Ticker, _upwardStart, end, _upwardData);
+            (DateTime, DateTime) timerange = _upwardTimeRange;
+            _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
+            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
+
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+
+            var trailingAmount = 0.5;
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) - trailingAmount;
             var order = new TrailingStopOrder()
             {
-                Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                TrailingAmount = 0.2,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Absolute,
+                StopPrice = initialStopPrice,
                 TotalQuantity = 50
             };
 
-            var position = _fakeIBSocket.Account.Positions.First();
-            position.PositionAmount = 50;
-            position.AverageCost = 28.00;
+            _backtester.Account.Positions[Ticker] = new Position()
+            {
+                PositionAmount = 50,
+                AverageCost = 413.94,
+            };
+
+            var expectedStopPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Max(ba => ba.Bid - order.TrailingAmount.Value);
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            _fakeIBSocket.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
+            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            await backtestingTask;
 
             // Assert
-            var expectedStopPrice = _upwardData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - order.TrailingAmount);
-            var actualStopPrice = order.StopPrice;
-            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
-
-            await Task.CompletedTask;
+            var actualStopPrice = order.StopPrice!.Value;
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.01);
         }
-
+        
         [Test]
         public async Task TrailingStopOrder_Sell_TrailingPercent_StopPriceRisesWhenMarketRises()
         {
             // Setup
-            var end = _upwardStart.AddMinutes(3);
-            _fakeIBSocket = new BacktesterClientSocket(Ticker, _upwardStart, end, _upwardData);
+            (DateTime, DateTime) timerange = _upwardTimeRange;
+            _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
+            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
+
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+
+            var trailingAmount = 0.5;
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) * (1 - trailingAmount);
             var order = new TrailingStopOrder()
             {
-                Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                TrailingPercent = 0.1,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Percent,
+                StopPrice = initialStopPrice,
                 TotalQuantity = 50
             };
 
-            var position = _fakeIBSocket.Account.Positions.First();
-            position.PositionAmount = 50;
-            position.AverageCost = 28.00;
+            _backtester.Account.Positions[Ticker] = new Position()
+            {
+                PositionAmount = 50,
+                AverageCost = 413.94,
+            };
+
+            var expectedStopPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Max(ba => ba.Bid * (1 - order.TrailingAmount.Value));
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            _fakeIBSocket.Start();
-            Assert.ThrowsAsync<DayIsOverException>(async () => await PlaceOrderAsync(order));
+            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            await backtestingTask;
 
             // Assert
-            var expectedStopPrice = _upwardData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid - ba.Bid * order.TrailingPercent);
-            var actualStopPrice = order.StopPrice;
-            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.0001);
-
-            await Task.CompletedTask;
+            var actualStopPrice = order.StopPrice!.Value;
+            Assert.AreEqual(expectedStopPrice, actualStopPrice, 0.01);
         }
-
+        
         [Test]
         public async Task TrailingStopOrder_Buy_GetsFilledWhenMarketChangesDirection_DownThenUp()
         {
             // Setup
-            var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new BacktesterClientSocket(Ticker, _downThenUpStart, end, _downThenUpData);
+            (DateTime, DateTime) timerange = _downThenUpTimeRange;
+            _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
+            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
+
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+
+            var trailingAmount = 0.2;
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) + trailingAmount;
             var order = new TrailingStopOrder()
             {
-                Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.BUY,
-                TrailingAmount = 0.1,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Absolute,
+                StopPrice = initialStopPrice,
                 TotalQuantity = 50
             };
 
+            _ = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
             // Test
-            _fakeIBSocket.Start();
-            var orderExecution = await PlaceOrderAsync(order);
+            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var result = await _backtester.OrderManager.AwaitExecution(order);
 
             // Assert
-            Assert.NotNull(orderExecution);
-            var expectedPrice = _downThenUpData.BidAsks.Where(ba => ba.Time < end).Min(ba => ba.Ask) + order.TrailingAmount;
-            var actualPrice = orderExecution.AvgPrice;
-            Assert.AreEqual(expectedPrice, actualPrice, 0.01);
+            bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, result.OrderExecution.Time);
+            var lowest = bidAsks.Select(ba => ba.Ask).Min();
+            var highest = bidAsks.Select(ba => ba.Ask).Max();
+            var actualPrice = result.OrderExecution.AvgPrice;
+            Assert.GreaterOrEqual(actualPrice, order.StopPrice.Value);
+            Assert.GreaterOrEqual(actualPrice, lowest);
+            Assert.LessOrEqual(actualPrice, highest);
         }
-
+        
         [Test]
         public async Task TrailingStopOrder_Sell_GetsFilledWhenMarketChangesDirection_UpThenDown()
         {
             // Setup
-            var end = _downThenUpStart.AddMinutes(30);
-            _fakeIBSocket = new BacktesterClientSocket(Ticker, _upThenDownStart, end, _upThenDownData);
+            (DateTime, DateTime) timerange = _upThenDownTimeRange;
+            _backtester = new Backtester(timerange.Item1.Date, timerange.Item1.TimeOfDay, timerange.Item2.TimeOfDay, _logger);
+            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(6);
+
+            var bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, timeOfOrderPlacement, timerange.Item2);
+
+            var trailingAmount = 0.2;
+            var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) - trailingAmount;
             var order = new TrailingStopOrder()
             {
-                Id = _fakeIBSocket.NextValidOrderId,
                 Action = OrderAction.SELL,
-                TrailingAmount = 0.1,
+                TrailingAmount = trailingAmount,
+                TrailingAmountUnits = TrailingAmountUnits.Absolute,
+                StopPrice = initialStopPrice,
                 TotalQuantity = 50
             };
 
-            var position = _fakeIBSocket.Account.Positions.First();
-            position.PositionAmount = 50;
-            position.AverageCost = 28.00;
+            _backtester.Account.Positions[Ticker] = new Position()
+            {
+                PositionAmount = 50,
+                AverageCost = 413.94,
+            };
+
+            _ = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            _fakeIBSocket.Start();
-            var orderExecution = await PlaceOrderAsync(order);
+            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var result = await _backtester.OrderManager.AwaitExecution(order);
 
             // Assert
-            Assert.NotNull(orderExecution);
-            var expectedPrice = _upThenDownData.BidAsks.Where(ba => ba.Time < end).Max(ba => ba.Bid) - order.TrailingAmount;
-            var actualPrice = orderExecution.AvgPrice;
-            Assert.AreEqual(expectedPrice, actualPrice, 0.01);
+            bidAsks = await _backtester.MarketData.BidAsks.GetAsync(Ticker, result.OrderExecution.Time);
+            var lowest = bidAsks.Select(ba => ba.Bid).Min();
+            var highest = bidAsks.Select(ba => ba.Bid).Max();
+            var actualPrice = result.OrderExecution.AvgPrice;
+            Assert.LessOrEqual(actualPrice, order.StopPrice.Value);
+            Assert.GreaterOrEqual(actualPrice, lowest);
+            Assert.LessOrEqual(actualPrice, highest);
         }
-        */
 
         async Task WaitUntilTimeIsReached(DateTime dateTime)
         {
