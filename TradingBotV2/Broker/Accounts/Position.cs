@@ -2,20 +2,7 @@
 {
     public class Position
     {
-        public Position() { }
-
-        public Position(Position pos)
-        {
-            Ticker = pos.Ticker;
-            PositionAmount = pos.PositionAmount;
-            MarketPrice = pos.MarketPrice;
-            MarketValue = pos.MarketValue;
-            AverageCost = pos.AverageCost;
-            UnrealizedPNL = pos.UnrealizedPNL;
-            RealizedPNL = pos.RealizedPNL;
-        }
-
-        public string Ticker { get; set; }
+        public string? Ticker { get; set; }
         public double PositionAmount { get; set; }
         public double MarketPrice { get; set; }
         public double MarketValue { get; set; }

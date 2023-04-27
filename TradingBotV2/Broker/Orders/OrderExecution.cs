@@ -1,20 +1,25 @@
-﻿using System;
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace TradingBotV2.Broker.Orders
 {
     public class OrderExecution
     {
-        internal string ExecId { get; set; }
+        public OrderExecution(string execId, int orderId)
+        {
+            ExecId = execId;
+            OrderId = orderId;
+        }
+
+        internal string ExecId { get; set; } 
         public int OrderId { get; set; }
         public DateTime Time { get; set; }
-        public string AcctNumber { get; set; }
-        public string Exchange { get; set; }
+        public string? AcctNumber { get; set; } 
+        public string? Exchange { get; set; } 
         public OrderAction Action { get; set; }
         public double Shares { get; set; }
         public double Price { get; set; }
         public double AvgPrice { get; set; }
-        public CommissionInfo CommissionInfo { get; set; }
+        public CommissionInfo? CommissionInfo { get; set; }
 
         public override string ToString()
         {
@@ -23,10 +28,8 @@ namespace TradingBotV2.Broker.Orders
 
         public static explicit operator OrderExecution(IBApi.Execution exec)
         {
-            return new OrderExecution()
+            return new OrderExecution(exec.ExecId, exec.OrderId)
             {
-                ExecId = exec.ExecId,
-                OrderId = exec.OrderId,
                 Exchange = exec.Exchange,
                 Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
                 Shares = exec.Shares,

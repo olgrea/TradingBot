@@ -31,20 +31,16 @@ namespace TradingBotV2.IBKR
 
         IBClient _client;
         IBBroker _broker;
-        ILogger _logger;
-        string _dbPath;
+        ILogger? _logger;
 
-        public IBHistoricalDataProvider(IBBroker broker, string dbPath = null) : this(broker, null, dbPath) {}
-
-        public IBHistoricalDataProvider(IBBroker broker, ILogger logger, string dbPath = null)
+        public IBHistoricalDataProvider(IBBroker broker, ILogger? logger)
         {
             _broker = broker;
             _client = broker.Client;
             _logger = logger;
-            _dbPath = dbPath ?? DefaultDbPath;
         }
 
-        public string DbPath { get => _dbPath; internal set => _dbPath = value; }
+        public string DbPath { get; internal set; } = DefaultDbPath;
         public bool EnableDb { get; set; } = true;
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime date) where TData : IMarketData, new()
@@ -110,7 +106,7 @@ namespace TradingBotV2.IBKR
                 var begin = current.AddMinutes(-30);
                 var end = current;
 
-                var commandFactory = DbCommandFactory.Create<TData>(_dbPath);
+                var commandFactory = DbCommandFactory.Create<TData>(DbPath);
                 bool exists = false;
                 if (EnableDb)
                 {
@@ -262,8 +258,8 @@ namespace TradingBotV2.IBKR
             // 1 M              : 30 mins - 1 month
             // 1 Y              : 1 day - 1 month
 
-            string durationStr = null;
-            string barSizeStr = null;
+            string durationStr = string.Empty;
+            string barSizeStr = string.Empty; 
             switch (barLength)
             {
                 case BarLength._1Sec:
@@ -338,7 +334,7 @@ namespace TradingBotV2.IBKR
             try
             {
                 var contract = _client.ContractsCache.Get(ticker);
-                reqId = _client.RequestHistoricalTicks(contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
+                reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
                 return await tcs.Task;
             }
             finally
@@ -380,7 +376,7 @@ namespace TradingBotV2.IBKR
             try
             {
                 var contract = _client.ContractsCache.Get(ticker);
-                reqId = _client.RequestHistoricalTicks(contract, null, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
+                reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
                 return await tcs.Task;
             }
             finally

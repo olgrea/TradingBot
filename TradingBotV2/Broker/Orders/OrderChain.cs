@@ -19,7 +19,7 @@ namespace TradingBotV2.Broker.Orders
         }
 
         public Order Order { get; }
-        public Order Parent { get; set; }
+        public Order? Parent { get; set; }
         public List<OrderChain> AttachedOrders { get; } = new List<OrderChain>();
 
         public static implicit operator OrderChain(Order o) => new OrderChain(o);

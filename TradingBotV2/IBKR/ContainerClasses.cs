@@ -5,9 +5,9 @@
         public long Time { get; set; }
         public double Price { get; set; }
         public int Size { get; set; }
-        public TickAttribLast TickAttribLast { get; set; }
-        public string Exchange { get; set; }
-        public string SpecialConditions { get; set; }
+        public TickAttribLast? TickAttribLast { get; set; } 
+        public string? Exchange { get; set; }
+        public string? SpecialConditions { get; set; }
     }
 
     public class BidAsk
@@ -17,7 +17,7 @@
         public double Ask { get; set; }
         public int AskSize { get; set; }
         public long Time { get; set; }
-        public TickAttribBidAsk TickAttribBidAsk { get; set; }
+        public TickAttribBidAsk? TickAttribBidAsk { get; set; }
     }
 
     public class FiveSecBar
@@ -32,7 +32,7 @@
         public double WAP { get; set; }
     }
 
-    public class AccountValue
+    public record struct AccountValue
     {
         public string Key { get; set; }
         public string Value { get; set; }
@@ -43,7 +43,7 @@
     public class OrderStatus
     {
         public int OrderId { get; set; }
-        public string Status { get; set; }
+        public string? Status { get; set; }
         public double Filled { get; set; }
         public double Remaining { get; set; }
         public double AvgFillPrice { get; set; }
@@ -51,12 +51,30 @@
         public int ParentId { get; set; }
         public double LastFillPrice { get; set; }
         public int ClientId { get; set; }
-        public string WhyHeld { get; set; }
+        public string? WhyHeld { get; set; }
         public double MktCapPrice { get; set; }
     }
 
     public class Position
     {
+        public Position(Contract contract, double positionAmount, double averageCost)
+        {
+            Contract = contract;
+            PositionAmount = positionAmount;
+            AverageCost = averageCost;
+        }
+
+        public Position(Contract contract, double positionAmount, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL)
+        {
+            Contract = contract;
+            PositionAmount = positionAmount;
+            MarketPrice = marketPrice;
+            MarketValue = marketValue;
+            AverageCost = averageCost;
+            UnrealizedPNL = unrealizedPNL;
+            RealizedPNL = realizedPNL;
+        }
+
         public Contract Contract { get; set; }
         public double PositionAmount { get; set; }
         public double MarketPrice { get; set; }

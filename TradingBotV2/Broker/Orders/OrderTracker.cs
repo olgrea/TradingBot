@@ -13,7 +13,7 @@
         public bool HasBeenRequested(Order order) => order != null && order.Id > 0 && OrdersRequested.ContainsKey(order.Id);
         public bool HasBeenOpened(Order order) => order != null && order.Id > 0 && OrdersOpened.ContainsKey(order.Id);
         public bool IsCancelled(Order order) => order != null && order.Id > 0 && OrdersCancelled.ContainsKey(order.Id);
-        public bool IsExecuted(Order order, out OrderExecution orderExecution)
+        public bool IsExecuted(Order order, out OrderExecution? orderExecution)
         {
             orderExecution = null;
             if (order != null && order.Id > 0 && OrdersExecuted.ContainsKey(order.Id))

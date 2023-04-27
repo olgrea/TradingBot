@@ -6,12 +6,12 @@ namespace TradingBotV2.IBKR
 {
     internal class IBOrderManager : IOrderManager
     {
-        ILogger _logger;
+        ILogger? _logger;
         IBClient _client;
         OrderTracker _orderTracker;
         OrderValidator _validator;
 
-        public IBOrderManager(IBBroker broker, ILogger logger)
+        public IBOrderManager(IBBroker broker, ILogger? logger)
         {
             _logger = logger;
             _client = broker.Client;
@@ -24,8 +24,8 @@ namespace TradingBotV2.IBKR
             _client.Responses.CommissionReport += OnCommissionInfo;
         }
 
-        public event Action<string, Order, OrderStatus> OrderUpdated;
-        public event Action<string, OrderExecution> OrderExecuted;
+        public event Action<string, Order, OrderStatus>? OrderUpdated;
+        public event Action<string, OrderExecution>? OrderExecuted;
 
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order)
         {
@@ -252,13 +252,13 @@ namespace TradingBotV2.IBKR
         void OnOrderStatus(IBApi.OrderStatus status)
         {
             OrderStatus os = (OrderStatus)status;
-            _orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out Order order);
-            if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
-            {
-                _orderTracker.TrackCancellation(order);
-            }
+            if (!_orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out Order? order))
+                throw new ArgumentException($"Unknown order id {os.Info.OrderId}");
 
-            OrderUpdated?.Invoke(_orderTracker.OrderIdsToTicker[order.Id], order, os);
+            if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
+                _orderTracker.TrackCancellation(order);
+
+            OrderUpdated?.Invoke(_orderTracker.OrderIdsToTicker[os.Info.OrderId], order, os);
         }
 
         void OnOrderExecuted(IBApi.Contract contract, IBApi.Execution e)

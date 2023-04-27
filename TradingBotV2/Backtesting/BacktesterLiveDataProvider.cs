@@ -13,9 +13,9 @@ namespace TradingBotV2.Backtesting
             public HashSet<string> BidAsk { get; set; } = new HashSet<string>();
             public HashSet<string> Last { get; set; } = new HashSet<string>();
             
-            public Action<string, IBApi.FiveSecBar> RealtimeBarCallback;
-            public Action<string, IBApi.BidAsk> TickByTickBidAskCallback;
-            public Action<string, IBApi.Last> TickByTickLastCallback;
+            public Action<string, IBApi.FiveSecBar>? RealtimeBarCallback;
+            public Action<string, IBApi.BidAsk>? TickByTickBidAskCallback;
+            public Action<string, IBApi.Last>? TickByTickLastCallback;
         }
         
         ServerSideSubscriptions _subscriptions = new ServerSideSubscriptions();

@@ -10,13 +10,13 @@ namespace TradingBotV2.Broker.Contracts
     public abstract class Contract
     {
         public int Id { get; set; }
-        public string Symbol { get; set; }
-        public string SecType { get; set; }
-        public string Exchange { get; set; }
-        public string Currency { get; set; }
+        public string? Symbol { get; set; }
+        public string? SecType { get; set; }
+        public string? Exchange { get; set; }
+        public string? Currency { get; set; }
 
         public override int GetHashCode() => Id;
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             var c = obj as Contract;
             return Id.Equals(c?.Id);
@@ -56,7 +56,7 @@ namespace TradingBotV2.Broker.Contracts
     public class Cash : Contract
     {
         public Cash() => SecType = "CASH";
-        public override string ToString()
+        public override string? ToString()
         {
             return Currency;
         }
@@ -88,9 +88,9 @@ namespace TradingBotV2.Broker.Contracts
     public class Stock : Contract
     {
         public Stock() => SecType = "STK";
-        public string LastTradeDate { get; set; }
+        public string? LastTradeDate { get; set; }
 
-        public override string ToString()
+        public override string? ToString()
         {
             return Symbol;
         }
@@ -127,7 +127,7 @@ namespace TradingBotV2.Broker.Contracts
         public Option() => SecType = "OPT";
         public double Strike { get; set; }
         public double Multiplier { get; set; }
-        public string ContractMonth { get; set; }
+        public string? ContractMonth { get; set; }
         public OptionType OptionType { get; set; }
 
         public override string ToString()

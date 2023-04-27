@@ -26,8 +26,8 @@ namespace TradingBotV2.Backtesting
             _orderEvaluator.OrderExecuted += OnOrderExecuted;
         }
 
-        public event Action<string, Order, OrderStatus> OrderUpdated;
-        public event Action<string, OrderExecution> OrderExecuted;
+        public event Action<string, Order, OrderStatus>? OrderUpdated;
+        public event Action<string, OrderExecution>? OrderExecuted;
 
         int NextOrderId => _nextOrderId++;
 

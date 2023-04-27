@@ -43,7 +43,7 @@ namespace TradingBotV2.IBKR
             };
 
             var contractDetails = await GetContractDetailsAsync(sampleContract);
-            return contractDetails?.FirstOrDefault().Contract;
+            return contractDetails.First().Contract;
         }
 
         async Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract)

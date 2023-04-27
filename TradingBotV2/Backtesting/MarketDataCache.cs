@@ -8,7 +8,7 @@ namespace TradingBotV2.Backtesting
     public class MarketDataCache<TData> where TData : IMarketData, new()
     {
         IBroker _broker;
-        Task _backgroundTask;
+        Task? _backgroundTask;
         ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>> _marketData = new ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>>();
 
         // Used as a hashset
@@ -44,7 +44,7 @@ namespace TradingBotV2.Backtesting
         public async Task<IEnumerable<TData>> GetAsync(string ticker, DateTime dateTime)
         {
             var timeDict = _marketData.GetOrAdd(ticker, new ConcurrentDictionary<DateTime, IEnumerable<TData>>()); 
-            if(!timeDict.TryGetValue(dateTime, out IEnumerable<TData> marketData))
+            if(!timeDict.TryGetValue(dateTime, out IEnumerable<TData>? marketData))
             {
                 if (_timestampsRetrieved.ContainsKey(dateTime))
                     return Enumerable.Empty<TData>();
