@@ -5,9 +5,9 @@ namespace TradingBotV2.IBKR
     public class ErrorMessage : Exception
     {
         public ErrorMessage(Exception innerException) : base(innerException.Message, innerException) { }
-        public ErrorMessage(string msg, Exception innerException = null) : base(msg, innerException) { }
-        public ErrorMessage(int errorCode, string msg, Exception innerException = null) : this(-1, errorCode, msg, innerException) { }
-        public ErrorMessage(int id, int errorCode, string msg, Exception innerException = null) : base(msg, innerException)
+        public ErrorMessage(string msg, Exception? innerException = null) : base(msg, innerException) { }
+        public ErrorMessage(int errorCode, string msg, Exception? innerException = null) : this(-1, errorCode, msg, innerException) { }
+        public ErrorMessage(int id, int errorCode, string msg, Exception? innerException = null) : base(msg, innerException)
         {
             Id = id;
             ErrorCode = errorCode;

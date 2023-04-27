@@ -42,7 +42,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 return d.ToString(CultureInfo.InvariantCulture);
             }
             else
-                return value.ToString();
+                return value?.ToString() ?? string.Empty;
         }
     }
 

@@ -2,9 +2,14 @@
 {
     public class CommissionInfo
     {
-        public string ExecId { get; set; }
+        public CommissionInfo(string execId)
+        {
+            ExecId = execId;
+        }
+
+        public string ExecId { get; set; } 
         public double Commission { get; set; }
-        public string Currency { get; set; }
+        public string? Currency { get; set; } 
         public double RealizedPNL { get; set; }
 
         public override string ToString()
@@ -14,10 +19,9 @@
 
         public static explicit operator CommissionInfo(IBApi.CommissionReport report)
         {
-            return new CommissionInfo()
+            return new CommissionInfo(report.ExecId)
             {
                 Commission = report.Commission,
-                ExecId = report.ExecId,
                 Currency = report.Currency,
                 RealizedPNL = report.RealizedPNL,
             };

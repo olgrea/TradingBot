@@ -9,16 +9,18 @@ using TradingBotV2.Broker.Orders;
 namespace TradingBotV2.IBKR
 {
     public class IBBroker : IBroker
-    {        
-        IBClient _client;
-        int _port;
+    {
         int _clientId;
+        int _port;
+        IBClient _client;
+        ILogger? _logger;
 
-        public IBBroker(int clientId, ILogger logger = null)
+        public IBBroker(int clientId, ILogger? logger = null)
         {
             _port = GetPort();
             _clientId = clientId;
             _client = new IBClient();
+            _logger = logger;
 
             LiveDataProvider = new IBLiveDataProvider(_client);
             HistoricalDataProvider = new IBHistoricalDataProvider(this, logger);
@@ -62,7 +64,7 @@ namespace TradingBotV2.IBKR
 
             var nextValidId = new Action<int>(id =>
             {
-                //_logger.Trace($"ConnectAsync : next valid id {id}");
+                _logger?.Trace($"ConnectAsync : next valid id {id}");
                 Debug.Assert(id > 0);
                 nextId = id;
                 if(nextId > 0 && !string.IsNullOrEmpty(account))
@@ -74,7 +76,7 @@ namespace TradingBotV2.IBKR
                 if (accList.Count() > 1)
                     tcs.SetException(new NotSupportedException("Only single account structures are supported."));
 
-                //_logger.Trace($"ConnectAsync : managedAccounts {accList} - set result");
+                _logger?.Trace($"ConnectAsync : managedAccounts {accList} - set result");
                 account = accList.First();
                 if (nextId > 0 && !string.IsNullOrEmpty(account))
                     tcs.TrySetResult(account);
@@ -108,7 +110,7 @@ namespace TradingBotV2.IBKR
         public async Task DisconnectAsync()
         {
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            //_logger.Debug($"Disconnecting from TWS");
+            _logger?.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.TrySetResult());
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -148,7 +150,7 @@ namespace TradingBotV2.IBKR
         }
 
         // In a single account structure, the account number is ignored.
-        public async Task<Account> GetAccountAsync(string accountCode = null)
+        public async Task<Account> GetAccountAsync(string accountCode)
         {
             var accList = await GetManagedAccountsList();
             if(string.IsNullOrEmpty(accountCode))
@@ -164,24 +166,24 @@ namespace TradingBotV2.IBKR
                 throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
             }
 
-            var account = new Account();
+            var account = new Account(accountCode);
             var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var updateAccountTime = new Action<TimeSpan>(time =>
             {
-                //_logger.Trace($"GetAccountAsync updateAccountTime : {time}");
+                _logger?.Trace($"GetAccountAsync updateAccountTime : {time}");
                 account.Time = time;
             });
             var updateAccountValue = new Action<IBApi.AccountValue>(accValue =>
             {
-                //_logger.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
+                _logger?.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
                 switch (accValue.Key)
                 {
                     case "AccountReady":
                         if (!bool.Parse(accValue.Value))
                         {
                             string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate.";
-                            //_logger.Warn(msg);
+                            _logger?.Warn(msg);
                         }
                         break;
 
@@ -200,12 +202,12 @@ namespace TradingBotV2.IBKR
             });
             var updatePortfolio = new Action<IBApi.Position>(pos =>
             {
-                //_logger.Trace($"GetAccountAsync updatePortfolio : {pos}");
+                _logger?.Trace($"GetAccountAsync updatePortfolio : {pos}");
                 account.Positions[pos.Contract.Symbol] = (Position)pos;
             });
             var accountDownloadEnd = new Action<string>(accountCode =>
             {
-                //_logger.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
+                _logger?.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
                 account.Code = accountCode;
                 tcs.SetResult(account);
             });

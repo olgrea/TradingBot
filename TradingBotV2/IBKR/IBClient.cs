@@ -21,11 +21,11 @@ namespace TradingBotV2.IBKR
 
         EClientSocket _clientSocket;
         EReaderSignal _signal;
-        EReader _reader;
-        Task _processMsgTask;
+        EReader? _reader;
+        Task? _processMsgTask;
 
         int _clientId = -1;
-        string _accountCode = null;
+        string _accountCode = string.Empty;
         int _nextValidId = -1;
         RequestIdsToContracts _requestIdsToContracts = new RequestIdsToContracts();
         
@@ -75,6 +75,7 @@ namespace TradingBotV2.IBKR
         {
             while (_clientSocket.IsConnected())
             {
+                ArgumentNullException.ThrowIfNull(_reader);
                 _signal.waitForSignal();
                 _reader.processMsgs();
             }

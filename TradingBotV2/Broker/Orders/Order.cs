@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Data;
+using System.Diagnostics;
 using TradingBotV2.Broker.Accounts;
 
 namespace TradingBotV2.Broker.Orders
@@ -23,7 +24,7 @@ namespace TradingBotV2.Broker.Orders
         public int ParentId { get; set; }
         public int PermId { get; set; }
         public bool Transmit { get; set; } = true; // if false, order will be created but not transmitted
-        public string OcaGroup { get; set; }
+        public string? OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
     }
 
@@ -45,7 +46,7 @@ namespace TradingBotV2.Broker.Orders
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             Debug.Assert(Id > 0);
             var other = obj as Order;
@@ -345,7 +346,7 @@ namespace TradingBotV2.Broker.Orders
             get => _units;
             set
             {
-                if (value is not null && value == Orders.TrailingAmountUnits.Percent)
+                if (value is not null && value == Orders.TrailingAmountUnits.Percent && _trailingAmount is not null)
                     _trailingAmount = Math.Clamp(_trailingAmount.Value, 0.0, 1.0);
 
                 _units = value;
@@ -383,9 +384,10 @@ namespace TradingBotV2.Broker.Orders
                 TrailStopPrice = order.StopPrice is null ? double.MaxValue : order.StopPrice.Value,
             };
 
-            if (order.TrailingAmountUnits is null)
-                throw new ArgumentNullException(nameof(order.TrailingAmountUnits));
-            else if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Absolute)
+            ArgumentNullException.ThrowIfNull(order.TrailingAmount, nameof(order.TrailingAmount));
+            ArgumentNullException.ThrowIfNull(order.TrailingAmountUnits, nameof(order.TrailingAmountUnits));
+
+            if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Absolute)
                 o.AuxPrice = order.TrailingAmount.Value;
             else if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Percent)
                 o.TrailingPercent = order.TrailingAmount.Value;

@@ -19,7 +19,7 @@ namespace TradingBotV2.Backtesting
         }
 
         private const string FakeAccountCode = "FAKEACCOUNT123";
-        Account _fakeAccount = new Account()
+        Account _fakeAccount = new Account(FakeAccountCode)
         {
             Code = FakeAccountCode,
             CashBalances = new Dictionary<string, double>()
@@ -43,19 +43,19 @@ namespace TradingBotV2.Backtesting
         double _totalCommission = 0.0;
 
         IBBroker _broker;
-        ILogger _logger;
+        ILogger? _logger;
         ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
-        Task _consumerTask;
-        CancellationTokenSource _cancellation;
+        Task? _consumerTask;
+        CancellationTokenSource? _cancellation;
         
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
 
-        public Backtester(DateTime date, ILogger logger = null) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, logger) { }
+        public Backtester(DateTime date, ILogger? logger = null) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, logger) { }
 
-        public Backtester(DateTime date, TimeSpan startTime, TimeSpan endTime, ILogger logger = null)
+        public Backtester(DateTime date, TimeSpan startTime, TimeSpan endTime, ILogger? logger = null)
         {
             _start = new DateTime(date.Date.Ticks + startTime.Ticks);
             _end = new DateTime(date.Date.Ticks + endTime.Ticks);
@@ -77,7 +77,8 @@ namespace TradingBotV2.Backtesting
             await Stop();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
-            await _broker?.DisconnectAsync();
+            if(_broker != null )
+                await _broker.DisconnectAsync();
         }
 
         internal DateTime StartTime => _start;
@@ -85,11 +86,11 @@ namespace TradingBotV2.Backtesting
         internal DateTime CurrentTime => _currentTime;
         internal (DateTime, DateTime) TimeRange => (_start, _end);
 
-        internal ILogger Logger => _logger;
+        internal ILogger? Logger => _logger;
         internal Account Account => _fakeAccount;
         internal CancellationToken CancellationToken => _cancellation != null ? _cancellation.Token : CancellationToken.None;
 
-        internal event Action<DateTime> ClockTick;
+        internal event Action<DateTime>? ClockTick;
                 
         internal MarketDataCollections MarketData { get; init; }
 
@@ -97,7 +98,7 @@ namespace TradingBotV2.Backtesting
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
 
-        public Action<BacktesterProgress> ProgressHandler { get; set; }
+        public Action<BacktesterProgress>? ProgressHandler { get; set; }
 
         internal void EnqueueRequest(Action action)
         {
@@ -107,7 +108,7 @@ namespace TradingBotV2.Backtesting
             if (_consumerTask.IsFaulted)
                 _consumerTask.Wait();
             else
-                _cancellation.Token.ThrowIfCancellationRequested();
+                _cancellation?.Token.ThrowIfCancellationRequested();
 
             _requestsQueue.Enqueue(action);
         }
@@ -121,14 +122,14 @@ namespace TradingBotV2.Backtesting
                 throw new InvalidOperationException($"Backtester needs to be reset before being started again.");
 
             _cancellation = new CancellationTokenSource();
-            _consumerTask = Task.Factory.StartNew(PassTime, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
+            _consumerTask = Task.Factory.StartNew(() => PassTime(_cancellation.Token), _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
 
             return _consumerTask;
         }
 
         public async Task Stop()
         {
-            if (_cancellation != null && !_cancellation.IsCancellationRequested)
+            if (_consumerTask != null &&_cancellation != null && !_cancellation.IsCancellationRequested)
             {
                 _cancellation.Cancel();
                 try
@@ -158,9 +159,8 @@ namespace TradingBotV2.Backtesting
             LiveDataProvider = new BacktesterLiveDataProvider(this);
         }
 
-        void PassTime()
+        void PassTime(CancellationToken mainToken)
         {
-            var mainToken = _cancellation.Token;
             var bp = new BacktesterProgress();
 
             //_logger.Trace($"Passing time task started");
@@ -169,7 +169,7 @@ namespace TradingBotV2.Backtesting
                 mainToken.ThrowIfCancellationRequested();
 
                 // Let's process the requests first 
-                while (_requestsQueue.TryDequeue(out Action action))
+                while (_requestsQueue.TryDequeue(out Action? action))
                 {
                     mainToken.ThrowIfCancellationRequested();
                     action();
@@ -216,7 +216,7 @@ namespace TradingBotV2.Backtesting
         internal double UpdateCommissions(Order order, double price)
         {
             double commission = GetCommission(order, price);
-            _logger.Debug($"{order} : commission : {commission:c}");
+            _logger?.Debug($"{order} : commission : {commission:c}");
 
             UpdateCashBalance(-commission);
             _totalCommission += commission;
@@ -238,7 +238,7 @@ namespace TradingBotV2.Backtesting
             _fakeAccount.RealizedPnL["BASE"] += realized;
             _fakeAccount.RealizedPnL["USD"] += realized;
 
-            _logger.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
+            _logger?.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
         }
 
         internal void UpdateUnrealizedPNL(string ticker, double currentPrice)

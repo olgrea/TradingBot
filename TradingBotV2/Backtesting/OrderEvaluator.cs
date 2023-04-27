@@ -9,7 +9,7 @@ namespace TradingBotV2.Backtesting
     {
         Backtester _backtester;
         OrderTracker _orderTracker;
-        ILogger _logger;
+        ILogger? _logger;
         int _execId = 1;
 
         public OrderEvaluator(Backtester backtester, OrderTracker orderTracker)
@@ -22,7 +22,7 @@ namespace TradingBotV2.Backtesting
         }
 
         int NextExecId => _execId++;
-        internal event Action<string, OrderExecution> OrderExecuted;
+        internal event Action<string, OrderExecution>? OrderExecuted;
 
         void OnClockTick_EvaluateOrders(DateTime newTime)
         {
@@ -93,10 +93,8 @@ namespace TradingBotV2.Backtesting
 
         private void EvaluateTrailingStopOrder(string ticker, BidAsk bidAsk, TrailingStopOrder o)
         {
-            if (o.TrailingAmount is null)
-                throw new ArgumentNullException(nameof(o.TrailingAmount));
-            if (o.TrailingAmountUnits is null)
-                throw new ArgumentNullException(nameof(o.TrailingAmountUnits));
+            ArgumentNullException.ThrowIfNull(o.TrailingAmount, nameof(o.TrailingAmount));
+            ArgumentNullException.ThrowIfNull(o.TrailingAmountUnits, nameof(o.TrailingAmountUnits));
 
             if (o.Action == OrderAction.BUY)
             {
@@ -206,7 +204,7 @@ namespace TradingBotV2.Backtesting
             var total = order.TotalQuantity * price;
 
             Account account = _backtester.Account;
-            if(!_backtester.Account.Positions.TryGetValue(ticker, out Position position))
+            if(!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
             {
                 position = _backtester.Account.Positions[ticker] = new Position() { Ticker = ticker};
             }
@@ -252,17 +250,16 @@ namespace TradingBotV2.Backtesting
 
             _logger?.Debug($"Account {account.Code} :  New USD cash balance : {account.CashBalances["USD"]:c}");
 
-            var oe = new OrderExecution()
+            string nextExecId = NextExecId.ToString();
+            var oe = new OrderExecution(nextExecId, order.Id)
             {
                 AcctNumber = account.Code,
-                OrderId = order.Id,
-                ExecId = NextExecId.ToString(),
                 Time = _backtester.CurrentTime,
                 Action = order.Action,
                 Shares = order.TotalQuantity,
                 Price = total,
                 AvgPrice = price,
-                CommissionInfo = new CommissionInfo()
+                CommissionInfo = new CommissionInfo(nextExecId)
                 {
                     Commission = commission,
                     Currency = "USD",

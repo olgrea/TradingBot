@@ -11,6 +11,11 @@
         public Dictionary<string, double> RealizedPnL { get; set; } = new Dictionary<string, double>();
         public Dictionary<string, double> UnrealizedPnL { get; set; } = new Dictionary<string, double>();
 
+        public Account(string code)
+        {
+            Code = code;
+        }
+
         public double USDCash
         {
             get => CashBalances["USD"];
@@ -24,7 +29,7 @@
             return Time.GetHashCode();
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             var a = obj as Account;
             return a != null && a.Time == Time;

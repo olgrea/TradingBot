@@ -2,7 +2,7 @@
 {
     public class OrderStatus
     {
-        internal RequestInfo Info { get; set; }
+        internal RequestInfo Info { get; set; } = new RequestInfo();
         public Status Status { get; set; }
         public double Filled { get; set; }
         public double Remaining { get; set; }
