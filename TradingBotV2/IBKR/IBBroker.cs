@@ -14,6 +14,9 @@ namespace TradingBotV2.IBKR
         int _port;
         IBClient _client;
         ILogger? _logger;
+        
+        bool _accountValuesRequested = false;
+        Account? _tmpAccount;
 
         public IBBroker(int clientId, ILogger? logger = null)
         {
@@ -25,7 +28,14 @@ namespace TradingBotV2.IBKR
             LiveDataProvider = new IBLiveDataProvider(_client);
             HistoricalDataProvider = new IBHistoricalDataProvider(this, logger);
             OrderManager = new IBOrderManager(this, logger);
+
+            _client.Responses.UpdateAccountTime += OnAccountTimeUpdate;
+            _client.Responses.UpdateAccountValue += OnAccountValueUpdate;
+            _client.Responses.UpdatePortfolio += OnPortfolioUpdate;
+            _client.Responses.AccountDownloadEnd += OnAccountDownloadEnd;
         }
+
+        public event Action<Account>? AccountUpdated;
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
@@ -149,88 +159,110 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        // In a single account structure, the account number is ignored.
         public async Task<Account> GetAccountAsync(string accountCode)
         {
-            var accList = await GetManagedAccountsList();
-            if(string.IsNullOrEmpty(accountCode))
-            {
-                if (accList.Count() > 1)
-                {
-                    throw new ArgumentException("An account code must be specified for multiple-account structures.");
-                }
-                accountCode = accList.First();
-            }
-            else if (!accList.Contains(accountCode))
-            {
-                throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
-            }
+            await ValidateAccount(accountCode);
 
-            var account = new Account(accountCode);
             var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            var updateAccountTime = new Action<TimeSpan>(time =>
+            var accountUpdated = new Action<Account>(account => 
             {
-                _logger?.Trace($"GetAccountAsync updateAccountTime : {time}");
-                account.Time = time;
-            });
-            var updateAccountValue = new Action<IBApi.AccountValue>(accValue =>
-            {
-                _logger?.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
-                switch (accValue.Key)
-                {
-                    case "AccountReady":
-                        if (!bool.Parse(accValue.Value))
-                        {
-                            string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate.";
-                            _logger?.Warn(msg);
-                        }
-                        break;
-
-                    case "CashBalance":
-                        account.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "RealizedPnL":
-                        account.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
-                        break;
-
-                    case "UnrealizedPnL":
-                        account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
-                        break;
-                }
-            });
-            var updatePortfolio = new Action<IBApi.Position>(pos =>
-            {
-                _logger?.Trace($"GetAccountAsync updatePortfolio : {pos}");
-                account.Positions[pos.Contract.Symbol] = (Position)pos;
-            });
-            var accountDownloadEnd = new Action<string>(accountCode =>
-            {
-                _logger?.Trace($"GetAccountAsync accountDownloadEnd : {accountCode} - set result");
-                account.Code = accountCode;
-                tcs.SetResult(account);
+                if (account.Code == accountCode)
+                    tcs.TrySetResult(account);
             });
 
-            _client.Responses.UpdateAccountTime += updateAccountTime;
-            _client.Responses.UpdateAccountValue += updateAccountValue;
-            _client.Responses.UpdatePortfolio += updatePortfolio;
-            _client.Responses.AccountDownloadEnd += accountDownloadEnd;
-
+            AccountUpdated += accountUpdated;
             try
             {
-                _client.RequestAccountUpdates(accountCode);
+                RequestAccountUpdates(accountCode);
                 return await tcs.Task;
             }
             finally
             {
-                _client.CancelAccountUpdates(accountCode);
-
-                _client.Responses.UpdateAccountTime -= updateAccountTime;
-                _client.Responses.UpdateAccountValue -= updateAccountValue;
-                _client.Responses.UpdatePortfolio -= updatePortfolio;
-                _client.Responses.AccountDownloadEnd -= accountDownloadEnd;
+                CancelAccountUpdates(accountCode);
+                AccountUpdated -= accountUpdated;
             }
+        }
+
+        async Task ValidateAccount(string accountCode)
+        {
+            var accList = await GetManagedAccountsList();
+            if (accList.Count() > 1)
+            {
+                throw new NotSupportedException("Multiple-account structures not supported.");
+            }
+            else if (accList.First() != accountCode)
+            {
+                throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
+            }
+        }
+
+        public void RequestAccountUpdates(string account)
+        {
+            if (!_accountValuesRequested)
+            {
+                ValidateAccount(account).Wait();
+                _tmpAccount = new Account(account);
+                _accountValuesRequested = true;
+                _client.RequestAccountUpdates(account);
+            }
+        }
+
+        public void CancelAccountUpdates(string account)
+        {
+            if (_accountValuesRequested)
+            {
+                _tmpAccount = null;
+                _accountValuesRequested = false;
+                _client.CancelAccountUpdates(account);
+            }
+        }
+
+        void OnAccountDownloadEnd(string account)
+        {
+            Debug.Assert(_tmpAccount != null);
+            AccountUpdated?.Invoke(_tmpAccount);
+        }
+
+        void OnPortfolioUpdate(IBApi.Position pos)
+        {
+            Debug.Assert(_tmpAccount != null);
+            _logger?.Trace($"GetAccountAsync updatePortfolio : {pos}");
+            _tmpAccount.Positions[pos.Contract.Symbol] = (Position)pos;
+        }
+
+        void OnAccountValueUpdate(IBApi.AccountValue accValue)
+        {
+            Debug.Assert(_tmpAccount != null);
+            _logger?.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
+            switch (accValue.Key)
+            {
+                case "AccountReady":
+                    if (!bool.Parse(accValue.Value))
+                    {
+                        string msg = "Account not available at the moment. The IB server is in the process of resetting. Values returned may not be accurate.";
+                        _logger?.Warn(msg);
+                    }
+                    break;
+
+                case "CashBalance":
+                    _tmpAccount.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    break;
+
+                case "RealizedPnL":
+                    _tmpAccount.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    break;
+
+                case "UnrealizedPnL":
+                    _tmpAccount.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    break;
+            }
+        }
+
+        void OnAccountTimeUpdate(TimeSpan time)
+        {
+            Debug.Assert(_tmpAccount != null);
+            _logger?.Trace($"GetAccountAsync updateAccountTime : {time}");
+            _tmpAccount.Time = time;
         }
     }
 }
