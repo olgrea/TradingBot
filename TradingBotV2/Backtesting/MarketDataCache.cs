@@ -12,7 +12,7 @@ namespace TradingBotV2.Backtesting
         ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>> _marketData = new ConcurrentDictionary<string, ConcurrentDictionary<DateTime, IEnumerable<TData>>>();
 
         // Used as a hashset
-        ConcurrentDictionary<DateTime, byte> _timestampsRetrieved = new ConcurrentDictionary<DateTime, byte>();
+        ConcurrentDictionary<string, ConcurrentDictionary<DateTime, byte>> _timestampsRetrieved = new ConcurrentDictionary<string, ConcurrentDictionary<DateTime, byte>>();
 
         public MarketDataCache(IBroker broker)
         {
@@ -46,7 +46,7 @@ namespace TradingBotV2.Backtesting
             var timeDict = _marketData.GetOrAdd(ticker, new ConcurrentDictionary<DateTime, IEnumerable<TData>>()); 
             if(!timeDict.TryGetValue(dateTime, out IEnumerable<TData>? marketData))
             {
-                if (_timestampsRetrieved.ContainsKey(dateTime))
+                if (_timestampsRetrieved.ContainsKey(ticker) && _timestampsRetrieved[ticker].ContainsKey(dateTime))
                     return Enumerable.Empty<TData>();
 
                 // Retrieving 10 minutes right now and the rest on a background task
@@ -54,7 +54,7 @@ namespace TradingBotV2.Backtesting
                 var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, to)).Cast<TData>();
                 
                 FillCache(ticker, data);
-                MarkTimestampsAsRetrieved(dateTime, to);
+                MarkTimestampsAsRetrieved(ticker, dateTime, to);
 
                 marketData = data.OrderBy(d => d.Time).TakeWhile(d => d.Time <= dateTime);
 
@@ -64,7 +64,7 @@ namespace TradingBotV2.Backtesting
                     {
                         var progress = new Action<IEnumerable<IMarketData>>(newData =>
                         {
-                            MarkTimestampsAsRetrieved(newData.First().Time, newData.Last().Time);
+                            MarkTimestampsAsRetrieved(ticker, newData.First().Time, newData.Last().Time);
                             FillCache(ticker, newData.Cast<TData>());
                         });
                         await _broker.HistoricalDataProvider.GetDataForDayInChunks<TData>(ticker, dateTime.Date, MarketDataUtils.MarketDayTimeRange, progress);
@@ -85,15 +85,16 @@ namespace TradingBotV2.Backtesting
             }
         }
 
-        void MarkTimestampsAsRetrieved(DateTime from, DateTime to)
+        void MarkTimestampsAsRetrieved(string ticker, DateTime from, DateTime to)
         {
             if (from > to) 
                 return;
 
+            _timestampsRetrieved.GetOrAdd(ticker, new ConcurrentDictionary<DateTime, byte>());
             DateTime current = from;
             while (current < to)
             {
-                _timestampsRetrieved.GetOrAdd(current, 0);
+                _timestampsRetrieved[ticker].GetOrAdd(current, 0);
                 current = current.AddSeconds(1);
             }
         }
