@@ -22,8 +22,6 @@ namespace TradingBotV2.Broker.MarketData
         public DateTime Time { get; set; }
         public BarLength BarLength { get; set; }
 
-        public DateTime Date => Time;
-
         public override string ToString()
         {
             return $"{Time} : O={Open:c} H={High:c} L={Low:c} C={Close:c}";
