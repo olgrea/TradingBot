@@ -12,10 +12,10 @@ namespace TradingBotV2.Backtesting
 {
     internal class Backtester : IBroker, IAsyncDisposable
     {
-        static class TimeDelays
+        static class TimeCompression
         {
-            public static double TimeScale = 0.001;
-            public static int OneSecond => (int)Math.Round(1 * 1000 * TimeScale);
+            public static double Factor = 0.001;
+            public static int OneSecond => (int)Math.Round(1 * 1000 * Factor);
         }
 
         private const string FakeAccountCode = "FAKEACCOUNT123";
@@ -39,7 +39,6 @@ namespace TradingBotV2.Backtesting
                 }
         };
 
-        bool _isConnected = false;
         double _totalCommission = 0.0;
 
         IBBroker _broker;
@@ -48,10 +47,12 @@ namespace TradingBotV2.Backtesting
 
         Task? _consumerTask;
         CancellationTokenSource? _cancellation;
-        
+
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
+        BacktesterProgress _progress = new BacktesterProgress();
+        TaskCompletionSource? _tcsDayIsOver;
 
         public Backtester(DateTime date, ILogger? logger = null) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, logger) { }
 
@@ -69,12 +70,14 @@ namespace TradingBotV2.Backtesting
             LiveDataProvider = new BacktesterLiveDataProvider(this);
             HistoricalDataProvider = new IBHistoricalDataProvider(_broker, logger);
             OrderManager = new BacktesterOrderManager(this);
+
             MarketData = new MarketDataCollections(this);
         }
 
         public async ValueTask DisposeAsync()
         {
             await Stop();
+            await DisconnectAsync();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
             if(_broker != null )
@@ -91,7 +94,8 @@ namespace TradingBotV2.Backtesting
         internal CancellationToken CancellationToken => _cancellation != null ? _cancellation.Token : CancellationToken.None;
 
         internal event Action<DateTime>? ClockTick;
-                
+        public event Action<Account>? AccountUpdated;
+
         internal MarketDataCollections MarketData { get; init; }
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
@@ -99,6 +103,77 @@ namespace TradingBotV2.Backtesting
         public IOrderManager OrderManager { get; init; }
 
         public Action<BacktesterProgress>? ProgressHandler { get; set; }
+
+        public Task<string> ConnectAsync()
+        {
+            if (_consumerTask != null)
+                throw new ErrorMessage("Already connected");
+
+            _cancellation = new CancellationTokenSource();
+            _cancellation.Token.Register(() => _tcsDayIsOver?.TrySetCanceled());
+            _consumerTask = Task.Factory.StartNew(ConsumeRequests, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
+            _consumerTask.ContinueWith(t =>
+            {
+                var e = t.Exception ?? new Exception("Unknown exception occured");
+                _tcsDayIsOver?.TrySetException(e);
+            }, TaskContinuationOptions.OnlyOnFaulted);
+
+            return Task.FromResult(FakeAccountCode);
+        }
+
+        public async Task DisconnectAsync()
+        {
+            if (_consumerTask != null && _cancellation != null && !_cancellation.IsCancellationRequested)
+            {
+                _cancellation.Cancel();
+                try
+                {
+                    await _consumerTask;
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger?.Debug("Task stopped");
+                }
+
+                _cancellation?.Dispose();
+                _cancellation = null;
+                _consumerTask?.Dispose();
+                _consumerTask = null;
+            }
+        }
+
+        public Task Start()
+        {
+            if (IsDayOver())
+                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is completed.");
+            else if(_consumerTask == null)
+                throw new InvalidOperationException($"Not connected");
+
+            if (_tcsDayIsOver == null)
+            {
+                _tcsDayIsOver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            return _tcsDayIsOver.Task;
+        }
+
+        public async Task Stop()
+        {
+            _tcsDayIsOver?.TrySetCanceled();
+            _tcsDayIsOver = null;
+            await Task.CompletedTask;
+        }
+
+        public async Task Reset()
+        {
+            await Stop();
+
+            _requestsQueue.Clear();
+            _currentTime = _start;
+
+            LiveDataProvider.Dispose();
+            LiveDataProvider = new BacktesterLiveDataProvider(this);
+        }
 
         internal void EnqueueRequest(Action action)
         {
@@ -113,58 +188,12 @@ namespace TradingBotV2.Backtesting
             _requestsQueue.Enqueue(action);
         }
 
-        public Task Start()
+        void ConsumeRequests()
         {
-            if (IsDayOver())
-                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is completed.");
-
-            if(_cancellation != null || _consumerTask != null)
-                throw new InvalidOperationException($"Backtester needs to be reset before being started again.");
-
-            _cancellation = new CancellationTokenSource();
-            _consumerTask = Task.Factory.StartNew(() => PassTime(_cancellation.Token), _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
-
-            return _consumerTask;
-        }
-
-        public async Task Stop()
-        {
-            if (_consumerTask != null &&_cancellation != null && !_cancellation.IsCancellationRequested)
-            {
-                _cancellation.Cancel();
-                try
-                {
-                    await _consumerTask;
-                }
-                catch (OperationCanceledException)
-                {
-                    _logger?.Debug("Task stopped");
-                }
-            }
-        }
-
-        public async Task Reset()
-        {
-            await Stop();
-
-            _cancellation?.Dispose();
-            _cancellation = null;
-            _consumerTask?.Dispose();
-            _consumerTask = null;
-
-            _requestsQueue.Clear();
-            _currentTime = _start;
-
-            LiveDataProvider.Dispose();
-            LiveDataProvider = new BacktesterLiveDataProvider(this);
-        }
-
-        void PassTime(CancellationToken mainToken)
-        {
-            var bp = new BacktesterProgress();
+            var mainToken = _cancellation!.Token;
 
             //_logger.Trace($"Passing time task started");
-            while (!mainToken.IsCancellationRequested && !IsDayOver())
+            while (!mainToken.IsCancellationRequested)
             {
                 mainToken.ThrowIfCancellationRequested();
 
@@ -175,38 +204,36 @@ namespace TradingBotV2.Backtesting
                     action();
                 }
 
-                mainToken.ThrowIfCancellationRequested();
-                ClockTick?.Invoke(_currentTime);
-                mainToken.ThrowIfCancellationRequested();
-
-                if (TimeDelays.OneSecond > 0)
-                    Task.Delay(TimeDelays.OneSecond).Wait(mainToken);
-
-                _currentTime = _currentTime.AddSeconds(1);
-                
-                bp.CurrentTime = _currentTime;
-
-                mainToken.ThrowIfCancellationRequested();
-                ProgressHandler?.Invoke(bp);
+                if(_tcsDayIsOver != null)
+                {
+                    if (!IsDayOver())
+                        AdvanceTime();
+                    else
+                        _tcsDayIsOver.TrySetResult();
+                }
             }
         }
 
+        void AdvanceTime()
+        {
+            var mainToken = _cancellation.Token;
+
+            mainToken.ThrowIfCancellationRequested();
+            ClockTick?.Invoke(_currentTime);
+            mainToken.ThrowIfCancellationRequested();
+
+            if (TimeCompression.OneSecond > 0)
+                Task.Delay(TimeCompression.OneSecond).Wait(mainToken);
+
+            _currentTime = _currentTime.AddSeconds(1);
+
+            mainToken.ThrowIfCancellationRequested();
+
+            _progress.CurrentTime = _currentTime;
+            ProgressHandler?.Invoke(_progress);
+        }
+
         bool IsDayOver() => _currentTime >= _end;
-
-        public Task<string> ConnectAsync()
-        {
-            if (_isConnected)
-                throw new ErrorMessage("Already connected");
-
-            _isConnected = true;
-            return Task.FromResult<string>(FakeAccountCode);
-        }
-
-        public Task DisconnectAsync()
-        {
-            _isConnected = false;
-            return Task.CompletedTask;
-        }
 
         public Task<Account> GetAccountAsync(string accountCode)
         {
@@ -268,6 +295,16 @@ namespace TradingBotV2.Backtesting
             double max = order.TotalQuantity * price * 0.01; // 1% of trade value
 
             return Math.Min(Math.Max(@fixed * order.TotalQuantity, min), max);
+        }
+
+        public void RequestAccountUpdates(string account)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void CancelAccountUpdates(string account)
+        {
+            throw new NotImplementedException();
         }
     }
 }
