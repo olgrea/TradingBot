@@ -23,12 +23,13 @@ namespace IBBrokerTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            var logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
-            _broker = new IBBroker(9001, logger);
-            await _broker.ConnectAsync();
-            
+            _broker = new IBBroker(9001);
+
             _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
             _historicalProvider.DbPath = TestDbPath;
+            _historicalProvider.Logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
+
+            await _broker.ConnectAsync();
         }
 
         [SetUp]
