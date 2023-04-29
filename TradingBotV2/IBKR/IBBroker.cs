@@ -119,6 +119,9 @@ namespace TradingBotV2.IBKR
 
         public async Task DisconnectAsync()
         {
+            if (!_client.IsConnected())
+                return;
+
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             _logger?.Debug($"Disconnecting from TWS");
 

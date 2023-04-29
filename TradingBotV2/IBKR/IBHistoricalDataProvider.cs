@@ -1,6 +1,6 @@
-﻿using System.Diagnostics;
-using System.Linq;
-using System.Xml.Linq;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using NLog;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
@@ -13,10 +13,24 @@ namespace TradingBotV2.IBKR
     {
         public const string DefaultDbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
 
+        class MarketDataCache
+        {
+            public ConcurrentDictionary<DateTime, IEnumerable<IMarketData>> Cache = new();
+            public ConcurrentDictionary<DateTime, byte> TimestampsRetrieved = new();
+            
+            //debug
+            List<DateTime> KeysDebug => Cache.Keys.OrderBy(k => k).ToList();
+        }
+
+        ConcurrentDictionary<string, ConcurrentDictionary<Type, MarketDataCache>> _cache = new();
+
         // for unit tests
-        internal int _nbRetrievedFromDb = 0;
         internal int _nbRetrievedFromIBKR = 0;
+        internal int _nbRetrievedFromDb = 0;
+        internal int _nbRetrievedFromCache = 0;
+        internal int _nbInsertedInCache = 0;
         internal int _nbInsertedInDb = 0;
+        internal void ClearCache() => _cache.Clear();
 
         int _nbRequest = 0;
         int NbRequest
@@ -32,6 +46,7 @@ namespace TradingBotV2.IBKR
         IBClient _client;
         IBBroker _broker;
         ILogger? _logger;
+        CancellationToken _token;
 
         public IBHistoricalDataProvider(IBBroker broker, ILogger? logger)
         {
@@ -41,127 +56,224 @@ namespace TradingBotV2.IBKR
         }
 
         public string DbPath { get; internal set; } = DefaultDbPath;
-        public bool EnableDb { get; set; } = true;
-
+        public bool DbEnabled { get; set; } = true;
+        public bool CacheEnabled { get; set; } = true;
+        
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime date) where TData : IMarketData, new()
+        {
+            return await GetHistoricalDataAsync<TData>(ticker, date, CancellationToken.None);
+        }
+
+        public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
+        {
+            return await GetHistoricalDataAsync<TData>(ticker, from, to, CancellationToken.None);
+        }
+
+        public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime date, CancellationToken token) where TData : IMarketData, new()
         {
             date = new DateTime(date.Date.Ticks + MarketDataUtils.MarketStartTime.Ticks);
 
             ValidateDate(date);
 
-            if (!MarketDataUtils.WasMarketOpen(date))
-                throw new ArgumentException($"The market was closed on {date}");
-
             IEnumerable<IMarketData> data = new LinkedList<IMarketData>();
             var progress = new Action<IEnumerable<IMarketData>>(newData =>
             {
+                token.ThrowIfCancellationRequested();
                 data = newData.Concat(data);
             });
 
-            await GetDataForDayInChunks<TData>(ticker, date, MarketDataUtils.MarketDayTimeRange, progress);
+            token.ThrowIfCancellationRequested();
+            var marketHours = date.ToMarketHours();
+            await GetDataInChunks<TData>(ticker, marketHours.Item1, marketHours.Item2, progress);
 
             return data;
         }
 
-        public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
+        public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to, CancellationToken token) where TData : IMarketData, new()
         {
-            ValidateDate(from);
-
-            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to).ToList();
-            if (!days.Any())
-                throw new ArgumentException($"Market was closed from {from} to {to}");
+            ValidateDates(from, to);
 
             IEnumerable<IMarketData> data = new LinkedList<IMarketData>();
             var progress = new Action<IEnumerable<IMarketData>>(newData =>
             {
+                token.ThrowIfCancellationRequested();
                 data = newData.Concat(data);
             });    
 
-            foreach ((DateTime, DateTime) day in days)
+            foreach ((DateTime, DateTime) day in MarketDataUtils.GetMarketDays(from, to))
             {
-                await GetDataForDayInChunks<TData>(ticker, day.Item1.Date, (day.Item1.TimeOfDay, day.Item2.TimeOfDay), progress);
+                token.ThrowIfCancellationRequested();
+                await GetDataInChunks<TData>(ticker, day.Item1, day.Item2, progress);
             }
 
-            // TODO : fix this. "from" and "to" time of day are not respected
+            // TODO : fix this. "from" and "to" time of day are not respected when retrieved from server
             return data.SkipWhile(d => d.Time < from);
         }
 
-        public async Task GetDataForDayInChunks<TData>(string ticker, DateTime date, (TimeSpan, TimeSpan) timeRange, Action<IEnumerable<IMarketData>> onChunckReceived) where TData : IMarketData, new()
+        internal async Task GetDataInChunks<TData>(string ticker, DateTime from, DateTime to, Action<IEnumerable<IMarketData>> onChunckReceived) where TData : IMarketData, new()
         {
             Type datatype = typeof(TData);
-            DateTime morning = new DateTime(date.Date.Ticks + timeRange.Item1.Ticks);
-            DateTime current = new DateTime(date.Date.Ticks + timeRange.Item2.Ticks);
+            _logger?.Info($"Getting {datatype.Name} for {ticker} on {from.Date.ToShortDateString()} ({from.ToShortTimeString()} to {to.ToShortTimeString()})");
 
-            _logger?.Info($"Getting {datatype.Name} for {ticker} on {date.ToShortDateString()} ({morning.ToShortTimeString()} to {current.ToShortTimeString()})");
-
-            // In order to respect TWS limitations, data is retrieved in chunks of max 30 minutes for bars of 1 sec length (1800 bars total), from the end of the
-            // time range to the beginning. 
-            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
-
+            _nbRetrievedFromCache = 0;
             _nbRetrievedFromDb = 0;
             _nbRetrievedFromIBKR = 0;
+            _nbInsertedInCache = 0;
             _nbInsertedInDb = 0;
-            while (current > morning)
+
+            DateTime current = to;
+            DbCommandFactory? cmdFactory = null;
+            while (current > from)
             {
-                var begin = current.AddMinutes(-30);
-                var end = current;
+                // In order to respect TWS limitations, data is retrieved in chunks, from the end of the
+                // time range to the beginning. 
+                // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+                var chunkEnd = current;
+                var chunkBegin = current.AddSeconds(-30 * 60);
+                if (chunkBegin < from)
+                    chunkBegin = from;
 
-                var commandFactory = DbCommandFactory.Create<TData>(DbPath);
-                bool exists = false;
-                if (EnableDb)
+                IEnumerable<IMarketData>? data;
+                if (!TryGetFromCache<TData>(ticker, chunkBegin, chunkEnd, out data))
                 {
-                    DbCommand<bool> existsCmd = commandFactory.CreateExistsCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
-                    exists = existsCmd.Execute();
-                }
+                    if(cmdFactory == null)
+                        cmdFactory = DbCommandFactory.Create<TData>(DbPath);
 
-                IEnumerable<IMarketData> data;
-                if (exists)
-                {
-                    // If the data exists in the database, retrieve it
-                    var selectCmd = commandFactory.CreateSelectCommand(ticker, current.Date, (begin.TimeOfDay, end.TimeOfDay));
-                    data = selectCmd.Execute();
-                    _nbRetrievedFromDb += data.Count();
-
-                    var dateStr = current.Date.ToShortDateString();
-                    _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) already exists in db. Skipping.");
-                }
-                else
-                {
-                    // Otherwise get it from the server and insert it in the db
-                    data = await FetchHistoricalDataFromServer<TData>(ticker, current);
-                    _nbRetrievedFromIBKR += data.Count();
-
-                    var dateStr = current.Date.ToShortDateString();
-                    _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({begin.ToShortTimeString()}-{end.ToShortTimeString()}) received from TWS.");
-
-                    if (EnableDb)
+                    if(TryGetFromDb<TData>(ticker, datatype, chunkBegin, chunkEnd, cmdFactory, out data))
                     {
-                        _logger?.Info($"Inserting in db.");
-                        DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
-                        if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
-                            _nbInsertedInDb += iCmd.NbInserted;
+                        InsertInCache<TData>(ticker, chunkBegin, chunkEnd, data);
+                    }
+                    else
+                    {
+                        data = await GetFromServer<TData>(ticker, current);
+                        _logger?.Info($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin.ToShortTimeString()}-{chunkEnd.ToShortTimeString()}) received from TWS.");
+                        if (data != null && data.Any())
+                        {
+                            InsertInDb<TData>(ticker, data, cmdFactory);
+                            InsertInCache<TData>(ticker, chunkBegin, chunkEnd, data);
+                        }
                     }
                 }
-
+                Debug.Assert(data != null);
                 onChunckReceived?.Invoke(data);
-
                 current = current.AddMinutes(-30);
             }
         }
 
-        async Task<IEnumerable<IMarketData>> FetchHistoricalDataFromServer<TData>(string ticker, DateTime time) where TData : IMarketData, new()
+        bool TryGetFromCache<TData>(string ticker, DateTime from, DateTime to, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
+        {
+            if (!CacheEnabled || !_cache.TryGetValue(ticker, out var typeCache) || !typeCache.TryGetValue(typeof(TData), out var dataCache))
+            {
+                data = null;
+                return false;
+            }
+
+            data = Enumerable.Empty<IMarketData>();
+            for(DateTime i = from; i < to; i = i.AddSeconds(1))
+            {
+                if (!dataCache.TimestampsRetrieved.ContainsKey(i))
+                {
+                    data = null;
+                    return false;
+                }
+
+                if(dataCache.Cache.TryGetValue(i, out IEnumerable<IMarketData>? value))
+                    data = data.Concat(value);
+            }
+
+            _nbRetrievedFromCache += data.Count();
+            return true;
+        }
+
+        void InsertInCache<TData>(string ticker, DateTime from, DateTime to, IEnumerable<IMarketData> newData) where TData : IMarketData, new()
+        {
+            if (!CacheEnabled)
+                return;
+
+            var typeCache = _cache.GetOrAdd(ticker, new ConcurrentDictionary<Type, MarketDataCache>());
+            var dataCache = typeCache.GetOrAdd(typeof(TData), new MarketDataCache());
+
+            foreach (IGrouping<DateTime, IMarketData> data in newData.GroupBy(d => d.Time))
+            {
+                dataCache.Cache.AddOrUpdate(data.Key, data, (k, currentData) => currentData.Union(data));
+            }
+
+            _nbInsertedInCache += newData.Count();
+            MarkAsRetrieved<TData>(ticker, from, to);
+        }
+
+        void MarkAsRetrieved<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
+        {
+            if (!CacheEnabled)
+                return;
+
+            if (from > to)
+                return;
+            
+            if(_cache.TryGetValue(ticker, out var typeCache) && typeCache.TryGetValue(typeof(TData), out var dataCache))
+            {
+                DateTime current = from;
+                while (current < to)
+                {
+                    dataCache.TimestampsRetrieved.GetOrAdd(current, 0);
+                    current = current.AddSeconds(1);
+                }
+            }
+        }
+
+        bool TryGetFromDb<TData>(string ticker, Type datatype, DateTime from, DateTime to, DbCommandFactory cmdFactory, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
+        {
+            if(!DbEnabled)
+            {
+                data = null;
+                return false;
+            }
+
+            DbCommand<bool> existsCmd = cmdFactory.CreateExistsCommand(ticker, from.Date, (from.TimeOfDay, to.TimeOfDay));
+            if(!existsCmd.Execute())
+            {
+                data = null;
+                return false;
+            }
+
+            var selectCmd = cmdFactory.CreateSelectCommand(ticker, from.Date, (from.TimeOfDay, to.TimeOfDay));
+            data = selectCmd.Execute();
+            _nbRetrievedFromDb += data.Count();
+
+            var dateStr = from.Date.ToShortDateString();
+            _logger?.Info($"{datatype.Name} for {ticker} {dateStr} ({from.ToShortTimeString()}-{to.ToShortTimeString()}) already exists in db. Skipping.");
+
+            return true;
+        }
+
+        void InsertInDb<TData>(string ticker, IEnumerable<IMarketData> data, DbCommandFactory commandFactory) where TData : IMarketData, new()
+        {
+            if (!DbEnabled)
+                return;
+
+            _logger?.Info($"Inserting in db.");
+            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
+            if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
+                _nbInsertedInDb += iCmd.NbInserted;
+        }
+
+        async Task<IEnumerable<IMarketData>> GetFromServer<TData>(string ticker, DateTime time) where TData : IMarketData, new()
         {
             if (!_broker.IsConnected())
                 await _broker.ConnectAsync();
 
+            IEnumerable<IMarketData> data;
             if (typeof(TData) == typeof(Bar))
             {
-                return await FetchBars<TData>(ticker, time);
+                data = await FetchBars<TData>(ticker, time);
             }
             else
             {
-                return await FetchTooMuchData<TData>(ticker, time);
+                data = await FetchTooMuchData<TData>(ticker, time);
             }
+
+            _nbRetrievedFromIBKR += data.Count();
+            return data;
         }
 
         private async Task<IEnumerable<IMarketData>> FetchTooMuchData<TData>(string ticker, DateTime time) where TData : IMarketData, new()
@@ -394,6 +506,8 @@ namespace TradingBotV2.IBKR
             // - Making more than 60 requests within any 10 minute period.
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
 
+            // Not working properly since program restarts are not taken into account...
+
             if (_nbRequest == 60)
             {
                 int minutes = 10;
@@ -425,6 +539,18 @@ namespace TradingBotV2.IBKR
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
             if (DateTime.Now - date > TimeSpan.FromDays(6 * 30))
                 throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {date}");
+            if (!MarketDataUtils.WasMarketOpen(date))
+                throw new ArgumentException($"The market was closed on {date}");
+        }
+
+        private static void ValidateDates(DateTime from, DateTime to)
+        {
+            if (from >= to)
+                throw new ArgumentException("Starting date is after ending date");
+
+            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to).ToList();
+            if (!days.Any())
+                throw new ArgumentException($"Market was closed from {from} to {to}");
         }
     }
 }

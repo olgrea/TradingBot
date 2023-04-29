@@ -58,7 +58,7 @@ namespace TradingBotV2.Backtesting
                 DateTime current = newTime;
                 for (int i = 0; i < 5; i++)
                 {
-                    bars[i] = _backtester.MarketData.Bars.GetAsync(ticker, current).Result.First();
+                    bars[i] = _backtester.GetAsync<Bar>(ticker, current).Result.First();
                     current = current.AddSeconds(1);
                 }
 
@@ -108,7 +108,7 @@ namespace TradingBotV2.Backtesting
         {
             foreach (string ticker in _subscriptions.BidAsk)
             {
-                IEnumerable<BidAsk> bidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result;
+                IEnumerable<BidAsk> bidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime).Result;
                 foreach (BidAsk ba in bidAsks)
                 {
                     _subscriptions.TickByTickBidAskCallback?.Invoke(ticker, (IBApi.BidAsk)ba);
@@ -156,7 +156,7 @@ namespace TradingBotV2.Backtesting
         {
             foreach (string ticker in _subscriptions.Last)
             {
-                IEnumerable<Last> lasts = _backtester.MarketData.Lasts.GetAsync(ticker, newTime).Result;
+                IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, newTime).Result;
                 foreach (Last last in lasts)
                 {
                     _subscriptions.TickByTickLastCallback?.Invoke(ticker, (IBApi.Last)last);

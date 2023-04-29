@@ -30,7 +30,7 @@ namespace TradingBotV2.Backtesting
             {
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
                 
-                IEnumerable<BidAsk> latestBidAsks = _backtester.MarketData.BidAsks.GetAsync(ticker, newTime).Result;
+                IEnumerable<BidAsk> latestBidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime).Result;
                 foreach (BidAsk bidAsk in latestBidAsks)
                 {
                     if(_orderTracker.OpenOrders.ContainsKey(o.Id))
