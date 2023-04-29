@@ -1,5 +1,8 @@
 ﻿using System.Diagnostics;
+using BacktesterTests;
 using Microsoft.Data.Sqlite;
+using NLog.TradingBot;
+using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
@@ -20,7 +23,8 @@ namespace IBBrokerTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _broker = new IBBroker(9001);
+            var logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
+            _broker = new IBBroker(9001, logger);
             await _broker.ConnectAsync();
             
             _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;

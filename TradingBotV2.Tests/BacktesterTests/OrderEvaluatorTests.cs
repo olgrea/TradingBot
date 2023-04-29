@@ -6,6 +6,7 @@ using TradingBotV2.IBKR;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
+using NLog.TradingBot;
 
 namespace BacktesterTests
 {
@@ -25,8 +26,8 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(TradingBotV2.Tests.NunitTargetLogger));
-            _logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(TradingBotV2.Tests.NunitTargetLogger));
+            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(NunitTargetLogger));
+            _logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(NunitTargetLogger));
             await Task.CompletedTask;
         }
 

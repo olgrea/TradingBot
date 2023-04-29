@@ -5,6 +5,7 @@ using TradingBotV2.Backtesting;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 using TradingBotV2.Broker.MarketData;
+using NLog.TradingBot;
 
 namespace BacktesterTests
 {
@@ -15,9 +16,9 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(TradingBotV2.Tests.NunitTargetLogger));
+            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(NunitTargetLogger));
 
-            var logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(TradingBotV2.Tests.NunitTargetLogger));
+            var logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(NunitTargetLogger));
 
             // The 10:55:00 here is just so the order gets filled rapidly in test AwaitExecution_OrderGetsFilled_Returns ...
             _backtester = new Backtester(new DateTime(2023, 04, 10), new TimeSpan(10, 55, 00), MarketDataUtils.MarketEndTime, logger);
