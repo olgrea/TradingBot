@@ -32,6 +32,8 @@ namespace IBBrokerTests
         {
             Debug.Assert(_historicalProvider.DbPath == TestDbPath);
             _historicalProvider.DbEnabled = true;
+            _historicalProvider.CacheEnabled = true;
+            _historicalProvider.ClearCache();
             await Task.CompletedTask;
         }
 
