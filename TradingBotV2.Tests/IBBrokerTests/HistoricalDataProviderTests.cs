@@ -31,7 +31,7 @@ namespace IBBrokerTests
         public async Task SetUp()
         {
             Debug.Assert(_historicalProvider.DbPath == TestDbPath);
-            _historicalProvider.EnableDb = true;
+            _historicalProvider.DbEnabled = true;
             await Task.CompletedTask;
         }
 
@@ -124,12 +124,13 @@ namespace IBBrokerTests
         }
 
         [Test]
-        public async Task GetHistoricalData_DbDisabled_RetrievesThemFromIBKR()
+        public async Task GetHistoricalData_CacheDisabled_DbDisabled_RetrievesThemFromIBKR()
         {
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 03, 10, 0, 0);
             DateTime to = new DateTime(2023, 04, 03, 11, 0, 0);
-            _historicalProvider.EnableDb = false;
+            _historicalProvider.CacheEnabled = false;
+            _historicalProvider.DbEnabled = false;
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -139,11 +140,12 @@ namespace IBBrokerTests
         }
 
         [Test]
-        public async Task GetHistoricalData_DbEnabled_RetrievesThemFromDb()
+        public async Task GetHistoricalData_CacheDisabled_DbEnabled_RetrievesThemFromDb()
         {
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 03, 10, 0, 0);
             DateTime to = new DateTime(2023, 04, 03, 11, 0, 0);
+            _historicalProvider.CacheEnabled = false;
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -153,7 +155,7 @@ namespace IBBrokerTests
         }
 
         [Test]
-        public async Task GetHistoricalData_DbEnabled_DataNotInDb_InsertsIt()
+        public async Task GetHistoricalData_CacheDisabled_DbEnabled_DataNotInDb_InsertsItInDb()
         {
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
@@ -175,13 +177,14 @@ namespace IBBrokerTests
         }
 
         [Test]
-        public async Task GetHistoricalData_DbDisabled_DataNotInDb_DoesntInsertsIt()
+        public async Task GetHistoricalData_CacheEnabled_DataNotInCache_InsertsItInCache()
         {
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
             DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
             DeleteData(ticker, from, to);
-            _historicalProvider.EnableDb = false;
+            _historicalProvider.CacheEnabled = true;
+            _historicalProvider.ClearCache();
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -189,6 +192,59 @@ namespace IBBrokerTests
             {
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
+                Assert.Greater(_historicalProvider._nbInsertedInCache, 0);
+            }
+            finally
+            {
+                DeleteData(ticker, from, to);
+            }
+        }
+
+        [Test]
+        public async Task GetHistoricalData_CacheEnabled_DataInCache_RetrievesItFromCache()
+        {
+            string ticker = "GME";
+            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
+            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            DeleteData(ticker, from, to);
+            _historicalProvider.CacheEnabled = true;
+
+            var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
+
+            try
+            {
+                Assert.IsNotNull(results);
+                Assert.IsNotEmpty(results);
+                Assert.Greater(_historicalProvider._nbInsertedInCache, 0);
+
+                results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
+                Assert.IsNotNull(results);
+                Assert.IsNotEmpty(results);
+                Assert.Greater(_historicalProvider._nbRetrievedFromCache, 0);
+            }
+            finally
+            {
+                DeleteData(ticker, from, to);
+            }
+        }
+
+        [Test]
+        public async Task GetHistoricalData_CacheDisabled_DbDisabled_DataNotInDbOrCache_DoesntInsertsItAnywhere()
+        {
+            string ticker = "GME";
+            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
+            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            DeleteData(ticker, from, to);
+            _historicalProvider.CacheEnabled = false;
+            _historicalProvider.DbEnabled = false;
+
+            var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
+
+            try
+            {
+                Assert.IsNotNull(results);
+                Assert.IsNotEmpty(results);
+                Assert.AreEqual(0, _historicalProvider._nbInsertedInCache);
                 Assert.AreEqual(0, _historicalProvider._nbInsertedInDb);
             }
             finally
