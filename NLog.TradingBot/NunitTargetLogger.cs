@@ -1,14 +1,14 @@
-﻿using NLog;
-using NLog.Targets;
+﻿using NLog.Targets;
 using NUnit.Framework;
 
-namespace TradingBotV2.Tests
+namespace NLog.TradingBot
 {
+    [Target("NunitLogger")]
     public sealed class NunitTargetLogger : TargetWithLayout
     {
         protected override void Write(LogEventInfo logEvent)
         {
-            string logMessage = this.Layout.Render(logEvent);
+            string logMessage = Layout.Render(logEvent);
             TestContext.Progress.WriteLine(logMessage);
         }
     }
