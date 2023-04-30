@@ -245,10 +245,10 @@ namespace TradingBotV2.IBKR
             _clientSocket.reqGlobalCancel();
         }
 
-        public int RequestHistoricalData(Contract contract, string endDateTime, string durationStr, string barSizeStr, bool onlyRTH)
+        public int RequestHistoricalData(Contract contract, string endDateTime, string durationStr, string barSizeStr, string whatToShow, bool onlyRTH)
         {
             int reqId = NextValidId;
-            _clientSocket.reqHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, "TRADES", Convert.ToInt32(onlyRTH), 1, false, null);
+            _clientSocket.reqHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, whatToShow, Convert.ToInt32(onlyRTH), 1, false, null);
             return reqId;
         }
 
