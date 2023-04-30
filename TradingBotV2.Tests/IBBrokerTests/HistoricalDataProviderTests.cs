@@ -17,6 +17,7 @@ namespace IBBrokerTests
     {
         public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
 
+        ILogger? _logger;
         IBBroker _broker;
         IBHistoricalDataProvider _historicalProvider;
 
@@ -24,10 +25,11 @@ namespace IBBrokerTests
         public async Task OneTimeSetUp()
         {
             _broker = new IBBroker(9001);
+            _logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
 
             _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
             _historicalProvider.DbPath = TestDbPath;
-            _historicalProvider.Logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
+            _historicalProvider.Logger = _logger;
 
             await _broker.ConnectAsync();
         }
@@ -39,6 +41,8 @@ namespace IBBrokerTests
             _historicalProvider.DbEnabled = true;
             _historicalProvider.CacheEnabled = true;
             _historicalProvider.ClearCache();
+            
+            _logger?.Info(TestContext.CurrentContext.Test.Name);
             await Task.CompletedTask;
         }
 
@@ -84,7 +88,7 @@ namespace IBBrokerTests
         public async Task GetHistoricalData_Holiday_ShouldThrow()
         {
             string ticker = "GME";
-            DateTime date = new DateTime(2023, 04, 07);
+            DateOnly date = new DateOnly(2023, 04, 07);
 
             Assert.ThrowsAsync<ArgumentException>(async () => await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, date));
             await Task.CompletedTask;
@@ -94,7 +98,7 @@ namespace IBBrokerTests
         public async Task GetHistoricalData_SpecificDate()
         {
             string ticker = "GME";
-            DateTime date = new DateTime(2023, 04, 03);
+            DateOnly date = new DateOnly(2023, 04, 03);
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, date);
 

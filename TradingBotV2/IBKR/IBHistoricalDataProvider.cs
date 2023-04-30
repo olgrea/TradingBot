@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using NLog;
+using NLog.LayoutRenderers;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
@@ -21,6 +22,9 @@ namespace TradingBotV2.IBKR
             List<DateTime> KeysDebug => Cache.Keys.OrderBy(k => k).ToList();
         }
 
+        record struct BarRequest(IBApi.Contract Contract, string EndDateTime, string DurationStr, string BarSizeStr, string WhatToShow);
+        record struct TickRequest(IBApi.Contract Contract, string StartDateTime, string EndDateTime, int NbOfTicks, string WhatToShow);
+
         ConcurrentDictionary<string, ConcurrentDictionary<Type, MarketDataCache>> _cache = new();
 
         // for unit tests
@@ -31,18 +35,7 @@ namespace TradingBotV2.IBKR
         internal int _nbInsertedInDb = 0;
         internal void ClearCache() => _cache.Clear();
 
-        int _nbRequest = 0;
-        int NbRequest
-        {
-            get => _nbRequest;
-            set
-            {
-                _nbRequest = value;
-                _logger?.Trace($"Current nb of requests : {_nbRequest}.");
-                CheckForPacingViolations();
-            }
-        }
-
+        PacingViolationChecker _pvc;
         IBClient _client;
         IBBroker _broker;
         ILogger? _logger;
@@ -53,9 +46,18 @@ namespace TradingBotV2.IBKR
             _broker = broker;
             _client = broker.Client;
             _logger = logger;
+            _pvc = new PacingViolationChecker(logger);
         }
 
-        internal ILogger? Logger { get => _logger; set => _logger = value; }
+        internal ILogger? Logger
+        {
+            get => _logger;
+            set
+            {
+                _logger = value;
+                _pvc.Logger = value;
+            }
+        }
 
         public string DbPath
         {
@@ -251,7 +253,8 @@ namespace TradingBotV2.IBKR
             if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
             {
                 _nbInsertedInDb += iCmd.NbInserted;
-                _logger?.Debug($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
+                if(iCmd.NbInserted > 0)
+                    _logger?.Debug($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
             }
         }
 
@@ -367,16 +370,18 @@ namespace TradingBotV2.IBKR
 
             string edt = endDateTime == DateTime.MinValue ? string.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
 
+            _logger?.Trace($"Retrieving {count} bars from TWS for '{ticker}' descending from {endDateTime}.");
+            var contract = _client.ContractsCache.Get(ticker);
+            BarRequest req = new(contract, edt, durationStr, barSizeStr, "TRADES");
+            _pvc.CheckRequest(req);
+
             _client.Responses.HistoricalData += historicalData;
             _client.Responses.HistoricalDataEnd += historicalDataEnd;
             _client.Responses.Error += error;
             try
             {
-                var contract = _client.ContractsCache.Get(ticker);
-
-                _logger?.Trace($"Retrieving {count} bars from TWS for '{ticker}' descending from {endDateTime}.");
-                reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, true);
-                NbRequest++;
+                reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, "TRADES", true);
+                _pvc.NbRequest++;
 
                 await tcs.Task;
             }
@@ -445,17 +450,19 @@ namespace TradingBotV2.IBKR
             });
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
+            _logger?.Trace($"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
+            var contract = _client.ContractsCache.Get(ticker);
+            TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK");
+            _pvc.CheckRequest(req);
+
             _client.Responses.HistoricalTicksBidAsk += historicalTicks;
             _client.Responses.Error += error;
             try
             {
-                var contract = _client.ContractsCache.Get(ticker);
-
-                _logger?.Trace($"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
-                
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc.
-                NbRequest++; NbRequest++;
+                _pvc.NbRequest++; 
+                _pvc.NbRequest++;
                 return await tcs.Task;
             }
             finally
@@ -487,57 +494,26 @@ namespace TradingBotV2.IBKR
             });
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
+            _logger?.Trace($"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
+            var contract = _client.ContractsCache.Get(ticker);
+            TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES");
+            _pvc.CheckRequest(req);
+
             _client.Responses.HistoricalTicksLast += historicalTicks;
             _client.Responses.Error += error;
             try
             {
-                var contract = _client.ContractsCache.Get(ticker);
-                _logger?.Trace($"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
 
                 // No idea if historical Lasts requests are counted twice but I'll assume they are.
-                NbRequest++; NbRequest++;
+                _pvc.NbRequest++; 
+                _pvc.NbRequest++;
                 return await tcs.Task;
             }
             finally
             {
                 _client.Responses.HistoricalTicksLast -= historicalTicks;
                 _client.Responses.Error -= error;
-            }
-        }
-
-        void CheckForPacingViolations()
-        {
-            // TWS API limitations. Pacing violation occurs when : 
-            // - Making identical historical data requests within 15 seconds.
-            // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
-            // - Making more than 60 requests within any 10 minute period.
-            // https://interactivebrokers.github.io/tws-api/historical_limitations.html
-
-            // Not working properly since program restarts are not taken into account...
-
-            if (_nbRequest != 0 && _nbRequest % 60 == 0)
-            {
-                int minutes = 10;
-                _logger?.Debug($"60 requests made : waiting {minutes} minutes...");
-                WaitFor(minutes);
-                _logger?.Debug($"Resuming.");
-            }
-            else if (_nbRequest != 0 && _nbRequest % 5 == 0)
-            {
-                _logger?.Debug($"{_nbRequest} requests made : waiting 2 seconds...");
-                Task.Delay(2000).Wait();
-                _logger?.Debug($"Resuming.");
-            }
-        }
-
-        void WaitFor(int minutes)
-        {
-            for (int i = 0; i < minutes; ++i)
-            {
-                Task.Delay(60 * 1000).Wait();
-                if (i < minutes - 1)
-                    _logger?.Debug($"{9 - i} minutes left...");
             }
         }
 
@@ -553,6 +529,92 @@ namespace TradingBotV2.IBKR
             IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to).ToList();
             if (!days.Any())
                 throw new ArgumentException($"Market was closed from {from} to {to}");
+        }
+
+        // TWS API limitations. Pacing violation occurs when : 
+        // - Making identical historical data requests within 15 seconds.
+        // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
+        // - Making more than 60 requests within any 10 minute period.
+        // https://interactivebrokers.github.io/tws-api/historical_limitations.html
+        // NOTE : program restarts are not taken into account...
+        class PacingViolationChecker
+        {
+            ILogger? _logger;
+            int _nbRequest = 0;
+            Dictionary<BarRequest, DateTime> _barRequests = new ();
+            Dictionary<TickRequest, DateTime> _tickRequests = new();
+
+            public PacingViolationChecker(ILogger? logger)
+            {
+                _logger = logger;
+            }
+
+            internal ILogger? Logger { get => _logger; set => _logger = value; }
+
+            internal int NbRequest
+            {
+                get => _nbRequest;
+                set
+                {
+                    _nbRequest = value;
+                    _logger?.Trace($"Current nb of requests : {_nbRequest}.");
+                    CheckForNBRequestsPacingViolations();
+                }
+            }
+
+            internal void CheckRequest(BarRequest req)
+            {
+                CheckRequestInternal(req, _barRequests);
+            }
+
+            internal void CheckRequest(TickRequest req)
+            {
+                CheckRequestInternal(req, _tickRequests);
+            }
+
+            void CheckRequestInternal<TRecord>(TRecord req, IDictionary<TRecord, DateTime> dict)
+            {
+                if (dict.ContainsKey(req))
+                {
+                    var elapsed = DateTime.Now - dict[req];
+                    TimeSpan _15sec = TimeSpan.FromSeconds(15);
+                    if (elapsed < _15sec)
+                    {
+                        TimeSpan toWait = _15sec - elapsed + TimeSpan.FromMilliseconds(250);
+                        _logger?.Debug($"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
+                        Task.Delay(toWait).Wait();
+                    }
+                }
+
+                dict[req] = DateTime.Now;
+            }
+
+            void CheckForNBRequestsPacingViolations()
+            {
+                if (_nbRequest != 0 && _nbRequest % 60 == 0)
+                {
+                    int minutes = 10;
+                    _logger?.Debug($"60 requests made : waiting {minutes} minutes...");
+                    WaitFor(minutes);
+                    _logger?.Debug($"Resuming.");
+                }
+                else if (_nbRequest != 0 && _nbRequest % 5 == 0)
+                {
+                    _logger?.Debug($"{_nbRequest} requests made : waiting 2 seconds...");
+                    Task.Delay(2000).Wait();
+                    _logger?.Debug($"Resuming.");
+                }
+            }
+
+            void WaitFor(int minutes)
+            {
+                for (int i = 0; i < minutes; ++i)
+                {
+                    Task.Delay(60 * 1000).Wait();
+                    if (i < minutes - 1)
+                        _logger?.Debug($"{9 - i} minutes left...");
+                }
+            }
         }
     }
 }
