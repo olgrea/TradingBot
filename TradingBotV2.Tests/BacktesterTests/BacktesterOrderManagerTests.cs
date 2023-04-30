@@ -21,12 +21,11 @@ namespace BacktesterTests
             var logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(NunitTargetLogger));
 
             // The 10:55:00 here is just so the order gets filled rapidly in test AwaitExecution_OrderGetsFilled_Returns ...
-            _backtester = new Backtester(new DateTime(2023, 04, 10), new TimeSpan(10, 55, 00), MarketDataUtils.MarketEndTime, logger);
+            DateTime dateTime = new DateTime(2023, 04, 10);
+            _backtester = new Backtester(dateTime.Add(new TimeSpan(10, 55, 00)), dateTime.Add(MarketDataUtils.MarketEndTime), logger);
             _broker = _backtester;
+            _backtester.DbPath = TestDbPath;
             await _broker.ConnectAsync();
-
-            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
-            hdp.DbPath = TestDbPath;
         }
 
         [SetUp]

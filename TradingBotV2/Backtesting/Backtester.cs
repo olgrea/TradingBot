@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
@@ -46,32 +45,34 @@ namespace TradingBotV2.Backtesting
         ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
         Task? _consumerTask;
+        Task? _marketDataBackgroundTask;
         CancellationTokenSource? _cancellation;
+        TaskCompletionSource? _tcsDayIsOver;
 
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
         BacktesterProgress _progress = new BacktesterProgress();
-        TaskCompletionSource? _tcsDayIsOver;
 
-        public Backtester(DateTime date, ILogger? logger = null) : this(date, MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, logger) { }
+        public Backtester(DateTime date, ILogger? logger = null) : this(date.ToMarketHours().Item1, date.ToMarketHours().Item2, logger) { }
 
-        public Backtester(DateTime date, TimeSpan startTime, TimeSpan endTime, ILogger? logger = null)
+        public Backtester(DateTime from, DateTime to, ILogger? logger = null)
         {
-            _start = new DateTime(date.Date.Ticks + startTime.Ticks);
-            _end = new DateTime(date.Date.Ticks + endTime.Ticks);
+            if(to - from > TimeSpan.FromDays(1))
+                throw new ArgumentException("Can only backtest a single day.");
+
+            if (from.Date == DateTime.Now.Date || to.Date == DateTime.Now.Date)
+                throw new ArgumentException("Can't backtest the current day.");
+
+            _start = from;
+            _end = to;
             _currentTime = _start;
             _logger = logger;
-
-            if (date.Date == DateTime.Now.Date)
-                throw new ArgumentException("Can't backtest the current day.");
 
             _broker = new IBBroker(191919, logger);
             LiveDataProvider = new BacktesterLiveDataProvider(this);
             HistoricalDataProvider = new IBHistoricalDataProvider(_broker, logger);
             OrderManager = new BacktesterOrderManager(this);
-
-            MarketData = new MarketDataCollections(this);
         }
 
         public async ValueTask DisposeAsync()
@@ -80,28 +81,33 @@ namespace TradingBotV2.Backtesting
             await DisconnectAsync();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
-            if(_broker != null )
+            _marketDataBackgroundTask?.Dispose();
+            if (_broker != null )
                 await _broker.DisconnectAsync();
         }
 
         internal DateTime StartTime => _start;
         internal DateTime EndTime => _end;
         internal DateTime CurrentTime => _currentTime;
-        internal (DateTime, DateTime) TimeRange => (_start, _end);
-
         internal ILogger? Logger => _logger;
         internal Account Account => _fakeAccount;
-        internal CancellationToken CancellationToken => _cancellation != null ? _cancellation.Token : CancellationToken.None;
 
-        internal event Action<DateTime>? ClockTick;
-        public event Action<Account>? AccountUpdated;
-
-        internal MarketDataCollections MarketData { get; init; }
+        internal string? DbPath
+        {
+            get => (HistoricalDataProvider as IBHistoricalDataProvider)?.DbPath;
+            set
+            {
+                if(HistoricalDataProvider is IBHistoricalDataProvider ibh)
+                    ibh.DbPath = value!;
+            }
+        }
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
 
+        internal event Action<DateTime>? ClockTick;
+        public event Action<Account>? AccountUpdated;
         public Action<BacktesterProgress>? ProgressHandler { get; set; }
 
         public Task<string> ConnectAsync()
@@ -123,12 +129,17 @@ namespace TradingBotV2.Backtesting
 
         public async Task DisconnectAsync()
         {
-            if (_consumerTask != null && _cancellation != null && !_cancellation.IsCancellationRequested)
+            if (!_cancellation!.IsCancellationRequested)
             {
                 _cancellation.Cancel();
                 try
                 {
-                    await _consumerTask;
+                    if(_consumerTask != null && _marketDataBackgroundTask != null)
+                        await Task.WhenAll(_consumerTask, _marketDataBackgroundTask);
+                    else if(_consumerTask != null)
+                        await _consumerTask;
+                    else if (_marketDataBackgroundTask != null)
+                        await _marketDataBackgroundTask;
                 }
                 catch (OperationCanceledException)
                 {
@@ -139,20 +150,20 @@ namespace TradingBotV2.Backtesting
                 _cancellation = null;
                 _consumerTask?.Dispose();
                 _consumerTask = null;
+                _marketDataBackgroundTask?.Dispose();
+                _marketDataBackgroundTask = null;
             }
         }
 
         public Task Start()
         {
             if (IsDayOver())
-                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is completed.");
+                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is already completed.");
             else if(_consumerTask == null)
                 throw new InvalidOperationException($"Not connected");
 
             if (_tcsDayIsOver == null)
-            {
                 _tcsDayIsOver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
 
             return _tcsDayIsOver.Task;
         }
@@ -180,10 +191,8 @@ namespace TradingBotV2.Backtesting
             if (_consumerTask == null)
                 throw new InvalidOperationException($"Consumer task not started.");
 
-            if (_consumerTask.IsFaulted)
+            if (_consumerTask.IsFaulted || _consumerTask.IsCanceled)
                 _consumerTask.Wait();
-            else
-                _cancellation?.Token.ThrowIfCancellationRequested();
 
             _requestsQueue.Enqueue(action);
         }
@@ -192,7 +201,6 @@ namespace TradingBotV2.Backtesting
         {
             var mainToken = _cancellation!.Token;
 
-            //_logger.Trace($"Passing time task started");
             while (!mainToken.IsCancellationRequested)
             {
                 mainToken.ThrowIfCancellationRequested();
@@ -209,14 +217,14 @@ namespace TradingBotV2.Backtesting
                     if (!IsDayOver())
                         AdvanceTime();
                     else
-                        _tcsDayIsOver.TrySetResult();
+                        _tcsDayIsOver?.TrySetResult();
                 }
             }
         }
 
         void AdvanceTime()
         {
-            var mainToken = _cancellation.Token;
+            var mainToken = _cancellation!.Token;
 
             mainToken.ThrowIfCancellationRequested();
             ClockTick?.Invoke(_currentTime);
@@ -231,9 +239,46 @@ namespace TradingBotV2.Backtesting
 
             _progress.CurrentTime = _currentTime;
             ProgressHandler?.Invoke(_progress);
+            mainToken.ThrowIfCancellationRequested();
         }
 
         bool IsDayOver() => _currentTime >= _end;
+
+        public async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
+        {
+            if (from > to)
+                throw new ArgumentException($"'from' is greater than 'to'");
+
+            DateTime current = from;
+            IEnumerable<TData> results = Enumerable.Empty<TData>();
+            while (current < to)
+            {
+                var data = await GetAsync<TData>(ticker, current);
+                results = results.Concat(data);
+                current = current.AddSeconds(1);
+            }
+
+            return results;
+        }
+
+        public async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime) where TData : IMarketData, new()
+        {
+            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, dateTime.AddSeconds(1), _cancellation!.Token))
+                .OrderBy(d => d.Time)
+                .Cast<TData>();
+            
+            if (_marketDataBackgroundTask == null)
+            {
+                // Retrieving 10 mins right now and the rest on a background task
+                await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, dateTime.AddMinutes(10), _cancellation!.Token);
+                _marketDataBackgroundTask = Task.Run(async () =>
+                {
+                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
+                }, _cancellation!.Token);
+            }
+
+            return data;
+        }
 
         public Task<Account> GetAccountAsync(string accountCode)
         {

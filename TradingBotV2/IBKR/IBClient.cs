@@ -259,9 +259,9 @@ namespace TradingBotV2.IBKR
             return reqId;
         }
 
-        public void RequestCurrentTime()
+        public void CancelHistoricalData(int reqId)
         {
-            _clientSocket.reqCurrentTime();
+            _clientSocket.cancelHistoricalData(reqId);
         }
     }
 }
