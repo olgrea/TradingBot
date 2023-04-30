@@ -42,7 +42,7 @@ namespace IBBrokerTests
             _historicalProvider.CacheEnabled = true;
             _historicalProvider.ClearCache();
             
-            _logger?.Info(TestContext.CurrentContext.Test.Name);
+            _logger?.Info($"=== CURRENT TEST : {TestContext.CurrentContext.Test.Name}");
             await Task.CompletedTask;
         }
 
@@ -104,6 +104,7 @@ namespace IBBrokerTests
 
             Assert.IsNotNull(results);
             Assert.IsNotEmpty(results);
+            Assert.IsTrue(results.All(r => DateOnly.FromDateTime(r.Time.Date) == date));
         }
 
         [Test]
@@ -117,8 +118,7 @@ namespace IBBrokerTests
 
             Assert.IsNotNull(results);
             Assert.IsNotEmpty(results);
-            Assert.GreaterOrEqual(results.First().Time, from);
-            Assert.LessOrEqual(results.Last().Time, to);
+            Assert.IsTrue(results.All(r => r.Time >= from && r.Time < to));
         }
 
         [Test]
@@ -132,6 +132,7 @@ namespace IBBrokerTests
 
             Assert.IsNotNull(results);
             Assert.IsNotEmpty(results);
+            Assert.IsTrue(results.All(r => r.Time >= from && r.Time < to));
         }
 
         [Test]

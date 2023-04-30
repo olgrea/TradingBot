@@ -12,6 +12,7 @@ namespace TradingBotV2.IBKR
 {
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
+        const int RequestTimeoutInMs = 30000;
         public const string DefaultDbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
 
         class MarketDataCache
@@ -117,6 +118,7 @@ namespace TradingBotV2.IBKR
 
             DbCommandFactory? cmdFactory = null;
             IEnumerable<IMarketData>? data;
+
             if (!TryGetFromCache<TData>(ticker, from, to, out data))
             {
                 token.ThrowIfCancellationRequested();
@@ -144,8 +146,6 @@ namespace TradingBotV2.IBKR
                 }
             }
 
-            // TODO : Test if this is fixed . fix this. "from" and "to" time of day are not respected when retrieved from server
-            //return data.SkipWhile(d => d.Time < from);
             token.ThrowIfCancellationRequested();
             return data;
         }
@@ -407,7 +407,7 @@ namespace TradingBotV2.IBKR
             TimeSpan totalRange = to - from;
             TimeSpan rangeRetrieved = TimeSpan.FromTicks(0);
             DateTime current = to;
-            while (rangeRetrieved <= totalRange)
+            while (rangeRetrieved < totalRange)
             {
                 IEnumerable<IMarketData> ticks = Enumerable.Empty<IMarketData>();
                 if (typeof(TData) == typeof(BidAsk))
@@ -420,7 +420,10 @@ namespace TradingBotV2.IBKR
                 }
 
                 data = ticks.Concat(data);
-                current = ticks.First().Time;
+                if (ticks.Any())
+                    current = ticks.First().Time;
+                else
+                    current = current.AddSeconds(-1);
                 rangeRetrieved = to - current;
             }
 
@@ -430,7 +433,7 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime time, int count)
         {
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 15000);
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
 
             int reqId = -1;
             var tmpList = new LinkedList<BidAsk>();
@@ -474,7 +477,7 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime time, int count)
         {
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : 15000);
+            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
 
             int reqId = -1;
             var tmpList = new LinkedList<Last>();
@@ -505,8 +508,6 @@ namespace TradingBotV2.IBKR
             {
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
 
-                // No idea if historical Lasts requests are counted twice but I'll assume they are.
-                _pvc.NbRequest++; 
                 _pvc.NbRequest++;
                 return await tcs.Task;
             }
@@ -536,20 +537,48 @@ namespace TradingBotV2.IBKR
         // - Making six or more historical data requests for the same Contract, Exchange and Tick Type within two seconds.
         // - Making more than 60 requests within any 10 minute period.
         // https://interactivebrokers.github.io/tws-api/historical_limitations.html
-        // NOTE : program restarts are not taken into account...
         class PacingViolationChecker
         {
+            const string RequestFileName = "pvc";
+
             ILogger? _logger;
             int _nbRequest = 0;
+
             Dictionary<BarRequest, DateTime> _barRequests = new ();
             Dictionary<TickRequest, DateTime> _tickRequests = new();
+            List<DateTime> _requestTimes;
 
             public PacingViolationChecker(ILogger? logger)
             {
                 _logger = logger;
+                ReadRequestFile();
             }
 
             internal ILogger? Logger { get => _logger; set => _logger = value; }
+
+            [MemberNotNull(nameof(_requestTimes))]
+            void ReadRequestFile()
+            {
+                if (!File.Exists(RequestFileName))
+                {
+                    var stream = File.CreateText(RequestFileName);
+                    stream.Close();
+                }
+
+                _requestTimes = new(File.ReadAllLines(RequestFileName).Select(l => DateTime.Parse(l)));
+                _nbRequest = _requestTimes.Count(rt => DateTime.Now - rt < TimeSpan.FromMinutes(10));
+            }
+
+            void WriteRequestFile()
+            {
+                File.WriteAllText(
+                    RequestFileName, 
+                    string.Join(Environment.NewLine, _requestTimes
+                        .Where(rt => DateTime.Now - rt < TimeSpan.FromMinutes(10))
+                        .Select(rt => rt.ToString())
+                        )
+                    );
+            }
 
             internal int NbRequest
             {
@@ -558,7 +587,10 @@ namespace TradingBotV2.IBKR
                 {
                     _nbRequest = value;
                     _logger?.Trace($"Current nb of requests : {_nbRequest}.");
-                    CheckForNBRequestsPacingViolations();
+                    _requestTimes.Add(DateTime.Now);
+                    WriteRequestFile();
+
+                    CheckForNbRequestsPacingViolations();
                 }
             }
 
@@ -589,7 +621,7 @@ namespace TradingBotV2.IBKR
                 dict[req] = DateTime.Now;
             }
 
-            void CheckForNBRequestsPacingViolations()
+            void CheckForNbRequestsPacingViolations()
             {
                 if (_nbRequest != 0 && _nbRequest % 60 == 0)
                 {
@@ -600,7 +632,7 @@ namespace TradingBotV2.IBKR
                 }
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
-                    _logger?.Debug($"{_nbRequest} requests made : waiting 2 seconds...");
+                    _logger?.Debug($"5 requests made : waiting 2 seconds...");
                     Task.Delay(2000).Wait();
                     _logger?.Debug($"Resuming.");
                 }
