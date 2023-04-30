@@ -27,6 +27,7 @@ namespace TradingBotV2.IBKR
         record struct TickRequest(IBApi.Contract Contract, string StartDateTime, string EndDateTime, int NbOfTicks, string WhatToShow);
 
         ConcurrentDictionary<string, ConcurrentDictionary<Type, MarketDataCache>> _cache = new();
+        CancellationToken? _token;
 
         // for unit tests
         internal int _nbRetrievedFromIBKR = 0;
@@ -108,6 +109,10 @@ namespace TradingBotV2.IBKR
             _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} from ({from} to {to}");
             _logger?.Trace($"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
 
+            _token = token;
+            _pvc.Token = token;
+
+            _token?.ThrowIfCancellationRequested();
             ValidateDates(from, to);
 
             _nbRetrievedFromCache = 0;
@@ -121,13 +126,13 @@ namespace TradingBotV2.IBKR
 
             if (!TryGetFromCache<TData>(ticker, from, to, out data))
             {
-                token.ThrowIfCancellationRequested();
+                _token?.ThrowIfCancellationRequested();
                 if (cmdFactory == null)
                     cmdFactory = DbCommandFactory.Create<TData>(DbPath);
 
                 if (TryGetFromDb<TData>(ticker, from, to, cmdFactory, out data))
                 {
-                    token.ThrowIfCancellationRequested();
+                    _token?.ThrowIfCancellationRequested();
                     InsertInCache<TData>(ticker, from, to, data);
                 }
                 else
@@ -136,9 +141,9 @@ namespace TradingBotV2.IBKR
                     var onChunkReceived = new Action<DateTime, DateTime, IEnumerable<IMarketData>>((from, to, newData) =>
                     {
                         data = newData.Concat(data);
-                        token.ThrowIfCancellationRequested();
+                        _token?.ThrowIfCancellationRequested();
                         InsertInDb<TData>(ticker, newData, cmdFactory);
-                        token.ThrowIfCancellationRequested();
+                        _token?.ThrowIfCancellationRequested();
                         InsertInCache<TData>(ticker, from, to, newData);
                     });
 
@@ -146,12 +151,13 @@ namespace TradingBotV2.IBKR
                 }
             }
 
-            token.ThrowIfCancellationRequested();
+            _token?.ThrowIfCancellationRequested();
             return data;
         }
 
         bool TryGetFromCache<TData>(string ticker, DateTime from, DateTime to, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
         {
+            _token?.ThrowIfCancellationRequested();
             if (!CacheEnabled || !_cache.TryGetValue(ticker, out var typeCache) || !typeCache.TryGetValue(typeof(TData), out var dataCache))
             {
                 data = null;
@@ -161,6 +167,7 @@ namespace TradingBotV2.IBKR
             data = Enumerable.Empty<IMarketData>();
             for (DateTime i = from; i < to; i = i.AddSeconds(1))
             {
+                _token?.ThrowIfCancellationRequested();
                 if (!dataCache.Cache.TryGetValue(i, out IEnumerable<IMarketData>? value))
                 {
                     _logger?.Trace($"Timestamp {i} not in cache. Aborting.");
@@ -168,6 +175,7 @@ namespace TradingBotV2.IBKR
                     return false;
                 }
 
+                _token?.ThrowIfCancellationRequested();
                 data = data.Concat(value);
             }
 
@@ -179,6 +187,7 @@ namespace TradingBotV2.IBKR
 
         void InsertInCache<TData>(string ticker, DateTime from, DateTime to, IEnumerable<IMarketData> newData) where TData : IMarketData, new()
         {
+            _token?.ThrowIfCancellationRequested();
             if (!CacheEnabled)
                 return;
 
@@ -192,6 +201,7 @@ namespace TradingBotV2.IBKR
             int nbInserted = 0;
             for (DateTime i = from; i < to; i = i.AddSeconds(1))
             {
+                _token?.ThrowIfCancellationRequested();
                 if (dataDict.TryGetValue(i, out var data))
                 {
                     dataCache.Cache.AddOrUpdate(i,
@@ -220,6 +230,7 @@ namespace TradingBotV2.IBKR
 
         bool TryGetFromDb<TData>(string ticker, DateTime from, DateTime to, DbCommandFactory cmdFactory, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
         {
+            _token?.ThrowIfCancellationRequested();
             if (!DbEnabled)
             {
                 data = null;
@@ -234,6 +245,7 @@ namespace TradingBotV2.IBKR
                 return false;
             }
 
+            _token?.ThrowIfCancellationRequested();
             var selectCmd = cmdFactory.CreateSelectCommand(ticker, from.Date, (from.TimeOfDay, to.TimeOfDay));
             data = selectCmd.Execute();
             _nbRetrievedFromDb += data.Count();
@@ -249,6 +261,7 @@ namespace TradingBotV2.IBKR
             if (!DbEnabled)
                 return;
 
+            _token?.ThrowIfCancellationRequested();
             DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
             if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
             {
@@ -260,6 +273,7 @@ namespace TradingBotV2.IBKR
 
         async Task GetFromServer<TData>(string ticker, DateTime from, DateTime to, Action<DateTime, DateTime, IEnumerable<IMarketData>> onChunckReceived) where TData : IMarketData, new()
         {
+            _token?.ThrowIfCancellationRequested();
             if (!_broker.IsConnected())
             {
                 _logger?.Trace($"Connecting to TWS.");
@@ -269,6 +283,7 @@ namespace TradingBotV2.IBKR
             DateTime current = to;
             while (current > from)
             {
+                _token?.ThrowIfCancellationRequested();
                 // In order to respect TWS limitations, data is retrieved in chunks, from the end of the
                 // time range to the beginning. 
                 // https://interactivebrokers.github.io/tws-api/historical_limitations.html
@@ -292,8 +307,12 @@ namespace TradingBotV2.IBKR
 
                 _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin.ToShortTimeString()}-{chunkEnd.ToShortTimeString()}) received from TWS.");
 
+                _token?.ThrowIfCancellationRequested();
                 Debug.Assert(data != null);
+
                 onChunckReceived?.Invoke(chunkBegin, chunkEnd, data);
+                _token?.ThrowIfCancellationRequested();
+
                 current = current.AddSeconds(-chunkSizeInSec);
             }
 
@@ -308,12 +327,17 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<Bar>> GetHistoricalBarsAsync(string ticker, BarLength barLength, DateTime endDateTime, int count)
         {
+            _token?.ThrowIfCancellationRequested();
+
             var tmpList = new LinkedList<Bar>();
             var tcs = new TaskCompletionSource<IEnumerable<Bar>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var reqId = -1;
 
             var historicalData = new Action<int, IBApi.Bar>((rId, IBApiBar) =>
             {
+                if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                    tcs.TrySetCanceled();
+
                 if (rId == reqId)
                 {
                     var bar = (Bar)IBApiBar;
@@ -324,8 +348,11 @@ namespace TradingBotV2.IBKR
 
             var historicalDataEnd = new Action<int, string, string>((rId, start, end) =>
             {
+                if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                    tcs.TrySetCanceled();
+
                 if (rId == reqId)
-                    tcs.SetResult(tmpList);
+                    tcs.TrySetResult(tmpList);
             });
 
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -384,6 +411,10 @@ namespace TradingBotV2.IBKR
                 _pvc.NbRequest++;
 
                 await tcs.Task;
+
+                if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
+                    _client.CancelHistoricalData(reqId);
+                _token?.ThrowIfCancellationRequested();
             }
             finally
             {
@@ -409,6 +440,8 @@ namespace TradingBotV2.IBKR
             DateTime current = to;
             while (rangeRetrieved < totalRange)
             {
+                _token?.ThrowIfCancellationRequested();
+
                 IEnumerable<IMarketData> ticks = Enumerable.Empty<IMarketData>();
                 if (typeof(TData) == typeof(BidAsk))
                 {
@@ -433,6 +466,8 @@ namespace TradingBotV2.IBKR
 
         async Task<IEnumerable<BidAsk>> GetHistoricalBidAsksAsync(string ticker, DateTime time, int count)
         {
+            _token?.ThrowIfCancellationRequested();
+
             CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
 
             int reqId = -1;
@@ -442,13 +477,21 @@ namespace TradingBotV2.IBKR
             source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickBidAsk>, bool>((rId, data, isDone) =>
             {
+                if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                    tcs.TrySetCanceled();
+
                 if (rId == reqId)
                 {
                     foreach (var d in data)
+                    {
+                        if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                            tcs.TrySetCanceled();
+
                         tmpList.AddLast((BidAsk)d);
+                    }
 
                     if (isDone)
-                        tcs.SetResult(tmpList);
+                        tcs.TrySetResult(tmpList);
                 }
             });
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -466,17 +509,25 @@ namespace TradingBotV2.IBKR
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc.
                 _pvc.NbRequest++; 
                 _pvc.NbRequest++;
-                return await tcs.Task;
+                await tcs.Task;
+
+                if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
+                    _client.CancelHistoricalData(reqId);
+                _token?.ThrowIfCancellationRequested();
             }
             finally
             {
                 _client.Responses.HistoricalTicksBidAsk -= historicalTicks;
                 _client.Responses.Error -= error;
             }
+
+            return tcs.Task.Result;
         }
 
         async Task<IEnumerable<Last>> GetHistoricalLastsAsync(string ticker, DateTime time, int count)
         {
+            _token?.ThrowIfCancellationRequested();
+
             CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
 
             int reqId = -1;
@@ -486,13 +537,21 @@ namespace TradingBotV2.IBKR
             source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalLastsAsync")));
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
             {
+                if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                    tcs.TrySetCanceled();
+
                 if (rId == reqId)
                 {
                     foreach (var d in data)
+                    {
+                        if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
+                            tcs.TrySetCanceled();
+
                         tmpList.AddLast((Last)d);
+                    }
 
                     if (isDone)
-                        tcs.SetResult(tmpList);
+                        tcs.TrySetResult(tmpList);
                 }
             });
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -509,13 +568,19 @@ namespace TradingBotV2.IBKR
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
 
                 _pvc.NbRequest++;
-                return await tcs.Task;
+                await tcs.Task;
+
+                if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
+                    _client.CancelHistoricalData(reqId);
+                _token?.ThrowIfCancellationRequested();
             }
             finally
             {
                 _client.Responses.HistoricalTicksLast -= historicalTicks;
                 _client.Responses.Error -= error;
             }
+
+            return tcs.Task.Result;
         }
 
         static void ValidateDates(DateTime from, DateTime to)
@@ -547,6 +612,7 @@ namespace TradingBotV2.IBKR
             Dictionary<BarRequest, DateTime> _barRequests = new ();
             Dictionary<TickRequest, DateTime> _tickRequests = new();
             List<DateTime> _requestTimes;
+            CancellationToken? _token;
 
             public PacingViolationChecker(ILogger? logger)
             {
@@ -555,6 +621,8 @@ namespace TradingBotV2.IBKR
             }
 
             internal ILogger? Logger { get => _logger; set => _logger = value; }
+            internal CancellationToken? Token { get => _token; set => _token = value; }
+
 
             [MemberNotNull(nameof(_requestTimes))]
             void ReadRequestFile()
@@ -614,7 +682,8 @@ namespace TradingBotV2.IBKR
                     {
                         TimeSpan toWait = _15sec - elapsed + TimeSpan.FromMilliseconds(250);
                         _logger?.Debug($"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
-                        Task.Delay(toWait).Wait();
+
+                        Task.Delay(toWait).Wait(_token ?? CancellationToken.None);
                     }
                 }
 
@@ -633,7 +702,7 @@ namespace TradingBotV2.IBKR
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
                     _logger?.Debug($"5 requests made : waiting 2 seconds...");
-                    Task.Delay(2000).Wait();
+                    Task.Delay(2000).Wait(_token ?? CancellationToken.None);
                     _logger?.Debug($"Resuming.");
                 }
             }
@@ -642,7 +711,7 @@ namespace TradingBotV2.IBKR
             {
                 for (int i = 0; i < minutes; ++i)
                 {
-                    Task.Delay(60 * 1000).Wait();
+                    Task.Delay(60 * 1000).Wait(_token ?? CancellationToken.None);
                     if (i < minutes - 1)
                         _logger?.Debug($"{9 - i} minutes left...");
                 }

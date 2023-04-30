@@ -15,11 +15,9 @@ namespace BacktesterTests
         {
             var logger = LogManager.GetLogger($"{nameof(BacktesterLiveDataProviderTests)}", typeof(NunitTargetLogger));
             _backtester = new Backtester(new DateTime(2023, 04, 03), logger);
+            _backtester.DbPath = TestDbPath;
             _broker = _backtester;
             await _broker.ConnectAsync();
-
-            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
-            hdp.DbPath = TestDbPath;
         }
 
         [SetUp]

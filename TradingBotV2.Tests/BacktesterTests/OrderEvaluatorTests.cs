@@ -40,11 +40,10 @@ namespace BacktesterTests
             }
         }
 
-        async Task<Backtester> CreateBacktester(DateTime date, DateTime start, DateTime end)
+        async Task<Backtester> CreateBacktester((DateTime, DateTime) timeRange)
         {
-            var backtester = new Backtester(date.Date, start.TimeOfDay, end.TimeOfDay, _logger);
-            var hdp = (IBHistoricalDataProvider)backtester.HistoricalDataProvider;
-            hdp.DbPath = TestDbPath;
+            var backtester = new Backtester(timeRange.Item1, timeRange.Item2, _logger);
+            backtester.DbPath = TestDbPath;
             await backtester.ConnectAsync();
             return backtester;
         }
@@ -54,7 +53,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var order = new MarketOrder()
@@ -87,7 +86,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var order = new MarketOrder()
@@ -126,7 +125,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
             
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -162,7 +161,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -198,7 +197,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -240,7 +239,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -282,7 +281,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -318,7 +317,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -354,7 +353,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -396,7 +395,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -438,7 +437,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -474,7 +473,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -510,7 +509,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -552,7 +551,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
@@ -594,7 +593,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
@@ -629,7 +628,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
@@ -664,7 +663,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
@@ -705,7 +704,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
@@ -746,7 +745,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _downThenUpTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
@@ -784,7 +783,7 @@ namespace BacktesterTests
         {
             // Setup
             (DateTime, DateTime) timerange = _upThenDownTimeRange;
-            _backtester = await CreateBacktester(timerange.Item1.Date, timerange.Item1, timerange.Item2);
+            _backtester = await CreateBacktester(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(6);
 
             var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
