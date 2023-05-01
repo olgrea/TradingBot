@@ -2,6 +2,7 @@
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.IBKR;
+using TradingBotV2.IBKR.Client;
 
 namespace IBBrokerTests
 {

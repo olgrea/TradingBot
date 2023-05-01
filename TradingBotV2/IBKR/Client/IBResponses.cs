@@ -1,15 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
+﻿using System.Globalization;
 using IBApi;
-using static TradingBotV2.IBKR.IBClient;
+using static TradingBotV2.IBKR.Client.IBClient;
 
-namespace TradingBotV2.IBKR
+namespace TradingBotV2.IBKR.Client
 {
     public class IBResponses : EWrapper
     {
         RequestIdsToContracts _requestIdsToContracts;
 
-        internal IBResponses(RequestIdsToContracts requestIdsToContracts) 
+        internal IBResponses(RequestIdsToContracts requestIdsToContracts)
         {
             _requestIdsToContracts = requestIdsToContracts;
         }
@@ -109,7 +108,7 @@ namespace TradingBotV2.IBKR
             PositionEnd?.Invoke();
         }
 
-        public Action<string, int , double , double , double , double >? PnlSingle;
+        public Action<string, int, double, double, double, double>? PnlSingle;
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             //_logger.Trace($"PnL ({reqId}): {pnl}");
