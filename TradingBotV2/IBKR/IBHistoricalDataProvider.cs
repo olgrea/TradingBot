@@ -2,11 +2,11 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using NLog;
-using NLog.LayoutRenderers;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
+using TradingBotV2.IBKR.Client;
 
 namespace TradingBotV2.IBKR
 {

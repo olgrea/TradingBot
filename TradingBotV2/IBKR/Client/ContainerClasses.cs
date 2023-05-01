@@ -5,7 +5,7 @@
         public long Time { get; set; }
         public double Price { get; set; }
         public int Size { get; set; }
-        public TickAttribLast? TickAttribLast { get; set; } 
+        public TickAttribLast? TickAttribLast { get; set; }
         public string? Exchange { get; set; }
         public string? SpecialConditions { get; set; }
     }

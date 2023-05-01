@@ -1,6 +1,7 @@
 ﻿using NLog;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
+using TradingBotV2.IBKR.Client;
 
 namespace TradingBotV2.IBKR
 {

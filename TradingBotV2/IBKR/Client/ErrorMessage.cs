@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TradingBotV2.IBKR
+namespace TradingBotV2.IBKR.Client
 {
     public class ErrorMessage : Exception
     {

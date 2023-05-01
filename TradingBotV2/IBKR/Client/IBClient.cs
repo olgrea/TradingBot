@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using IBApi;
 
-namespace TradingBotV2.IBKR
+namespace TradingBotV2.IBKR.Client
 {
     internal class IBClient
     {
@@ -28,7 +28,7 @@ namespace TradingBotV2.IBKR
         string _accountCode = string.Empty;
         int _nextValidId = -1;
         RequestIdsToContracts _requestIdsToContracts = new RequestIdsToContracts();
-        
+
         ContractsCache _contractsCache;
 
         public IBClient()
@@ -155,7 +155,7 @@ namespace TradingBotV2.IBKR
         public void RequestFiveSecondsBarUpdates(string ticker)
         {
             var contract = ContractsCache.Get(ticker);
-            if(!_requestIdsToContracts.FiveSecBars.ContainsValue(contract))
+            if (!_requestIdsToContracts.FiveSecBars.ContainsValue(contract))
             {
                 int reqId = NextValidId;
                 _requestIdsToContracts.FiveSecBars[reqId] = contract;

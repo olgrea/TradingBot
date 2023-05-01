@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using TradingBotV2.IBKR.Client;
 
 namespace TradingBotV2.Broker.MarketData
 {

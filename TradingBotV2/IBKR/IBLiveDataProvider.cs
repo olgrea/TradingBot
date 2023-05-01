@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using TradingBotV2.IBKR.Client;
 
 namespace TradingBotV2.IBKR
 {
