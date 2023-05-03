@@ -54,6 +54,7 @@ namespace TradingBotV2.Backtesting
         DateTime _end;
         DateTime _currentTime;
         BacktesterProgress _progress = new BacktesterProgress();
+        Dictionary<(string, Type), DateTime> _timeSlicesUpperBounds = new();
 
         public Backtester(DateTime date, ILogger? logger = null) : this(date.ToMarketHours().Item1, date.ToMarketHours().Item2, logger) { }
 
@@ -249,32 +250,51 @@ namespace TradingBotV2.Backtesting
         {
             if (from > to)
                 throw new ArgumentException($"'from' is greater than 'to'");
+            
+            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, from, to, _cancellation!.Token))
+                .OrderBy(d => d.Time)
+                .Cast<TData>();
 
-            DateTime current = from;
-            IEnumerable<TData> results = Enumerable.Empty<TData>();
-            while (current < to)
+            if (_marketDataBackgroundTask == null)
             {
-                var data = await GetAsync<TData>(ticker, current);
-                results = results.Concat(data);
-                current = current.AddSeconds(1);
+                _marketDataBackgroundTask = Task.Run(async () =>
+                {
+                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
+                }, _cancellation!.Token);
             }
 
-            return results;
+            return data;
         }
 
         public async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime) where TData : IMarketData, new()
         {
-            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, dateTime.AddSeconds(1), _cancellation!.Token))
-                .OrderBy(d => d.Time)
+            // Retrieving data in slices of ~10 mins (rounded up to the next 10 mins)
+            var upper = dateTime.AddSeconds(1);
+
+            var key = (ticker, typeof(TData));
+            if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] < dateTime)
+            {
+                var span = TimeSpan.FromMinutes(10);
+                long ticks = (dateTime.Ticks + span.Ticks - 1) / span.Ticks;
+                var aroundTenMins = new DateTime(ticks * span.Ticks, dateTime.Kind);
+                
+                upper = aroundTenMins;
+                if (upper >= EndTime)
+                    upper = EndTime;
+
+                _timeSlicesUpperBounds[key] = upper;
+            }
+
+            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, upper, _cancellation!.Token))
+                .Where(d => d.Time == dateTime)
                 .Cast<TData>();
-            
+
+            // The rest on a background task
             if (_marketDataBackgroundTask == null)
             {
-                // Retrieving 10 mins right now and the rest on a background task
-                await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, dateTime.AddMinutes(10), _cancellation!.Token);
                 _marketDataBackgroundTask = Task.Run(async () =>
                 {
-                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
+                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, upper, EndTime, _cancellation!.Token);
                 }, _cancellation!.Token);
             }
 

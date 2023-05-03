@@ -23,7 +23,7 @@ namespace TradingBotV2.Broker.Orders
 
         public override string ToString()
         {
-            return $"execId={ExecId} {Time} : orderId={OrderId} {Action} shares={Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange}";
+            return $"[{OrderId}] : {Action} {Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange} time={Time} execId={ExecId}";
         }
 
         public static explicit operator OrderExecution(IBApi.Execution exec)

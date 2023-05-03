@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using NLog.TradingBot;
+using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
@@ -18,10 +20,12 @@ namespace IBBrokerTests
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _broker = new IBBroker(9001);
-            _accountCode = await _broker.ConnectAsync();
-            Assert.NotNull(_accountCode);
-            Assert.AreEqual("DU5962304", _accountCode);
+            var logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
+            _broker = new IBBroker(9001, logger);
+
+            var accountCode = await _broker.ConnectAsync();
+            Assert.NotNull(accountCode);
+            Assert.AreEqual("DU5962304", accountCode);
 
             var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
             hdp.DbPath = TestDbPath;
@@ -31,7 +35,8 @@ namespace IBBrokerTests
         public async Task OneTimeTearDown()
         {
             await _broker.OrderManager.CancelAllOrdersAsync();
-            //TODO : await _broker.SellAllPositions();
+            await Task.Delay(50);
+            await _broker.OrderManager.SellAllPositionsAsync();
             await Task.Delay(50);
             await _broker.DisconnectAsync();
             await Task.Delay(50);
@@ -171,6 +176,35 @@ namespace IBBrokerTests
             Assert.ThrowsAsync<ArgumentException>(async () => await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id));
         }
 
+        [Test, Order(1)]
+        public async Task SellAllPositions_SellsEverything()
+        {
+            if (!IsMarketOpen())
+                Assert.Ignore();
+
+            // Setup
+            string[] tickers = new string[2] { "GME", "AMC" };
+            foreach(string ticker in tickers)
+            {
+                int randomQty = new Random().Next(3, 10);
+                var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty};
+                await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+                await _broker.OrderManager.AwaitExecutionAsync(order);
+            }
+
+            // Test
+            IEnumerable<OrderExecutedResult>? execResults = null;
+            execResults = await _broker.OrderManager.SellAllPositionsAsync();
+
+            // Assert
+            var account = await _broker.GetAccountAsync();
+            Assert.Multiple(() =>
+            {
+                foreach (var pos in account.Positions)
+                    Assert.AreEqual(0, pos.Value.PositionAmount);
+            });
+        }
+
         [Test]
         public async Task AwaitExecution_AlreadyExecuted_Returns()
         {
@@ -186,7 +220,8 @@ namespace IBBrokerTests
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            var result = await _broker.OrderManager.AwaitExecution(openOrderMsg.Order);
+            await Task.Delay(500);
+            var result = await _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order);
             Assert.NotNull(result);
             Assert.AreEqual(order.Id, result.Order.Id);
         }
@@ -207,10 +242,10 @@ namespace IBBrokerTests
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 60*1000);
+            TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120*1000);
             try
             {
-                var task = _broker.OrderManager.AwaitExecution(openOrderMsg.Order);
+                var task = _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order);
                 OrderExecutedResult result = await task.WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
@@ -241,7 +276,7 @@ namespace IBBrokerTests
             Assert.IsTrue(status.Status == Status.Cancelled || status.Status == Status.ApiCancelled);
 
             // Test
-            Assert.ThrowsAsync<ArgumentException>(async () => await _broker.OrderManager.AwaitExecution(openOrderMsg.Order));
+            Assert.ThrowsAsync<ArgumentException>(async () => await _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order));
         }
 
         async Task<BidAsk> GetLatestBidAskAsync(string ticker)

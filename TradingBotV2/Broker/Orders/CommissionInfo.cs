@@ -10,11 +10,12 @@
         public string ExecId { get; set; } 
         public double Commission { get; set; }
         public string? Currency { get; set; } 
-        public double RealizedPNL { get; set; }
+        public double? RealizedPNL { get; set; }
 
         public override string ToString()
         {
-            return $"execId={ExecId} commission={Commission} {Currency} : realizedPnL={RealizedPNL}";
+            string realizedPNL = RealizedPNL == null ? string.Empty : $"realizedPnL={RealizedPNL:c}";
+            return $"commission={Commission:C} {Currency} {realizedPNL} (execId={ExecId})";
         }
 
         public static explicit operator CommissionInfo(IBApi.CommissionReport report)
@@ -23,7 +24,7 @@
             {
                 Commission = report.Commission,
                 Currency = report.Currency,
-                RealizedPNL = report.RealizedPNL,
+                RealizedPNL = report.RealizedPNL == double.MaxValue ? null : report.RealizedPNL,
             };
         }
     }

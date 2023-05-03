@@ -67,7 +67,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -106,7 +106,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -142,7 +142,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -178,7 +178,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -220,7 +220,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -262,7 +262,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -298,7 +298,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -334,7 +334,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -376,7 +376,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -418,7 +418,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -454,7 +454,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -490,7 +490,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -532,7 +532,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -574,7 +574,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -766,7 +766,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
@@ -810,7 +810,7 @@ namespace BacktesterTests
 
             // Test
             await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecution(order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
