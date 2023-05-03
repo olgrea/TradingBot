@@ -10,11 +10,13 @@ namespace IBBrokerTests
     public class BrokerTests
     {
         protected IBroker _broker;
+        protected ILogger _logger;
 
         [SetUp]
         public virtual async Task SetUp()
         {
-            _broker = new IBBroker(9001);
+            _logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
+            _broker = new IBBroker(9001, _logger);
             await Task.CompletedTask;
         }
 
