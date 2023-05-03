@@ -1,4 +1,5 @@
 ﻿using NLog;
+using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR.Client;
@@ -8,6 +9,7 @@ namespace TradingBotV2.IBKR
     internal class IBOrderManager : IOrderManager
     {
         ILogger? _logger;
+        IBroker _broker;
         IBClient _client;
         OrderTracker _orderTracker;
         OrderValidator _validator;
@@ -15,6 +17,7 @@ namespace TradingBotV2.IBKR
         public IBOrderManager(IBBroker broker, ILogger? logger)
         {
             _logger = logger;
+            _broker = broker;
             _client = broker.Client;
             _orderTracker = new OrderTracker();
             _validator = new OrderValidator(broker, _orderTracker);
@@ -40,134 +43,13 @@ namespace TradingBotV2.IBKR
             return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order);
         }
 
-        public async Task<OrderStatus> CancelOrderAsync(int orderId)
-        {
-            _validator.ValidateOrderCancellation(orderId);
-            var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderStatus = new Action<IBApi.OrderStatus>(os =>
-            {
-                var oStatus = (OrderStatus)os;
-                if (orderId == oStatus.Info.OrderId)
-                {
-                    if (!tcs.Task.IsCompleted && (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled))
-                        tcs.TrySetResult(oStatus);
-                }
-            });
-
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
-
-            _client.Responses.OrderStatus += orderStatus;
-            _client.Responses.Error += error;
-            try
-            {
-                _client.CancelOrder(orderId);
-                return await tcs.Task;
-            }
-            finally
-            {
-                _client.Responses.OrderStatus -= orderStatus;
-                _client.Responses.Error -= error;
-            }
-        }
-
-        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
-        {
-            var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var cancelledOrders = new List<OrderStatus>();
-
-            var openOrdersCount = (await GetOpenOrdersAsync()).Count();
-            if (openOrdersCount == 0)
-                return Enumerable.Empty<OrderStatus>();
-
-            var orderStatus = new Action<IBApi.OrderStatus>(os =>
-            {
-                var oStatus = (OrderStatus)os;
-                if (oStatus.Status == Status.Cancelled || oStatus.Status == Status.ApiCancelled)
-                {
-                    cancelledOrders.Add(oStatus);
-                }
-
-                if (cancelledOrders.Count == openOrdersCount)
-                    tcs.TrySetResult(cancelledOrders);
-            });
-
-            var error = new Action<ErrorMessage>(msg =>
-            {
-                if (msg.ErrorCode == 202) // Order cancelled
-                    return;
-
-                tcs.TrySetException(msg);
-            });
-
-            _client.Responses.OrderStatus += orderStatus;
-            _client.Responses.Error += error;
-
-            try
-            {
-                _client.CancelAllOrders();
-                return await tcs.Task;
-            }
-            finally
-            {
-                _client.Responses.OrderStatus -= orderStatus;
-                _client.Responses.Error -= error;
-            }
-        }
-
-        public async Task<OrderExecutedResult> AwaitExecution(Order order)
-        {
-            _validator.ValidateExecutionAwaiting(order.Id);
-            if(_orderTracker.OrdersExecuted.ContainsKey(order.Id))
-            {
-                return new OrderExecutedResult()
-                {
-                    Ticker = _orderTracker.OrderIdsToTicker[order.Id],
-                    Order = order,
-                    OrderExecution = _orderTracker.OrdersExecuted[order.Id],
-                };
-            }
-
-            var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
-            {
-                if (oe.OrderId == order.Id)
-                {
-                    tcs.TrySetResult(new OrderExecutedResult()
-                    {
-                        Ticker = _orderTracker.OrderIdsToTicker[order.Id],
-                        Order = order,
-                        OrderExecution = _orderTracker.OrdersExecuted[order.Id],
-                    });
-                }
-            });
-
-            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) => 
-            { 
-                if(o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
-                    tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
-            });
-
-            OrderExecuted += orderExecuted;
-            OrderUpdated += orderUpdated;
-            try
-            {
-                return await tcs.Task;
-            }
-            finally
-            {
-                OrderExecuted -= orderExecuted;
-                OrderUpdated -= orderUpdated;
-            }
-        }
-
         // TODO : investigate/implement/test partially filled orders
-
         async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, Order order)
         {
             var orderPlacedResult = new OrderPlacedResult();
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            var contract = await _client.ContractsCache.GetAsync(ticker);
+            var contract = _client.ContractsCache.Get(ticker);
 
             if (order.Id < 0)
                 order.Id = await GetNextValidOrderIdAsync();
@@ -210,6 +92,7 @@ namespace TradingBotV2.IBKR
 
             try
             {
+                _logger?.Info($"Placing order... : {order}");
                 _orderTracker.TrackRequest(ticker, order);
                 _client.PlaceOrder(contract, (IBApi.Order)order);
                 return await tcs.Task;
@@ -219,6 +102,155 @@ namespace TradingBotV2.IBKR
                 _client.Responses.OpenOrder -= openOrder;
                 _client.Responses.OrderStatus -= orderStatus;
                 _client.Responses.Error -= error;
+            }
+        }
+
+        public async Task<OrderStatus> CancelOrderAsync(int orderId)
+        {
+            _validator.ValidateOrderCancellation(orderId);
+            var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderStatus = new Action<IBApi.OrderStatus>(os =>
+            {
+                var oStatus = (OrderStatus)os;
+                if (orderId == oStatus.Info.OrderId)
+                {
+                    if (!tcs.Task.IsCompleted && (oStatus.Status == Status.ApiCancelled || oStatus.Status == Status.Cancelled))
+                    {
+                        _logger?.Info($"Order cancelled : {orderId}");
+                        tcs.TrySetResult(oStatus);
+                    }
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+
+            _client.Responses.OrderStatus += orderStatus;
+            _client.Responses.Error += error;
+            try
+            {
+                _logger?.Info($"Cancelling order... : {orderId}");
+                _client.CancelOrder(orderId);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.OrderStatus -= orderStatus;
+                _client.Responses.Error -= error;
+            }
+        }
+
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cancelledOrders = new List<OrderStatus>();
+
+            var openOrdersCount = (await GetOpenOrdersAsync()).Count();
+            if (openOrdersCount == 0)
+                return Enumerable.Empty<OrderStatus>();
+
+            var orderStatus = new Action<IBApi.OrderStatus>(os =>
+            {
+                var oStatus = (OrderStatus)os;
+                if (oStatus.Status == Status.Cancelled || oStatus.Status == Status.ApiCancelled)
+                {
+                    cancelledOrders.Add(oStatus);
+                }
+
+                if (cancelledOrders.Count == openOrdersCount)
+                {
+                    _logger?.Info($"All open orders cancelled.");
+                    tcs.TrySetResult(cancelledOrders);
+                }
+            });
+
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (msg.ErrorCode == 202) // Order cancelled
+                    return;
+
+                tcs.TrySetException(msg);
+            });
+
+            _client.Responses.OrderStatus += orderStatus;
+            _client.Responses.Error += error;
+
+            try
+            {
+                _logger?.Info($"Cancelling all open orders...");
+                _client.CancelAllOrders();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.OrderStatus -= orderStatus;
+                _client.Responses.Error -= error;
+            }
+        }
+
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync()
+        {
+            var list = new List<OrderExecutedResult>();
+            var account = await _broker.GetAccountAsync();
+            foreach(KeyValuePair<string, Broker.Accounts.Position> pos in account.Positions) 
+            {
+                if (pos.Value.PositionAmount <= 0)
+                    continue;
+
+                var placedResult = await PlaceOrderAsync(pos.Key, new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = pos.Value.PositionAmount });
+                if(placedResult?.Order != null)
+                {
+                    var execRes = await AwaitExecutionAsync(placedResult.Order);
+                    list.Add(execRes);
+                }
+            }
+
+            return list;
+        }
+
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order)
+        {
+            _validator.ValidateExecutionAwaiting(order.Id);
+            if(_orderTracker.OrdersExecuted.ContainsKey(order.Id))
+            {
+                return new OrderExecutedResult()
+                {
+                    Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                    Order = order,
+                    OrderExecution = _orderTracker.OrdersExecuted[order.Id],
+                };
+            }
+
+            var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            {
+                if (oe.OrderId == order.Id)
+                {
+                    tcs.TrySetResult(new OrderExecutedResult()
+                    {
+                        Ticker = _orderTracker.OrderIdsToTicker[order.Id],
+                        Order = order,
+                        OrderExecution = _orderTracker.OrdersExecuted[order.Id],
+                    });
+                }
+            });
+
+            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) => 
+            { 
+                if(o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
+                    tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
+            });
+
+            OrderExecuted += orderExecuted;
+            OrderUpdated += orderUpdated;
+            try
+            {
+                _logger?.Debug($"Awaiting order execution... {order}");
+                return await tcs.Task;
+            }
+            finally
+            {
+                OrderExecuted -= orderExecuted;
+                OrderUpdated -= orderUpdated;
             }
         }
 
@@ -232,12 +264,12 @@ namespace TradingBotV2.IBKR
             {
                 if (!_orderTracker.OrdersOpened.ContainsKey(order.Id)) // new order submitted
                 {
-                    _logger?.Debug($"New order placed : {order}");
+                    _logger?.Info($"Order opened : {order}");
                     _orderTracker.TrackOpening(order);
                 }
                 else // modified order?
                 {
-                    _logger?.Debug($"Order with id {order.Id} modified to : {order}.");
+                    _logger?.Info($"Order with id {order.Id} modified : {order}.");
                     _orderTracker.TrackOpening(order);
                 }
             }
@@ -257,8 +289,12 @@ namespace TradingBotV2.IBKR
                 throw new ArgumentException($"Unknown order id {os.Info.OrderId}");
 
             if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
+            {
+                _logger?.Info($"OrderCancelled : {order}");
                 _orderTracker.TrackCancellation(order);
+            }
 
+            _logger?.Debug($"Order status changed : {os}");
             OrderUpdated?.Invoke(_orderTracker.OrderIdsToTicker[os.Info.OrderId], order, os);
         }
 
@@ -266,6 +302,7 @@ namespace TradingBotV2.IBKR
         {
             var execution = (OrderExecution)e;
             _orderTracker.TrackExecution(execution);
+            _logger?.Debug($"execution received : {execution}");
         }
 
         void OnCommissionInfo(IBApi.CommissionReport cr)
@@ -273,6 +310,9 @@ namespace TradingBotV2.IBKR
             var ci = (CommissionInfo)cr;
             var exec = _orderTracker.ExecIdsToExecutions[ci.ExecId];
             exec.CommissionInfo = ci;
+
+            _logger?.Debug($"commission report received : {ci}");
+            _logger?.Info($"Order Executed : [{exec.OrderId}] {exec.Action} {exec.Shares} {exec.Price:c} avgPrice={exec.AvgPrice:c} commission={exec.CommissionInfo.Commission} time={exec.Time}");
             OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec);
         }
 
@@ -287,7 +327,7 @@ namespace TradingBotV2.IBKR
             _client.Responses.Error += error;
             try
             {
-                _logger?.Debug($"Requesting next valid order ids");
+                _logger?.Trace($"Requesting next valid order ids");
                 _client.RequestValidOrderIds();
                 return await tcs.Task;
             }
@@ -343,6 +383,7 @@ namespace TradingBotV2.IBKR
 
             try
             {
+                _logger?.Debug($"Requesting open orders...");
                 _client.RequestOpenOrders();
                 return await tcs.Task;
             }

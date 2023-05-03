@@ -12,7 +12,7 @@
 
         public override string ToString()
         {
-            return $"{Info.OrderId} {Status} : filled={Filled:c} remaining={Remaining:c} avgFillprice={AvgFillPrice:c} lastFillPrice={LastFillPrice:c}";
+            return $"[{Info.OrderId}] : {Status} filled={Filled:c} remaining={Remaining:c} avgFillprice={AvgFillPrice:c} lastFillPrice={LastFillPrice:c}";
         }
 
         public static explicit operator OrderStatus(IBApi.OrderStatus status)

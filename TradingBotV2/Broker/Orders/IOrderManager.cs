@@ -6,7 +6,8 @@
         public Task<OrderPlacedResult> ModifyOrderAsync(Order order);
         public Task<OrderStatus> CancelOrderAsync(int orderId);
         public Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync();
-        public Task<OrderExecutedResult> AwaitExecution(Order order);
+        public Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync();
+        public Task<OrderExecutedResult> AwaitExecutionAsync(Order order);
 
         public event Action<string, Order, OrderStatus> OrderUpdated;
         public event Action<string, OrderExecution> OrderExecuted;

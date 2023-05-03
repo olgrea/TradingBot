@@ -17,17 +17,11 @@ namespace TradingBotV2.IBKR
         {
             if (!_cache.ContainsKey(ticker))
             {
-                _cache[ticker] = GetContractAsync(ticker).Result;
-            }
-
-            return _cache[ticker];
-        }
-
-        public async Task<Contract> GetAsync(string ticker)
-        {
-            if(!_cache.ContainsKey(ticker))
-            {
-                _cache[ticker] = await GetContractAsync(ticker);
+                lock(_cache)
+                {
+                    if (!_cache.ContainsKey(ticker))
+                        _cache[ticker] = GetContractAsync(ticker).Result;
+                }
             }
 
             return _cache[ticker];

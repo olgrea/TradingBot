@@ -36,7 +36,7 @@ namespace IBBrokerTests
         public async Task RequestBidAskUpdates_SingleTickerSubscription()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string expectedTicker = "SPY";
             var baList = new List<BidAsk>();
@@ -75,7 +75,7 @@ namespace IBBrokerTests
         public async Task RequestLastUpdates_SingleTickerSubscription()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string expectedTicker = "SPY";
             var lastList = new List<Last>();
@@ -118,7 +118,7 @@ namespace IBBrokerTests
         public void RequestTickByTickData_SameTicker_Under15seconds_ShouldFail()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string expectedTicker = "SPY";
 
@@ -146,7 +146,7 @@ namespace IBBrokerTests
         public void RequestTickByTickData_NbOfRequestsOver3_ShouldFail()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string[] tickers = { "SPY", "QQQ", "GME", "AMC" };
             try
@@ -172,7 +172,7 @@ namespace IBBrokerTests
         public async Task RequestBarUpdates_SingleTickerSubscription_SingleBarLength()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string expectedTicker = "SPY";
             var barList = new List<Bar>();
@@ -212,7 +212,7 @@ namespace IBBrokerTests
         public async Task RequestBarUpdates_SingleTickerSubscription_MultipleBarLengths()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string expectedTicker = "SPY";
             var fiveSecBars = new List<Bar>();
@@ -267,7 +267,7 @@ namespace IBBrokerTests
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_SingleBarLengths()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
@@ -324,7 +324,7 @@ namespace IBBrokerTests
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_MultipleBarLengths()
         {
             if (!IsMarketOpen())
-                Assert.Ignore("Market is not open.");
+                Assert.Inconclusive("Market is not open.");
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };

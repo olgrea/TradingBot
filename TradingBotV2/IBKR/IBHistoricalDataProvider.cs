@@ -170,7 +170,7 @@ namespace TradingBotV2.IBKR
                 _token?.ThrowIfCancellationRequested();
                 if (!dataCache.Cache.TryGetValue(i, out IEnumerable<IMarketData>? value))
                 {
-                    _logger?.Trace($"Timestamp {i} not in cache. Aborting.");
+                    _logger?.Trace($"Timestamp {i} not in cache. Can't retrieve whole timerange.");
                     data = null;
                     return false;
                 }
@@ -251,7 +251,7 @@ namespace TradingBotV2.IBKR
             _nbRetrievedFromDb += data.Count();
 
             var dateStr = from.Date.ToShortDateString();
-            _logger?.Debug($"{typeof(TData).Name} for {ticker} {dateStr} ({from.ToShortTimeString()}-{to.ToShortTimeString()}) retrieved from db.");
+            _logger?.Debug($"{typeof(TData).Name} for {ticker} {dateStr} ({from}-{to}) retrieved from db.");
 
             return true;
         }
@@ -305,7 +305,7 @@ namespace TradingBotV2.IBKR
                 }
                 _nbRetrievedFromIBKR += data.Count();
 
-                _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin.ToShortTimeString()}-{chunkEnd.ToShortTimeString()}) received from TWS.");
+                _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin}-{chunkEnd}) received from TWS.");
 
                 _token?.ThrowIfCancellationRequested();
                 Debug.Assert(data != null);

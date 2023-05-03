@@ -16,9 +16,7 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            ConfigurationItemFactory.Default.Targets.RegisterDefinition("NUnitLogger", typeof(NunitTargetLogger));
-
-            var logger = LogManager.GetLogger($"{nameof(BacktesterOrderManagerTests)}", typeof(NunitTargetLogger));
+            var logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
 
             // The 10:55:00 here is just so the order gets filled rapidly in test AwaitExecution_OrderGetsFilled_Returns ...
             DateTime dateTime = new DateTime(2023, 04, 10);

@@ -1,7 +1,5 @@
-﻿using System.Net.Sockets;
-using TradingBotV2.Broker.MarketData;
+﻿using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Orders;
-using TradingBotV2.IBKR;
 
 namespace TradingBotV2.Backtesting
 {
@@ -38,30 +36,7 @@ namespace TradingBotV2.Backtesting
             {
                 try
                 {
-                    order.Id = NextOrderId;
-                    _validator.ValidateOrderPlacement(order);
-                    _orderTracker.TrackRequest(ticker, order);
-                    _orderTracker.TrackOpening(order);
-
-                    var result = new OrderPlacedResult()
-                    {
-                        Order = order,
-                        OrderStatus = new OrderStatus()
-                        {
-                            Status = Status.Submitted,
-                            Remaining = order.TotalQuantity,
-                            Info = new RequestInfo()
-                            {
-                                OrderId = order.Id,
-                            },
-                        },
-                        OrderState = new OrderState()
-                        {
-                            Status = Status.Submitted,
-                        }
-                    };
-
-                    OrderUpdated?.Invoke(ticker, order, result.OrderStatus);
+                    OrderPlacedResult result = PlaceOrderInternal(ticker, order);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -82,29 +57,9 @@ namespace TradingBotV2.Backtesting
             {
                 try
                 {
-                    _validator.ValidateOrderModification(order);
-                    _orderTracker.TrackOpening(order);
-
-                    var result = new OrderPlacedResult()
-                    {
-                        Order = order,
-                        OrderStatus = new OrderStatus()
-                        {
-                            Status = Status.Submitted,
-                            Remaining = order.TotalQuantity,
-                            Info = new RequestInfo()
-                            {
-                                OrderId = order.Id,
-                            },
-                        },
-                        OrderState = new OrderState()
-                        {
-                            Status = Status.Submitted,
-                        }
-                    };
-
+                    OrderPlacedResult result = ModifyOrderInternal(order);
                     string ticker = _orderTracker.OrderIdsToTicker[order.Id];
-                    OrderUpdated?.Invoke(ticker, order, result.OrderStatus);
+                    OrderUpdated?.Invoke(ticker, order, result.OrderStatus!);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -117,7 +72,7 @@ namespace TradingBotV2.Backtesting
 
             return await tcs.Task;
         }
-
+                
         public async Task<OrderStatus> CancelOrderAsync(int orderId)
         {
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -125,21 +80,7 @@ namespace TradingBotV2.Backtesting
             {
                 try
                 {
-                    _validator.ValidateOrderCancellation(orderId);
-
-                    var order = _orderTracker.OpenOrders[orderId];
-                    _orderTracker.TrackCancellation(order);
-
-                    var os = new OrderStatus()
-                    {
-                        Status = Status.Cancelled,
-                        Remaining = order.TotalQuantity,
-                        Info = new RequestInfo()
-                        {
-                            OrderId = order.Id,
-                        },
-                    };
-
+                    OrderStatus os = CancelOrderInternal(orderId, out Order order);
                     string ticker = _orderTracker.OrderIdsToTicker[order.Id];
                     OrderUpdated?.Invoke(ticker, order, os);
                     tcs.TrySetResult(os);
@@ -187,7 +128,7 @@ namespace TradingBotV2.Backtesting
             return await tcs.Task;
         }
 
-        public async Task<OrderExecutedResult> AwaitExecution(Order order)
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order)
         {
             var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             Action request = () =>
@@ -244,7 +185,133 @@ namespace TradingBotV2.Backtesting
             }
         }
 
-        private void EnqueueRequest<TResult>(TaskCompletionSource<TResult> tcs, Action request)
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync()
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<OrderExecutedResult>>();
+            var ordersPlaced = new Dictionary<int, Order>();
+            Action request = () =>
+            {
+                try
+                {
+                    var positions = _backtester.Account.Positions.Where(p => p.Value.PositionAmount > 0);
+                    if(!positions.Any())
+                        tcs.TrySetResult(Enumerable.Empty<OrderExecutedResult>());
+
+                    foreach (KeyValuePair<string, Position> pos in positions)
+                    {
+                        MarketOrder marketOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = pos.Value.PositionAmount };
+                        var result = PlaceOrderInternal(pos.Key, marketOrder);
+                        ordersPlaced.Add(marketOrder.Id, marketOrder);
+                    }
+                }
+                catch (Exception e)
+                {
+                    tcs.TrySetException(e);
+                }
+            };
+
+            var execList = new List<OrderExecutedResult>();
+            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            {
+                if (ordersPlaced.ContainsKey(oe.OrderId))
+                {
+                    execList.Add(new OrderExecutedResult()
+                    {
+                        Ticker = _orderTracker.OrderIdsToTicker[oe.OrderId],
+                        Order = ordersPlaced[oe.OrderId],
+                        OrderExecution = oe,
+                    });
+
+                    if (execList.Count == ordersPlaced.Count)
+                        tcs.TrySetResult(execList);
+                }
+            });
+
+            OrderExecuted += orderExecuted;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                OrderExecuted -= orderExecuted;
+            }
+        }
+
+        OrderPlacedResult PlaceOrderInternal(string ticker, Order order)
+        {
+            order.Id = NextOrderId;
+            _validator.ValidateOrderPlacement(order);
+            _orderTracker.TrackRequest(ticker, order);
+            _orderTracker.TrackOpening(order);
+
+            var result = new OrderPlacedResult()
+            {
+                Order = order,
+                OrderStatus = new OrderStatus()
+                {
+                    Status = Status.Submitted,
+                    Remaining = order.TotalQuantity,
+                    Info = new RequestInfo()
+                    {
+                        OrderId = order.Id,
+                    },
+                },
+                OrderState = new OrderState()
+                {
+                    Status = Status.Submitted,
+                }
+            };
+
+            OrderUpdated?.Invoke(ticker, order, result.OrderStatus);
+            return result;
+        }
+
+        OrderPlacedResult ModifyOrderInternal(Order order)
+        {
+            _validator.ValidateOrderModification(order);
+            _orderTracker.TrackOpening(order);
+
+            var result = new OrderPlacedResult()
+            {
+                Order = order,
+                OrderStatus = new OrderStatus()
+                {
+                    Status = Status.Submitted,
+                    Remaining = order.TotalQuantity,
+                    Info = new RequestInfo()
+                    {
+                        OrderId = order.Id,
+                    },
+                },
+                OrderState = new OrderState()
+                {
+                    Status = Status.Submitted,
+                }
+            };
+            return result;
+        }
+
+        OrderStatus CancelOrderInternal(int orderId, out Order order)
+        {
+            _validator.ValidateOrderCancellation(orderId);
+
+            order = _orderTracker.OpenOrders[orderId];
+            _orderTracker.TrackCancellation(order);
+
+            return new OrderStatus()
+            {
+                Status = Status.Cancelled,
+                Remaining = order.TotalQuantity,
+                Info = new RequestInfo()
+                {
+                    OrderId = order.Id,
+                },
+            };
+        }
+
+        void EnqueueRequest<TResult>(TaskCompletionSource<TResult> tcs, Action request)
         {
             try
             {
