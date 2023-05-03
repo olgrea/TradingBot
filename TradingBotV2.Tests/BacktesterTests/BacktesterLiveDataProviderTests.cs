@@ -13,7 +13,7 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            var logger = LogManager.GetLogger($"{nameof(BacktesterLiveDataProviderTests)}", typeof(NunitTargetLogger));
+            var logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
             _backtester = new Backtester(new DateTime(2023, 04, 03), logger);
             _backtester.DbPath = TestDbPath;
             _broker = _backtester;

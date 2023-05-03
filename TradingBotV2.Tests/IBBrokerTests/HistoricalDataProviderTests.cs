@@ -25,7 +25,7 @@ namespace IBBrokerTests
         public async Task OneTimeSetUp()
         {
             _broker = new IBBroker(9001);
-            _logger = LogManager.GetLogger("HistoricalDataProviderTests", typeof(NunitTargetLogger));
+            _logger = LogManager.GetLogger("NUnitLogger", typeof(NunitTargetLogger));
 
             _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
             _historicalProvider.DbPath = TestDbPath;
