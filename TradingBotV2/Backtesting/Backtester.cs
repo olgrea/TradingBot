@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
@@ -10,14 +12,24 @@ using TradingBotV2.IBKR.Client;
 
 namespace TradingBotV2.Backtesting
 {
+    internal class TimeCompression
+    {
+        public const double DefaultCompressionFactor = 0.001;
+        public double Factor = DefaultCompressionFactor;
+
+        // ticks param : expressed in 100-nanosecond units.
+        public TimeSpan OneSecond => new TimeSpan(ticks: (long)Math.Round(1 * 1_000_000 * Factor * 10));
+    }
+
+    internal struct BacktestingResults
+    {
+        public DateTime Start {get; set;}
+        public DateTime End {get; set;}
+        public TimeSpan RunTime { get; set; } 
+    }
+
     internal class Backtester : IBroker, IAsyncDisposable
     {
-        static class TimeCompression
-        {
-            public static double Factor = 0.001;
-            public static int OneSecond => (int)Math.Round(1 * 1000 * Factor);
-        }
-
         private const string FakeAccountCode = "FAKEACCOUNT123";
         Account _fakeAccount = new Account(FakeAccountCode)
         {
@@ -42,21 +54,29 @@ namespace TradingBotV2.Backtesting
         double _totalCommission = 0.0;
 
         IBBroker _broker;
-        ILogger? _logger;
         ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
         Task? _consumerTask;
         Task? _marketDataBackgroundTask;
         CancellationTokenSource? _cancellation;
-        TaskCompletionSource? _tcsDayIsOver;
+        TaskCompletionSource<BacktestingResults>? _startTcs = null;
+        bool _isRunning = false;
 
+        internal TimeCompression TimeCompression = new();
+        Stopwatch _totalRuntimeStopwatch = new Stopwatch();
+        Stopwatch _µsWaitStopwatch = new Stopwatch();
+        
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
-        BacktesterProgress _progress = new BacktesterProgress();
+        DateTime? _lastProcessedTime;
         Dictionary<(string, Type), DateTime> _timeSlicesUpperBounds = new();
+        
+        BacktesterProgress _progress = new BacktesterProgress();
+        BacktestingResults _result = new BacktestingResults();
+        ILogger? _logger;
 
-        public Backtester(DateTime date, ILogger? logger = null) : this(date.ToMarketHours().Item1, date.ToMarketHours().Item2, logger) { }
+        public Backtester(DateOnly date, ILogger? logger = null) : this(date.ToDateTime(default).ToMarketHours().Item1, date.ToDateTime(default).ToMarketHours().Item2, logger) { }
 
         public Backtester(DateTime from, DateTime to, ILogger? logger = null)
         {
@@ -66,9 +86,8 @@ namespace TradingBotV2.Backtesting
             if (from.Date == DateTime.Now.Date || to.Date == DateTime.Now.Date)
                 throw new ArgumentException("Can't backtest the current day.");
 
-            _start = from;
-            _end = to;
-            _currentTime = _start;
+            _fakeAccount.Time = _currentTime = _result.Start = _start = from;
+            _end = _result.End = to;
             _logger = logger;
 
             _broker = new IBBroker(191919, logger);
@@ -79,20 +98,20 @@ namespace TradingBotV2.Backtesting
 
         public async ValueTask DisposeAsync()
         {
-            await Stop();
+            Stop();
             await DisconnectAsync();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
             _marketDataBackgroundTask?.Dispose();
-            if (_broker != null )
-                await _broker.DisconnectAsync();
         }
 
         internal DateTime StartTime => _start;
         internal DateTime EndTime => _end;
         internal DateTime CurrentTime => _currentTime;
-        internal ILogger? Logger => _logger;
+        internal DateTime? LastProcessedTime => _lastProcessedTime;
+        internal ILogger? Logger { get => _logger; set => _logger = value; }
         internal Account Account => _fakeAccount;
+        internal event Action<DateTime>? ClockTick;
 
         internal string? DbPath
         {
@@ -107,23 +126,23 @@ namespace TradingBotV2.Backtesting
         public ILiveDataProvider LiveDataProvider { get; private set; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
-
-        internal event Action<DateTime>? ClockTick;
-        public event Action<Account>? AccountUpdated;
-        public Action<BacktesterProgress>? ProgressHandler { get; set; }
+        
+        public event Action<AccountValue>? AccountValueUpdated;
+        public event Action<BacktesterProgress>? ProgressHandler;
 
         public Task<string> ConnectAsync()
         {
             if (_consumerTask != null)
                 throw new ErrorMessage("Already connected");
 
+            _logger?.Trace($"Backtester connected.");
             _cancellation = new CancellationTokenSource();
-            _cancellation.Token.Register(() => _tcsDayIsOver?.TrySetCanceled());
+            _cancellation.Token.Register(() => _startTcs?.TrySetCanceled());
             _consumerTask = Task.Factory.StartNew(ConsumeRequests, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
             _consumerTask.ContinueWith(t =>
             {
                 var e = t.Exception ?? new Exception("Unknown exception occured");
-                _tcsDayIsOver?.TrySetException(e);
+                _startTcs?.TrySetException(e);
             }, TaskContinuationOptions.OnlyOnFaulted);
 
             return Task.FromResult(FakeAccountCode);
@@ -131,8 +150,12 @@ namespace TradingBotV2.Backtesting
 
         public async Task DisconnectAsync()
         {
-            if (!_cancellation!.IsCancellationRequested)
+            if (_consumerTask == null || _cancellation == null)
+                return;
+
+            if (!_cancellation.IsCancellationRequested)
             {
+                _logger?.Trace($"Backtester disconnected.");
                 _cancellation.Cancel();
                 try
                 {
@@ -157,35 +180,52 @@ namespace TradingBotV2.Backtesting
             }
         }
 
-        public Task Start()
+        public Task<BacktestingResults> Start()
         {
-            if (IsDayOver())
-                throw new InvalidOperationException($"Backtesting of {_currentTime.ToShortDateString()} is already completed.");
-            else if(_consumerTask == null)
+            if(_consumerTask == null)
                 throw new InvalidOperationException($"Not connected");
+            else if (IsDayOver())
+                return Task.FromResult(_result);
 
-            if (_tcsDayIsOver == null)
-                _tcsDayIsOver = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (_startTcs == null)
+                _logger?.Debug($"Backtester started (from {_start} to {_end})");
+            else
+                _logger?.Debug($"Backtester resumed at {_currentTime}");
 
-            return _tcsDayIsOver.Task;
+            _startTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            _totalRuntimeStopwatch.Start();
+            _isRunning = true;
+            return _startTcs.Task;
         }
 
-        public async Task Stop()
+        public void Stop()
         {
-            _tcsDayIsOver?.TrySetCanceled();
-            _tcsDayIsOver = null;
-            await Task.CompletedTask;
+            if(_isRunning)
+            {
+                _totalRuntimeStopwatch.Stop();
+                _logger?.Debug($"Backtester stopped at {_currentTime}");
+                _startTcs?.TrySetException(new BacktesterStoppedException($"Backtester stopped at {_currentTime}"));
+            }
+            _isRunning = false;
         }
 
-        public async Task Reset()
+        public void Reset()
         {
-            await Stop();
+            Stop();
 
             _requestsQueue.Clear();
             _currentTime = _start;
+            _lastProcessedTime = null;
+            _result.RunTime = TimeSpan.Zero;
+            _totalRuntimeStopwatch.Reset();
+            _startTcs = null;
 
+            // TODO : handle this better
             LiveDataProvider.Dispose();
             LiveDataProvider = new BacktesterLiveDataProvider(this);
+
+            _logger?.Trace($"Backtester reset");
         }
 
         internal void EnqueueRequest(Action action)
@@ -196,13 +236,13 @@ namespace TradingBotV2.Backtesting
             if (_consumerTask.IsFaulted || _consumerTask.IsCanceled)
                 _consumerTask.Wait();
 
+            _logger?.Trace($"EnqueueRequest : {action.GetMethodInfo().Name}");
             _requestsQueue.Enqueue(action);
         }
 
         void ConsumeRequests()
         {
-            var mainToken = _cancellation!.Token;
-
+            CancellationToken mainToken = _cancellation!.Token;
             while (!mainToken.IsCancellationRequested)
             {
                 mainToken.ThrowIfCancellationRequested();
@@ -212,14 +252,24 @@ namespace TradingBotV2.Backtesting
                 {
                     mainToken.ThrowIfCancellationRequested();
                     action();
+                    _logger?.Trace($"Request consumed : {action.GetMethodInfo().Name}");
                 }
 
-                if(_tcsDayIsOver != null)
+                if (_isRunning)
                 {
                     if (!IsDayOver())
+                    {
                         AdvanceTime();
+                    }
                     else
-                        _tcsDayIsOver?.TrySetResult();
+                    {
+                        _totalRuntimeStopwatch.Stop();
+                        _result.RunTime = _totalRuntimeStopwatch.Elapsed;
+                        _logger?.Debug($"Backtester finished. Runtime : {_result.RunTime}");
+
+                        _startTcs?.TrySetResult(_result);
+                        Stop();
+                    }
                 }
             }
         }
@@ -228,20 +278,44 @@ namespace TradingBotV2.Backtesting
         {
             var mainToken = _cancellation!.Token;
 
+            if (Debugger.IsAttached)
+                _logger?.Trace($"Processing time {_currentTime}");
+
             mainToken.ThrowIfCancellationRequested();
+
             ClockTick?.Invoke(_currentTime);
             mainToken.ThrowIfCancellationRequested();
 
-            if (TimeCompression.OneSecond > 0)
-                Task.Delay(TimeCompression.OneSecond).Wait(mainToken);
-
-            _currentTime = _currentTime.AddSeconds(1);
+            WaitOneSecond(mainToken);
 
             mainToken.ThrowIfCancellationRequested();
 
-            _progress.CurrentTime = _currentTime;
+            _progress.Time = _currentTime;
             ProgressHandler?.Invoke(_progress);
+
             mainToken.ThrowIfCancellationRequested();
+            _lastProcessedTime = _currentTime;
+            _currentTime = _currentTime.AddSeconds(1);
+        }
+
+        void WaitOneSecond(CancellationToken mainToken)
+        {
+            var timeToWait = TimeCompression.OneSecond;
+            if (timeToWait.TotalMilliseconds > 10)
+            {
+                Task.Delay(timeToWait).Wait(mainToken);
+                return;
+            }
+
+            // µs resolution. Not always super accurate but it's good enough
+            long nbMicroSecToWait = timeToWait.Ticks / 10;
+            double microSecPerTick = 1000000D / Stopwatch.Frequency;
+
+            _µsWaitStopwatch.Restart();
+            Thread.SpinWait(10);
+            while((long)(_µsWaitStopwatch.ElapsedTicks * microSecPerTick) < nbMicroSecToWait)
+                Thread.SpinWait(10);
+            _µsWaitStopwatch.Stop();
         }
 
         bool IsDayOver() => _currentTime >= _end;
@@ -301,7 +375,7 @@ namespace TradingBotV2.Backtesting
             return data;
         }
 
-        public Task<Account> GetAccountAsync(string accountCode)
+        public Task<Account> GetAccountAsync()
         {
             return Task.FromResult(_fakeAccount);
         }
@@ -362,15 +436,10 @@ namespace TradingBotV2.Backtesting
 
             return Math.Min(Math.Max(@fixed * order.TotalQuantity, min), max);
         }
+    }
 
-        public void RequestAccountUpdates(string account)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void CancelAccountUpdates(string account)
-        {
-            throw new NotImplementedException();
-        }
+    public class BacktesterStoppedException : Exception
+    {
+        public BacktesterStoppedException(string? message) : base(message) {}
     }
 }
