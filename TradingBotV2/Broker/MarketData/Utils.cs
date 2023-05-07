@@ -34,6 +34,11 @@
             return WasMarketOpen(DateTime.Now);
         }
 
+        public static bool WasMarketOpen(DateOnly date)
+        {
+            return WasMarketOpen(date.ToDateTime(new TimeOnly(MarketStartTime.Hours, MarketStartTime.Minutes, MarketStartTime.Seconds)));
+        }
+
         public static bool WasMarketOpen(DateTime date)
         {
             var timeOfday = date.TimeOfDay;

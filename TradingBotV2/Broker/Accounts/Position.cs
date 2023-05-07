@@ -1,29 +1,57 @@
 ﻿namespace TradingBotV2.Broker.Accounts
 {
+    public record struct PnL(string Ticker, int Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue)
+    {
+        public static explicit operator PnL(IBApi.PnL pnl)
+        {
+            return new PnL()
+            {
+                Ticker = pnl.Ticker,
+                Pos = pnl.Pos,
+                DailyPnL= pnl.DailyPnL,
+                UnrealizedPnL= pnl.UnrealizedPnL,
+                RealizedPnL= pnl.RealizedPnL,
+                MarketValue = pnl.MarketValue,
+            };
+        }
+    }
+
     public class Position
     {
-        public string? Ticker { get; set; }
+        public Position(string ticker)
+        {
+            Ticker = ticker;
+        }
+
+        public string Ticker { get; set; }
         public double PositionAmount { get; set; }
-        public double MarketPrice { get; set; }
-        public double MarketValue { get; set; }
+        public double Price { get; set; }
+        public double TotalMarketValue { get; set; }
         public double AverageCost { get; set; }
         public double UnrealizedPNL { get; set; }
         public double RealizedPNL { get; set; }
 
-        public bool InAny() => PositionAmount > 0;
-
         public static explicit operator Position(IBApi.Position position)
         {
-            return new Position()
+            return new Position(position.Contract.Symbol)
             {
-                Ticker = position.Contract.Symbol,
                 PositionAmount = position.PositionAmount,
-                MarketPrice = position.MarketPrice,
-                MarketValue = position.MarketValue,
+                Price = position.MarketPrice,
+                TotalMarketValue = position.MarketValue,
                 AverageCost = position.AverageCost,
                 UnrealizedPNL = position.UnrealizedPNL,
                 RealizedPNL = position.RealizedPNL,
             };
+        }
+
+        public PnL ToPnL()
+        {
+            return new PnL(Ticker, (int)PositionAmount, RealizedPNL + UnrealizedPNL, UnrealizedPNL, RealizedPNL, TotalMarketValue);
+        }
+
+        public override string ToString()
+        {
+            return $"{PositionAmount} {Ticker} at {Price:c} (avgCost={AverageCost:c}, total={TotalMarketValue:c})";
         }
     }
 }

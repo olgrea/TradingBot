@@ -28,7 +28,6 @@ namespace TradingBotV2.IBKR.Client
         string _accountCode = string.Empty;
         int _nextValidId = -1;
         RequestIdsToContracts _requestIdsToContracts = new RequestIdsToContracts();
-
         ContractsCache _contractsCache;
 
         public IBClient()
@@ -69,6 +68,7 @@ namespace TradingBotV2.IBKR.Client
             _reader = new EReader(_clientSocket, _signal);
             _reader.Start();
             _processMsgTask = Task.Factory.StartNew(ProcessMsg, TaskCreationOptions.LongRunning);
+            _processMsgTask.ContinueWith(t => Responses.error(t.Exception ?? new Exception("Unknown EReader Thread exception")), TaskContinuationOptions.OnlyOnFaulted);
         }
 
         void ProcessMsg()
@@ -101,6 +101,11 @@ namespace TradingBotV2.IBKR.Client
             _clientSocket.reqManagedAccts();
         }
 
+        // https://interactivebrokers.github.io/tws-api/account_updates.html
+        // Updates are first sent instantly when reqAccountUpdates(true, code) is called and then, if no change in positions occured,
+        // at a FIXED interval of three minutes (not 3 minutes after the first call).
+        // IMPORTANT also : accountDownloadEnd() is ONLY called on the first reqAccountUpdates(true, code) call, NOT during updates...
+        // So you don't have any reliable ways of knowing when an update has finished...
         public void RequestAccountUpdates(string accountCode)
         {
             _clientSocket.reqAccountUpdates(true, accountCode);
@@ -231,6 +236,7 @@ namespace TradingBotV2.IBKR.Client
         public void PlaceOrder(Contract contract, Order order)
         {
             Debug.Assert(order.OrderId > 0);
+            Debug.Assert(order.TotalQuantity > 0);
             _clientSocket.placeOrder(order.OrderId, contract, order);
         }
 

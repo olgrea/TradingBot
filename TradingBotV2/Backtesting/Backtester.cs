@@ -51,6 +51,10 @@ namespace TradingBotV2.Backtesting
                 }
         };
 
+        bool _accountUpdatesRequested = false;
+        DateTime? _lastAccountUpdateTime;
+        DateTime? _lastPnLUpdateTime;
+
         double _totalCommission = 0.0;
 
         IBBroker _broker;
@@ -94,6 +98,9 @@ namespace TradingBotV2.Backtesting
             LiveDataProvider = new BacktesterLiveDataProvider(this);
             HistoricalDataProvider = new IBHistoricalDataProvider(_broker, logger);
             OrderManager = new BacktesterOrderManager(this);
+
+            ClockTick += OnClockTick_SendAccountUpdates;
+            ClockTick += OnClockTick_UpdateUnrealizedPnL;
         }
 
         public async ValueTask DisposeAsync()
@@ -103,6 +110,7 @@ namespace TradingBotV2.Backtesting
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
             _marketDataBackgroundTask?.Dispose();
+            _startTcs?.TrySetException(new ObjectDisposedException(nameof(Backtester)));
         }
 
         internal DateTime StartTime => _start;
@@ -128,6 +136,8 @@ namespace TradingBotV2.Backtesting
         public IOrderManager OrderManager { get; init; }
         
         public event Action<AccountValue>? AccountValueUpdated;
+        public event Action<Position>? PositionUpdated;
+        public event Action<PnL>? PnLUpdated;
         public event Action<BacktesterProgress>? ProgressHandler;
 
         public Task<string> ConnectAsync()
@@ -156,6 +166,7 @@ namespace TradingBotV2.Backtesting
             if (!_cancellation.IsCancellationRequested)
             {
                 _logger?.Trace($"Backtester disconnected.");
+
                 _cancellation.Cancel();
                 try
                 {
@@ -168,7 +179,7 @@ namespace TradingBotV2.Backtesting
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger?.Debug("Task stopped");
+                    Logger?.Debug("Task stopped");
                 }
 
                 _cancellation?.Dispose();
@@ -259,7 +270,15 @@ namespace TradingBotV2.Backtesting
                 {
                     if (!IsDayOver())
                     {
-                        AdvanceTime();
+
+                        try
+                        {
+                            AdvanceTime();
+                        }
+                        catch (AggregateException ae)
+                        {
+                            ae.Handle(ex => ex is TaskCanceledException);
+                        }
                     }
                     else
                     {
@@ -377,13 +396,46 @@ namespace TradingBotV2.Backtesting
 
         public Task<Account> GetAccountAsync()
         {
+            _lastAccountUpdateTime = _currentTime;
             return Task.FromResult(_fakeAccount);
+        }
+
+        public void RequestAccountUpdates()
+        {
+            EnqueueRequest(() =>
+            {
+                _accountUpdatesRequested = true;
+                SendAccountUpdates();
+            });
+        }
+
+        void OnClockTick_SendAccountUpdates(DateTime newTime)
+        {
+            if (!_accountUpdatesRequested || _cancellation!.IsCancellationRequested) 
+                return;
+
+            if (_lastAccountUpdateTime == null || _currentTime - _lastAccountUpdateTime > TimeSpan.FromMinutes(3))
+            {
+                SendAccountUpdates();
+            }
+        }
+
+        internal void SendAccountUpdates()
+        {
+            AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, _currentTime.ToString()));
+            Account.Time = _currentTime;
+            _lastAccountUpdateTime = _currentTime;
+        }
+
+        public void CancelAccountUpdates()
+        {
+            EnqueueRequest(() => _accountUpdatesRequested = false);
         }
 
         internal double UpdateCommissions(Order order, double price)
         {
             double commission = GetCommission(order, price);
-            _logger?.Debug($"{order} : commission : {commission:c}");
+            Logger?.Debug($"{order} : commission : {commission:c}");
 
             UpdateCashBalance(-commission);
             _totalCommission += commission;
@@ -405,18 +457,18 @@ namespace TradingBotV2.Backtesting
             _fakeAccount.RealizedPnL["BASE"] += realized;
             _fakeAccount.RealizedPnL["USD"] += realized;
 
-            _logger?.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
+            Logger?.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
         }
 
         internal void UpdateUnrealizedPNL(string ticker, double currentPrice)
         {
             Position position = Account.Positions[ticker];
 
-            position.MarketPrice = currentPrice;
-            position.MarketValue = currentPrice * position.PositionAmount;
+            position.Price = currentPrice;
+            position.TotalMarketValue = currentPrice * position.PositionAmount;
 
             var positionValue = position.PositionAmount * position.AverageCost;
-            var unrealizedPnL = position.MarketValue - positionValue;
+            var unrealizedPnL = position.TotalMarketValue - positionValue;
 
             position.UnrealizedPNL = unrealizedPnL;
             _fakeAccount.UnrealizedPnL["USD"] = unrealizedPnL;
@@ -435,6 +487,28 @@ namespace TradingBotV2.Backtesting
             double max = order.TotalQuantity * price * 0.01; // 1% of trade value
 
             return Math.Min(Math.Max(@fixed * order.TotalQuantity, min), max);
+        }
+
+        internal void OnPositionUpdated(Position pos)
+        {
+            _lastAccountUpdateTime = _currentTime;
+            PositionUpdated?.Invoke(pos);
+        }
+
+        //TODO : to confirm : what does "real time" means here? See link
+        // https://interactivebrokers.github.io/tws-api/pnl.html
+        void OnClockTick_UpdateUnrealizedPnL(DateTime newTime)
+        {
+            foreach (KeyValuePair<string, Position> pos in Account.Positions.Where(p => p.Value.PositionAmount > 0))
+            {
+                var lasts = GetAsync<Last>(pos.Key, newTime).Result;
+                if(lasts.Any())
+                {
+                    var lastPriceAvg = lasts.Average(l => l.Price);
+                    UpdateUnrealizedPNL(pos.Key, lastPriceAvg);
+                    PnLUpdated?.Invoke(pos.Value.ToPnL());
+                }
+            }
         }
     }
 

@@ -13,7 +13,6 @@ namespace IBBrokerTests
 {
     internal class OrderManagerTests
     {
-        string _accountCode;
         internal IBroker _broker;
 
         [OneTimeSetUp]
@@ -73,7 +72,7 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var account = await _broker.GetAccountAsync(_accountCode);
+            var account = await _broker.GetAccountAsync();
             var balance = account.CashBalances["BASE"];
             var bidAsk = await GetLatestBidAskAsync(ticker);
             var qty = (int)Math.Round(balance/ bidAsk.Ask + 500);
@@ -92,7 +91,7 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var account = await _broker.GetAccountAsync(_accountCode);
+            var account = await _broker.GetAccountAsync();
             var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
             await _broker.OrderManager.PlaceOrderAsync(ticker, buyOrder);
 

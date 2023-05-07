@@ -19,10 +19,12 @@ namespace TradingBotV2.Backtesting
             _orderTracker = orderTracker;
 
             _backtester.ClockTick += OnClockTick_EvaluateOrders;
+            PositionUpdated += p => _backtester.OnPositionUpdated(p);
         }
 
         int NextExecId => _execId++;
         internal event Action<string, OrderExecution>? OrderExecuted;
+        internal event Action<Position>? PositionUpdated;
 
         void OnClockTick_EvaluateOrders(DateTime newTime)
         {
@@ -206,7 +208,7 @@ namespace TradingBotV2.Backtesting
             Account account = _backtester.Account;
             if(!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
             {
-                position = _backtester.Account.Positions[ticker] = new Position() { Ticker = ticker};
+                position = _backtester.Account.Positions[ticker] = new Position(ticker);
             }
 
             if (order.Action == OrderAction.BUY)
@@ -268,6 +270,9 @@ namespace TradingBotV2.Backtesting
             };
 
             OrderExecuted?.Invoke(ticker, oe);
+            PositionUpdated?.Invoke(position);
+
+            _backtester.SendAccountUpdates();
         }
     }
 }
