@@ -3,21 +3,23 @@ using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
+using TradingBotV2.Tests;
 
 namespace IBBrokerTests
 {
     [TestFixture]
     public class BrokerTests
     {
+        protected string _accountCode;
         protected IBroker _broker;
         protected ILogger _logger;
 
         [SetUp]
         public virtual async Task SetUp()
         {
-            _logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
-            _broker = new IBBroker(9001, _logger);
-            await Task.CompletedTask;
+            _logger = TestsUtils.CreateLogger();
+            _broker = TestsUtils.CreateBroker(_logger);
+            _accountCode = await _broker.ConnectAsync();
         }
 
         [TearDown]
