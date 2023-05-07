@@ -1,11 +1,10 @@
 ﻿using System.Diagnostics;
-using BacktesterTests;
 using Microsoft.Data.Sqlite;
-using NLog.TradingBot;
 using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
+using TradingBotV2.Tests;
 
 namespace IBBrokerTests
 {
@@ -15,8 +14,6 @@ namespace IBBrokerTests
 
     abstract class HistoricalDataProviderTests<TData> where TData : IMarketData, new()
     {
-        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
-
         ILogger? _logger;
         IBBroker _broker;
         IBHistoricalDataProvider _historicalProvider;
@@ -24,25 +21,20 @@ namespace IBBrokerTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _broker = new IBBroker(9001);
-            _logger = LogManager.GetLogger("NUnitLogger", typeof(NunitTargetLogger));
-
-            _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
-            _historicalProvider.DbPath = TestDbPath;
-            _historicalProvider.Logger = _logger;
-
+            _logger = TestsUtils.CreateLogger();
+            _broker = TestsUtils.CreateBroker(_logger);
             await _broker.ConnectAsync();
         }
 
         [SetUp]
         public async Task SetUp()
         {
-            Debug.Assert(_historicalProvider.DbPath == TestDbPath);
+            Debug.Assert(_historicalProvider.DbPath == TestsUtils.TestDbPath);
             _historicalProvider.DbEnabled = true;
             _historicalProvider.CacheEnabled = true;
             _historicalProvider.ClearCache();
             
-            _logger?.Info($"=== CURRENT TEST : {TestContext.CurrentContext.Test.Name}");
+            _logger?.PrintCurrentTestName();
             await Task.CompletedTask;
         }
 
@@ -267,9 +259,9 @@ namespace IBBrokerTests
 
         void DeleteData(string ticker, DateTime from, DateTime to) 
         {
-            Debug.Assert(_historicalProvider.DbPath == TestDbPath);
+            Debug.Assert(_historicalProvider.DbPath == TestsUtils.TestDbPath);
 
-            var connection = new SqliteConnection("Data Source=" + TestDbPath);
+            var connection = new SqliteConnection("Data Source=" + TestsUtils.TestDbPath);
             connection.Open();
             
             var cmd = connection.CreateCommand();

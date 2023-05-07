@@ -1,7 +1,6 @@
-﻿using NLog;
-using NLog.TradingBot;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using TradingBotV2.Backtesting;
+using TradingBotV2.Tests;
 
 namespace BacktesterTests
 {
@@ -13,18 +12,16 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            var logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
-            _backtester = new Backtester(new DateTime(2023, 04, 03), logger);
-            _backtester.DbPath = TestDbPath;
+            _backtester = TestsUtils.CreateBacktester(new DateOnly(2023, 04, 03));
             _broker = _backtester;
             await _broker.ConnectAsync();
         }
 
         [SetUp]
-        public async Task SetUp()
+        public void SetUp()
         {
             // TODO : Is there a better way?
-            await _backtester.Reset();
+            _backtester.Reset();
             _backtestingTask = _backtester.Start();
             _ = _backtestingTask.ContinueWith(t =>
             {
@@ -34,14 +31,9 @@ namespace BacktesterTests
         }
 
         [TearDown]
-        public async Task TearDown()
+        public void TearDown()
         {
-            await _backtester.Stop();
-        }
-
-        protected override bool IsMarketOpen()
-        {
-            return true;
+            _backtester.Stop();
         }
     }
 }

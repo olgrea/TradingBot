@@ -7,6 +7,7 @@ using TradingBotV2.Broker.Orders;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
 using NLog.TradingBot;
+using TradingBotV2.Tests;
 
 namespace BacktesterTests
 {
@@ -42,8 +43,7 @@ namespace BacktesterTests
 
         async Task<Backtester> CreateBacktester((DateTime, DateTime) timeRange)
         {
-            var backtester = new Backtester(timeRange.Item1, timeRange.Item2, _logger);
-            backtester.DbPath = TestDbPath;
+            var backtester = TestsUtils.CreateBacktester(timeRange.Item1, timeRange.Item2);
             await backtester.ConnectAsync();
             return backtester;
         }

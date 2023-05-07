@@ -1,27 +1,22 @@
 ﻿using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
-using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
+using TradingBotV2.Tests;
 
 namespace IBBrokerTests
 {
     [TestFixture]
     public class LiveDataProviderTests
     {
-        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
-
         protected TaskCompletionSource _tcs;
         internal IBroker _broker;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _broker = new IBBroker(9001);
+            _broker = TestsUtils.CreateBroker();
             await _broker.ConnectAsync();
-
-            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
-            hdp.DbPath = TestDbPath;
         }
 
         [OneTimeTearDown]
@@ -35,8 +30,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBidAskUpdates_SingleTickerSubscription()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string expectedTicker = "SPY";
             var baList = new List<BidAsk>();
@@ -74,8 +68,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestLastUpdates_SingleTickerSubscription()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string expectedTicker = "SPY";
             var lastList = new List<Last>();
@@ -117,8 +110,7 @@ namespace IBBrokerTests
         [Ignore("It seems to be working fine. Not sure why the doc is saying that.")]
         public void RequestTickByTickData_SameTicker_Under15seconds_ShouldFail()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string expectedTicker = "SPY";
 
@@ -145,8 +137,7 @@ namespace IBBrokerTests
         [Ignore("It seems to be working fine. Not sure why the doc is saying that.")]
         public void RequestTickByTickData_NbOfRequestsOver3_ShouldFail()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string[] tickers = { "SPY", "QQQ", "GME", "AMC" };
             try
@@ -171,8 +162,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_SingleTickerSubscription_SingleBarLength()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string expectedTicker = "SPY";
             var barList = new List<Bar>();
@@ -211,8 +201,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_SingleTickerSubscription_MultipleBarLengths()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string expectedTicker = "SPY";
             var fiveSecBars = new List<Bar>();
@@ -266,8 +255,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_SingleBarLengths()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
@@ -323,8 +311,7 @@ namespace IBBrokerTests
         [Test]
         public async Task RequestBarUpdates_MultipleTickerSubscriptions_MultipleBarLengths()
         {
-            if (!IsMarketOpen())
-                Assert.Inconclusive("Market is not open.");
+            TestsUtils.Assert.MarketIsOpen();
 
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
@@ -397,11 +384,6 @@ namespace IBBrokerTests
                 Assert.AreEqual(1, bars.Count);
                 Assert.AreEqual(0, bars[0].Time.Second % 60);
             }
-        }
-
-        protected virtual bool IsMarketOpen()
-        {
-            return MarketDataUtils.IsMarketOpen();
         }
     }
 }

@@ -1,6 +1,4 @@
-﻿using NLog.TradingBot;
-using NLog;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using TradingBotV2.Backtesting;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Tests;
@@ -16,32 +14,13 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _openDay = DateOnly.FromDateTime(DateTime.Now.AddDays(-1));
-            while (!MarketDataUtils.WasMarketOpen(_openDay))
-                _openDay = _openDay.AddDays(-1);
+            _openDay = TestsUtils.FindLastOpenDay();
 
             var from = _openDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.MarketStartTime));
-            _backtester = CreateBacktester(from, from.AddHours(1));
+            _backtester = TestsUtils.CreateBacktester(from, from.AddHours(1));
             //_backtester.TimeCompression.Factor = 0;
 
             await _backtester.ConnectAsync();
-        }
-
-        Backtester CreateBacktester(DateOnly date)
-        {
-            var backtester = new Backtester(date);
-            backtester.DbPath = TestsUtils.TestDbPath;
-            backtester.Logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
-
-            return backtester;
-        }
-
-        Backtester CreateBacktester(DateTime from, DateTime to)
-        {
-            var backtester = new Backtester(from, to);
-            backtester.DbPath = TestsUtils.TestDbPath;
-            backtester.Logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
-            return backtester;
         }
 
         [OneTimeTearDown]
@@ -65,7 +44,7 @@ namespace BacktesterTests
             Backtester bt = null;
             try
             {
-                bt = CreateBacktester(_openDay);
+                bt = TestsUtils.CreateBacktester(_openDay);
                 Assert.ThrowsAsync<InvalidOperationException>(async () => await bt.Start());
             }
             finally
@@ -77,7 +56,7 @@ namespace BacktesterTests
         [Test]
         public void Backtester_CurrentDay_WhenCreated_Throws()
         {
-            Assert.Throws<ArgumentException>(() => CreateBacktester(DateOnly.FromDateTime(DateTime.Now)));
+            Assert.Throws<ArgumentException>(() => TestsUtils.CreateBacktester(DateOnly.FromDateTime(DateTime.Now)));
         }
 
         [Test]
@@ -205,7 +184,7 @@ namespace BacktesterTests
             Backtester backtester = null;
             try
             {
-                backtester = CreateBacktester(from, to);
+                backtester = TestsUtils.CreateBacktester(from, to);
                 await backtester.ConnectAsync();
                 backtester.TimeCompression.Factor = 0.0001;
                 var res1 = await backtester.Start();

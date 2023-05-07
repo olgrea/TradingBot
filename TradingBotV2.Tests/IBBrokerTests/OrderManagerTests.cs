@@ -7,32 +7,32 @@ using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
+using TradingBotV2.Tests;
 
 namespace IBBrokerTests
 {
     internal class OrderManagerTests
     {
-        public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
-
         string _accountCode;
         internal IBroker _broker;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            var logger = LogManager.GetLogger($"NUnitLogger", typeof(NunitTargetLogger));
-            _broker = new IBBroker(9001, logger);
+            _broker = TestsUtils.CreateBroker(TestsUtils.CreateLogger());
+            await Task.CompletedTask;
+        }
 
+        [SetUp]
+        public virtual async Task SetUp()
+        {
             var accountCode = await _broker.ConnectAsync();
             Assert.NotNull(accountCode);
             Assert.AreEqual("DU5962304", accountCode);
-
-            var hdp = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
-            hdp.DbPath = TestDbPath;
         }
 
-        [OneTimeTearDown]
-        public async Task OneTimeTearDown()
+        [TearDown]
+        public virtual async Task TearDown()
         {
             await _broker.OrderManager.CancelAllOrdersAsync();
             await Task.Delay(50);
@@ -47,8 +47,7 @@ namespace IBBrokerTests
         [Test]
         public async Task PlaceOrder_ShouldSucceed()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -70,8 +69,7 @@ namespace IBBrokerTests
         [Ignore("Move that to Trader tests.")]
         public async Task PlaceBuyOrder_WhenNotEnoughFunds_ShouldFail()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -90,8 +88,7 @@ namespace IBBrokerTests
         [Ignore("IB allow shorting for paper trading accounts but not for cash accounts. Need to implement client-side validation. Move that to Trader tests.")]
         public async Task PlaceSellOrder_WhenNotEnoughPosition_ShouldFail()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -107,8 +104,7 @@ namespace IBBrokerTests
         [Test]
         public async Task ModifyOrder_ValidOrderParams_ShouldSucceed()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -132,8 +128,7 @@ namespace IBBrokerTests
         [Test]
         public async Task CancelOrder_ShouldSucceed()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -155,8 +150,7 @@ namespace IBBrokerTests
         [Test]
         public async Task CancelOrder_AlreadyCanceled_Throws()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -179,8 +173,7 @@ namespace IBBrokerTests
         [Test, Order(1)]
         public async Task SellAllPositions_SellsEverything()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string[] tickers = new string[2] { "GME", "AMC" };
@@ -208,8 +201,7 @@ namespace IBBrokerTests
         [Test]
         public async Task AwaitExecution_AlreadyExecuted_Returns()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -229,8 +221,7 @@ namespace IBBrokerTests
         [Test]
         public async Task AwaitExecution_OrderGetsFilled_Returns()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -259,8 +250,7 @@ namespace IBBrokerTests
         [Test]
         public async Task AwaitExecution_OrderGetsCancelled_Throws()
         {
-            if (!IsMarketOpen())
-                Assert.Ignore();
+            TestsUtils.Assert.MarketIsOpen();
 
             // Setup
             string ticker = "GME";
@@ -299,11 +289,6 @@ namespace IBBrokerTests
                 _broker.LiveDataProvider.CancelBidAskUpdates(ticker);
                 _broker.LiveDataProvider.BidAskReceived -= callback;
             }
-        }
-
-        protected virtual bool IsMarketOpen()
-        {
-            return MarketDataUtils.IsMarketOpen();
         }
     }
 }
