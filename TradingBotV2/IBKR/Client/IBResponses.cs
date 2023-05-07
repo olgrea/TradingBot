@@ -4,6 +4,7 @@ using static TradingBotV2.IBKR.Client.IBClient;
 
 namespace TradingBotV2.IBKR.Client
 {
+    // NOTE : TWS API uses double.MaxValue for an unset value
     public class IBResponses : EWrapper
     {
         RequestIdsToContracts _requestIdsToContracts;
@@ -42,11 +43,11 @@ namespace TradingBotV2.IBKR.Client
             NextValidId?.Invoke(orderId);
         }
 
-        public Action<TimeSpan>? UpdateAccountTime;
+        public Action<DateTime>? UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
             //_logger.Trace($"Getting account time : {timestamp}");
-            UpdateAccountTime?.Invoke(TimeSpan.Parse(timestamp, CultureInfo.InvariantCulture));
+            UpdateAccountTime?.Invoke(DateTime.Parse(timestamp, CultureInfo.InvariantCulture));
         }
 
         public Action<AccountValue>? UpdateAccountValue;
@@ -108,11 +109,11 @@ namespace TradingBotV2.IBKR.Client
             PositionEnd?.Invoke();
         }
 
-        public Action<string, int, double, double, double, double>? PnlSingle;
+        public Action<PnL>? PnlSingle;
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             //_logger.Trace($"PnL ({reqId}): {pnl}");
-            PnlSingle?.Invoke(_requestIdsToContracts.Pnl[reqId].Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value);
+            PnlSingle?.Invoke(new PnL(_requestIdsToContracts.Pnl[reqId].Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value));
         }
 
         // called at 5 sec intervals

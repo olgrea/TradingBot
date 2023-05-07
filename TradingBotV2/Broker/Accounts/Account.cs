@@ -1,11 +1,38 @@
 ﻿namespace TradingBotV2.Broker.Accounts
 {
+    public enum AccountValueKey
+    {
+        Time,
+        AccountReady,
+        CashBalance,
+        UnrealizedPnL,
+        RealizedPnL,
+    }
+
+    public record struct AccountValue(AccountValueKey Key, string Value, string? Currency)
+    {
+        public AccountValue(AccountValueKey Key, string Value) : this(Key, Value, null) { }
+
+        public static explicit operator AccountValue(IBApi.AccountValue val)
+        {
+            if (!Enum.TryParse(val.Key, out AccountValueKey key))
+                throw new NotImplementedException($"{val.Key}");
+
+            return new AccountValue()
+            {
+                Key = key,
+                Value= val.Value,
+                Currency = val.Currency,
+            };
+        }
+    }
+
     public class Account
     {
         public const double MinimumUSDCashBalance = 500.0d;
 
         public string Code { get; set; }
-        public TimeSpan Time { get; set; }
+        public DateTime Time { get; set; }
         public Dictionary<string, double> CashBalances { get; set; } = new Dictionary<string, double>();
         public Dictionary<string, Position> Positions { get; set; } = new Dictionary<string, Position>();
         public Dictionary<string, double> RealizedPnL { get; set; } = new Dictionary<string, double>();

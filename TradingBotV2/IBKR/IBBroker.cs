@@ -3,6 +3,7 @@ using System.Globalization;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
+using TradingBotV2.Broker.Contracts;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR.Client;
@@ -15,10 +16,10 @@ namespace TradingBotV2.IBKR
         int _port;
         IBClient _client;
         ILogger? _logger;
+        Account? _account;
+        DateTime? _lastTimeUpdate = null;
+        HashSet<string> _pnlSubscriptions = new HashSet<string>();
         
-        bool _accountValuesRequested = false;
-        Account? _tmpAccount;
-
         public IBBroker(int clientId, ILogger? logger = null)
         {
             _port = GetPort();
@@ -34,9 +35,15 @@ namespace TradingBotV2.IBKR
             _client.Responses.UpdateAccountValue += OnAccountValueUpdate;
             _client.Responses.UpdatePortfolio += OnPortfolioUpdate;
             _client.Responses.AccountDownloadEnd += OnAccountDownloadEnd;
+
+            _client.Responses.Position += OnPositionReceived;
+            _client.Responses.PositionEnd += OnPositionReceptionEnd;
+            _client.Responses.PnlSingle += OnPnLReceived;
         }
 
-        public event Action<Account>? AccountUpdated;
+        public event Action<AccountValue>? AccountValueUpdated;
+        public event Action<Position>? PositionUpdated;
+        public event Action<PnL>? PnLUpdated;
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
@@ -47,11 +54,17 @@ namespace TradingBotV2.IBKR
         {
             var ibGatewayProc = Process.GetProcessesByName("ibgateway").FirstOrDefault();
             if (ibGatewayProc != null)
+            {
+                _logger?.Trace($"ibgateway is running");
                 return IBClient.DefaultIBGatewayPort;
+            }
 
             var twsProc = Process.GetProcessesByName("tws").FirstOrDefault();
             if (twsProc != null)
+            {
+                _logger?.Trace($"TWS is running");
                 return IBClient.DefaultTWSPort;
+            }
 
             throw new ArgumentException("Neither TWS Workstation or IB Gateway is running.");
         }
@@ -66,20 +79,18 @@ namespace TradingBotV2.IBKR
         async Task<string> ConnectAsync(TimeSpan timeout, CancellationToken token)
         {
             // awaiting a TaskCompletionSource's task doesn't return on the main thread without this flag.
-
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             int nextId = -1;
-            string account = string.Empty;
+            string accountCode = string.Empty;
 
             var nextValidId = new Action<int>(id =>
             {
-                _logger?.Trace($"ConnectAsync : next valid id {id}");
                 Debug.Assert(id > 0);
                 nextId = id;
-                if(nextId > 0 && !string.IsNullOrEmpty(account))
-                    tcs.TrySetResult(account);
+                if(nextId > 0 && !string.IsNullOrEmpty(accountCode))
+                    tcs.TrySetResult(accountCode);
             });
 
             var managedAccounts = new Action<IEnumerable<string>>(accList =>
@@ -87,10 +98,9 @@ namespace TradingBotV2.IBKR
                 if (accList.Count() > 1)
                     tcs.SetException(new NotSupportedException("Only single account structures are supported."));
 
-                _logger?.Trace($"ConnectAsync : managedAccounts {accList} - set result");
-                account = accList.First();
-                if (nextId > 0 && !string.IsNullOrEmpty(account))
-                    tcs.TrySetResult(account);
+                accountCode = accList.First();
+                if (nextId > 0 && !string.IsNullOrEmpty(accountCode))
+                    tcs.TrySetResult(accountCode);
             });
 
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -103,10 +113,12 @@ namespace TradingBotV2.IBKR
             {
                 if(timeout.Milliseconds > 0)
                     _ = Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
-                
-                _client.Connect(IBClient.DefaultIP, _port, _clientId);
-                await tcs.Task;
 
+                _logger?.Debug($"Connecting client id {_clientId} to {IBClient.DefaultIP}:{_port}");
+                _client.Connect(IBClient.DefaultIP, _port, _clientId);
+
+                await tcs.Task;
+                _account = new Account(tcs.Task.Result);
             }
             finally
             {
@@ -124,7 +136,6 @@ namespace TradingBotV2.IBKR
                 return;
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            _logger?.Debug($"Disconnecting from TWS");
 
             var disconnect = new Action(() => tcs.TrySetResult());
             var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
@@ -133,8 +144,10 @@ namespace TradingBotV2.IBKR
             _client.Responses.Error += error;
             try
             {
+                _logger?.Debug($"Disconnecting from TWS");
                 _client.Disconnect();
                 await tcs.Task;
+                _account = null;
             }
             finally
             {
@@ -142,7 +155,7 @@ namespace TradingBotV2.IBKR
                 _client.Responses.Error -= error;
             }
         }
-
+        
         async Task<IEnumerable<string>> GetManagedAccountsList()
         {
             var tcs = new TaskCompletionSource<IEnumerable<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -163,81 +176,90 @@ namespace TradingBotV2.IBKR
             }
         }
 
-        public async Task<Account> GetAccountAsync(string accountCode)
+        public async Task<Account> GetAccountAsync()
         {
-            await ValidateAccount(accountCode);
+            Debug.Assert(_account != null);
+            await ValidateAccount();
 
             var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var accountUpdated = new Action<Account>(account => 
-            {
-                if (account.Code == accountCode)
-                    tcs.TrySetResult(account);
-            });
+            bool accDownloaded = false;
+            bool posDownloaded = false;
 
-            AccountUpdated += accountUpdated;
+            Action<string> onAccountDownloadEnd = accCode =>
+            {
+                accDownloaded = true;
+                if (accDownloaded && posDownloaded)
+                    tcs.TrySetResult(_account);
+            };
+            Action positionEnd = () =>
+            {
+                posDownloaded = true;
+                if (accDownloaded && posDownloaded)
+                    tcs.TrySetResult(_account);
+            };
+
+            _client.Responses.AccountDownloadEnd += onAccountDownloadEnd;
+            _client.Responses.PositionEnd += positionEnd;
             try
             {
-                RequestAccountUpdates(accountCode);
+                _logger?.Debug($"Retrieving Account {_account.Code}");
+                RequestAccountUpdates();
                 return await tcs.Task;
             }
             finally
             {
-                CancelAccountUpdates(accountCode);
-                AccountUpdated -= accountUpdated;
+                _client.Responses.AccountDownloadEnd -= onAccountDownloadEnd;
+                _client.Responses.PositionEnd -= positionEnd;
             }
         }
 
-        async Task ValidateAccount(string accountCode)
+        async Task ValidateAccount()
         {
             var accList = await GetManagedAccountsList();
             if (accList.Count() > 1)
             {
                 throw new NotSupportedException("Multiple-account structures not supported.");
             }
-            else if (accList.First() != accountCode)
+        }
+
+        // https://interactivebrokers.github.io/tws-api/account_updates.html
+        public void RequestAccountUpdates()
+        {
+            Debug.Assert(_account != null);
+            _logger?.Debug($"Requesting account {_account.Code} updates...");
+
+            _client.CancelAccountUpdates(_account.Code); // we need to cancel it first
+            _client.RequestAccountUpdates(_account.Code);
+            _client.RequestPositionsUpdates();
+        }
+
+        public void CancelAccountUpdates()
+        {
+            Debug.Assert(_account != null);
+            CancelPnLUpdates();
+            _logger?.Debug($"Cancelling account {_account.Code} updates...");
+            _client.CancelAccountUpdates(_account.Code);
+            _client.CancelPositionsUpdates();
+        }
+
+        void OnAccountTimeUpdate(DateTime time)
+        {
+            Debug.Assert(_account != null);
+            _account.Time = time;
+
+            // The same timestamp is received multiple times...
+            if(_lastTimeUpdate == null || _lastTimeUpdate < time)
             {
-                throw new ArgumentException($"The account code \"{accountCode}\" doesn't exists.");
+                _logger?.Debug($"OnAccountTimeUpdate : {time}");
+                _lastTimeUpdate = time;
+                AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, time.ToString()));
             }
-        }
-
-        public void RequestAccountUpdates(string account)
-        {
-            if (!_accountValuesRequested)
-            {
-                ValidateAccount(account).Wait();
-                _tmpAccount = new Account(account);
-                _accountValuesRequested = true;
-                _client.RequestAccountUpdates(account);
-            }
-        }
-
-        public void CancelAccountUpdates(string account)
-        {
-            if (_accountValuesRequested)
-            {
-                _tmpAccount = null;
-                _accountValuesRequested = false;
-                _client.CancelAccountUpdates(account);
-            }
-        }
-
-        void OnAccountDownloadEnd(string account)
-        {
-            Debug.Assert(_tmpAccount != null);
-            AccountUpdated?.Invoke(_tmpAccount);
-        }
-
-        void OnPortfolioUpdate(IBApi.Position pos)
-        {
-            Debug.Assert(_tmpAccount != null);
-            _logger?.Trace($"GetAccountAsync updatePortfolio : {pos}");
-            _tmpAccount.Positions[pos.Contract.Symbol] = (Position)pos;
         }
 
         void OnAccountValueUpdate(IBApi.AccountValue accValue)
         {
-            Debug.Assert(_tmpAccount != null);
-            _logger?.Trace($"GetAccountAsync updateAccountValue : key={accValue.Key}, value={accValue.Value}");
+            Debug.Assert(_account != null);
+            string curr = !string.IsNullOrEmpty(accValue.Currency) ? $"currency={accValue.Currency}" : string.Empty;
             switch (accValue.Key)
             {
                 case "AccountReady":
@@ -249,24 +271,116 @@ namespace TradingBotV2.IBKR
                     break;
 
                 case "CashBalance":
-                    _tmpAccount.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
+                    _account.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
 
                 case "RealizedPnL":
-                    _tmpAccount.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
+                    _account.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
 
                 case "UnrealizedPnL":
-                    _tmpAccount.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
+                    _account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
+                    AccountValueUpdated?.Invoke((AccountValue)accValue);
+                    break;
+                
+                default:
+                    //_logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
                     break;
             }
         }
 
-        void OnAccountTimeUpdate(TimeSpan time)
+        void OnPortfolioUpdate(IBApi.Position ibPos)
         {
-            Debug.Assert(_tmpAccount != null);
-            _logger?.Trace($"GetAccountAsync updateAccountTime : {time}");
-            _tmpAccount.Time = time;
+            Debug.Assert(_account != null);
+            Position pos = (Position)ibPos;
+            _logger?.Trace($"OnPortfolioUpdate : {pos}");
+            _account.Positions[ibPos.Contract.Symbol] = pos;
+        }
+
+        void OnAccountDownloadEnd(string account)
+        {
+            Debug.Assert(_account != null);
+            _logger?.Trace($"OnAccountDownloadEnd");
+        }
+
+        // NOTE : called from an ActionBlock 
+        void OnPositionReceived(IBApi.Position ibPos)
+        {
+            Debug.Assert(_account != null);
+            Contract c = (Contract)ibPos.Contract;
+            Debug.Assert(c is Stock);
+
+            Position pos = (Position)ibPos;
+
+            string msg = $"Position received :  {pos}";
+            if(pos.PositionAmount > 0)
+                _logger?.Debug(msg);
+            else
+                _logger?.Trace(msg);
+
+            if(pos.PositionAmount > 0 && !_pnlSubscriptions.Contains(pos.Ticker!))
+            {
+                RequestPnLUpdate(pos);
+            }
+            else if (pos.PositionAmount == 0 && _pnlSubscriptions.Contains(pos.Ticker!))
+            {
+                CancelPnLUpdate(pos.Ticker!);
+            }
+
+            _account.Positions[pos.Ticker!] = pos;
+            PositionUpdated?.Invoke(pos);
+        }
+
+        void OnPositionReceptionEnd()
+        {
+            Debug.Assert(_account != null);
+            _logger?.Trace($"OnPositionReceptionEnd");
+        }
+
+        void RequestPnLUpdate(Position pos)
+        {
+            if (pos.PositionAmount <= 0)
+                return;
+
+            _logger?.Trace($"Requesting live PnL updates for ticker {pos.Ticker}...");
+
+            // PnL subscriptions are requested after receiving a position update. Since these updates are supplied
+            // by the EReader thread, we start a Task in order to prevent a deadlock.
+            // TODO : implement some kind of custom SynchronizationContext in order to prevent having to do this?
+            Task.Run(() => _client.RequestPnLUpdates(pos.Ticker!));
+            _pnlSubscriptions.Add(pos.Ticker!);
+        }
+
+        HashSet<string> _pnlTraces = new HashSet<string>();
+        void OnPnLReceived(IBApi.PnL pnl)
+        {
+            if(!_pnlTraces.Contains(pnl.Ticker))
+            {
+                _pnlTraces.Add(pnl.Ticker);
+                _logger?.Trace($"pnl received : {pnl.Ticker}");
+            }
+
+            PnLUpdated?.Invoke((PnL)pnl);
+        }
+
+        void CancelPnLUpdates()
+        {
+            Debug.Assert(_account != null);
+            foreach (var ticker in _pnlSubscriptions)
+                CancelPnLUpdate(ticker);
+        }
+
+        void CancelPnLUpdate(string ticker)
+        {
+            _logger?.Trace($"Cancelling live PnL updates for ticker {ticker}...");
+            Task.Run(() => _client.CancelPnLUpdates(ticker));
+            _pnlTraces.Remove(ticker);
+            _pnlSubscriptions.Remove(ticker);
         }
     }
 }

@@ -1,5 +1,7 @@
 ﻿namespace IBApi
 {
+    public record struct PnL(string Ticker, int Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue);
+
     public class Last
     {
         public long Time { get; set; }
