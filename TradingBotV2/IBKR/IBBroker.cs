@@ -39,16 +39,14 @@ namespace TradingBotV2.IBKR
             _client.Responses.Position += OnPositionReceived;
             _client.Responses.PositionEnd += OnPositionReceptionEnd;
             _client.Responses.PnlSingle += OnPnLReceived;
+
+            _client.Responses.Error += e => ErrorOccured?.Invoke(e);
         }
 
         public event Action<AccountValue>? AccountValueUpdated;
         public event Action<Position>? PositionUpdated;
         public event Action<PnL>? PnLUpdated;
-        public event Action<Exception>? ErrorOccured
-        {
-            add => _client.Responses.Error += value;
-            remove => _client.Responses.Error -= value;
-        }
+        public event Action<Exception>? ErrorOccured;
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
