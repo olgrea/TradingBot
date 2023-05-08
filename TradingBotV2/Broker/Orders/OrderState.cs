@@ -34,5 +34,10 @@ namespace TradingBotV2.Broker.Orders
                 CommissionCurrency = ibo.CommissionCurrency,
             };
         }
+
+        public override string? ToString()
+        {
+            return Status.ToString();
+        }
     }
 }

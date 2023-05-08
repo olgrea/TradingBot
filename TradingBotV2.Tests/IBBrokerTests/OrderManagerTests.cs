@@ -25,11 +25,13 @@ namespace IBBrokerTests
             var accountCode = await _broker.ConnectAsync();
             Assert.NotNull(accountCode);
             Assert.AreEqual("DU5962304", accountCode);
+            await Task.Delay(50);
         }
 
         [TearDown]
         public virtual async Task TearDown()
         {
+            await Task.Delay(50);
             await _broker.OrderManager.CancelAllOrdersAsync();
             await Task.Delay(50);
             await _broker.OrderManager.SellAllPositionsAsync();

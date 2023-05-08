@@ -233,7 +233,7 @@ namespace TradingBotV2.IBKR.Client
 
         public void RequestOpenOrders()
         {
-            _clientSocket.reqOpenOrders();
+            _clientSocket.reqAllOpenOrders();
         }
 
         public void PlaceOrder(Contract contract, Order order)

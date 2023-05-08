@@ -71,10 +71,14 @@ namespace TradingBotV2.IBKR
             var orderStatus = new Action<IBApi.OrderStatus>(os =>
             {
                 var oStatus = (OrderStatus)os;
-                if (order.Id == oStatus.Info.OrderId && (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted))
+                if (order.Id == oStatus.Info.OrderId)
                 {
-                    orderPlacedResult.OrderStatus = oStatus;
-                    tcs.TrySetResult(orderPlacedResult);
+                    if (oStatus.Status == Status.PreSubmitted || oStatus.Status == Status.Submitted)
+                    {
+                        orderPlacedResult.OrderStatus = oStatus;
+                        orderPlacedResult.Time = DateTime.Now;
+                        tcs.TrySetResult(orderPlacedResult);
+                    }
                 }
             });
 
@@ -142,24 +146,29 @@ namespace TradingBotV2.IBKR
         public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
         {
             var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var cancelledOrders = new List<OrderStatus>();
+            var cancelledOrders = new Dictionary<int, OrderStatus>();
+            int nbRetries = 0;
 
-            var openOrdersCount = (await GetOpenOrdersAsync()).Count();
+            IEnumerable<OrderPlacedResult> openOrders = await GetOpenOrdersAsync();
+            var openOrdersCount = openOrders.Count();
+
             if (openOrdersCount == 0)
                 return Enumerable.Empty<OrderStatus>();
 
+            _logger?.Trace($"{openOrdersCount} currently open orders");
             var orderStatus = new Action<IBApi.OrderStatus>(os =>
             {
                 var oStatus = (OrderStatus)os;
+                _logger?.Trace($"{oStatus}");
                 if (oStatus.Status == Status.Cancelled || oStatus.Status == Status.ApiCancelled)
                 {
-                    cancelledOrders.Add(oStatus);
+                    cancelledOrders[oStatus.Info.OrderId] = oStatus;
                 }
 
                 if (cancelledOrders.Count == openOrdersCount)
                 {
                     _logger?.Info($"All open orders cancelled.");
-                    tcs.TrySetResult(cancelledOrders);
+                    tcs.TrySetResult(cancelledOrders.Values);
                 }
             });
 
@@ -167,6 +176,21 @@ namespace TradingBotV2.IBKR
             {
                 if (msg.ErrorCode == 202) // Order cancelled
                     return;
+                
+                if(msg.ErrorCode == 161) // Cancel attempted when order is not in a cancellable state.
+                {
+                    const int maxRetries = 5;
+                    if(!tcs.Task.IsCompleted && nbRetries < maxRetries)
+                    {
+                        _logger?.Trace(msg);
+                        nbRetries++;
+                        _logger?.Trace($"Retrying...{nbRetries}/{maxRetries}");
+                        // Wait a bit and retry;
+                        Task.Delay(1000).Wait();
+                        _client.CancelAllOrders();
+                        return;
+                    }
+                }
 
                 tcs.TrySetException(msg);
             });
