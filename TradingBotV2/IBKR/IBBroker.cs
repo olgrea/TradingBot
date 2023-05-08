@@ -24,7 +24,7 @@ namespace TradingBotV2.IBKR
         {
             _port = GetPort();
             _clientId = clientId;
-            _client = new IBClient();
+            _client = new IBClient(logger);
             _logger = logger;
 
             LiveDataProvider = new IBLiveDataProvider(_client);
