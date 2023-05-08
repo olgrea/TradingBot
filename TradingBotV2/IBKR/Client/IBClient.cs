@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using IBApi;
+using NLog;
 
 namespace TradingBotV2.IBKR.Client
 {
@@ -19,6 +20,7 @@ namespace TradingBotV2.IBKR.Client
         public const int DefaultIBGatewayPort = 4002;
         public const string DefaultIP = "127.0.0.1";
 
+        ILogger? _logger;
         EClientSocket _clientSocket;
         EReaderSignal _signal;
         EReader? _reader;
@@ -30,10 +32,11 @@ namespace TradingBotV2.IBKR.Client
         RequestIdsToContracts _requestIdsToContracts = new RequestIdsToContracts();
         ContractsCache _contractsCache;
 
-        public IBClient()
+        public IBClient(ILogger? logger = null)
         {
+            _logger = logger;
             _signal = new EReaderMonitorSignal();
-            Responses = new IBResponses(_requestIdsToContracts);
+            Responses = new IBResponses(_requestIdsToContracts, logger);
             _clientSocket = new EClientSocket(Responses, _signal);
 
             _contractsCache = new ContractsCache(this);

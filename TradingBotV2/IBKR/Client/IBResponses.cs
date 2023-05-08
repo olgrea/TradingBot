@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using IBApi;
+using NLog;
 using static TradingBotV2.IBKR.Client.IBClient;
 
 namespace TradingBotV2.IBKR.Client
@@ -8,9 +9,11 @@ namespace TradingBotV2.IBKR.Client
     public class IBResponses : EWrapper
     {
         RequestIdsToContracts _requestIdsToContracts;
+        ILogger? _logger;
 
-        internal IBResponses(RequestIdsToContracts requestIdsToContracts)
+        internal IBResponses(RequestIdsToContracts requestIdsToContracts, ILogger? logger = null)
         {
+            _logger = logger;
             _requestIdsToContracts = requestIdsToContracts;
         }
 
@@ -337,12 +340,13 @@ namespace TradingBotV2.IBKR.Client
         {
             if (IsWarningMessage(ex.ErrorCode))
             {
-                //_logger.Warn($"{ex.Message} ({ex.ErrorCode})");
+                _logger?.Warn(ex);
                 return;
             }
 
             // TODO : investigate which is better. Ideally it would be nice if I could just throw
             //throw ex;
+            //_logger?.Error(ex);
             Error?.Invoke(ex);
         }
 
