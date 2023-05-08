@@ -116,60 +116,70 @@ namespace TradingBotV2.IBKR.Client
         public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             //_logger.Trace($"PnL ({reqId}): {pnl}");
-            PnlSingle?.Invoke(new PnL(_requestIdsToContracts.Pnl[reqId].Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value));
+            if(_requestIdsToContracts.Pnl.TryGetValue(reqId, out var contract))
+                PnlSingle?.Invoke(new PnL(contract.Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value));
         }
 
         // called at 5 sec intervals
         public Action<string, FiveSecBar>? RealtimeBar;
         public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
         {
-            FiveSecBar bar = new FiveSecBar()
+            if (_requestIdsToContracts.FiveSecBars.TryGetValue(reqId, out var contract))
             {
-                Open = open,
-                Close = close,
-                High = high,
-                Low = low,
-                Volume = volume,
-                TradeAmount = count,
-                Date = date
-            };
+                FiveSecBar bar = new FiveSecBar()
+                {
+                    Open = open,
+                    Close = close,
+                    High = high,
+                    Low = low,
+                    Volume = volume,
+                    TradeAmount = count,
+                    Date = date
+                };
 
-            //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
-            RealtimeBar?.Invoke(_requestIdsToContracts.FiveSecBars[reqId].Symbol, bar);
+                //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
+                RealtimeBar?.Invoke(contract.Symbol, bar);
+            }
         }
 
         public Action<string, BidAsk>? TickByTickBidAsk;
         public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
         {
-            var bidAsk = new BidAsk()
+            if (_requestIdsToContracts.BidAsk.TryGetValue(reqId, out var contract))
             {
-                Time = time,
-                Bid = bidPrice,
-                BidSize = bidSize,
-                Ask = askPrice,
-                AskSize = askSize,
-                TickAttribBidAsk = tickAttribBidAsk
-            };
+                var bidAsk = new BidAsk()
+                {
+                    Time = time,
+                    Bid = bidPrice,
+                    BidSize = bidSize,
+                    Ask = askPrice,
+                    AskSize = askSize,
+                    TickAttribBidAsk = tickAttribBidAsk
+                };
 
-            //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
-            TickByTickBidAsk?.Invoke(_requestIdsToContracts.BidAsk[reqId].Symbol, bidAsk);
+                //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
+                TickByTickBidAsk?.Invoke(contract.Symbol, bidAsk);
+            }
         }
 
         public Action<string, Last>? TickByTickAllLast;
         public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
-            var last = new Last()
+            if (_requestIdsToContracts.Last.TryGetValue(reqId, out var contract))
             {
-                Time = time,
-                Price = price,
-                Size = size,
-                TickAttribLast = tickAttribLast,
-                Exchange = exchange,
-                SpecialConditions = specialConditions,
-            };
+                var last = new Last()
+                {
+                    Time = time,
+                    Price = price,
+                    Size = size,
+                    TickAttribLast = tickAttribLast,
+                    Exchange = exchange,
+                    SpecialConditions = specialConditions,
+                };
 
-            //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
-            TickByTickAllLast?.Invoke(_requestIdsToContracts.Last[reqId].Symbol, last);
+                //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
+                TickByTickAllLast?.Invoke(contract.Symbol, last);
+            }
         }
 
         public Action<int, IBApi.ContractDetails>? ContractDetails;
