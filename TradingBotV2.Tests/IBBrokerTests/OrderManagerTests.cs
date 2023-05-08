@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
@@ -11,17 +12,20 @@ namespace IBBrokerTests
     internal class OrderManagerTests
     {
         internal IBroker _broker;
+        ILogger _logger;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()
         {
-            _broker = TestsUtils.CreateBroker(TestsUtils.CreateLogger());
+            _logger = TestsUtils.CreateLogger();
+            _broker = TestsUtils.CreateBroker(_logger);
             await Task.CompletedTask;
         }
 
         [SetUp]
         public virtual async Task SetUp()
         {
+            _logger?.PrintCurrentTestName();
             var accountCode = await _broker.ConnectAsync();
             Assert.NotNull(accountCode);
             Assert.AreEqual("DU5962304", accountCode);
@@ -31,13 +35,14 @@ namespace IBBrokerTests
         [TearDown]
         public virtual async Task TearDown()
         {
-            await Task.Delay(50);
+            const int delay = 100;
+            await Task.Delay(delay);
             await _broker.OrderManager.CancelAllOrdersAsync();
-            await Task.Delay(50);
+            await Task.Delay(delay);
             await _broker.OrderManager.SellAllPositionsAsync();
-            await Task.Delay(50);
+            await Task.Delay(delay);
             await _broker.DisconnectAsync();
-            await Task.Delay(50);
+            await Task.Delay(delay);
         }
 
         // TODO : add more tests
