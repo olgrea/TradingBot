@@ -346,18 +346,22 @@ namespace TradingBotV2.IBKR.Client
             HandleError(new ErrorMessage(id, errorCode, errorMsg));
         }
 
-        void HandleError(ErrorMessage ex)
+        void HandleError(ErrorMessage msg)
         {
-            if (IsWarningMessage(ex.ErrorCode))
+            if (IsWarningMessage(msg.ErrorCode))
             {
-                _logger?.Warn(ex);
+                _logger?.Warn(msg);
                 return;
             }
+            else if (msg.ErrorCode == 202) // Order cancelled
+                return;
+            else if (msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
+                return;
 
             // TODO : investigate which is better. Ideally it would be nice if I could just throw
             //throw ex;
             //_logger?.Error(ex);
-            Error?.Invoke(ex);
+            Error?.Invoke(msg);
         }
 
         #region Not Implemented

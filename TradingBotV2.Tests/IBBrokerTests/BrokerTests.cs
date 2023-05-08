@@ -22,6 +22,7 @@ namespace IBBrokerTests
             _logger = TestsUtils.CreateLogger();
             _broker = TestsUtils.CreateBroker(_logger);
             _accountCode = await _broker.ConnectAsync();
+            _logger?.PrintCurrentTestName();
         }
 
         [TearDown]
@@ -35,14 +36,12 @@ namespace IBBrokerTests
         [Test]
         public void ConnectAsync_AlreadyConnected_ThrowsError()
         {
-            _logger?.PrintCurrentTestName();
             Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.ConnectAsync());
         }
 
         [Test]
         public async Task GetAccountAsync_WithValidAccountCode_GetsTheAccount()
         {
-            _logger?.PrintCurrentTestName();
             Account account = await _broker.GetAccountAsync();
             Assert.IsNotNull(account);
             Assert.AreEqual(_accountCode, account.Code);
@@ -53,8 +52,6 @@ namespace IBBrokerTests
         public async Task GetAccountAsync_ReceivesPositionsUpdates()
         {
             TestsUtils.Assert.MarketIsOpen();
-
-            _logger?.PrintCurrentTestName();
 
             string ticker = "GME";
             var randomQty = new Random().Next(2, 10);
@@ -92,7 +89,6 @@ namespace IBBrokerTests
         public async Task GetAccountAsync_ReceivesPnLUpdates()
         {
             TestsUtils.Assert.MarketIsOpen();
-            _logger?.PrintCurrentTestName();
 
             string ticker = "GME";
             var randomQty = new Random().Next(2, 10);
@@ -133,7 +129,6 @@ namespace IBBrokerTests
         {
             TestsUtils.Assert.MarketIsOpen();
 
-            _logger?.PrintCurrentTestName();
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             CancellationTokenSource cancellation = new CancellationTokenSource();
@@ -183,7 +178,6 @@ namespace IBBrokerTests
         {
             TestsUtils.Assert.MarketIsOpen();
             
-            _logger?.PrintCurrentTestName();
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             CancellationTokenSource cancellation = new CancellationTokenSource();
