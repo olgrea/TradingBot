@@ -23,6 +23,7 @@ namespace IBBrokerTests
         {
             _logger = TestsUtils.CreateLogger();
             _broker = TestsUtils.CreateBroker(_logger);
+            _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;
             await _broker.ConnectAsync();
         }
 
