@@ -586,7 +586,7 @@ namespace TradingBotV2.IBKR
         static void ValidateDates(DateTime from, DateTime to)
         {
             if (from >= to)
-                throw new ArgumentException("Starting date is after ending date");
+                throw new ArgumentException("Starting date is after or equal to ending date");
 
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
             if (DateTime.Now - from > TimeSpan.FromDays(6 * 30))

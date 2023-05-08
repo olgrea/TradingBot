@@ -373,13 +373,14 @@ namespace TradingBotV2.Backtesting
             if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] < dateTime)
             {
                 var span = TimeSpan.FromMinutes(10);
-                long ticks = (dateTime.Ticks + span.Ticks - 1) / span.Ticks;
+                long ticks = (dateTime.Ticks + span.Ticks) / span.Ticks;
                 var aroundTenMins = new DateTime(ticks * span.Ticks, dateTime.Kind);
                 
                 upper = aroundTenMins;
                 if (upper >= EndTime)
                     upper = EndTime;
 
+                Debug.Assert(upper - dateTime >= TimeSpan.FromSeconds(1));
                 _timeSlicesUpperBounds[key] = upper;
             }
 
