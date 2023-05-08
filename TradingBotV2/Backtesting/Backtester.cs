@@ -53,7 +53,6 @@ namespace TradingBotV2.Backtesting
 
         bool _accountUpdatesRequested = false;
         DateTime? _lastAccountUpdateTime;
-        DateTime? _lastPnLUpdateTime;
 
         double _totalCommission = 0.0;
 
@@ -134,7 +133,8 @@ namespace TradingBotV2.Backtesting
         public ILiveDataProvider LiveDataProvider { get; private set; }
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
-        
+        public event Action<Exception>? ErrorOccured;
+
         public event Action<AccountValue>? AccountValueUpdated;
         public event Action<Position>? PositionUpdated;
         public event Action<PnL>? PnLUpdated;
@@ -149,13 +149,17 @@ namespace TradingBotV2.Backtesting
             _cancellation = new CancellationTokenSource();
             _cancellation.Token.Register(() => _startTcs?.TrySetCanceled());
             _consumerTask = Task.Factory.StartNew(ConsumeRequests, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
-            _consumerTask.ContinueWith(t =>
-            {
-                var e = t.Exception ?? new Exception("Unknown exception occured");
-                _startTcs?.TrySetException(e);
-            }, TaskContinuationOptions.OnlyOnFaulted);
+            _consumerTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
 
             return Task.FromResult(FakeAccountCode);
+        }
+
+        internal void HandleTaskError(Task t)
+        {
+            var e = t.Exception ?? new Exception("Unknown exception occured in Backtester");
+            _startTcs?.TrySetException(e);
+            ErrorOccured?.Invoke(e);
+            // cancel other tasks on error?
         }
 
         public async Task DisconnectAsync()
@@ -354,6 +358,7 @@ namespace TradingBotV2.Backtesting
                 {
                     await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
                 }, _cancellation!.Token);
+                _ = _marketDataBackgroundTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
             }
 
             return data;
@@ -389,6 +394,7 @@ namespace TradingBotV2.Backtesting
                 {
                     await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, upper, EndTime, _cancellation!.Token);
                 }, _cancellation!.Token);
+                _ = _marketDataBackgroundTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
             }
 
             return data;

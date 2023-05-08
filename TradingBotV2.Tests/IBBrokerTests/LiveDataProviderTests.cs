@@ -9,7 +9,6 @@ namespace IBBrokerTests
     [TestFixture]
     public class LiveDataProviderTests
     {
-        protected TaskCompletionSource _tcs;
         internal IBroker _broker;
 
         [OneTimeSetUp]
@@ -35,7 +34,7 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var baList = new List<BidAsk>();
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var bidAskReceived = new Action<string, BidAsk>((ticker, bidAsk) =>
             {
                 if (expectedTicker == ticker)
@@ -44,21 +43,24 @@ namespace IBBrokerTests
                     {
                         baList.Add(bidAsk);
                         if (baList.Count == 3)
-                            _tcs.TrySetResult();
+                            tcs.TrySetResult();
                     }
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.BidAskReceived += bidAskReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestBidAskUpdates(expectedTicker);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
-                _broker.LiveDataProvider.CancelBidAskUpdates(expectedTicker);
                 _broker.LiveDataProvider.BidAskReceived -= bidAskReceived;
+                _broker.ErrorOccured -= error;
+                _broker.LiveDataProvider.CancelBidAskUpdates(expectedTicker);
             }
 
             Assert.IsNotEmpty(baList);
@@ -73,7 +75,7 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var lastList = new List<Last>();
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var lastReceived = new Action<string, Last>((ticker, last) =>
             {
                 if (expectedTicker == ticker)
@@ -82,21 +84,24 @@ namespace IBBrokerTests
                     {
                         lastList.Add(last);
                         if (lastList.Count == 3)
-                            _tcs.TrySetResult();
+                            tcs.TrySetResult();
                     }
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.LastReceived += lastReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
-                _broker.LiveDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
                 _broker.LiveDataProvider.LastReceived -= lastReceived;
+                _broker.ErrorOccured -= error;
+                _broker.LiveDataProvider.CancelLastTradedPriceUpdates(expectedTicker);
             }
 
             Assert.IsNotEmpty(lastList);
@@ -167,27 +172,30 @@ namespace IBBrokerTests
             string expectedTicker = "SPY";
             var barList = new List<Bar>();
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker && bar.BarLength == BarLength._5Sec)
                 {
                     barList.Add(bar);
                     if (barList.Count == 3)
-                        _tcs.TrySetResult();
+                        tcs.TrySetResult();
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.BarReceived += barReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
-                _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
                 _broker.LiveDataProvider.BarReceived -= barReceived;
+                _broker.ErrorOccured -= error;
+                _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
             }
 
             Assert.IsNotEmpty(barList);
@@ -207,7 +215,7 @@ namespace IBBrokerTests
             var fiveSecBars = new List<Bar>();
             var oneMinBars = new List<Bar>();
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTicker == ticker)
@@ -221,23 +229,26 @@ namespace IBBrokerTests
                     {
                         oneMinBars.Add(bar);
                         if (oneMinBars.Count == 1)
-                            _tcs.TrySetResult();
+                            tcs.TrySetResult();
                     }
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.BarReceived += barReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTicker, BarLength._1Min);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
+                _broker.LiveDataProvider.BarReceived -= barReceived;
+                _broker.ErrorOccured -= error;
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._5Sec);
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTicker, BarLength._1Min);
-                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             Assert.IsNotEmpty(fiveSecBars);
@@ -260,7 +271,7 @@ namespace IBBrokerTests
             string[] expectedTickers = { "SPY", "QQQ" };
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -280,21 +291,24 @@ namespace IBBrokerTests
                 }
 
                 if (fiveSecBars[0].Count == 3 && fiveSecBars[1].Count == 3)
-                    _tcs.TrySetResult();
+                    tcs.TrySetResult();
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.BarReceived += barReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
+                _broker.LiveDataProvider.BarReceived -= barReceived;
+                _broker.ErrorOccured -= error;
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
-                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             foreach(var bars in fiveSecBars)
@@ -317,7 +331,7 @@ namespace IBBrokerTests
             List<Bar>[] fiveSecBars = { new List<Bar>(), new List<Bar>() };
             List<Bar>[] oneMinuteBars = { new List<Bar>(), new List<Bar>() };
 
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var barReceived = new Action<string, Bar>((ticker, bar) =>
             {
                 if (expectedTickers[0] == ticker)
@@ -347,25 +361,28 @@ namespace IBBrokerTests
                 }
 
                 if (oneMinuteBars[0].Count == 1 && oneMinuteBars[1].Count == 1)
-                    _tcs.TrySetResult();
+                    tcs.TrySetResult();
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.LiveDataProvider.BarReceived += barReceived;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[0], BarLength._1Min);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._5Sec);
                 _broker.LiveDataProvider.RequestBarUpdates(expectedTickers[1], BarLength._1Min);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
+                _broker.LiveDataProvider.BarReceived -= barReceived;
+                _broker.ErrorOccured -= error;
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._5Sec);
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[0], BarLength._1Min);
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._5Sec);
                 _broker.LiveDataProvider.CancelBarUpdates(expectedTickers[1], BarLength._1Min);
-                _broker.LiveDataProvider.BarReceived -= barReceived;
             }
 
             foreach (var bars in fiveSecBars)

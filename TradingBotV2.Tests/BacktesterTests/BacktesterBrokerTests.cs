@@ -22,8 +22,7 @@ namespace BacktesterTests
             _broker = _backtester;
 
             _accountCode = await _broker.ConnectAsync();
-            var task = _backtester.Start();
-            _ = task.ContinueWith(t => _tcs.TrySetException(t.Exception ?? new Exception("Unknown exception")), TaskContinuationOptions.OnlyOnFaulted);
+            _ = _backtester.Start();
 
             await Task.CompletedTask;
         }

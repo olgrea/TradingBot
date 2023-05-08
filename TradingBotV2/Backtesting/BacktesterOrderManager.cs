@@ -45,9 +45,17 @@ namespace TradingBotV2.Backtesting
                 }
             });
 
-            EnqueueRequest(tcs, request);
-
-            return await tcs.Task;
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            _backtester.ErrorOccured += error;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _backtester.ErrorOccured -= error;
+            }
         }
 
         public async Task<OrderPlacedResult> ModifyOrderAsync(Order order)
@@ -68,9 +76,17 @@ namespace TradingBotV2.Backtesting
                 }
             };
 
-            EnqueueRequest(tcs, request);
-
-            return await tcs.Task;
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            _backtester.ErrorOccured += error;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _backtester.ErrorOccured -= error;
+            }
         }
                 
         public async Task<OrderStatus> CancelOrderAsync(int orderId)
@@ -91,9 +107,17 @@ namespace TradingBotV2.Backtesting
                 }
             };
 
-            EnqueueRequest(tcs, request);
-
-            return await tcs.Task;
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            _backtester.ErrorOccured += error;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _backtester.ErrorOccured -= error;
+            }
         }
 
         public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
@@ -123,9 +147,17 @@ namespace TradingBotV2.Backtesting
                 tcs.TrySetResult(list);
             };
 
-            EnqueueRequest(tcs, request);
-
-            return await tcs.Task;
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            _backtester.ErrorOccured += error;
+            try
+            {
+                EnqueueRequest(tcs, request);
+                return await tcs.Task;
+            }
+            finally
+            {
+                _backtester.ErrorOccured -= error;
+            }
         }
 
         public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order)
@@ -170,7 +202,9 @@ namespace TradingBotV2.Backtesting
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
             });
-
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            
+            _backtester.ErrorOccured += error;
             OrderExecuted += orderExecuted;
             OrderUpdated += orderUpdated;
             try
@@ -182,6 +216,7 @@ namespace TradingBotV2.Backtesting
             {
                 OrderExecuted -= orderExecuted;
                 OrderUpdated -= orderUpdated;
+                _backtester.ErrorOccured -= error;
             }
         }
 
@@ -226,7 +261,9 @@ namespace TradingBotV2.Backtesting
                         tcs.TrySetResult(execList);
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
+            _backtester.ErrorOccured += error;
             OrderExecuted += orderExecuted;
             try
             {
@@ -235,6 +272,7 @@ namespace TradingBotV2.Backtesting
             }
             finally
             {
+                _backtester.ErrorOccured -= error;
                 OrderExecuted -= orderExecuted;
             }
         }
@@ -261,7 +299,8 @@ namespace TradingBotV2.Backtesting
                 OrderState = new OrderState()
                 {
                     Status = Status.Submitted,
-                }
+                },
+                Time = _backtester.CurrentTime,
             };
 
             OrderUpdated?.Invoke(ticker, order, result.OrderStatus);
@@ -288,7 +327,8 @@ namespace TradingBotV2.Backtesting
                 OrderState = new OrderState()
                 {
                     Status = Status.Submitted,
-                }
+                },
+                Time = _backtester.CurrentTime,
             };
             return result;
         }

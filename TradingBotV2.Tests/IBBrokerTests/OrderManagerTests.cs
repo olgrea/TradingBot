@@ -1,11 +1,8 @@
 ﻿using System.Diagnostics;
-using NLog.TradingBot;
-using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
-using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
 using TradingBotV2.Tests;
 

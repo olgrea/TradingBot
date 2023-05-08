@@ -7,7 +7,6 @@ namespace BacktesterTests
     internal class BacktesterLiveDataProviderTests : IBBrokerTests.LiveDataProviderTests
     {
         Backtester _backtester;
-        Task _backtestingTask;
 
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
@@ -20,14 +19,8 @@ namespace BacktesterTests
         [SetUp]
         public void SetUp()
         {
-            // TODO : Is there a better way?
             _backtester.Reset();
-            _backtestingTask = _backtester.Start();
-            _ = _backtestingTask.ContinueWith(t =>
-            {
-                var e = t.Exception ?? new Exception("Backtesting task faulted.");
-                _tcs?.TrySetException(e);
-            }, TaskContinuationOptions.OnlyOnFaulted);
+            _ = _backtester.Start();
         }
 
         [TearDown]

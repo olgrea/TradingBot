@@ -4,7 +4,6 @@ using NUnit.Framework;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Orders;
-using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
 using TradingBotV2.Tests;
 
@@ -16,7 +15,6 @@ namespace IBBrokerTests
         protected string _accountCode;
         protected IBroker _broker;
         protected ILogger _logger;
-        protected TaskCompletionSource? _tcs;
 
         [SetUp]
         public virtual async Task SetUp()
@@ -60,7 +58,7 @@ namespace IBBrokerTests
 
             string ticker = "GME";
             var randomQty = new Random().Next(2, 10);
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             
             Account account = await _broker.GetAccountAsync();
             double currentPos = 0;
@@ -73,15 +71,18 @@ namespace IBBrokerTests
                 if(p.Ticker == ticker)
                 {
                     positionAfterOrderExec = p;
-                    _tcs.TrySetResult();
+                    tcs.TrySetResult();
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+
             _broker.PositionUpdated += positionUpdate;
+            _broker.ErrorOccured += error;
 
             var buyOrder = new MarketOrder() {Action = OrderAction.BUY, TotalQuantity = randomQty };
             await _broker.OrderManager.PlaceOrderAsync(ticker, buyOrder);
             await _broker.OrderManager.AwaitExecutionAsync(buyOrder);
-            await _tcs.Task;
+            await tcs.Task;
 
             Assert.NotNull(positionAfterOrderExec);
             Assert.AreEqual(currentPos + randomQty, positionAfterOrderExec.PositionAmount);
@@ -95,7 +96,7 @@ namespace IBBrokerTests
 
             string ticker = "GME";
             var randomQty = new Random().Next(2, 10);
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await _broker.OrderManager.SellAllPositionsAsync();
             Account account = await _broker.GetAccountAsync();
@@ -110,15 +111,18 @@ namespace IBBrokerTests
                         nbPnLReceived++;
 
                     if(nbPnLReceived == receiveUntil)
-                        _tcs.TrySetResult();
+                        tcs.TrySetResult();
                 }
             });
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
+
             _broker.PnLUpdated += pnlUpdates;
+            _broker.ErrorOccured += error;
 
             var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty };
             await _broker.OrderManager.PlaceOrderAsync(ticker, buyOrder);
             await _broker.OrderManager.AwaitExecutionAsync(buyOrder);
-            await _tcs.Task;
+            await tcs.Task;
 
             Assert.AreEqual(receiveUntil, nbPnLReceived);
         }
@@ -130,11 +134,11 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             _logger?.PrintCurrentTestName();
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             CancellationTokenSource cancellation = new CancellationTokenSource();
             cancellation.CancelAfter(Debugger.IsAttached ? -1 : 3 * 60 * 1000 + 500);
-            cancellation.Token.Register(() => _tcs.TrySetException(new TimeoutException()));
+            cancellation.Token.Register(() => tcs.TrySetException(new TimeoutException()));
 
             DateTime? updateReceivedInstantly = null;
             DateTime? updateReceivedAfter3Mins = null;
@@ -148,20 +152,23 @@ namespace IBBrokerTests
                     else
                     {
                         updateReceivedAfter3Mins = DateTime.Parse(val.Value);
-                        _tcs.TrySetResult();
+                        tcs.TrySetResult();
                     }
                 }
             };
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.AccountValueUpdated += accValueUpdated;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.RequestAccountUpdates();
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
                 _broker.AccountValueUpdated -= accValueUpdated;
+                _broker.ErrorOccured -= error;
                 _broker.CancelAccountUpdates();
             }
 
@@ -177,11 +184,11 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
             
             _logger?.PrintCurrentTestName();
-            _tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             CancellationTokenSource cancellation = new CancellationTokenSource();
             cancellation.CancelAfter(Debugger.IsAttached ? -1 : 3 * 60 * 1000 + 500);
-            cancellation.Token.Register(() => _tcs.TrySetException(new TimeoutException()));
+            cancellation.Token.Register(() => tcs.TrySetException(new TimeoutException()));
 
             DateTime? updateReceivedInstantly = null;
             DateTime? updateReceivedAfterPositionChange = null;
@@ -195,12 +202,14 @@ namespace IBBrokerTests
                     else
                     {
                         updateReceivedAfterPositionChange = DateTime.Parse(val.Value);
-                        _tcs.TrySetResult();
+                        tcs.TrySetResult();
                     }
                 }
             };
+            var error = new Action<Exception>(e => tcs.TrySetException(e));
 
             _broker.AccountValueUpdated += accValueUpdated;
+            _broker.ErrorOccured += error;
             try
             {
                 _broker.RequestAccountUpdates();
@@ -208,11 +217,12 @@ namespace IBBrokerTests
                 
                 MarketOrder order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
                 var placedResult = await _broker.OrderManager.PlaceOrderAsync("GME", order);
-                await _tcs.Task;
+                await tcs.Task;
             }
             finally
             {
                 _broker.AccountValueUpdated -= accValueUpdated;
+                _broker.ErrorOccured -= error;
                 _broker.CancelAccountUpdates();
             }
 
