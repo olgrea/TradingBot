@@ -27,6 +27,8 @@ namespace TradingBotV2.Tests
             var broker = new IBBroker(9001, logger);
             var historicalProvider = (IBHistoricalDataProvider)broker.HistoricalDataProvider;
             historicalProvider.DbPath = TestDbPath;
+
+            //historical data provider always has a logger
             historicalProvider.Logger = logger ?? CreateLogger();
             return broker;
         }
