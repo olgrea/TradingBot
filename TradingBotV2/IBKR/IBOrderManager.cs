@@ -1,4 +1,5 @@
-﻿using NLog;
+﻿using System.Collections.Generic;
+using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
@@ -82,13 +83,7 @@ namespace TradingBotV2.IBKR
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg =>
-            {
-                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
-                    return;
-
-                tcs.TrySetException(msg);
-            });
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Responses.OpenOrder += openOrder;
             _client.Responses.OrderStatus += orderStatus;
@@ -145,9 +140,34 @@ namespace TradingBotV2.IBKR
 
         public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
         {
+            int nbRetries = 0;
+            const int maxRetries = 5;
+            IEnumerable<OrderStatus>? results = null;
+            while (results == null && nbRetries < maxRetries)
+            {
+                try
+                {
+                    results = await CancelAllOrdersInternal();
+                }
+                catch (ErrorMessage msg)
+                {
+                    if(msg.ErrorCode == 161)// Code 161 : Cancel attempted when order is not in a cancellable state.
+                    {
+                        nbRetries++;
+                        _logger?.Trace($"Retrying...{nbRetries}/{maxRetries}");
+                    }
+                    else
+                        throw;
+                }
+            }
+
+            return results!;
+        }
+
+        async Task<IEnumerable<OrderStatus>> CancelAllOrdersInternal()
+        {
             var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var cancelledOrders = new Dictionary<int, OrderStatus>();
-            int nbRetries = 0;
 
             IEnumerable<OrderPlacedResult> openOrders = await GetOpenOrdersAsync();
             var openOrdersCount = openOrders.Count();
@@ -172,28 +192,7 @@ namespace TradingBotV2.IBKR
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg =>
-            {
-                if (msg.ErrorCode == 202) // Order cancelled
-                    return;
-                
-                if(msg.ErrorCode == 161) // Cancel attempted when order is not in a cancellable state.
-                {
-                    const int maxRetries = 5;
-                    if(!tcs.Task.IsCompleted && nbRetries < maxRetries)
-                    {
-                        _logger?.Trace(msg);
-                        nbRetries++;
-                        _logger?.Trace($"Retrying...{nbRetries}/{maxRetries}");
-                        // Wait a bit and retry;
-                        Task.Delay(1000).Wait();
-                        _client.CancelAllOrders();
-                        return;
-                    }
-                }
-
-                tcs.TrySetException(msg);
-            });
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Responses.OrderStatus += orderStatus;
             _client.Responses.Error += error;
@@ -392,13 +391,7 @@ namespace TradingBotV2.IBKR
                 tcs.TrySetResult(results);
             });
 
-            var error = new Action<ErrorMessage>(msg =>
-            {
-                if (!MarketDataUtils.IsMarketOpen() && msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
-                    return;
-
-                tcs.TrySetException(msg);
-            });
+            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
 
             _client.Responses.OpenOrder += openOrder;
             _client.Responses.OrderStatus += orderStatus;
