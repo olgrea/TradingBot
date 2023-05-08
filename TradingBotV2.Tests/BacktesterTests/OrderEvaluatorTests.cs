@@ -40,7 +40,6 @@ namespace BacktesterTests
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
             _backtester = await CreateBacktesterAndConnect(timerange);
-            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var order = new MarketOrder()
             {
@@ -49,20 +48,20 @@ namespace BacktesterTests
             };
 
             _ = _backtester.Start();
-            await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(placedResult);
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time , TimeSpan.FromSeconds(1));
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -73,7 +72,6 @@ namespace BacktesterTests
             // Setup
             (DateTime, DateTime) timerange = _upwardTimeRange;
             _backtester = await CreateBacktesterAndConnect(timerange);
-            DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
             var order = new MarketOrder()
             {
@@ -88,20 +86,20 @@ namespace BacktesterTests
             };
 
             _ = _backtester.Start();
-            await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(placedResult);
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -127,17 +125,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResults = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResults.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -163,17 +161,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -205,17 +203,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -247,17 +245,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -283,17 +281,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -319,17 +317,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -361,17 +359,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -403,17 +401,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -439,17 +437,17 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.NotNull(execResult);
+            Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
-            var actualPrice = result.OrderExecution.AvgPrice;
+            var actualPrice = execResult.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -475,12 +473,12 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.Greater(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
             bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
@@ -517,12 +515,12 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
-            Assert.Greater(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.Greater(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
             bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
@@ -559,12 +557,12 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
-            Assert.LessOrEqual(result.OrderExecution.Time - timeOfOrderPlacement, TimeSpan.FromSeconds(1));
+            Assert.LessOrEqual(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
             bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
@@ -601,7 +599,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -636,7 +634,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -677,7 +675,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -718,7 +716,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -751,7 +749,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
@@ -795,7 +793,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
