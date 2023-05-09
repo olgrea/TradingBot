@@ -1,7 +1,7 @@
 ﻿using Skender.Stock.Indicators;
 using TradingBotV2.Broker.MarketData;
 
-namespace TradingBot.Indicators
+namespace TradingBotV2.Indicators
 {
     public interface IIndicator
     {
@@ -10,8 +10,7 @@ namespace TradingBot.Indicators
         int NbPeriods { get; }
         int NbWarmupPeriods { get; }
 
-        // TODO : update this when Skender.Stock.Indicators' streaming feature will be available.
+        // TODO : update this when Skender.Stock.Indicators' streaming feature will be available (v3.0 apparently).
         void Compute(IEnumerable<IQuote> quotes);
-        void ComputePartial(Last last);
     }
 }

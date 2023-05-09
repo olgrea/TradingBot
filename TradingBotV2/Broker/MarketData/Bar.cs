@@ -1,5 +1,5 @@
 ﻿using System.Globalization;
-using TradingBotV2.IBKR.Client;
+using Skender.Stock.Indicators;
 
 namespace TradingBotV2.Broker.MarketData
 {
@@ -11,7 +11,7 @@ namespace TradingBotV2.Broker.MarketData
         _5min = 5 * 60,
     }
 
-    public class Bar : IMarketData
+    public class Bar : IMarketData, IQuote
     {
         public double Open { get; set; }
         public double Close { get; set; }
@@ -22,6 +22,18 @@ namespace TradingBotV2.Broker.MarketData
         public double VWAP { get; set; }
         public DateTime Time { get; set; }
         public BarLength BarLength { get; set; }
+
+        decimal IQuote.Open => Convert.ToDecimal(Open);
+
+        decimal IQuote.High => Convert.ToDecimal(High);
+
+        decimal IQuote.Low => Convert.ToDecimal(Low);
+
+        decimal IQuote.Close => Convert.ToDecimal(Close);
+
+        decimal IQuote.Volume => Convert.ToDecimal(Volume);
+
+        DateTime ISeries.Date => Time;
 
         public override string ToString()
         {
