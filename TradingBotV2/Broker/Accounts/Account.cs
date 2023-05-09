@@ -49,6 +49,8 @@
             set => CashBalances["USD"] = value;
         }
 
+        public bool IsReady { get; set; } = true;
+
         public double AvailableBuyingPower => Math.Max(USDCash - MinimumUSDCashBalance, 0);
 
         public override int GetHashCode()

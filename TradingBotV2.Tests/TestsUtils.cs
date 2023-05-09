@@ -50,14 +50,6 @@ namespace TradingBotV2.Tests
             return backtester;
         }
 
-        public static DateOnly FindLastOpenDay()
-        {
-            var openDay = DateOnly.FromDateTime(DateTime.Now.AddDays(-1));
-            while (!MarketDataUtils.WasMarketOpen(openDay))
-                openDay = openDay.AddDays(-1);
-            return openDay;
-        }
-
         public static bool IsMarketOpen()
         {
             if (TestContext.CurrentContext.Test.FullName.Contains("BacktesterTests")) return true;

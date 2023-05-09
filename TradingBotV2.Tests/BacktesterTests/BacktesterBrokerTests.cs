@@ -1,5 +1,6 @@
 ﻿using NUnit.Framework;
 using TradingBotV2.Backtesting;
+using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Tests;
 
 namespace BacktesterTests
@@ -12,7 +13,7 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public void OneTimeSetUp()
         {
-            _openDay = TestsUtils.FindLastOpenDay();
+            _openDay = MarketDataUtils.FindLastOpenDay(DateTime.Now.AddDays(-1));
         }
 
         [SetUp]

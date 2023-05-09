@@ -293,5 +293,10 @@ namespace TradingBotV2.IBKR.Client
         {
             _clientSocket.cancelHistoricalData(reqId);
         }
+
+        public void RequestServerTime()
+        {
+            _clientSocket.reqCurrentTime();
+        }
     }
 }

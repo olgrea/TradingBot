@@ -407,7 +407,7 @@ namespace TradingBotV2.IBKR
             _client.Responses.Error += error;
             try
             {
-                reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, "TRADES", true);
+                reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, "TRADES", false);
                 _pvc.NbRequest++;
 
                 await tcs.Task;

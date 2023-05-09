@@ -517,6 +517,11 @@ namespace TradingBotV2.Backtesting
                 }
             }
         }
+
+        public Task<DateTime> GetServerTimeAsync()
+        {
+            return Task.FromResult(_currentTime);
+        }
     }
 
     public class BacktesterStoppedException : Exception

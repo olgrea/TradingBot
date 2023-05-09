@@ -22,6 +22,14 @@
             new DateTime(2023, 12, 25), new DateTime(2024, 12, 25), new DateTime(2025, 12, 25),
         };
 
+        public static DateOnly FindLastOpenDay(DateTime date)
+        {
+            var openDay = DateOnly.FromDateTime(date);
+            while (!WasMarketOpen(openDay))
+                openDay = openDay.AddDays(-1);
+            return openDay;
+        }
+
         public static bool IsMarketHoliday(DateTime date)
         {
             return MarketHolidays.Contains(date.Date);
