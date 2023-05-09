@@ -1,9 +1,16 @@
 ﻿using Skender.Stock.Indicators;
 using TradingBotV2.Broker.MarketData;
 
-namespace TradingBot.Indicators
+namespace TradingBotV2.Indicators
 {
-    internal class Rsi : IndicatorBase<RsiResult>
+    internal enum RsiSignal
+    {
+        None = 0,
+        Overbought,
+        Oversold,
+    }
+
+    internal class Rsi : IndicatorBase<RsiResult, RsiSignal>
     {
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
@@ -12,24 +19,23 @@ namespace TradingBot.Indicators
         {
         }
         
-        public bool IsOverbought => IsReady && LatestResult.Rsi > _overboughtThreshold;
-        public bool IsOversold => IsReady && LatestResult.Rsi < _oversoldThreshold;
-
-        public override void Compute(IEnumerable<IQuote> quotes)
+        protected override IEnumerable<RsiResult> ComputeResults()
         {
-            base.Compute(quotes);
-            _results = ComputeResults(_quotes);
+            return _quotes.GetRsi(NbPeriods);
         }
 
-        public override void ComputePartial(Last last)
+        protected override IEnumerable<RsiSignal> ComputeSignals()
         {
-            base.ComputePartial(last);
-            _trendingResults = ComputeResults(_quotes.Append(_partialQuote));
-        }
+            List<RsiSignal> signals = new List<RsiSignal>();
+            if(IsReady && _results.Any())
+            {
+                if (_results.Last().Rsi > _overboughtThreshold)
+                    signals.Add(RsiSignal.Overbought);
+                else if(_results.Last().Rsi < _oversoldThreshold)
+                    signals.Add(RsiSignal.Oversold);
+            }
 
-        IEnumerable<RsiResult> ComputeResults(IEnumerable<IQuote> quotes)
-        {
-            return quotes.GetRsi(NbPeriods);
+            return signals;
         }
     }
 }

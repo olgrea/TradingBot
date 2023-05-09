@@ -1,21 +1,17 @@
 ﻿using Skender.Stock.Indicators;
-using TradingBot.Indicators.Quotes;
 using TradingBotV2.Broker.MarketData;
 
-namespace TradingBot.Indicators
+namespace TradingBotV2.Indicators
 {
-    internal abstract class IndicatorBase<TResult> : IIndicator where TResult : ResultBase
+    internal abstract class IndicatorBase<TResult, TSignal> : IIndicator where TResult : ResultBase
     {
-        BarLength _barLength;
-        int _nbPeriods;
-        int _nbWarmupPeriods;
+        protected BarLength _barLength;
+        protected int _nbPeriods;
+        protected int _nbWarmupPeriods;
 
-        protected IEnumerable<IQuote> _quotes;
-        protected IEnumerable<TResult> _results;
-
-        protected LinkedList<Last> _lasts = new LinkedList<Last>();
-        protected IQuote _partialQuote;
-        protected IEnumerable<TResult> _trendingResults;
+        protected IEnumerable<IQuote> _quotes = Enumerable.Empty<IQuote>();
+        protected IEnumerable<TResult> _results = Enumerable.Empty<TResult>();
+        protected IEnumerable<TSignal> _signals = Enumerable.Empty<TSignal>();
 
         public IndicatorBase(BarLength barLength, int nbPeriods, int nbWarmupPeriods)
         {
@@ -27,28 +23,20 @@ namespace TradingBot.Indicators
         public BarLength BarLength => _barLength;
         public int NbPeriods => _nbPeriods;
         public int NbWarmupPeriods => _nbWarmupPeriods;
+        public virtual bool IsReady => _results.Count() >= NbWarmupPeriods && _results.Last() != null;
 
-        public virtual bool IsReady => LatestResult != null && _results.Count() >= NbWarmupPeriods;
-
-        public TResult LatestResult => _results?.LastOrDefault();
         public IEnumerable<TResult> Results => _results;
+        public IEnumerable<TSignal> Signals => _signals;
 
-        public TResult LatestTrendingResult => _trendingResults?.LastOrDefault();
-        public IEnumerable<TResult> TrendingResults => _trendingResults;
-
-        public virtual void Compute(IEnumerable<IQuote> quotes)
+        public void Compute(IEnumerable<IQuote> quotes)
         {
             _quotes = quotes;
-            _lasts.Clear();
+            _results = ComputeResults();
+            _signals = ComputeSignals();
         }
 
-        public virtual void ComputePartial(Last last)
-        {
-            if (!IsReady)
-                throw new InvalidOperationException("Indicator is not ready.");
+        protected abstract IEnumerable<TResult> ComputeResults();
 
-            _lasts.AddLast(last);
-            _partialQuote = (BarQuote)MarketDataUtils.MakeBarFromLasts(_lasts, _barLength);
-        }
+        protected abstract IEnumerable<TSignal> ComputeSignals();
     }
 }

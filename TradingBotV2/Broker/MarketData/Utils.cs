@@ -104,8 +104,11 @@
             return newBar;
         }
 
-        public static Bar MakeBarFromLasts(IEnumerable<Last> lasts, BarLength barLength)
+        public static Bar? MakeBarFromLasts(IEnumerable<Last> lasts, BarLength barLength)
         {
+            if (lasts == null || !lasts.Any())
+                return null;
+
             Bar newBar = new Bar() { High = double.MinValue, Low = double.MaxValue, BarLength = barLength };
 
             int i = 0;

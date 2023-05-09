@@ -1,29 +1,48 @@
 ﻿using Skender.Stock.Indicators;
 using TradingBotV2.Broker.MarketData;
 
-namespace TradingBot.Indicators
+namespace TradingBotV2.Indicators
 {
-    internal class BollingerBands : IndicatorBase<BollingerBandsResult>
+    internal enum BollingerBandsSignals
+    {
+        None = 0,
+        Overbought,
+        Oversold,
+        OverSma, 
+        UnderSma,
+    }
+
+    internal class BollingerBands : IndicatorBase<BollingerBandsResult, BollingerBandsSignals>
     {
         public BollingerBands(BarLength barLength, int nbPeriods = 20) : base(barLength, nbPeriods, nbPeriods)
         {
         }
 
-        public override void Compute(IEnumerable<IQuote> quotes)
+        protected override IEnumerable<BollingerBandsResult> ComputeResults()
         {
-            base.Compute(quotes);
-            _results = ComputeResults(quotes);
+            return _quotes!.Use(CandlePart.HLC3).GetBollingerBands();
         }
 
-        public override void ComputePartial(Last last)
+        protected override IEnumerable<BollingerBandsSignals> ComputeSignals()
         {
-            base.ComputePartial(last);
-            _trendingResults = ComputeResults(_quotes.Append(_partialQuote));
-        }
+            List<BollingerBandsSignals> signals = new List<BollingerBandsSignals>();
+            if (IsReady && _results.Any() && _quotes.Any())
+            {
+                var latestVal = Convert.ToDouble(_quotes.Last().Close);
+                var latestResult = _results.Last();
 
-        IEnumerable<BollingerBandsResult> ComputeResults(IEnumerable<IQuote> quotes)
-        {
-            return quotes.Use(CandlePart.HLC3).GetBollingerBands();
+                if (latestVal > latestResult.Sma)
+                    signals.Add(BollingerBandsSignals.OverSma);
+                else
+                    signals.Add(BollingerBandsSignals.UnderSma);
+
+                if(latestVal > latestResult.UpperBand)
+                    signals.Add(BollingerBandsSignals.Overbought);
+                else if(latestVal < latestResult.LowerBand)
+                    signals.Add(BollingerBandsSignals.Oversold);
+            }
+
+            return signals;
         }
     }
 }
