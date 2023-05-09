@@ -14,7 +14,7 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
-            _openDay = TestsUtils.FindLastOpenDay();
+            _openDay = MarketDataUtils.FindLastOpenDay(DateTime.Now.AddDays(-1));
 
             var from = _openDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.MarketStartTime));
             _backtester = TestsUtils.CreateBacktester(from, from.AddHours(1));

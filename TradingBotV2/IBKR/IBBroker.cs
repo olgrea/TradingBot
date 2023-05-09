@@ -4,6 +4,7 @@ using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
+using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR.Client;
@@ -263,6 +264,7 @@ namespace TradingBotV2.IBKR
         {
             Debug.Assert(_account != null);
             string curr = !string.IsNullOrEmpty(accValue.Currency) ? $"currency={accValue.Currency}" : string.Empty;
+            _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
             switch (accValue.Key)
             {
                 case "AccountReady":
@@ -274,25 +276,21 @@ namespace TradingBotV2.IBKR
                     break;
 
                 case "CashBalance":
-                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
                     _account.CashBalances[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                     AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
 
                 case "RealizedPnL":
-                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
                     _account.RealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                     AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
 
                 case "UnrealizedPnL":
-                    _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
                     _account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                     AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
                 
                 default:
-                    //_logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
                     break;
             }
         }
@@ -311,7 +309,6 @@ namespace TradingBotV2.IBKR
             _logger?.Trace($"OnAccountDownloadEnd");
         }
 
-        // NOTE : called from an ActionBlock 
         void OnPositionReceived(IBApi.Position ibPos)
         {
             Debug.Assert(_account != null);
@@ -384,6 +381,30 @@ namespace TradingBotV2.IBKR
             Task.Run(() => _client.CancelPnLUpdates(ticker));
             _pnlTraces.Remove(ticker);
             _pnlSubscriptions.Remove(ticker);
+        }
+
+        public async Task<DateTime> GetServerTimeAsync()
+        {
+            var tcs = new TaskCompletionSource<DateTime>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var currentTime = new Action<long>(time =>
+            {
+                DateTime result = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime();
+                tcs.TrySetResult(result);
+            });
+            var error = new Action<ErrorMessage>(e => tcs.TrySetException(e));
+
+            try
+            {
+                _client.Responses.CurrentTime += currentTime;
+                _client.Responses.Error += error;
+                _client.RequestServerTime();
+                return await tcs.Task;
+            }
+            finally
+            {
+                _client.Responses.CurrentTime -= currentTime;
+                _client.Responses.Error -= error;
+            }
         }
     }
 }

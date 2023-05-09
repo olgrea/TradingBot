@@ -20,5 +20,7 @@ namespace TradingBotV2.Broker
         public Task<Account> GetAccountAsync();
         public void RequestAccountUpdates();
         public void CancelAccountUpdates();
+
+        public Task<DateTime> GetServerTimeAsync();
     }
 }
