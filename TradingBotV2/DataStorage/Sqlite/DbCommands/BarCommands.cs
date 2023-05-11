@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
@@ -94,7 +95,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 INSERT OR IGNORE INTO HistoricalBar (Stock, DateTime, BarLength, Bar)
                 SELECT 
                     Stock.Id AS StockId,
-                    {Sanitize(new DateTimeOffset(data.Time).ToUnixTimeSeconds())} AS DateTime,
+                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,
                     {Sanitize(data.BarLength)} AS BarLength,
                     Bar.Id AS BarId   
                 FROM Bar

@@ -1,5 +1,5 @@
 ﻿using System.Globalization;
-using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Broker.Orders
 {

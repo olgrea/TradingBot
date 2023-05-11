@@ -7,6 +7,7 @@ using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Strategies;
 using TradingBotV2.Strategies.TestStrategies;
+using TradingBotV2.Utils;
 
 [assembly: InternalsVisibleTo("TradingBotV2.Tests")]
 namespace TradingBotV2

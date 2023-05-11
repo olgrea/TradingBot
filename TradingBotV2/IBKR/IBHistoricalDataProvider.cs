@@ -7,6 +7,7 @@ using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
 using TradingBotV2.IBKR.Client;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.IBKR
 {

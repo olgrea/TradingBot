@@ -1,5 +1,6 @@
 ﻿using TradingBotV2.Broker.MarketData;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 {

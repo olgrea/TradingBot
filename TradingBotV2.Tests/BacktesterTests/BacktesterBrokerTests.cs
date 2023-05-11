@@ -1,7 +1,7 @@
 ﻿using NUnit.Framework;
 using TradingBotV2.Backtesting;
-using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Tests;
+using TradingBotV2.Utils;
 
 namespace BacktesterTests
 {

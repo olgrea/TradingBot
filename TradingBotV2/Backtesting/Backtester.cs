@@ -9,6 +9,7 @@ using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR;
 using TradingBotV2.IBKR.Client;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Backtesting
 {
@@ -372,9 +373,7 @@ namespace TradingBotV2.Backtesting
             var key = (ticker, typeof(TData));
             if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] < dateTime)
             {
-                var span = TimeSpan.FromMinutes(10);
-                long ticks = (dateTime.Ticks + span.Ticks) / span.Ticks;
-                var aroundTenMins = new DateTime(ticks * span.Ticks, dateTime.Kind);
+                var aroundTenMins = dateTime.Ceiling(TimeSpan.FromMinutes(10));
                 
                 upper = aroundTenMins;
                 if (upper >= EndTime)
