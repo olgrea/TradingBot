@@ -2,10 +2,18 @@
 {
     public static class MarketDataUtils
     {
+        public static TimeSpan PreMarketStartTime = new TimeSpan(4, 00, 00);
+        public static TimeSpan PreMarketEndTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketStartTime = new TimeSpan(9, 30, 0);
         public static TimeSpan MarketEndTime = new TimeSpan(16, 00, 0);
+        public static TimeSpan AfterHoursStartTime = new TimeSpan(16, 00, 0);
+        public static TimeSpan AfterHoursEndTime = new TimeSpan(20, 00, 0);
+
         public static (TimeSpan, TimeSpan) MarketDayTimeRange = (MarketStartTime, MarketEndTime);
-        public const string TWSTimeFormat = "yyyyMMdd  HH:mm:ss";
+        public static (TimeSpan, TimeSpan) PreMarketDayTimeRange = (PreMarketStartTime, PreMarketEndTime);
+        public static (TimeSpan, TimeSpan) AfterHoursTimeRange = (AfterHoursStartTime, AfterHoursEndTime);
+        public static (TimeSpan, TimeSpan) ExtendedHoursTimeRange = (PreMarketStartTime, AfterHoursEndTime);
+        public const string TWSTimeFormat = "yyyyMMdd HH:mm:ss";
 
         // https://www.nyse.com/markets/hours-calendars
         static HashSet<DateTime> MarketHolidays = new HashSet<DateTime>()
@@ -22,10 +30,10 @@
             new DateTime(2023, 12, 25), new DateTime(2024, 12, 25), new DateTime(2025, 12, 25),
         };
 
-        public static DateOnly FindLastOpenDay(DateTime date)
+        public static DateOnly FindLastOpenDay(DateTime date, bool extendedHours = false)
         {
             var openDay = DateOnly.FromDateTime(date);
-            while (!WasMarketOpen(openDay))
+            while (!WasMarketOpen(openDay, extendedHours))
                 openDay = openDay.AddDays(-1);
             return openDay;
         }
@@ -37,48 +45,52 @@
 
         public static bool IsWeekend(this DateTime dt) => dt.DayOfWeek == DayOfWeek.Sunday || dt.DayOfWeek == DayOfWeek.Saturday;
 
-        public static bool IsMarketOpen()
+        public static bool IsMarketOpen(bool extendedHours = false)
         {
-            return WasMarketOpen(DateTime.Now);
+            return WasMarketOpen(DateTime.Now, extendedHours);
         }
 
-        public static bool WasMarketOpen(DateOnly date)
+        public static bool WasMarketOpen(DateOnly date, bool extendedHours = false)
         {
-            return WasMarketOpen(date.ToDateTime(new TimeOnly(MarketStartTime.Hours, MarketStartTime.Minutes, MarketStartTime.Seconds)));
+            var startTime = extendedHours ? PreMarketStartTime : MarketStartTime;
+            return WasMarketOpen(date.ToDateTime(new TimeOnly(startTime.Hours, startTime.Minutes, startTime.Seconds)), extendedHours);
         }
 
-        public static bool WasMarketOpen(DateTime date)
+        public static bool WasMarketOpen(DateTime date, bool extendedHours = false)
         {
             var timeOfday = date.TimeOfDay;
-            return !IsMarketHoliday(date) && !date.IsWeekend() && timeOfday >= MarketStartTime && timeOfday <= MarketEndTime;
+            var (startTime, endTime) = extendedHours ? ExtendedHoursTimeRange : MarketDayTimeRange;
+            return !IsMarketHoliday(date) && !date.IsWeekend() && timeOfday >= startTime && timeOfday <= endTime;
         }
 
-        public static (DateTime, DateTime) ToMarketHours(this DateTime date)
+        public static (DateTime, DateTime) ToMarketHours(this DateTime date, bool extendedHours = false)
         {
-            return (new DateTime(date.Date.Ticks + MarketStartTime.Ticks), new DateTime(date.Date.Ticks + MarketEndTime.Ticks));
+            var (startTime, endTime) = extendedHours ? ExtendedHoursTimeRange : MarketDayTimeRange;
+            return (new DateTime(date.Date.Ticks + startTime.Ticks), new DateTime(date.Date.Ticks + endTime.Ticks));
         }
 
-        public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end)
+        public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end, bool extendedHours = false)
         {
+            var (startTime, endTime) = extendedHours ? ExtendedHoursTimeRange : MarketDayTimeRange;
             if (end <= start)
                 yield break;
 
-            if (start.TimeOfDay < MarketStartTime)
-                start = new DateTime(start.Date.Ticks + MarketStartTime.Ticks);
+            if (start.TimeOfDay < startTime)
+                start = new DateTime(start.Date.Ticks + startTime.Ticks);
 
             DateTime current = start;
             while (end - current > TimeSpan.FromDays(1)) 
             {
-                if (WasMarketOpen(current))
+                if (WasMarketOpen(current, extendedHours))
                 {
-                    yield return (current, new DateTime(current.Date.Ticks + MarketEndTime.Ticks));
+                    yield return (current, new DateTime(current.Date.Ticks + endTime.Ticks));
                 }
-                current = new DateTime(current.AddDays(1).Date.Ticks + MarketStartTime.Ticks);
+                current = new DateTime(current.AddDays(1).Date.Ticks + startTime.Ticks);
             }
 
-            if(current < end & WasMarketOpen(current) && end.TimeOfDay > MarketStartTime)
+            if(current < end & WasMarketOpen(current, extendedHours) && end.TimeOfDay > startTime)
             {
-                yield return (current, new DateTime(current.Date.Ticks + Math.Min(MarketEndTime.Ticks, end.TimeOfDay.Ticks)));
+                yield return (current, new DateTime(current.Date.Ticks + Math.Min(endTime.Ticks, end.TimeOfDay.Ticks)));
             }
         }
 
