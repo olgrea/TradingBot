@@ -115,7 +115,7 @@ namespace TradingBotV2.Broker.Orders
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
-                TotalQuantity = order.TotalQuantity,
+                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
                 OrderId = order.Id,
                 ClientId = order.Info.ClientId,
@@ -135,7 +135,7 @@ namespace TradingBotV2.Broker.Orders
             return new MarketOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = ibo.TotalQuantity,
+                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
                 Info = new RequestInfo()
                 {
                     OrderId = ibo.OrderId,
@@ -166,7 +166,7 @@ namespace TradingBotV2.Broker.Orders
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
-                TotalQuantity = order.TotalQuantity,
+                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
                 OrderId = order.Id,
                 ClientId = order.Info.ClientId,
@@ -188,7 +188,7 @@ namespace TradingBotV2.Broker.Orders
             return new MarketIfTouchedOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = ibo.TotalQuantity,
+                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
                 Info = new RequestInfo()
                 {
                     OrderId = ibo.OrderId,
@@ -221,7 +221,7 @@ namespace TradingBotV2.Broker.Orders
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
-                TotalQuantity = order.TotalQuantity,
+                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
                 OrderId = order.Id,
                 ClientId = order.Info.ClientId,
@@ -243,7 +243,7 @@ namespace TradingBotV2.Broker.Orders
             return new LimitOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = ibo.TotalQuantity,
+                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
                 Info = new RequestInfo()
                 {
                     OrderId = ibo.OrderId,
@@ -276,7 +276,7 @@ namespace TradingBotV2.Broker.Orders
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
-                TotalQuantity = order.TotalQuantity,
+                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
                 OrderId = order.Id,
                 ClientId = order.Info.ClientId,
@@ -298,7 +298,7 @@ namespace TradingBotV2.Broker.Orders
             return new StopOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = ibo.TotalQuantity,
+                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
                 Info = new RequestInfo()
                 {
                     OrderId = ibo.OrderId,
@@ -369,7 +369,7 @@ namespace TradingBotV2.Broker.Orders
             {
                 OrderType = order.OrderType,
                 Action = order.Action.ToString(),
-                TotalQuantity = order.TotalQuantity,
+                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
                 OrderId = order.Id,
                 ClientId = order.Info.ClientId,
@@ -402,7 +402,7 @@ namespace TradingBotV2.Broker.Orders
             var o = new TrailingStopOrder()
             {
                 Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = ibo.TotalQuantity,
+                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
                 Info = new RequestInfo()
                 {
                     OrderId = ibo.OrderId,

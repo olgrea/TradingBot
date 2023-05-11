@@ -1,6 +1,6 @@
 ﻿namespace TradingBotV2.Broker.Accounts
 {
-    public record struct PnL(string Ticker, int Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue)
+    public record struct PnL(string Ticker, decimal Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue)
     {
         public static explicit operator PnL(IBApi.PnL pnl)
         {
@@ -35,7 +35,7 @@
         {
             return new Position(position.Contract.Symbol)
             {
-                PositionAmount = position.PositionAmount,
+                PositionAmount = Convert.ToDouble(position.PositionAmount),
                 Price = position.MarketPrice,
                 TotalMarketValue = position.MarketValue,
                 AverageCost = position.AverageCost,

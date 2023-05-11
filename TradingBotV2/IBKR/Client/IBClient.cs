@@ -267,7 +267,7 @@ namespace TradingBotV2.IBKR.Client
         public void CancelOrder(int orderId)
         {
             Debug.Assert(orderId > 0);
-            _clientSocket.cancelOrder(orderId);
+            _clientSocket.cancelOrder(orderId, string.Empty);
         }
 
         public void CancelAllOrders()

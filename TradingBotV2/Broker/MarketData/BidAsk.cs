@@ -18,9 +18,10 @@
             return new BidAsk()
             {
                 Bid = ba.Bid,
-                BidSize = ba.BidSize,
+                // TODO : update db schema. Loss of data is acceptable for now.
+                BidSize = Convert.ToInt32(ba.BidSize),
                 Ask = ba.Ask,
-                AskSize = ba.AskSize,
+                AskSize = Convert.ToInt32(ba.AskSize),
                 Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
             };
         }
