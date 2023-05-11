@@ -1,4 +1,6 @@
-﻿namespace TradingBotV2.Broker.MarketData
+﻿using TradingBotV2.Utils;
+
+namespace TradingBotV2.Broker.MarketData
 {
     public class BidAsk : IMarketData
     {
@@ -34,7 +36,7 @@
                 BidSize = ba.BidSize,
                 Ask = ba.Ask,
                 AskSize = ba.AskSize,
-                Time = new DateTimeOffset(ba.Time).ToUnixTimeSeconds(),
+                Time = ba.Time.ToUnixTimeSeconds(),
             };
         }
 
@@ -53,7 +55,7 @@
         public static explicit operator IBApi.HistoricalTickBidAsk(BidAsk ba)
         {
             return new IBApi.HistoricalTickBidAsk(
-                new DateTimeOffset(ba.Time).ToUnixTimeSeconds(),
+                ba.Time.ToUnixTimeSeconds(),
                 new IBApi.TickAttribBidAsk(),
                 ba.Bid,
                 ba.Ask,

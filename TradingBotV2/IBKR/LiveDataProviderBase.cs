@@ -1,5 +1,6 @@
 ﻿using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.IBKR
 {

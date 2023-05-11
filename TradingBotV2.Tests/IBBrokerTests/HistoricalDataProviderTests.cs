@@ -5,6 +5,7 @@ using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 using TradingBotV2.Tests;
+using TradingBotV2.Utils;
 
 namespace IBBrokerTests
 {
@@ -272,8 +273,8 @@ namespace IBBrokerTests
                 WHERE Stock = (
                     SELECT Stock.Id from Stock
                     WHERE Stock.Symbol = '{ticker}'
-                    AND DateTime >= {new DateTimeOffset(from).ToUnixTimeSeconds()} 
-                    AND DateTime < {new DateTimeOffset(to).ToUnixTimeSeconds()} 
+                    AND DateTime >= {from.ToUnixTimeSeconds()} 
+                    AND DateTime < {to.ToUnixTimeSeconds()} 
                 )
             ";
             cmd.ExecuteNonQuery();

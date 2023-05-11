@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Backtesting
 {

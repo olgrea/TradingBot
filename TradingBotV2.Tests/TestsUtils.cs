@@ -3,8 +3,8 @@ using NLog.TradingBot;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
 using TradingBotV2.Broker;
-using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Tests
 {

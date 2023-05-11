@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using Skender.Stock.Indicators;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Broker.MarketData
 {
@@ -51,7 +52,7 @@ namespace TradingBotV2.Broker.MarketData
                 Volume = bar.Volume,
                 WAP = bar.VWAP,
                 TradeAmount = bar.TradeAmount,
-                Date = new DateTimeOffset(bar.Time).ToUnixTimeSeconds()
+                Date = bar.Time.ToUnixTimeSeconds()
             };
         }
 

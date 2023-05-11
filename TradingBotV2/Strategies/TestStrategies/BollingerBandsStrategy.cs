@@ -3,6 +3,7 @@ using System.Threading.Tasks.Dataflow;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.Indicators;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.Strategies.TestStrategies
 {

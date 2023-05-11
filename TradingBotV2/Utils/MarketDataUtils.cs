@@ -1,4 +1,6 @@
-﻿namespace TradingBotV2.Broker.MarketData
+﻿using TradingBotV2.Broker.MarketData;
+
+namespace TradingBotV2.Utils
 {
     public static class MarketDataUtils
     {
@@ -79,7 +81,7 @@
                 start = new DateTime(start.Date.Ticks + startTime.Ticks);
 
             DateTime current = start;
-            while (end - current > TimeSpan.FromDays(1)) 
+            while (end - current > TimeSpan.FromDays(1))
             {
                 if (WasMarketOpen(current, extendedHours))
                 {
@@ -88,7 +90,7 @@
                 current = new DateTime(current.AddDays(1).Date.Ticks + startTime.Ticks);
             }
 
-            if(current < end & WasMarketOpen(current, extendedHours) && end.TimeOfDay > startTime)
+            if (current < end & WasMarketOpen(current, extendedHours) && end.TimeOfDay > startTime)
             {
                 yield return (current, new DateTime(current.Date.Ticks + Math.Min(endTime.Ticks, end.TimeOfDay.Ticks)));
             }

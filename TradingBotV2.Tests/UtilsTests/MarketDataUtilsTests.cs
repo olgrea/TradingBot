@@ -1,5 +1,5 @@
 ﻿using NUnit.Framework;
-using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Utils;
 
 namespace UtilsTests
 {

@@ -1,4 +1,6 @@
-﻿namespace TradingBotV2.Broker.MarketData
+﻿using TradingBotV2.Utils;
+
+namespace TradingBotV2.Broker.MarketData
 {
     public class Last : IMarketData
     {
@@ -23,7 +25,7 @@
             {
                 Price = last.Price,
                 Size = last.Size,
-                Time = new DateTimeOffset(last.Time).ToUnixTimeSeconds(),
+                Time = last.Time.ToUnixTimeSeconds(),
             };
         }
 
@@ -40,7 +42,7 @@
         public static explicit operator IBApi.HistoricalTickLast(Last last)
         {
             return new IBApi.HistoricalTickLast(
-                new DateTimeOffset(last.Time).ToUnixTimeSeconds(),
+                last.Time.ToUnixTimeSeconds(),
                 new IBApi.TickAttribLast(),
                 last.Price,
                 last.Size,
