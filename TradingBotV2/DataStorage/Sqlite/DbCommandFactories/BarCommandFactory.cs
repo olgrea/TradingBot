@@ -8,9 +8,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
     {
         BarLength _barLength;
 
-        public BarCommandFactory(BarLength barLength, string dbPath) : base(dbPath)
+        public BarCommandFactory(string dbPath) : base(dbPath)
         {
-            _barLength = barLength;
+            _barLength = BarLength._1Sec;
         }
 
         public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
@@ -33,7 +33,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             return new SelectBarsCommand(symbol, date, timeRange, _barLength, _connection);
         }
 
-        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<IMarketData> dataCollection)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, TimeRange _, IEnumerable<IMarketData> dataCollection)
         {
             return new InsertBarsCommand(symbol, dataCollection.Cast<Bar>(), _connection);
         }

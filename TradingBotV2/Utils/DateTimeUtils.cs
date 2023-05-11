@@ -1,5 +1,7 @@
 ﻿namespace TradingBotV2.Utils
 {
+    public  record struct TimeRange(DateTime From, DateTime To);
+
     public static class DateTimeUtils
     {
         public static DateTime Floor(this DateTime dt, TimeSpan span)

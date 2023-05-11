@@ -261,7 +261,7 @@ namespace IBBrokerTests
 
         void DeleteData(string ticker, DateTime from, DateTime to) 
         {
-            Debug.Assert(_historicalProvider.DbPath == TestsUtils.TestDbPath);
+            Assert.AreEqual(_historicalProvider.DbPath, TestsUtils.TestDbPath);
 
             var connection = new SqliteConnection("Data Source=" + TestsUtils.TestDbPath);
             connection.Open();

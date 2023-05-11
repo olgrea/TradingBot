@@ -1,13 +1,14 @@
-﻿using System.Runtime.InteropServices;
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 {
     public abstract class DbCommandFactory
     {
         protected SqliteConnection _connection;
+        string _dbPath;
 
         protected DbCommandFactory(string dbPath)
         {
@@ -16,6 +17,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
                 throw new FileNotFoundException(dbPath);
             }
 
+            _dbPath = dbPath;
             _connection = new SqliteConnection("Data Source=" + dbPath);
             _connection.Open();
         }
@@ -26,10 +28,12 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             _connection?.Dispose();
         }
 
+        internal string DbPath => _dbPath;
+
         public static DbCommandFactory Create<TData>(string dbPath) where TData : IMarketData, new()
         {
             if (typeof(TData) == typeof(Bar))
-                return new BarCommandFactory(BarLength._1Sec, dbPath);
+                return new BarCommandFactory(dbPath);
             else if (typeof(TData) == typeof(BidAsk))
                 return new BidAskCommandFactory(dbPath);
             else if (typeof(TData) == typeof(Last))
@@ -42,6 +46,6 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
         public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
         public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date);
         public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
-        public abstract DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<IMarketData> dataCollection);
+        public abstract DbCommand<bool> CreateInsertCommand(string symbol, TimeRange timerange, IEnumerable<IMarketData> dataCollection);
     }
 }
