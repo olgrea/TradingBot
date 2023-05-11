@@ -94,7 +94,7 @@ namespace TradingBotV2.IBKR
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateOnly date, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} on {date.ToShortDateString()} from ({MarketDataUtils.MarketStartTime} to {MarketDataUtils.MarketStartTime}");
+            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} on {date.ToShortDateString()} from {MarketDataUtils.MarketStartTime} to {MarketDataUtils.MarketStartTime}");
             var marketHours = date.ToDateTime(default).ToMarketHours();
             return await GetHistoricalDataAsync<TData>(ticker, marketHours.Item1, marketHours.Item2, token);
         }
@@ -107,7 +107,7 @@ namespace TradingBotV2.IBKR
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} from ({from} to {to}");
+            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
             _logger?.Trace($"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
 
             _token = token;
@@ -143,7 +143,7 @@ namespace TradingBotV2.IBKR
                     {
                         data = newData.Concat(data);
                         _token?.ThrowIfCancellationRequested();
-                        InsertInDb<TData>(ticker, newData, cmdFactory);
+                        InsertInDb<TData>(ticker, from, to, newData, cmdFactory);
                         _token?.ThrowIfCancellationRequested();
                         InsertInCache<TData>(ticker, from, to, newData);
                     });
@@ -257,13 +257,13 @@ namespace TradingBotV2.IBKR
             return true;
         }
 
-        void InsertInDb<TData>(string ticker, IEnumerable<IMarketData> data, DbCommandFactory commandFactory) where TData : IMarketData, new()
+        void InsertInDb<TData>(string ticker, DateTime from, DateTime to, IEnumerable<IMarketData> data, DbCommandFactory commandFactory) where TData : IMarketData, new()
         {
             if (!DbEnabled)
                 return;
 
             _token?.ThrowIfCancellationRequested();
-            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, data);
+            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, new TimeRange(from, to), data);
             if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
             {
                 _nbInsertedInDb += iCmd.NbInserted;

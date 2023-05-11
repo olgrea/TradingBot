@@ -30,9 +30,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             return new SelectLastsCommand(symbol, date, timeRange, _connection);
         }
 
-        public override DbCommand<bool> CreateInsertCommand(string symbol, IEnumerable<IMarketData> dataCollection)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, TimeRange timerange, IEnumerable<IMarketData> dataCollection)
         {
-            return new InsertLastsCommand(symbol, dataCollection.Cast<Last>(), _connection);
+            return new InsertLastsCommand(symbol, timerange, dataCollection.Cast<Last>(), _connection);
         }
     }
 }

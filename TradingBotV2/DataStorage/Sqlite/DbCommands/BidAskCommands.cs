@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
@@ -39,9 +37,20 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
     internal class InsertBidAsksCommand : InsertCommand<BidAsk>
     {
-        public InsertBidAsksCommand(string symbol, IEnumerable<BidAsk> dataCollection, SqliteConnection connection)
+        TimeRange _timerange;
+
+        public InsertBidAsksCommand(string symbol, TimeRange timerange, IEnumerable<BidAsk> dataCollection, SqliteConnection connection)
             : base(symbol, dataCollection, connection)
         {
+            _timerange = timerange;
+        }
+
+        protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<BidAsk> dataCollection)
+        {
+            for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
+                InsertTimeStamp(insertCmd, i);
+
+            return base.InsertMarketData(insertCmd, dataCollection);
         }
 
         protected override int InsertMarketData(SqliteCommand command, BidAsk data)
@@ -67,6 +76,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 AND BidSize = {Sanitize(data.BidSize)}
                 AND Ask = {Sanitize(data.Ask)}
                 AND AskSize = {Sanitize(data.AskSize)}
+            ";
+
+            return command.ExecuteNonQuery();
+        }
+
+        int InsertTimeStamp(SqliteCommand command, DateTime timestamp)
+        {
+            command.CommandText =
+            $@"
+                INSERT OR IGNORE INTO BidAskTimestamps (Stock, DateTime)
+                SELECT Id AS StockId, {Sanitize(timestamp.ToUnixTimeSeconds())}
+                FROM Stock 
+                WHERE Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

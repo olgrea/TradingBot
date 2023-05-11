@@ -4,6 +4,7 @@ using System.Data;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
+using static TradingBotV2.DataStorage.Sqlite.DbCommandFactories.DbCommandFactory;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
@@ -37,9 +38,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
     internal class InsertLastsCommand : InsertCommand<Last>
     {
-        public InsertLastsCommand(string symbol, IEnumerable<Last> dataCollection, SqliteConnection connection)
+        TimeRange _timerange;
+        public InsertLastsCommand(string symbol, TimeRange timerange, IEnumerable<Last> dataCollection, SqliteConnection connection)
             : base(symbol, dataCollection, connection)
         {
+            _timerange = timerange;
+        }
+
+        protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<Last> dataCollection)
+        {
+            for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
+                InsertTimeStamp(insertCmd, i);
+
+            return base.InsertMarketData(insertCmd, dataCollection);
         }
 
         protected override int InsertMarketData(SqliteCommand command, Last data)
@@ -57,12 +68,25 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 INSERT OR IGNORE INTO HistoricalLast (Stock, DateTime, Last)
                 SELECT 
                     Stock.Id AS StockId,
-                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,                                    
+                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,
                     Last.Id AS LastId   
                 FROM Last
                 LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)} 
                 WHERE Price = {Sanitize(data.Price)}
                 AND Size = {Sanitize(data.Size)}
+            ";
+
+            return command.ExecuteNonQuery();
+        }
+
+        int InsertTimeStamp(SqliteCommand command, DateTime timestamp)
+        {
+            command.CommandText =
+            $@"
+                INSERT OR IGNORE INTO LastTimestamps (Stock, DateTime)
+                SELECT Id AS StockId, {Sanitize(timestamp.ToUnixTimeSeconds())}
+                FROM Stock 
+                WHERE Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

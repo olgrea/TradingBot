@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
+using TradingBotV2.Utils;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
@@ -72,14 +73,17 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected virtual string MakeExistsCommandText()
         {
+            var nbTimestamps = (_timeRange.Item2 - _timeRange.Item1).TotalSeconds;
             return
             $@"
                 SELECT EXISTS (
-                    SELECT 1 FROM Historical{_marketDataName}View
-                        WHERE Ticker = {Sanitize(_symbol)}
-                        AND Date = {Sanitize(_date.Date)}
-                        AND Time >= {Sanitize(_timeRange.Item1)} 
-                        AND Time < {Sanitize(_timeRange.Item2)}
+                    SELECT 1 WHERE 
+                        (SELECT COUNT(DISTINCT DateTime) FROM {_marketDataName}Timestamps
+                            LEFT JOIN Stock ON Stock.Id = {_marketDataName}Timestamps.Stock
+                            WHERE Symbol = {Sanitize(_symbol)}
+                            AND DateTime >= {Sanitize(new DateTime(_date.Date.Ticks + _timeRange.Item1.Ticks).ToUnixTimeSeconds())} 
+                            AND DateTime < {Sanitize(new DateTime(_date.Date.Ticks + _timeRange.Item2.Ticks).ToUnixTimeSeconds())} 
+                        ) = {Sanitize(nbTimestamps)}
                 );
             ";
         }
@@ -145,16 +149,23 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             SqliteCommand insertCmd = _connection.CreateCommand();
             Insert(insertCmd, "Stock", "Symbol", _symbol);
 
+            int nbInserted = InsertMarketData(insertCmd, _dataCollection);
+
+            transaction.Commit();
+            NbInserted = nbInserted;
+
+            return true;
+        }
+
+        protected virtual int InsertMarketData(SqliteCommand insertCmd, IEnumerable<TMarketData> dataCollection)
+        {
             int nbInserted = 0;
             foreach (TMarketData data in _dataCollection)
             {
                 nbInserted += InsertMarketData(insertCmd, data);
             }
 
-            transaction.Commit();
-            NbInserted = nbInserted;
-
-            return true;
+            return nbInserted;
         }
 
         protected virtual int Insert(SqliteCommand command, string tableName, string column, object value)

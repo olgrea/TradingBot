@@ -19,15 +19,18 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected override string MakeExistsCommandText()
         {
+            var nbTimestamps = (_timeRange.Item2 - _timeRange.Item1).TotalSeconds;
             return
             $@"
                 SELECT EXISTS (
-                    SELECT 1 FROM HistoricalBarView
-                        WHERE Ticker = {Sanitize(_symbol)}
-                        AND Date = {Sanitize(_date.Date)}
-                        AND Time >= {Sanitize(_timeRange.Item1)} 
-                        AND Time < {Sanitize(_timeRange.Item2)}
-                        AND BarLength = {Sanitize(_barLength)}
+                    SELECT 1 WHERE 
+                        (SELECT COUNT(*) FROM HistoricalBarView
+                            WHERE Ticker = {Sanitize(_symbol)}
+                            AND Date = {Sanitize(_date.Date)}
+                            AND Time >= {Sanitize(_timeRange.Item1)} 
+                            AND Time < {Sanitize(_timeRange.Item2)}
+                            AND BarLength = {Sanitize(_barLength)}
+                        ) = {Sanitize(nbTimestamps)}
                 );
             ";
         }
