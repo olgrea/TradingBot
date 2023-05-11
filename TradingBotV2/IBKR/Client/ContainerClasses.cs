@@ -1,12 +1,12 @@
 ﻿namespace IBApi
 {
-    public record struct PnL(string Ticker, int Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue);
+    public record struct PnL(string Ticker, decimal Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue);
 
     public class Last
     {
         public long Time { get; set; }
         public double Price { get; set; }
-        public int Size { get; set; }
+        public decimal Size { get; set; }
         public TickAttribLast? TickAttribLast { get; set; }
         public string? Exchange { get; set; }
         public string? SpecialConditions { get; set; }
@@ -15,9 +15,9 @@
     public class BidAsk
     {
         public double Bid { get; set; }
-        public int BidSize { get; set; }
+        public decimal BidSize { get; set; }
         public double Ask { get; set; }
-        public int AskSize { get; set; }
+        public decimal AskSize { get; set; }
         public long Time { get; set; }
         public TickAttribBidAsk? TickAttribBidAsk { get; set; }
     }
@@ -28,7 +28,7 @@
         public double Close { get; set; }
         public double High { get; set; }
         public double Low { get; set; }
-        public long Volume { get; set; }
+        public decimal Volume { get; set; }
         public int TradeAmount { get; set; }
         public long Date { get; set; }
         public double WAP { get; set; }
@@ -46,8 +46,8 @@
     {
         public int OrderId { get; set; }
         public string? Status { get; set; }
-        public double Filled { get; set; }
-        public double Remaining { get; set; }
+        public decimal Filled { get; set; }
+        public decimal Remaining { get; set; }
         public double AvgFillPrice { get; set; }
         public int PermId { get; set; }
         public int ParentId { get; set; }
@@ -59,14 +59,14 @@
 
     public class Position
     {
-        public Position(Contract contract, double positionAmount, double averageCost)
+        public Position(Contract contract, decimal positionAmount, double averageCost)
         {
             Contract = contract;
             PositionAmount = positionAmount;
             AverageCost = averageCost;
         }
 
-        public Position(Contract contract, double positionAmount, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL)
+        public Position(Contract contract, decimal positionAmount, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL)
         {
             Contract = contract;
             PositionAmount = positionAmount;
@@ -78,7 +78,7 @@
         }
 
         public Contract Contract { get; set; }
-        public double PositionAmount { get; set; }
+        public decimal PositionAmount { get; set; }
         public double MarketPrice { get; set; }
         public double MarketValue { get; set; }
         public double AverageCost { get; set; }

@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using TradingBotV2.Broker.MarketData;
 
 namespace TradingBotV2.Broker.Orders
 {
@@ -28,16 +29,18 @@ namespace TradingBotV2.Broker.Orders
 
         public static explicit operator OrderExecution(IBApi.Execution exec)
         {
+            var time = exec.Time.Substring(0, exec.Time.Length - exec.Time.LastIndexOf(' '));
+
             return new OrderExecution(exec.ExecId, exec.OrderId)
             {
                 Exchange = exec.Exchange,
                 Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
-                Shares = exec.Shares,
+                Shares = Convert.ToDouble(exec.Shares),
                 Price = exec.Price,
                 AvgPrice = exec.AvgPrice,
 
-                // non-standard date format...
-                Time = DateTime.ParseExact(exec.Time, "yyyyMMdd  HH:mm:ss", CultureInfo.InvariantCulture)
+                // TODO : confirm that format is correct. It changed when updating to API v10.16
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
         }
     }

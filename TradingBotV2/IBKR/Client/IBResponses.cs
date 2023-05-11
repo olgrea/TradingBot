@@ -67,7 +67,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<Position>? UpdatePortfolio;
-        public void updatePortfolio(IBApi.Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
+        public void updatePortfolio(IBApi.Contract contract, decimal position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
             var pos = new Position(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL);
 
@@ -97,7 +97,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<Position>? Position;
-        public void position(string account, IBApi.Contract contract, double pos, double avgCost)
+        public void position(string account, IBApi.Contract contract, decimal pos, double avgCost)
         {
             var p = new Position(contract, pos, avgCost);
 
@@ -113,7 +113,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<PnL>? PnlSingle;
-        public void pnlSingle(int reqId, int pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
+        public void pnlSingle(int reqId, decimal pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             //_logger.Trace($"PnL ({reqId}): {pnl}");
             if(_requestIdsToContracts.Pnl.TryGetValue(reqId, out var contract))
@@ -122,7 +122,7 @@ namespace TradingBotV2.IBKR.Client
 
         // called at 5 sec intervals
         public Action<string, FiveSecBar>? RealtimeBar;
-        public void realtimeBar(int reqId, long date, double open, double high, double low, double close, long volume, double WAP, int count)
+        public void realtimeBar(int reqId, long date, double open, double high, double low, double close, decimal volume, decimal WAP, int count)
         {
             if (_requestIdsToContracts.FiveSecBars.TryGetValue(reqId, out var contract))
             {
@@ -143,7 +143,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<string, BidAsk>? TickByTickBidAsk;
-        public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, int bidSize, int askSize, TickAttribBidAsk tickAttribBidAsk)
+        public void tickByTickBidAsk(int reqId, long time, double bidPrice, double askPrice, decimal bidSize, decimal askSize, TickAttribBidAsk tickAttribBidAsk)
         {
             if (_requestIdsToContracts.BidAsk.TryGetValue(reqId, out var contract))
             {
@@ -163,7 +163,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<string, Last>? TickByTickAllLast;
-        public void tickByTickAllLast(int reqId, int tickType, long time, double price, int size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
+        public void tickByTickAllLast(int reqId, int tickType, long time, double price, decimal size, TickAttribLast tickAttribLast, string exchange, string specialConditions)
         {
             if (_requestIdsToContracts.Last.TryGetValue(reqId, out var contract))
             {
@@ -216,7 +216,7 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public Action<OrderStatus>? OrderStatus;
-        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
+        public void orderStatus(int orderId, string status, decimal filled, decimal remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
             var os = new OrderStatus()
             {
@@ -341,9 +341,9 @@ namespace TradingBotV2.IBKR.Client
             HandleError(new ErrorMessage(str));
         }
 
-        public void error(int id, int errorCode, string errorMsg)
+        public void error(int id, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
-            HandleError(new ErrorMessage(id, errorCode, errorMsg));
+            HandleError(new ErrorMessage(id, errorCode, errorMsg, new Exception(advancedOrderRejectJson)));
         }
 
         void HandleError(ErrorMessage msg)
@@ -431,6 +431,11 @@ namespace TradingBotV2.IBKR.Client
             throw new NotImplementedException();
         }
 
+        public void historicalSchedule(int reqId, string startDateTime, string endDateTime, string timeZone, HistoricalSession[] sessions)
+        {
+            throw new NotImplementedException();
+        }
+
         public void historicalTicks(int reqId, HistoricalTick[] ticks, bool done)
         {
             throw new NotImplementedException();
@@ -471,7 +476,7 @@ namespace TradingBotV2.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, double pos, double avgCost)
+        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, decimal pos, double avgCost)
         {
             throw new NotImplementedException();
         }
@@ -576,7 +581,7 @@ namespace TradingBotV2.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void tickSize(int tickerId, int field, int size)
+        public void tickSize(int tickerId, int field, decimal size)
         {
             throw new NotImplementedException();
         }
@@ -591,17 +596,21 @@ namespace TradingBotV2.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
+        public void updateMktDepth(int tickerId, int position, int operation, int side, double price, decimal size)
         {
             throw new NotImplementedException();
         }
 
-        public void updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, int size, bool isSmartDepth)
+        public void updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, decimal size, bool isSmartDepth)
         {
             throw new NotImplementedException();
         }
 
         public void updateNewsBulletin(int msgId, int msgType, string message, string origExchange)
+        {
+            throw new NotImplementedException();
+        }
+        public void userInfo(int reqId, string whiteBrandingId)
         {
             throw new NotImplementedException();
         }
@@ -622,6 +631,16 @@ namespace TradingBotV2.IBKR.Client
         }
 
         public void verifyMessageAPI(string apiData)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void wshEventData(int reqId, string dataJson)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void wshMetaData(int reqId, string dataJson)
         {
             throw new NotImplementedException();
         }
