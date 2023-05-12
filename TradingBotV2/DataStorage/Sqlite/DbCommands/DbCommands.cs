@@ -122,7 +122,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         protected abstract IMarketData MakeDataFromResults(IDataRecord record);
     }
 
-    internal abstract class InsertCommand<TMarketData> : DbCommand<bool>
+    internal abstract class InsertCommand<TMarketData> : DbCommand<int>
     {
         protected string _symbol;
         protected DateRange _dateRange;
@@ -138,7 +138,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             _marketDataName = typeof(TMarketData).Name;
         }
 
-        public override bool Execute()
+        public override int Execute()
         {
             using var transaction = _connection.BeginTransaction();
 
@@ -150,7 +150,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             transaction.Commit();
             NbInserted = nbInserted;
 
-            return true;
+            return NbInserted;
         }
 
         protected virtual int InsertMarketData(SqliteCommand insertCmd, IEnumerable<TMarketData> dataCollection)

@@ -1,8 +1,9 @@
-﻿using NLog;
+﻿using Microsoft.Data.Sqlite;
+using NLog;
 using NLog.TradingBot;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
-using TradingBotV2.Broker;
+using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 using TradingBotV2.Utils;
 
@@ -63,6 +64,27 @@ namespace TradingBotV2.Tests
                 if (!IsMarketOpen())
                     NUnit.Framework.Assert.Inconclusive("Market is not open.");
             }
+        }
+
+        internal static void DeleteDataInTestDb<TData>(string ticker, DateRange dateRange) where TData : IMarketData, new()
+        {
+            var connection = new SqliteConnection("Data Source=" + TestDbPath);
+            connection.Open();
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText =
+            $@"
+                DELETE FROM {typeof(TData).Name}s
+                WHERE Ticker = (
+                    SELECT Tickers.Id from Tickers
+                    WHERE Tickers.Symbol = '{ticker}'
+                    AND DateTime >= {dateRange.From.ToUnixTimeSeconds()} 
+                    AND DateTime < {dateRange.To.ToUnixTimeSeconds()} 
+                )
+            ";
+            cmd.ExecuteNonQuery();
+
+            connection.Close();
         }
     }
 }
