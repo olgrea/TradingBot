@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
-using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Strategies;
 using TradingBotV2.Strategies.TestStrategies;
 using TradingBotV2.Utils;
@@ -12,21 +11,28 @@ using TradingBotV2.Utils;
 [assembly: InternalsVisibleTo("TradingBotV2.Tests")]
 namespace TradingBotV2
 {
+    public struct TradeResults
+    {
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+    }
+
     public class Trader
     {
-        ILogger _logger;
+        ILogger? _logger;
         IBroker _broker;
         Account? _account;
         List<IStrategy> _strategies = new();
+        TradeResults _results = new();
 
-        public Trader(IBroker broker, ILogger logger)
+        public Trader(IBroker broker, ILogger? logger = null)
         {
             _broker = broker;
             _logger = logger;
             AddStrategy(new BollingerBandsStrategy(MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, "GME", this));
         }
 
-        internal ILogger Logger => _logger;
+        internal ILogger? Logger => _logger;
         internal IBroker Broker => _broker;
         internal Account Account => _account!;
 
@@ -41,7 +47,7 @@ namespace TradingBotV2
             _strategies.Add(newStrat);
         }
 
-        public async Task Start()
+        public async Task<TradeResults> Start()
         {
             if (!_strategies.Any())
                 throw new Exception("No strategies set for this trader");
@@ -63,6 +69,8 @@ namespace TradingBotV2
             {
                 await strat.Start();
             }
+
+            return _results;
         }
 
         void OnAccountValueUpdated(AccountValue val)

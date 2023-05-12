@@ -11,8 +11,9 @@ namespace TradingBotV2.Strategies.TestStrategies
     {
         Trader _trader;
         string _ticker;
-        
-        LinkedList<Bar> _bars = new LinkedList<Bar>();
+
+        LinkedList<Bar> _bars;
+        LinkedList<Last> _lasts;
         BidAsk _latestBidAsk = new();
         Last _latestLast = new();
 
@@ -25,7 +26,10 @@ namespace TradingBotV2.Strategies.TestStrategies
 
             StartTime = start;
             EndTime = end;
+
             BollingerBands = new BollingerBands(BarLength._1Min);
+            _bars = new LinkedListWithFixedSize<Bar>(BollingerBands.NbWarmupPeriods * 2);
+            _lasts = new LinkedList<Last>();
         }
 
         BollingerBands BollingerBands { get; init; }
@@ -67,9 +71,12 @@ namespace TradingBotV2.Strategies.TestStrategies
                 await _trader.Broker.OrderManager.PlaceOrderAsync(_ticker, buyOrder);
 
             }
-            else if (signals.Contains(BollingerBandsSignals.Oversold))
+            else if (signals.Contains(BollingerBandsSignals.Overbought))
             {
-                int qtyToSell = (int)_trader.Account.Positions[_ticker].PositionAmount;
+                if (!_trader.Account.Positions.TryGetValue(_ticker, out var position))
+                    return;
+
+                int qtyToSell = (int)position.PositionAmount;
                 if (qtyToSell <= 0)
                     return;
 
@@ -94,7 +101,7 @@ namespace TradingBotV2.Strategies.TestStrategies
                     _trader.Broker.LiveDataProvider.LastReceived -= OnLastReceived;
                 });
 
-                _trader.Broker.LiveDataProvider.RequestBarUpdates(_ticker, BarLength._1Min);
+                _trader.Broker.LiveDataProvider.RequestBarUpdates(_ticker, BollingerBands.BarLength);
                 _trader.Broker.LiveDataProvider.RequestBidAskUpdates(_ticker);
                 _trader.Broker.LiveDataProvider.RequestLastTradedPriceUpdates(_ticker);
             }
@@ -107,51 +114,89 @@ namespace TradingBotV2.Strategies.TestStrategies
             if (BollingerBands.IsReady)
                 return;
 
-            int nbOfOneSecBarsNeeded = BollingerBands.NbWarmupPeriods * (int)BollingerBands.BarLength;
+            var st = Stopwatch.StartNew();
+            _trader.Logger?.Debug($"Initializing Bollinger Bands indicator.");
+            var nbSecs = (int)BollingerBands.BarLength;
+            int nbOfOneSecBarsNeeded = BollingerBands.NbWarmupPeriods * nbSecs;
             IEnumerable<IMarketData> oneSecBars = Enumerable.Empty<Bar>();
 
-            // Get the ones from today : from opening to now
-            DateTime currentTime = await _trader.Broker.GetServerTimeAsync();
-            if (currentTime.TimeOfDay > MarketDataUtils.MarketStartTime)
+            DateTime serverTime = await _trader.Broker.GetServerTimeAsync();
+            var to = serverTime;
+            while (oneSecBars.Count() < nbOfOneSecBarsNeeded)
             {
-                oneSecBars = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, currentTime.ToMarketHours().Item1, currentTime);
+                var from = to.AddSeconds(-nbOfOneSecBarsNeeded);
+                from = from.Floor(TimeSpan.FromSeconds(nbSecs));
+
+                if(from.TimeOfDay < MarketDataUtils.PreMarketStartTime)
+                    from = to.ToMarketHours(extendedHours: true).Item1;
+
+                var retrieved = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, from, to);
+                oneSecBars = retrieved.Concat(oneSecBars);
+
+                to = from;
+                if(to.TimeOfDay == MarketDataUtils.PreMarketStartTime)
+                {
+                    // Fetch the ones from the previous market day is still not enough
+                    DateOnly previousMarketDay = MarketDataUtils.FindLastOpenDay(to.AddDays(-1), extendedHours: true);
+                    to = previousMarketDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.AfterHoursEndTime));
+                }
             }
 
-            int count = oneSecBars.Count();
-            while (count < nbOfOneSecBarsNeeded)
-            {
-                // Not enough. Getting previous market day to fill the rest.
-                DateOnly previousMarketDay = MarketDataUtils.FindLastOpenDay(currentTime.AddDays(-1));
-                IEnumerable<IMarketData> previousMarketDayBars = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, previousMarketDay);
-                oneSecBars = oneSecBars.Concat(previousMarketDayBars);
-
-                currentTime = previousMarketDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.MarketStartTime));
-                count = oneSecBars.Count();
-            }
+            _trader.Logger?.Debug($"1 sec bars retrieved (count : {oneSecBars.Count()}, time : {st.Elapsed})");
 
             // build bar collections from 1 sec bars
-            _bars = new LinkedList<Bar>();
+            var combinedBars = new LinkedList<Bar>();
+            var tmp = new LinkedList<Bar>();
+            IEnumerable<Bar> ttttt = oneSecBars.OrderBy(b => b.Time).Cast<Bar>();
 
-            var nbSecs = (int)BollingerBands.BarLength;
-            var bars = oneSecBars.Cast<Bar>();
-            while (bars.Count() > nbSecs)
+            Bar? last = null;
+            foreach (Bar oneSecBar in ttttt)
             {
-                _bars.AddLast(MarketDataUtils.CombineBars(bars.Take(nbSecs), BollingerBands.BarLength));
-                bars = bars.Skip(nbSecs);
+                if (last != null && last.Time - oneSecBar.Time > TimeSpan.FromSeconds(1))
+                    Debugger.Break();
+
+                tmp.AddLast(oneSecBar);
+                if (tmp.Count == nbSecs)
+                {
+                    Bar newBar = MarketDataUtils.CombineBars(tmp, BollingerBands.BarLength);
+                    Debug.Assert(newBar.Time.Second % nbSecs == 0);
+                    combinedBars.AddLast(newBar);
+                    tmp.Clear();
+                }
+
+                last = oneSecBar;
             }
 
+            _trader.Logger?.Debug($" {BollingerBands.BarLength} bars built (count : {combinedBars.Count()}, time : {st.Elapsed}).");
+
             // Update all indicators.
+            lock (_bars)
+                _bars = new LinkedList<Bar>(combinedBars.OrderBy(b => b.Time).Concat(_bars));
+
+            Debug.Assert(_bars.All(b => b.Time.Second % nbSecs == 0));
             BollingerBands.Compute(_bars);
             Debug.Assert(BollingerBands.IsReady);
+            
+            st.Stop();
+            _trader.Logger?.Debug($" {BollingerBands.BarLength} bars built (count : {combinedBars.Count()}, time : {st.Elapsed}).");
+            _trader.Logger?.Info("Indicators Initialized");
         }
 
         void OnBarReceived(string ticker, Bar bar)
         {
-            if(ticker == _ticker && bar.BarLength == BarLength._1Min)
+            if(ticker == _ticker && bar.BarLength == BollingerBands.BarLength)
             {
-                _bars.AddLast(bar);
-                Debug.Assert(_executeStrategyBlock != null);
-                _executeStrategyBlock.Post(bar.Time);
+                lock (_bars)
+                    _bars.AddLast(bar);
+                
+                _lasts.Clear();
+
+                if(BollingerBands.IsReady)
+                {
+                    BollingerBands.Compute(_bars);
+                    Debug.Assert(_executeStrategyBlock != null);
+                    _executeStrategyBlock.Post(bar.Time);
+                }
             }
         }
 
@@ -168,6 +213,15 @@ namespace TradingBotV2.Strategies.TestStrategies
             if (ticker == _ticker)
             {
                 _latestLast = last;
+
+                //_lasts.AddLast(last);
+                //var partialBar = MarketDataUtils.MakeBarFromLasts(_lasts, BollingerBands.BarLength);
+                //if(partialBar is not null)
+                //{
+                //    BollingerBands.Compute(_bars.Append(partialBar));
+                //    Debug.Assert(_executeStrategyBlock != null);
+                //    _executeStrategyBlock.Post(last.Time);
+                //}
             }
         }
     }

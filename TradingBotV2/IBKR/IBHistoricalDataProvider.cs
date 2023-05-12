@@ -356,7 +356,13 @@ namespace TradingBotV2.IBKR
                     tcs.TrySetResult(tmpList);
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (msg.ErrorCode == 162) // query returned no data
+                    tcs.TrySetResult(tmpList);
+                else
+                    tcs.TrySetException(msg);
+            });
 
             //string timeFormat = "yyyyMMdd-HH:mm:ss";
 
@@ -495,7 +501,13 @@ namespace TradingBotV2.IBKR
                         tcs.TrySetResult(tmpList);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (msg.ErrorCode == 162) // query returned no data
+                    tcs.TrySetResult(tmpList);
+                else
+                    tcs.TrySetException(msg);
+            });
 
             _logger?.Trace($"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
             var contract = _client.ContractsCache.Get(ticker);
@@ -555,7 +567,13 @@ namespace TradingBotV2.IBKR
                         tcs.TrySetResult(tmpList);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessage>(msg =>
+            {
+                if (msg.ErrorCode == 162) // query returned no data
+                    tcs.TrySetResult(tmpList);
+                else
+                    tcs.TrySetException(msg);
+            });
 
             _logger?.Trace($"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
             var contract = _client.ContractsCache.Get(ticker);
@@ -593,7 +611,7 @@ namespace TradingBotV2.IBKR
             if (DateTime.Now - from > TimeSpan.FromDays(6 * 30))
                 throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {from}");
 
-            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to).ToList();
+            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to, extendedHours : true).ToList();
             if (!days.Any())
                 throw new ArgumentException($"Market was closed from {from} to {to}");
         }
