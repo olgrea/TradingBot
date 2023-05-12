@@ -18,9 +18,9 @@ namespace TradingBotV2.Broker.MarketData
         public double Close { get; set; }
         public double High { get; set; }
         public double Low { get; set; }
-        public long Volume { get; set; }
-        public int TradeAmount { get; set; }
-        public double VWAP { get; set; }
+        public decimal Volume { get; set; }
+        public int NbTrades { get; set; }
+        public decimal WAP { get; set; }
         public DateTime Time { get; set; }
         public BarLength BarLength { get; set; }
 
@@ -50,8 +50,8 @@ namespace TradingBotV2.Broker.MarketData
                 High = bar.High,
                 Low = bar.Low,
                 Volume = bar.Volume,
-                WAP = bar.VWAP,
-                TradeAmount = bar.TradeAmount,
+                WAP = bar.WAP,
+                TradeAmount = bar.NbTrades,
                 Date = bar.Time.ToUnixTimeSeconds()
             };
         }
@@ -65,10 +65,9 @@ namespace TradingBotV2.Broker.MarketData
                 Close = bar.Close,
                 High = bar.High,
                 Low = bar.Low,
-                // TODO : update db schema. Loss of data is acceptable for now.
-                Volume = Convert.ToInt64(bar.Volume),
-                VWAP = bar.WAP,
-                TradeAmount = bar.TradeAmount,
+                Volume = bar.Volume,
+                WAP = bar.WAP,
+                NbTrades = bar.TradeAmount,
                 Time = DateTimeOffset.FromUnixTimeSeconds(bar.Date).DateTime.ToLocalTime(),
             };
         }
@@ -87,8 +86,8 @@ namespace TradingBotV2.Broker.MarketData
                 Close = bar.Close,
                 High = bar.High,
                 Low = bar.Low,
-                Volume = Convert.ToInt64(bar.Volume),
-                TradeAmount = bar.Count,
+                Volume = bar.Volume,
+                NbTrades = bar.Count,
                 Time = DateTime.SpecifyKind(DateTime.ParseExact(time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
         }

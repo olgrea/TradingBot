@@ -162,7 +162,7 @@ namespace SqliteCommandsTests
                     WHERE Ticker = '{ticker}'
                     AND Date >= '{dateRange.From.ToShortDateString()}' 
                     AND Time >= '{dateRange.From.ToShortTimeString()}' 
-                    AND Date < '{dateRange.To.ToShortDateString()}' 
+                    AND Date <= '{dateRange.To.ToShortDateString()}' 
                     AND Time < '{dateRange.From.ToShortTimeString()}' 
                     AND Open IS NULL
                 ";
@@ -186,7 +186,7 @@ namespace SqliteCommandsTests
                         WHERE Tickers.Symbol = '{ticker}'
                         AND Date >= '{dateRange.From.ToShortDateString()}' 
                         AND Time >= '{dateRange.From.ToShortTimeString()}' 
-                        AND Date < '{dateRange.To.ToShortDateString()}' 
+                        AND Date <= '{dateRange.To.ToShortDateString()}' 
                         AND Time < '{dateRange.From.ToShortTimeString()}' 
                         AND Bid IS NULL
                     )

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
@@ -20,20 +18,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         protected override string MakeExistsCommandText()
         {
             var nbTimestamps = (_dateRange.To - _dateRange.From).TotalSeconds;
-            //return
-            //$@"
-            //    SELECT EXISTS (
-            //        SELECT 1 WHERE 
-            //            (SELECT COUNT(*) FROM HistoricalBarView
-            //                WHERE Ticker = {Sanitize(_symbol)}
-            //                AND Date = {Sanitize(_date.Date)}
-            //                AND Time >= {Sanitize(_dateRange.From)} 
-            //                AND Time < {Sanitize(_dateRange.To)}
-            //                AND BarLength = {Sanitize(_barLength)}
-            //            ) = {Sanitize(nbTimestamps)}
-            //    );
-            //";
-            return string.Empty;
+            return
+            $@"
+                SELECT EXISTS (
+                    SELECT 1 WHERE 
+                        (SELECT COUNT(DISTINCT DateTime) FROM {_marketDataName}s
+                            LEFT JOIN Tickers ON Tickers.Id = {_marketDataName}s.Ticker
+                            WHERE Symbol = {Sanitize(_symbol)}
+                            AND BarLength = {Sanitize(_barLength)}
+                            AND DateTime >= {Sanitize(_dateRange.From.ToUnixTimeSeconds())} 
+                            AND DateTime < {Sanitize(_dateRange.To.ToUnixTimeSeconds())} 
+                        ) = {Sanitize(nbTimestamps)}
+                );
+            ";
         }
     }
 
@@ -47,6 +44,21 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             _barLength = barLength;
         }
 
+        protected override string MakeSelectCommandText()
+        {
+            return
+            $@"
+                SELECT * FROM BarsView
+                WHERE Ticker = {Sanitize(_symbol)}
+                AND Date >= {Sanitize(_dateRange.From.Date)}
+                AND Time >= {Sanitize(_dateRange.From.TimeOfDay)}
+                AND Date <= {Sanitize(_dateRange.To.Date)}
+                AND Time < {Sanitize(_dateRange.To.TimeOfDay)}
+                AND OHLC IS NOT NULL
+                ORDER BY Time;
+            ";
+        }
+
         protected override Bar MakeDataFromResults(IDataRecord dr)
         {
             DateTime dateTime = DateTime.Parse(dr.GetString(1));
@@ -58,23 +70,11 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 Close = dr.GetDouble(5),
                 High = dr.GetDouble(6),
                 Low = dr.GetDouble(7),
+                Volume = dr.GetDecimal(8),
+                WAP = dr.GetDecimal(9),
+                NbTrades = dr.GetInt32(10),
             };
             return bar;
-        }
-
-        protected override string MakeSelectCommandText()
-        {
-            //return
-            //$@"
-            //    SELECT * FROM Historical{_marketDataName}View
-            //    WHERE Ticker = {Sanitize(_symbol)}
-            //    AND Date = {Sanitize(_date)}
-            //    AND Time >= {Sanitize(_timeRange.Item1)}
-            //    AND Time < {Sanitize(_timeRange.Item2)}
-            //    AND BarLength = {Sanitize(_barLength)}
-            //    ORDER BY Time;
-            //";
-            return string.Empty;
         }
     }
 
@@ -87,9 +87,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected override int InsertMarketData(SqliteCommand command, Bar data)
         {
-            var columns = new string[] { "Open", "Close", "High", "Low", "Volume" };
-            var values = new object[] { data.Open, data.Close, data.High, data.Low, data.Volume };
-            Insert(command, "Bar", columns, values);
+            var columns = new string[] { "Open", "Close", "High", "Low"};
+            var values = new object[] { data.Open, data.Close, data.High, data.Low };
+            Insert(command, "OHLC", columns, values);
             return InsertFromSelect(command, data);
         }
 
@@ -97,19 +97,40 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO HistoricalBar (Stock, DateTime, BarLength, Bar)
+                INSERT OR IGNORE INTO Bars (Ticker, DateTime, BarLength, OHLC, Volume, WAP, NbTrades)
                 SELECT 
-                    Stock.Id AS StockId,
-                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,
-                    {Sanitize(data.BarLength)} AS BarLength,
-                    Bar.Id AS BarId   
-                FROM Bar
-                LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)}  
+                    Tickers.Id,
+                    {Sanitize(data.Time.ToUnixTimeSeconds())},
+                    {Sanitize(data.BarLength)},
+                    OHLC.Id,
+                    {Sanitize(data.Volume)},
+                    {Sanitize(data.WAP)},
+                    {Sanitize(data.NbTrades)}
+                FROM OHLC
+                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)}  
                 WHERE Open = {Sanitize(data.Open)}
                 AND Close = {Sanitize(data.Close)}
                 AND High = {Sanitize(data.High)}
                 AND Low = {Sanitize(data.Low)}
-                AND Volume = {Sanitize(data.Volume)}
+            ";
+
+            return command.ExecuteNonQuery();
+        }
+
+        protected override int InsertNullMarketData(SqliteCommand command, DateTime dateTime)
+        {
+            command.CommandText =
+            $@"
+                INSERT OR IGNORE INTO Bars (Ticker, DateTime, BarLength, OHLC, Volume, WAP, NbTrades)
+                SELECT 
+                    Tickers.Id,
+                    {Sanitize(dateTime.ToUnixTimeSeconds())},
+                    {Sanitize(_dataDict.Values.First().First().BarLength)},
+                    NULL, 
+                    NULL, 
+                    NULL, 
+                    NULL
+                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

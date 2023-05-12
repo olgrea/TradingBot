@@ -23,6 +23,21 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
+        protected override string MakeSelectCommandText()
+        {
+            return
+            $@"
+                SELECT * FROM LastsView
+                WHERE Ticker = {Sanitize(_symbol)}
+                AND Date >= {Sanitize(_dateRange.From.Date)}
+                AND Time >= {Sanitize(_dateRange.From.TimeOfDay)}
+                AND Date <= {Sanitize(_dateRange.To.Date)}
+                AND Time < {Sanitize(_dateRange.To.TimeOfDay)}
+                AND Price IS NOT NULL
+                ORDER BY Time;
+            ";
+        }
+
         protected override Last MakeDataFromResults(IDataRecord dr)
         {
             DateTime dateTime = DateTime.Parse(dr.GetString(1));
@@ -30,7 +45,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             {
                 Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
                 Price = dr.GetDouble(3),
-                Size = Convert.ToInt32(dr.GetInt64(4)),
+                Size = dr.GetDecimal(4),
             };
             return last;
         }
@@ -43,48 +58,35 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
-        protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<Last> dataCollection)
-        {
-            //for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
-            //    InsertTimeStamp(insertCmd, i);
-
-            return base.InsertMarketData(insertCmd, dataCollection);
-        }
-
         protected override int InsertMarketData(SqliteCommand command, Last data)
-        {
-            var columns = new string[] { "Price", "Size" };
-            var values = new object[] { data.Price, data.Size };
-            Insert(command, "Last", columns, values);
-            return InsertFromSelect(command, data);
-        }
-
-        protected int InsertFromSelect(SqliteCommand command, Last data)
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO HistoricalLast (Stock, DateTime, Last)
-                SELECT 
-                    Stock.Id AS StockId,
-                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,
-                    Last.Id AS LastId   
-                FROM Last
-                LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)} 
-                WHERE Price = {Sanitize(data.Price)}
-                AND Size = {Sanitize(data.Size)}
+                INSERT OR IGNORE INTO Lasts (Ticker, DateTime, Price, Size)
+                VALUES (
+                    ( SELECT Tickers.Id From Tickers
+                    WHERE Symbol = {Sanitize(_symbol)} ),
+                    {Sanitize(data.Time.ToUnixTimeSeconds())},
+                    {Sanitize(data.Price)},
+                    {Sanitize(data.Size)}
+                )
             ";
 
             return command.ExecuteNonQuery();
         }
 
-        int InsertTimeStamp(SqliteCommand command, DateTime timestamp)
+        protected override int InsertNullMarketData(SqliteCommand command, DateTime dateTime)
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO LastTimestamps (Stock, DateTime)
-                SELECT Id AS StockId, {Sanitize(timestamp.ToUnixTimeSeconds())}
-                FROM Stock 
-                WHERE Symbol = {Sanitize(_symbol)} 
+                INSERT OR IGNORE INTO Lasts (Ticker, DateTime, Price, Size)
+                VALUES (
+                    ( SELECT Tickers.Id From Tickers
+                    WHERE Symbol = {Sanitize(_symbol)} ),
+                    {Sanitize(dateTime.ToUnixTimeSeconds())},
+                    NULL,
+                    NULL
+                )
             ";
 
             return command.ExecuteNonQuery();
