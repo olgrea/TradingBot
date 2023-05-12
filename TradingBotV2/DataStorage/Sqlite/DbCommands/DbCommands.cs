@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
-using System.Linq;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
@@ -50,15 +47,13 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
     internal abstract class ExistsCommand<TMarketData> : DbCommand<bool>
     {
         protected string _symbol;
-        protected DateTime _date;
-        protected (TimeSpan, TimeSpan) _timeRange;
+        protected DateRange _dateRange;
         protected string _marketDataName;
 
-        public ExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection) : base(connection)
+        public ExistsCommand(string symbol, DateRange dateRange, SqliteConnection connection) : base(connection)
         {
             _symbol = symbol;
-            _date = date;
-            _timeRange = timeRange;
+            _dateRange = dateRange;
             _marketDataName = typeof(TMarketData).Name;
         }
 
@@ -73,7 +68,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected virtual string MakeExistsCommandText()
         {
-            var nbTimestamps = (_timeRange.Item2 - _timeRange.Item1).TotalSeconds;
+            var nbTimestamps = (_dateRange.To - _dateRange.From).TotalSeconds;
             return
             $@"
                 SELECT EXISTS (
@@ -81,8 +76,8 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                         (SELECT COUNT(DISTINCT DateTime) FROM {_marketDataName}Timestamps
                             LEFT JOIN Stock ON Stock.Id = {_marketDataName}Timestamps.Stock
                             WHERE Symbol = {Sanitize(_symbol)}
-                            AND DateTime >= {Sanitize(new DateTime(_date.Date.Ticks + _timeRange.Item1.Ticks).ToUnixTimeSeconds())} 
-                            AND DateTime < {Sanitize(new DateTime(_date.Date.Ticks + _timeRange.Item2.Ticks).ToUnixTimeSeconds())} 
+                            AND DateTime >= {Sanitize(_dateRange.From.ToUnixTimeSeconds())} 
+                            AND DateTime < {Sanitize(_dateRange.To.ToUnixTimeSeconds())} 
                         ) = {Sanitize(nbTimestamps)}
                 );
             ";
@@ -92,15 +87,13 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
     internal abstract class SelectCommand<TMarketData> : DbCommand<IEnumerable<IMarketData>>
     {
         protected string _symbol;
-        protected DateTime _date;
-        protected (TimeSpan, TimeSpan) _timeRange;
+        protected DateRange _dateRange;
         protected string _marketDataName;
 
-        public SelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection) : base(connection)
+        public SelectCommand(string symbol, DateRange dateRange, SqliteConnection connection) : base(connection)
         {
             _symbol = symbol;
-            _date = date;
-            _timeRange = timeRange;
+            _dateRange = dateRange;
             _marketDataName = typeof(TMarketData).Name;
         }
 
@@ -114,15 +107,16 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected virtual string MakeSelectCommandText()
         {
-            return
-            $@"
-                SELECT * FROM Historical{_marketDataName}View
-                WHERE Ticker = {Sanitize(_symbol)}
-                AND Date = {Sanitize(_date)}
-                AND Time >= {Sanitize(_timeRange.Item1)}
-                AND Time < {Sanitize(_timeRange.Item2)}
-                ORDER BY Time;
-            ";
+            //return
+            //$@"
+            //    SELECT * FROM Historical{_marketDataName}View
+            //    WHERE Ticker = {Sanitize(_symbol)}
+            //    AND Date = {Sanitize(_dateRange)}
+            //    AND Time >= {Sanitize(_timeRange.Item1)}
+            //    AND Time < {Sanitize(_timeRange.Item2)}
+            //    ORDER BY Time;
+            //";
+            return string.Empty;
         }
 
         protected abstract IMarketData MakeDataFromResults(IDataRecord record);
@@ -131,13 +125,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
     internal abstract class InsertCommand<TMarketData> : DbCommand<bool>
     {
         protected string _symbol;
-        IEnumerable<TMarketData> _dataCollection;
+        protected DateRange _dateRange;
+        protected IEnumerable<TMarketData> _dataCollection;
         protected string _marketDataName;
         internal int NbInserted = 0;
 
-        public InsertCommand(string symbol, IEnumerable<TMarketData> dataCollection, SqliteConnection connection) : base(connection)
+        public InsertCommand(string symbol, DateRange dateRange, IEnumerable<TMarketData> dataCollection, SqliteConnection connection) : base(connection)
         {
             _symbol = symbol;
+            _dateRange = dateRange;
             _dataCollection = dataCollection;
             _marketDataName = typeof(TMarketData).Name;
         }

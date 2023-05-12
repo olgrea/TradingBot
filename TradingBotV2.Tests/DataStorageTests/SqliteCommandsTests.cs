@@ -37,7 +37,7 @@ namespace SqliteCommandsTests
         [Test]
         public void ExistsCommand_WhenCompleteRangeIsInDb_ReturnsTrue()
         {
-            var cmd = _commandFactory.CreateExistsCommand(Ticker, From.Date, (From.TimeOfDay, To.TimeOfDay));
+            var cmd = _commandFactory.CreateExistsCommand(Ticker, new DateRange(From, To));
             Assert.IsTrue(cmd.Execute());
         }
 
@@ -45,8 +45,26 @@ namespace SqliteCommandsTests
         public void ExistsCommand_WhenTimespansAreMissingInRange_ReturnsFalse()
         {
             DeleteData(Ticker, From.AddMinutes(5), To.AddMinutes(-5));
-            var cmd = _commandFactory.CreateExistsCommand(Ticker, From.Date, (From.TimeOfDay, To.TimeOfDay));
+            var cmd = _commandFactory.CreateExistsCommand(Ticker, new DateRange(From, To));
             Assert.IsFalse(cmd.Execute());
+        }
+
+        [Test]
+        public void SelectCommand_ReturnsRowsAssociatedWithTimeRange()
+        {
+
+        }
+
+        [Test]
+        public void SelectCommand_WhenSomeRowsHasNullValues_SkipsThem()
+        {
+
+        }
+
+        [Test]
+        public void InsertCommand_WhenTimestanmpsAreMissing_InsertsNullValues()
+        {
+
         }
 
         void DeleteData(string ticker, DateTime from, DateTime to)

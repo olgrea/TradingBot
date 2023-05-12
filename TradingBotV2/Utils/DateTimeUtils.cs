@@ -1,6 +1,6 @@
 ﻿namespace TradingBotV2.Utils
 {
-    public  record struct TimeRange(DateTime From, DateTime To);
+    public record struct DateRange(DateTime From, DateTime To);
 
     public static class DateTimeUtils
     {

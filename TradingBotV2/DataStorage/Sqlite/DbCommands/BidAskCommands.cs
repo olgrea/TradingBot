@@ -7,16 +7,16 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
     internal class BidAskExistsCommand : ExistsCommand<BidAsk>
     {
-        public BidAskExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public BidAskExistsCommand(string symbol, DateRange dateRange, SqliteConnection connection)
+            : base(symbol, dateRange, connection)
         {
         }
     }
 
     internal class SelectBidAsksCommand : SelectCommand<BidAsk>
     {
-        public SelectBidAsksCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public SelectBidAsksCommand(string symbol, DateRange dateRange, SqliteConnection connection)
+            : base(symbol, dateRange, connection)
         {
         }
 
@@ -37,18 +37,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
     internal class InsertBidAsksCommand : InsertCommand<BidAsk>
     {
-        TimeRange _timerange;
-
-        public InsertBidAsksCommand(string symbol, TimeRange timerange, IEnumerable<BidAsk> dataCollection, SqliteConnection connection)
-            : base(symbol, dataCollection, connection)
+        public InsertBidAsksCommand(string symbol, DateRange dateRange, IEnumerable<BidAsk> dataCollection, SqliteConnection connection)
+            : base(symbol, dateRange, dataCollection, connection)
         {
-            _timerange = timerange;
         }
 
         protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<BidAsk> dataCollection)
         {
-            for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
-                InsertTimeStamp(insertCmd, i);
+            //for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
+            //    InsertTimeStamp(insertCmd, i);
 
             return base.InsertMarketData(insertCmd, dataCollection);
         }

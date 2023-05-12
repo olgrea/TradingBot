@@ -42,10 +42,8 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
                 throw new NotImplementedException($"factory for market data type {typeof(TData).Name} is not implemented.");
         }
 
-        public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateTime date);
-        public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
-        public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date);
-        public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange);
-        public abstract DbCommand<bool> CreateInsertCommand(string symbol, TimeRange timerange, IEnumerable<IMarketData> dataCollection);
+        public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateRange dateRange);
+        public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateRange dateRange);
+        public abstract DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection);
     }
 }

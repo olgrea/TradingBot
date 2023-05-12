@@ -10,29 +10,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
         {
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateRange dateRange)
         {
-            return new LastExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
+            return new LastExistsCommand(symbol, dateRange, _connection);
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateRange dateRange)
         {
-            return new LastExistsCommand(symbol, date, timeRange, _connection);
+            return new SelectLastsCommand(symbol, dateRange, _connection);
         }
 
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection)
         {
-            return new SelectLastsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
-        }
-
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
-        {
-            return new SelectLastsCommand(symbol, date, timeRange, _connection);
-        }
-
-        public override DbCommand<bool> CreateInsertCommand(string symbol, TimeRange timerange, IEnumerable<IMarketData> dataCollection)
-        {
-            return new InsertLastsCommand(symbol, timerange, dataCollection.Cast<Last>(), _connection);
+            return new InsertLastsCommand(symbol, dateRange, dataCollection.Cast<Last>(), _connection);
         }
     }
 }
