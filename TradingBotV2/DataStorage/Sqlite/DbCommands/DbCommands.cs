@@ -39,6 +39,10 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             {
                 return d.ToString(CultureInfo.InvariantCulture);
             }
+            else if (value is decimal dec)
+            {
+                return dec.ToString(CultureInfo.InvariantCulture);
+            }
             else
                 return value?.ToString() ?? string.Empty;
         }
@@ -73,8 +77,8 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             $@"
                 SELECT EXISTS (
                     SELECT 1 WHERE 
-                        (SELECT COUNT(DISTINCT DateTime) FROM {_marketDataName}Timestamps
-                            LEFT JOIN Stock ON Stock.Id = {_marketDataName}Timestamps.Stock
+                        (SELECT COUNT(DISTINCT DateTime) FROM {_marketDataName}s
+                            LEFT JOIN Tickers ON Tickers.Id = {_marketDataName}s.Ticker
                             WHERE Symbol = {Sanitize(_symbol)}
                             AND DateTime >= {Sanitize(_dateRange.From.ToUnixTimeSeconds())} 
                             AND DateTime < {Sanitize(_dateRange.To.ToUnixTimeSeconds())} 
@@ -84,7 +88,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         }
     }
 
-    internal abstract class SelectCommand<TMarketData> : DbCommand<IEnumerable<IMarketData>>
+    internal abstract class SelectCommand<TMarketData> : DbCommand<IEnumerable<IMarketData>> where TMarketData : IMarketData, new()
     {
         protected string _symbol;
         protected DateRange _dateRange;
@@ -105,28 +109,16 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             return new LinkedList<IMarketData>(reader.Cast<IDataRecord>().Select(MakeDataFromResults));
         }
 
-        protected virtual string MakeSelectCommandText()
-        {
-            //return
-            //$@"
-            //    SELECT * FROM Historical{_marketDataName}View
-            //    WHERE Ticker = {Sanitize(_symbol)}
-            //    AND Date = {Sanitize(_dateRange)}
-            //    AND Time >= {Sanitize(_timeRange.Item1)}
-            //    AND Time < {Sanitize(_timeRange.Item2)}
-            //    ORDER BY Time;
-            //";
-            return string.Empty;
-        }
+        protected abstract string MakeSelectCommandText();
 
         protected abstract IMarketData MakeDataFromResults(IDataRecord record);
     }
 
-    internal abstract class InsertCommand<TMarketData> : DbCommand<int>
+    internal abstract class InsertCommand<TMarketData> : DbCommand<int> where TMarketData : IMarketData, new()
     {
         protected string _symbol;
         protected DateRange _dateRange;
-        protected IEnumerable<TMarketData> _dataCollection;
+        protected IDictionary<DateTime, List<TMarketData>> _dataDict;
         protected string _marketDataName;
         internal int NbInserted = 0;
 
@@ -134,7 +126,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
             _symbol = symbol;
             _dateRange = dateRange;
-            _dataCollection = dataCollection;
+
+            _dataDict = new Dictionary<DateTime, List<TMarketData>>();
+            foreach (var data in dataCollection)
+            {
+                if(!_dataDict.ContainsKey(data.Time))
+                    _dataDict[data.Time] = new List<TMarketData>();
+                _dataDict[data.Time].Add(data);
+            }
+
             _marketDataName = typeof(TMarketData).Name;
         }
 
@@ -143,9 +143,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             using var transaction = _connection.BeginTransaction();
 
             SqliteCommand insertCmd = _connection.CreateCommand();
-            Insert(insertCmd, "Stock", "Symbol", _symbol);
+            Insert(insertCmd, "Tickers", "Symbol", _symbol);
 
-            int nbInserted = InsertMarketData(insertCmd, _dataCollection);
+            int nbInserted = InsertMarketData(insertCmd);
 
             transaction.Commit();
             NbInserted = nbInserted;
@@ -153,12 +153,21 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             return NbInserted;
         }
 
-        protected virtual int InsertMarketData(SqliteCommand insertCmd, IEnumerable<TMarketData> dataCollection)
+        protected virtual int InsertMarketData(SqliteCommand insertCmd)
         {
             int nbInserted = 0;
-            foreach (TMarketData data in _dataCollection)
+
+            for (DateTime i = _dateRange.From; i < _dateRange.To; i = i.AddSeconds(1))
             {
-                nbInserted += InsertMarketData(insertCmd, data);
+                if(_dataDict.TryGetValue(i, out List<TMarketData>? data))
+                {
+                    foreach (var d in data)
+                        nbInserted += InsertMarketData(insertCmd, d);
+                }
+                else
+                {
+                    InsertNullMarketData(insertCmd, i);
+                }
             }
 
             return nbInserted;
@@ -187,5 +196,6 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         }
 
         protected abstract int InsertMarketData(SqliteCommand command, TMarketData data);
+        protected abstract int InsertNullMarketData(SqliteCommand command, DateTime dateTime);
     }
 }

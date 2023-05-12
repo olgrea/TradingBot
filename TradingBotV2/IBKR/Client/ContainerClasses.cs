@@ -31,7 +31,7 @@
         public decimal Volume { get; set; }
         public int TradeAmount { get; set; }
         public long Date { get; set; }
-        public double WAP { get; set; }
+        public decimal WAP { get; set; }
     }
 
     public record struct AccountValue

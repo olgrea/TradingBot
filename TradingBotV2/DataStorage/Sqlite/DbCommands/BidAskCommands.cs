@@ -20,6 +20,21 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
+        protected override string MakeSelectCommandText()
+        {
+            return
+            $@"
+                SELECT * FROM BidAsksView
+                WHERE Ticker = {Sanitize(_symbol)}
+                AND Date >= {Sanitize(_dateRange.From.Date)}
+                AND Time >= {Sanitize(_dateRange.From.TimeOfDay)}
+                AND Date <= {Sanitize(_dateRange.To.Date)}
+                AND Time < {Sanitize(_dateRange.To.TimeOfDay)}
+                AND BidAsk IS NOT NULL
+                ORDER BY Time;
+            ";
+        }
+
         protected override BidAsk MakeDataFromResults(IDataRecord dr)
         {
             DateTime dateTime = DateTime.Parse(dr.GetString(1));
@@ -27,9 +42,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             {
                 Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
                 Bid = dr.GetDouble(3),
-                BidSize = Convert.ToInt32(dr.GetInt64(4)),
+                BidSize = dr.GetDecimal(4),
                 Ask = dr.GetDouble(5),
-                AskSize = Convert.ToInt32(dr.GetInt64(6)),
+                AskSize = dr.GetDecimal(6),
             };
             return ba;
         }
@@ -42,19 +57,11 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
         }
 
-        protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<BidAsk> dataCollection)
-        {
-            //for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
-            //    InsertTimeStamp(insertCmd, i);
-
-            return base.InsertMarketData(insertCmd, dataCollection);
-        }
-
         protected override int InsertMarketData(SqliteCommand command, BidAsk data)
         {
             var columns = new string[] { "Bid", "BidSize", "Ask", "AskSize" };
             var values = new object[] { data.Bid, data.BidSize, data.Ask, data.AskSize };
-            Insert(command, "BidAsk", columns, values);
+            Insert(command, "BidAskPrices", columns, values);
             return InsertFromSelect(command, data);
         }
 
@@ -62,13 +69,13 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO HistoricalBidAsk (Stock, DateTime, BidAsk)
+                INSERT OR IGNORE INTO BidAsks (Ticker, DateTime, BidAsk)
                 SELECT 
-                    Stock.Id AS StockId,
-                    {Sanitize(data.Time.ToUnixTimeSeconds())} AS DateTime,                                    
-                    BidAsk.Id AS BidAskId   
-                FROM BidAsk
-                LEFT JOIN Stock ON Symbol = {Sanitize(_symbol)} 
+                    Tickers.Id,
+                    {Sanitize(data.Time.ToUnixTimeSeconds())},
+                    BidAskPrices.Id,
+                FROM BidAskPrices
+                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)}  
                 WHERE Bid = {Sanitize(data.Bid)}
                 AND BidSize = {Sanitize(data.BidSize)}
                 AND Ask = {Sanitize(data.Ask)}
@@ -78,14 +85,16 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             return command.ExecuteNonQuery();
         }
 
-        int InsertTimeStamp(SqliteCommand command, DateTime timestamp)
+        protected override int InsertNullMarketData(SqliteCommand command, DateTime dateTime)
         {
             command.CommandText =
             $@"
-                INSERT OR IGNORE INTO BidAskTimestamps (Stock, DateTime)
-                SELECT Id AS StockId, {Sanitize(timestamp.ToUnixTimeSeconds())}
-                FROM Stock 
-                WHERE Symbol = {Sanitize(_symbol)} 
+                INSERT OR IGNORE INTO BidAsks (Ticker, DateTime, BidAsk)
+                SELECT 
+                    Tickers.Id,
+                    {Sanitize(dateTime.ToUnixTimeSeconds())},
+                    NULL
+                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

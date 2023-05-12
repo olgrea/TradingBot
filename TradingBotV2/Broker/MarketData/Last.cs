@@ -6,7 +6,7 @@ namespace TradingBotV2.Broker.MarketData
     {
         public DateTime Time { get; set; }
         public double Price { get; set; }
-        public int Size { get; set; }
+        public decimal Size { get; set; }
 
         public static explicit operator Last(IBApi.Last last)
         {
@@ -34,7 +34,7 @@ namespace TradingBotV2.Broker.MarketData
             return new Last()
             {
                 Price = last.Price,
-                Size = Convert.ToInt32(last.Size),
+                Size = last.Size,
                 Time = DateTimeOffset.FromUnixTimeSeconds(last.Time).DateTime.ToLocalTime(),
             };
         }

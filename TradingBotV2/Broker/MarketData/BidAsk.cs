@@ -5,9 +5,9 @@ namespace TradingBotV2.Broker.MarketData
     public class BidAsk : IMarketData
     {
         public double Bid { get; set; }
-        public int BidSize { get; set; }
+        public decimal BidSize { get; set; }
         public double Ask { get; set; }
-        public int AskSize { get; set; }
+        public decimal AskSize { get; set; }
         public DateTime Time { get; set; }
 
         public override string ToString()
@@ -20,10 +20,9 @@ namespace TradingBotV2.Broker.MarketData
             return new BidAsk()
             {
                 Bid = ba.Bid,
-                // TODO : update db schema. Loss of data is acceptable for now.
-                BidSize = Convert.ToInt32(ba.BidSize),
+                BidSize = ba.BidSize,
                 Ask = ba.Ask,
-                AskSize = Convert.ToInt32(ba.AskSize),
+                AskSize = ba.AskSize,
                 Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
             };
         }
@@ -45,9 +44,9 @@ namespace TradingBotV2.Broker.MarketData
             return new BidAsk()
             {
                 Bid = ba.PriceBid,
-                BidSize = Convert.ToInt32(ba.SizeBid),
+                BidSize = ba.SizeBid,
                 Ask = ba.PriceAsk,
-                AskSize = Convert.ToInt32(ba.SizeAsk),
+                AskSize = ba.SizeAsk,
                 Time = DateTimeOffset.FromUnixTimeSeconds(ba.Time).DateTime.ToLocalTime(),
             };
         }
