@@ -263,8 +263,8 @@ namespace TradingBotV2.IBKR
                 return;
 
             _token?.ThrowIfCancellationRequested();
-            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, new DateRange(from, to), data);
-            if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
+            DbCommand<int> insertCmd = commandFactory.CreateInsertCommand(ticker, new DateRange(from, to), data);
+            if (insertCmd.Execute() > 0 && insertCmd is InsertCommand<TData> iCmd)
             {
                 _nbInsertedInDb += iCmd.NbInserted;
                 if(iCmd.NbInserted > 0)

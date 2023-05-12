@@ -166,7 +166,7 @@ namespace IBBrokerTests
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
             DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
-            DeleteData(ticker, from, to);
+            TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -178,7 +178,7 @@ namespace IBBrokerTests
             }
             finally
             {
-                DeleteData(ticker, from, to);
+                TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             }
         }
 
@@ -188,7 +188,7 @@ namespace IBBrokerTests
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
             DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
-            DeleteData(ticker, from, to);
+            TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = true;
             _historicalProvider.ClearCache();
 
@@ -202,7 +202,7 @@ namespace IBBrokerTests
             }
             finally
             {
-                DeleteData(ticker, from, to);
+                TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             }
         }
 
@@ -212,7 +212,7 @@ namespace IBBrokerTests
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
             DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
-            DeleteData(ticker, from, to);
+            TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = true;
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
@@ -230,7 +230,7 @@ namespace IBBrokerTests
             }
             finally
             {
-                DeleteData(ticker, from, to);
+                TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             }
         }
 
@@ -240,7 +240,7 @@ namespace IBBrokerTests
             string ticker = "GME";
             DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
             DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
-            DeleteData(ticker, from, to);
+            TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = false;
             _historicalProvider.DbEnabled = false;
 
@@ -255,31 +255,8 @@ namespace IBBrokerTests
             }
             finally
             {
-                DeleteData(ticker, from, to);
+                TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             }
-        }
-
-        void DeleteData(string ticker, DateTime from, DateTime to) 
-        {
-            Assert.AreEqual(_historicalProvider.DbPath, TestsUtils.TestDbPath);
-
-            var connection = new SqliteConnection("Data Source=" + TestsUtils.TestDbPath);
-            connection.Open();
-            
-            var cmd = connection.CreateCommand();
-            cmd.CommandText =
-            $@"
-                DELETE FROM Historical{typeof(TData).Name}
-                WHERE Stock = (
-                    SELECT Stock.Id from Stock
-                    WHERE Stock.Symbol = '{ticker}'
-                    AND DateTime >= {from.ToUnixTimeSeconds()} 
-                    AND DateTime < {to.ToUnixTimeSeconds()} 
-                )
-            ";
-            cmd.ExecuteNonQuery();
-
-            connection.Close();
         }
     }
 }

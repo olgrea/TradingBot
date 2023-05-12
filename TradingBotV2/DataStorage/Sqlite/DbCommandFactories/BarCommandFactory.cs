@@ -23,7 +23,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             return new SelectBarsCommand(symbol, dateRange, _barLength, _connection);
         }
 
-        public override DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection)
+        public override DbCommand<int> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection)
         {
             return new InsertBarsCommand(symbol, dateRange, dataCollection.Cast<Bar>(), _connection);
         }

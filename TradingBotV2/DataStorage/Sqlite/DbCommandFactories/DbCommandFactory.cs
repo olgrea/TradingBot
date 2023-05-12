@@ -44,6 +44,6 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 
         public abstract DbCommand<bool> CreateExistsCommand(string symbol, DateRange dateRange);
         public abstract DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateRange dateRange);
-        public abstract DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection);
+        public abstract DbCommand<int> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection);
     }
 }
