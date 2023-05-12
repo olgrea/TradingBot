@@ -10,16 +10,16 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
     internal class LastExistsCommand : ExistsCommand<Last>
     {
-        public LastExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public LastExistsCommand(string symbol, DateRange dateRange, SqliteConnection connection)
+            : base(symbol, dateRange, connection)
         {
         }
     }
 
     internal class SelectLastsCommand : SelectCommand<Last>
     {
-        public SelectLastsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public SelectLastsCommand(string symbol, DateRange dateRange, SqliteConnection connection) 
+            : base(symbol, dateRange, connection)
         {
         }
 
@@ -38,17 +38,15 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
     internal class InsertLastsCommand : InsertCommand<Last>
     {
-        TimeRange _timerange;
-        public InsertLastsCommand(string symbol, TimeRange timerange, IEnumerable<Last> dataCollection, SqliteConnection connection)
-            : base(symbol, dataCollection, connection)
+        public InsertLastsCommand(string symbol, DateRange dateRange, IEnumerable<Last> dataCollection, SqliteConnection connection)
+            : base(symbol, dateRange, dataCollection, connection)
         {
-            _timerange = timerange;
         }
 
         protected override int InsertMarketData(SqliteCommand insertCmd, IEnumerable<Last> dataCollection)
         {
-            for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
-                InsertTimeStamp(insertCmd, i);
+            //for (DateTime i = _timerange.From; i < _timerange.To; i = i.AddSeconds(1))
+            //    InsertTimeStamp(insertCmd, i);
 
             return base.InsertMarketData(insertCmd, dataCollection);
         }

@@ -11,28 +11,29 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
     {
         BarLength _barLength;
 
-        public BarExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, BarLength barLength, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public BarExistsCommand(string symbol, DateRange dateRange, BarLength barLength, SqliteConnection connection)
+            : base(symbol, dateRange, connection)
         {
             _barLength = barLength;
         }
 
         protected override string MakeExistsCommandText()
         {
-            var nbTimestamps = (_timeRange.Item2 - _timeRange.Item1).TotalSeconds;
-            return
-            $@"
-                SELECT EXISTS (
-                    SELECT 1 WHERE 
-                        (SELECT COUNT(*) FROM HistoricalBarView
-                            WHERE Ticker = {Sanitize(_symbol)}
-                            AND Date = {Sanitize(_date.Date)}
-                            AND Time >= {Sanitize(_timeRange.Item1)} 
-                            AND Time < {Sanitize(_timeRange.Item2)}
-                            AND BarLength = {Sanitize(_barLength)}
-                        ) = {Sanitize(nbTimestamps)}
-                );
-            ";
+            var nbTimestamps = (_dateRange.To - _dateRange.From).TotalSeconds;
+            //return
+            //$@"
+            //    SELECT EXISTS (
+            //        SELECT 1 WHERE 
+            //            (SELECT COUNT(*) FROM HistoricalBarView
+            //                WHERE Ticker = {Sanitize(_symbol)}
+            //                AND Date = {Sanitize(_date.Date)}
+            //                AND Time >= {Sanitize(_dateRange.From)} 
+            //                AND Time < {Sanitize(_dateRange.To)}
+            //                AND BarLength = {Sanitize(_barLength)}
+            //            ) = {Sanitize(nbTimestamps)}
+            //    );
+            //";
+            return string.Empty;
         }
     }
 
@@ -40,8 +41,8 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
     {
         BarLength _barLength;
 
-        public SelectBarsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange, BarLength barLength, SqliteConnection connection)
-            : base(symbol, date, timeRange, connection)
+        public SelectBarsCommand(string symbol, DateRange dateRange, BarLength barLength, SqliteConnection connection)
+            : base(symbol, dateRange, connection)
         {
             _barLength = barLength;
         }
@@ -63,23 +64,24 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
         protected override string MakeSelectCommandText()
         {
-            return
-            $@"
-                SELECT * FROM Historical{_marketDataName}View
-                WHERE Ticker = {Sanitize(_symbol)}
-                AND Date = {Sanitize(_date)}
-                AND Time >= {Sanitize(_timeRange.Item1)}
-                AND Time < {Sanitize(_timeRange.Item2)}
-                AND BarLength = {Sanitize(_barLength)}
-                ORDER BY Time;
-            ";
+            //return
+            //$@"
+            //    SELECT * FROM Historical{_marketDataName}View
+            //    WHERE Ticker = {Sanitize(_symbol)}
+            //    AND Date = {Sanitize(_date)}
+            //    AND Time >= {Sanitize(_timeRange.Item1)}
+            //    AND Time < {Sanitize(_timeRange.Item2)}
+            //    AND BarLength = {Sanitize(_barLength)}
+            //    ORDER BY Time;
+            //";
+            return string.Empty;
         }
     }
 
     internal class InsertBarsCommand : InsertCommand<Bar>
     {
-        public InsertBarsCommand(string symbol, IEnumerable<Bar> dataCollection, SqliteConnection connection)
-            : base(symbol, dataCollection, connection)
+        public InsertBarsCommand(string symbol, DateRange dateRange, IEnumerable<Bar> dataCollection, SqliteConnection connection)
+            : base(symbol, dateRange, dataCollection, connection)
         {
         }
 

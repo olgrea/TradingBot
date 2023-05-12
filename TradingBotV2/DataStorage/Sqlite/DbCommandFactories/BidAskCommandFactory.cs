@@ -10,29 +10,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
         {
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateRange dateRange)
         {
-            return new BidAskExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
+            return new BidAskExistsCommand(symbol, dateRange, _connection);
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateRange dateRange)
         {
-            return new BidAskExistsCommand(symbol, date, timeRange, _connection);
+            return new SelectBidAsksCommand(symbol, dateRange, _connection);
         }
 
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection)
         {
-            return new SelectBidAsksCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _connection);
-        }
-
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
-        {
-            return new SelectBidAsksCommand(symbol, date, timeRange, _connection);
-        }
-
-        public override DbCommand<bool> CreateInsertCommand(string symbol, TimeRange timerange, IEnumerable<IMarketData> dataCollection)
-        {
-            return new InsertBidAsksCommand(symbol, timerange, dataCollection.Cast<BidAsk>(), _connection);
+            return new InsertBidAsksCommand(symbol, dateRange, dataCollection.Cast<BidAsk>(), _connection);
         }
     }
 }

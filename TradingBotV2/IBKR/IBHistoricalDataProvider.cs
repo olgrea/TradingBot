@@ -238,7 +238,7 @@ namespace TradingBotV2.IBKR
                 return false;
             }
 
-            DbCommand<bool> existsCmd = cmdFactory.CreateExistsCommand(ticker, from.Date, (from.TimeOfDay, to.TimeOfDay));
+            DbCommand<bool> existsCmd = cmdFactory.CreateExistsCommand(ticker, new DateRange(from, to));
             if (!existsCmd.Execute())
             {
                 _logger?.Trace($"Data not in db.");
@@ -247,7 +247,7 @@ namespace TradingBotV2.IBKR
             }
 
             _token?.ThrowIfCancellationRequested();
-            var selectCmd = cmdFactory.CreateSelectCommand(ticker, from.Date, (from.TimeOfDay, to.TimeOfDay));
+            var selectCmd = cmdFactory.CreateSelectCommand(ticker, new DateRange(from, to));
             data = selectCmd.Execute();
             _nbRetrievedFromDb += data.Count();
 
@@ -263,7 +263,7 @@ namespace TradingBotV2.IBKR
                 return;
 
             _token?.ThrowIfCancellationRequested();
-            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, new TimeRange(from, to), data);
+            DbCommand<bool> insertCmd = commandFactory.CreateInsertCommand(ticker, new DateRange(from, to), data);
             if (insertCmd.Execute() && insertCmd is InsertCommand<TData> iCmd)
             {
                 _nbInsertedInDb += iCmd.NbInserted;

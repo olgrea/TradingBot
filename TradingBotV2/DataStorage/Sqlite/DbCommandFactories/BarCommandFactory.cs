@@ -13,29 +13,19 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
             _barLength = BarLength._1Sec;
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateExistsCommand(string symbol, DateRange dateRange)
         {
-            return CreateExistsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange);
+            return new BarExistsCommand(symbol, dateRange, _barLength, _connection);
         }
 
-        public override DbCommand<bool> CreateExistsCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
+        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateRange dateRange)
         {
-            return new BarExistsCommand(symbol, date, timeRange, _barLength, _connection);
+            return new SelectBarsCommand(symbol, dateRange, _barLength, _connection);
         }
 
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date)
+        public override DbCommand<bool> CreateInsertCommand(string symbol, DateRange dateRange, IEnumerable<IMarketData> dataCollection)
         {
-            return new SelectBarsCommand(symbol, date, MarketDataUtils.MarketDayTimeRange, _barLength, _connection);
-        }
-
-        public override DbCommand<IEnumerable<IMarketData>> CreateSelectCommand(string symbol, DateTime date, (TimeSpan, TimeSpan) timeRange)
-        {
-            return new SelectBarsCommand(symbol, date, timeRange, _barLength, _connection);
-        }
-
-        public override DbCommand<bool> CreateInsertCommand(string symbol, TimeRange _, IEnumerable<IMarketData> dataCollection)
-        {
-            return new InsertBarsCommand(symbol, dataCollection.Cast<Bar>(), _connection);
+            return new InsertBarsCommand(symbol, dateRange, dataCollection.Cast<Bar>(), _connection);
         }
     }
 }
