@@ -13,7 +13,7 @@ using TradingBotV2.Utils;
 
 namespace TradingBotV2.Backtesting
 {
-    internal class TimeCompression
+    public class TimeCompression
     {
         public const double DefaultCompressionFactor = 0.001;
         public double Factor = DefaultCompressionFactor;
@@ -22,14 +22,14 @@ namespace TradingBotV2.Backtesting
         public TimeSpan OneSecond => new TimeSpan(ticks: (long)Math.Round(1 * 1_000_000 * Factor * 10));
     }
 
-    internal struct BacktestingResults
+    public struct BacktestingResults
     {
         public DateTime Start {get; set;}
         public DateTime End {get; set;}
         public TimeSpan RunTime { get; set; } 
     }
 
-    internal class Backtester : IBroker, IAsyncDisposable
+    public class Backtester : IBroker, IAsyncDisposable
     {
         private const string FakeAccountCode = "FAKEACCOUNT123";
         Account _fakeAccount = new Account(FakeAccountCode)
@@ -66,7 +66,7 @@ namespace TradingBotV2.Backtesting
         TaskCompletionSource<BacktestingResults>? _startTcs = null;
         bool _isRunning = false;
 
-        internal TimeCompression TimeCompression = new();
+        TimeCompression _timeCompression = new();
         Stopwatch _totalRuntimeStopwatch = new Stopwatch();
         Stopwatch _µsWaitStopwatch = new Stopwatch();
         
@@ -113,6 +113,7 @@ namespace TradingBotV2.Backtesting
             _startTcs?.TrySetException(new ObjectDisposedException(nameof(Backtester)));
         }
 
+        public TimeCompression TimeCompression { get => _timeCompression; internal set => _timeCompression = value; }
         internal DateTime StartTime => _start;
         internal DateTime EndTime => _end;
         internal DateTime CurrentTime => _currentTime;
