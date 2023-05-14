@@ -627,6 +627,7 @@ namespace TradingBotV2.IBKR
 
             ILogger? _logger;
             int _nbRequest = 0;
+            int _nbRequestIn10Mins = 0;
 
             Dictionary<BarRequest, DateTime> _barRequests = new ();
             Dictionary<TickRequest, DateTime> _tickRequests = new();
@@ -652,8 +653,8 @@ namespace TradingBotV2.IBKR
                     stream.Close();
                 }
 
-                _requestTimes = new(File.ReadAllLines(RequestFileName).Select(l => DateTime.Parse(l)));
-                _nbRequest = _requestTimes.Count(rt => DateTime.Now - rt < TimeSpan.FromMinutes(10));
+                _requestTimes = new(File.ReadAllLines(RequestFileName).Select(l => DateTime.Parse(l)).SkipWhile(rt => DateTime.Now - rt < TimeSpan.FromMinutes(10)));
+                _nbRequestIn10Mins = _nbRequest = _requestTimes.Count();
             }
 
             void WriteRequestFile()
@@ -673,6 +674,7 @@ namespace TradingBotV2.IBKR
                 set
                 {
                     _nbRequest = value;
+                    _nbRequestIn10Mins = value;
                     _logger?.Trace($"Current nb of requests : {_nbRequest}.");
                     _requestTimes.Add(DateTime.Now);
                     WriteRequestFile();
@@ -711,12 +713,23 @@ namespace TradingBotV2.IBKR
 
             void CheckForNbRequestsPacingViolations()
             {
-                if (_nbRequest != 0 && _nbRequest % 60 == 0)
+                if (_nbRequestIn10Mins != 0 && _nbRequestIn10Mins % 60 == 0)
                 {
-                    int minutes = 10;
-                    _logger?.Debug($"60 requests made : waiting {minutes} minutes...");
-                    WaitFor(minutes);
+                    _logger?.Debug($"60 requests made within 10 min.");
+
+                    var now = DateTime.Now;
+                    var times = _requestTimes.SkipWhile(t => now - t > TimeSpan.FromMinutes(10));
+                    
+                    var first = times.First();
+                    var toWait = TimeSpan.FromSeconds(10);
+                    var countUnder10Sec = times.TakeWhile( rt => rt - first < toWait).Count();
+
+                    _logger?.Debug($"Waiting 10 seconds...");
+                    WaitFor(toWait);
                     _logger?.Debug($"Resuming.");
+
+                    _nbRequestIn10Mins -= countUnder10Sec;
+                    _requestTimes = times.Skip(countUnder10Sec).ToList();
                 }
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
@@ -726,13 +739,25 @@ namespace TradingBotV2.IBKR
                 }
             }
 
-            void WaitFor(int minutes)
+            void WaitFor(TimeSpan toWait)
             {
-                for (int i = 0; i < minutes; ++i)
+                TimeSpan oneMin = TimeSpan.FromMinutes(1);
+                var current = toWait;
+                while(current > TimeSpan.Zero)
                 {
-                    Task.Delay(60 * 1000).Wait(_token ?? CancellationToken.None);
-                    if (i < minutes - 1)
-                        _logger?.Debug($"{9 - i} minutes left...");
+                    if(current - oneMin >= TimeSpan.Zero)
+                    {
+                        Task.Delay(oneMin).Wait(_token ?? CancellationToken.None);
+                        current -= oneMin;
+                    }
+                    else
+                    {
+                        Task.Delay(current).Wait(_token ?? CancellationToken.None);
+                        current = TimeSpan.Zero;
+                    }
+
+                    if(current > TimeSpan.Zero) 
+                        _logger?.Debug($"{current} left...");
                 }
             }
         }
