@@ -19,16 +19,22 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommandFactories
 
             _dbPath = dbPath;
             _connection = new SqliteConnection("Data Source=" + dbPath);
-            _connection.Open();
+            OpenConnection();
         }
 
         ~DbCommandFactory()
         {
-            _connection?.Close();
-            _connection?.Dispose();
+            CloseConnection();
         }
 
         internal string DbPath => _dbPath;
+        internal SqliteConnection Connection => _connection;
+        internal void OpenConnection() => _connection.Open();
+        internal void CloseConnection()
+        {
+            _connection.Close();
+            _connection.Dispose();
+        }
 
         public static DbCommandFactory Create<TData>(string dbPath) where TData : IMarketData, new()
         {

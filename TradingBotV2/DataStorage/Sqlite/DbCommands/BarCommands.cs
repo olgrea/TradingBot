@@ -54,7 +54,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 AND Time >= {Sanitize(_dateRange.From.TimeOfDay)}
                 AND Date <= {Sanitize(_dateRange.To.Date)}
                 AND Time < {Sanitize(_dateRange.To.TimeOfDay)}
-                AND OHLC IS NOT NULL
+                AND Open IS NOT NULL
                 ORDER BY Time;
             ";
         }
@@ -70,9 +70,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 Close = dr.GetDouble(5),
                 High = dr.GetDouble(6),
                 Low = dr.GetDouble(7),
-                Volume = dr.GetDecimal(8),
-                WAP = dr.GetDecimal(9),
-                NbTrades = dr.GetInt32(10),
+                Volume = Convert.ToDecimal(dr.GetDouble(8)),
+                WAP = Convert.ToDecimal(dr.GetDouble(9)),
+                NbTrades = Convert.ToInt32(dr.GetInt64(10)),
             };
             return bar;
         }
@@ -130,7 +130,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                     NULL, 
                     NULL, 
                     NULL
-                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)} 
+                FROM Tickers WHERE Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

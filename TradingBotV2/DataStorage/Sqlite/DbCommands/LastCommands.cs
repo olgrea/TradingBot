@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
+﻿using System.Data;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
-using static TradingBotV2.DataStorage.Sqlite.DbCommandFactories.DbCommandFactory;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
@@ -45,7 +42,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             {
                 Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
                 Price = dr.GetDouble(3),
-                Size = dr.GetDecimal(4),
+                Size = Convert.ToDecimal(dr.GetDouble(4)),
             };
             return last;
         }
@@ -63,13 +60,12 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             command.CommandText =
             $@"
                 INSERT OR IGNORE INTO Lasts (Ticker, DateTime, Price, Size)
-                VALUES (
-                    ( SELECT Tickers.Id From Tickers
-                    WHERE Symbol = {Sanitize(_symbol)} ),
+                SELECT 
+                    Tickers.Id,
                     {Sanitize(data.Time.ToUnixTimeSeconds())},
                     {Sanitize(data.Price)},
                     {Sanitize(data.Size)}
-                )
+                FROM Tickers WHERE Symbol = {Sanitize(_symbol)}                                 
             ";
 
             return command.ExecuteNonQuery();
@@ -80,13 +76,12 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             command.CommandText =
             $@"
                 INSERT OR IGNORE INTO Lasts (Ticker, DateTime, Price, Size)
-                VALUES (
-                    ( SELECT Tickers.Id From Tickers
-                    WHERE Symbol = {Sanitize(_symbol)} ),
+                SELECT 
+                    Tickers.Id,
                     {Sanitize(dateTime.ToUnixTimeSeconds())},
                     NULL,
                     NULL
-                )
+                FROM Tickers WHERE Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

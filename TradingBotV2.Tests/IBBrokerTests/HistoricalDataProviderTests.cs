@@ -54,29 +54,6 @@ namespace IBBrokerTests
         // 2023/04/05 : full day
         // 2023/04/06 : 10:00 to 11:00
         // 2023/04/07 : holiday
-        
-        //[Test]
-        //public async Task SetupTestData()
-        //{
-        //    string ticker = "GME";
-
-        //    //await _historicalProvider.GetHistoricalOneSecBarsAsync(ticker, new DateTime(2023, 04, 03));
-        //    //await _historicalProvider.GetHistoricalOneSecBarsAsync(ticker, new DateTime(2023, 04, 04));
-        //    //await _historicalProvider.GetHistoricalOneSecBarsAsync(ticker, new DateTime(2023, 04, 05));
-        //    //await _historicalProvider.GetHistoricalOneSecBarsAsync(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
-
-        //    //await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 03));
-        //    //await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 04));
-        //    //await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 05));
-        //    //await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
-
-        //    //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 03));
-        //    //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 04));
-        //    //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 05));
-        //    //await _historicalProvider.GetHistoricalLastsAsync(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
-        //    //DeleteData(ticker, new DateTime(2023, 04, 07));
-        //    await Task.CompletedTask;
-        //}
 
         [Test]
         public async Task GetHistoricalData_Holiday_ShouldThrow()
@@ -256,6 +233,25 @@ namespace IBBrokerTests
             finally
             {
                 TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
+            }
+        }
+
+        async Task FillTestDataDb()
+        {
+            string ticker = "GME";
+
+            var path = _historicalProvider.DbPath;
+            try
+            {
+                _historicalProvider.DbPath = TestsUtils.TestDataDbPath;
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 03));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 04));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 05));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
+            }
+            finally
+            {
+                _historicalProvider.DbPath = path;
             }
         }
     }
