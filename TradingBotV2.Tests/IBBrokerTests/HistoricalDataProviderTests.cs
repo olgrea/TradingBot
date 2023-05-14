@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using Microsoft.Data.Sqlite;
 using NLog;
 using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
@@ -236,7 +235,7 @@ namespace IBBrokerTests
             }
         }
 
-        async Task FillTestDataDb()
+        public async Task FillTestDataDb()
         {
             string ticker = "GME";
 
@@ -244,10 +243,10 @@ namespace IBBrokerTests
             try
             {
                 _historicalProvider.DbPath = TestsUtils.TestDataDbPath;
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 03));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 04));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 05));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 06, 10, 0, 0), new DateTime(2023, 04, 06, 11, 0, 0));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 03));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 04));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 05));
+                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 06, 10, 00, 00), new DateTime(2023, 04, 06, 11, 00, 00));
             }
             finally
             {

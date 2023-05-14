@@ -4,7 +4,6 @@ using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
-using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
 using TradingBotV2.Broker.Orders;
 using TradingBotV2.IBKR.Client;
@@ -232,6 +231,10 @@ namespace TradingBotV2.IBKR
             Debug.Assert(_account != null);
             _logger?.Debug($"Requesting account {_account.Code} updates...");
 
+
+            // TODO : Handle connection lost
+            // Market data farm connection is OK:cashfarm(code = 2104)
+            // Market data farm connection is broken:cashfarm(code = 2103)
             _client.CancelAccountUpdates(_account.Code); // we need to cancel it first
             _client.RequestAccountUpdates(_account.Code);
             _client.RequestPositionsUpdates();
