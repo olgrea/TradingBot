@@ -1,11 +1,11 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using System.Data;
+using Microsoft.Data.Sqlite;
 using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
-using TradingBotV2.Broker.MarketData.Providers;
+using TradingBotV2.IBKR;
 using TradingBotV2.Tests;
 using TradingBotV2.Utils;
-using System.Data;
 
 namespace SqliteCommandsTests
 {
@@ -17,22 +17,22 @@ namespace SqliteCommandsTests
     {
         const string Ticker = "GME";
         protected DbCommandFactory _commandFactory;
-        IHistoricalDataProvider _historicalProvider;
+        IBHistoricalDataProvider _historicalProvider;
         DateRange _dateRange = new DateRange(new DateTime(2023, 04, 06, 10, 30, 0), new DateTime(2023, 04, 06, 11, 00, 00));
-        IEnumerable<IMarketData> _marketData;
 
         [OneTimeSetUp]
         public void OneTimeSetup()
         {
             _commandFactory = DbCommandFactory.Create<TData>(TestsUtils.TestDbPath);
             var broker = TestsUtils.CreateBroker();
-            _historicalProvider = broker.HistoricalDataProvider;
+            _historicalProvider = broker.HistoricalDataProvider as IBHistoricalDataProvider;
+            Assert.NotNull(_historicalProvider);
         }
 
         [SetUp]
-        public async Task Setup()
+        public void Setup()
         {
-            _marketData = await _historicalProvider.GetHistoricalDataAsync<TData>(Ticker, _dateRange.From, _dateRange.To);
+            TestsUtils.RestoreTestDb(_commandFactory.Connection);
         }
 
         [Test]
@@ -43,10 +43,12 @@ namespace SqliteCommandsTests
         }
 
         [Test]
-        public void ExistsCommand_WhenTimespansAreMissingInRange_ReturnsFalse()
+        public void ExistsCommand_WhenMissingTimespansInDb_ReturnsFalse()
         {
-            var range = new DateRange(_dateRange.From.AddMinutes(5), _dateRange.To.AddMinutes(-5));
-            var cmd = _commandFactory.CreateExistsCommand(Ticker, range);
+            var toDelete = new DateRange(_dateRange.From, _dateRange.From.AddMinutes(5));
+            TestsUtils.DeleteDataInTestDb<TData>(Ticker, toDelete, _commandFactory.Connection);
+
+            var cmd = _commandFactory.CreateExistsCommand(Ticker, _dateRange);
             Assert.IsFalse(cmd.Execute());
         }
 
@@ -62,15 +64,13 @@ namespace SqliteCommandsTests
         [Test]
         public void SelectCommand_WhenSomeRowsHasNullValues_SkipsThem()
         {
-            var range = new DateRange(_dateRange.From.AddMinutes(5), _dateRange.To.AddMinutes(-5));
+            var range = new DateRange(_dateRange.From, _dateRange.From.AddMinutes(5));
             UpdateToNull(Ticker, range);
-            var cmd = _commandFactory.CreateSelectCommand(Ticker, range);
+            var cmd = _commandFactory.CreateSelectCommand(Ticker, _dateRange);
             var results = cmd.Execute();
             Assert.NotNull(results);
             Assert.IsTrue(results.All(
-                r => r.Time >= _dateRange.From 
-                && r.Time < _dateRange.From.AddMinutes(5) 
-                && r.Time >= _dateRange.To.AddMinutes(-5) 
+                r => r.Time >= _dateRange.From.AddMinutes(5) 
                 && r.Time < _dateRange.To)
             );
         }
@@ -78,8 +78,10 @@ namespace SqliteCommandsTests
         [Test]
         public void InsertCommand_WhenTimestanmpsAreMissing_InsertsNullValues()
         {
-            TestsUtils.DeleteDataInTestDb<TData>(Ticker, _dateRange);
-            var data = _marketData.SkipWhile(d => d.Time < _dateRange.From.AddMinutes(5));
+            var cmd = _commandFactory.CreateSelectCommand(Ticker, _dateRange);
+            var data = cmd.Execute().SkipWhile(d => d.Time < _dateRange.From.AddMinutes(5));
+
+            TestsUtils.DeleteDataInTestDb<TData>(Ticker, _dateRange, _commandFactory.Connection);
             
             var insertCmd = _commandFactory.CreateInsertCommand(Ticker, _dateRange, data);
             var nbInserted = insertCmd.Execute();
@@ -91,24 +93,21 @@ namespace SqliteCommandsTests
 
             if (typeof(TData) == typeof(Bar))
             {
-                Assert.IsTrue(rowsWithNullValues.Cast<Bar>().All(d => d.Open == -1));
-            }
-            else if (typeof(TData) == typeof(Last))
-            {
-                Assert.IsTrue(rowsWithNullValues.Cast<BidAsk>().All(d => d.Bid == -1));
+                Assert.IsTrue(rowsWithNullValues.Cast<Bar>().All(d => double.IsNaN(d.Open)));
             }
             else if (typeof(TData) == typeof(BidAsk))
             {
-                Assert.IsTrue(rowsWithNullValues.Cast<Last>().All(d => d.Price == -1));
+                Assert.IsTrue(rowsWithNullValues.Cast<BidAsk>().All(d => double.IsNaN(d.Bid)));
+            }
+            else if (typeof(TData) == typeof(Last))
+            {
+                Assert.IsTrue(rowsWithNullValues.Cast<Last>().All(d => double.IsNaN(d.Price)));
             }
         }
 
         void UpdateToNull(string ticker, DateRange dateRange)
         {
-            var connection = new SqliteConnection("Data Source=" + TestsUtils.TestDbPath);
-            connection.Open();
-
-            var cmd = connection.CreateCommand();
+            var cmd = _commandFactory.Connection.CreateCommand();
 
             if (typeof(TData) == typeof(Bar))
             {
@@ -116,7 +115,7 @@ namespace SqliteCommandsTests
                 $@"
                     UPDATE Bars
                     SET OHLC = NULL
-                    WHERE Ticker = '{ticker}'
+                    WHERE Ticker = (SELECT Id FROM Tickers WHERE Tickers.Symbol = '{ticker}')
                     AND DateTime >= {dateRange.From.ToUnixTimeSeconds()}
                     AND DateTime < {dateRange.To.ToUnixTimeSeconds()}
                 ";
@@ -127,7 +126,7 @@ namespace SqliteCommandsTests
                 $@"
                     UPDATE BidAsks
                     SET BidAsk = NULL
-                    WHERE Ticker = '{ticker}'
+                    WHERE Ticker = (SELECT Id FROM Tickers WHERE Tickers.Symbol = '{ticker}')
                     AND DateTime >= {dateRange.From.ToUnixTimeSeconds()} 
                     AND DateTime < {dateRange.To.ToUnixTimeSeconds()}
                 ";
@@ -138,7 +137,7 @@ namespace SqliteCommandsTests
                 $@"
                     UPDATE Lasts
                     SET Price = NULL
-                    WHERE Ticker = '{ticker}'
+                    WHERE Ticker = (SELECT Id FROM Tickers WHERE Tickers.Symbol = '{ticker}')
                     AND DateTime >= {dateRange.From.ToUnixTimeSeconds()} 
                     AND DateTime < {dateRange.To.ToUnixTimeSeconds()} 
                 ";
@@ -149,10 +148,7 @@ namespace SqliteCommandsTests
 
         IEnumerable<IMarketData> SelectNulls(string ticker, DateRange dateRange)
         {
-            var connection = new SqliteConnection("Data Source=" + TestsUtils.TestDbPath);
-            connection.Open();
-
-            var cmd = connection.CreateCommand();
+            var cmd = _commandFactory.Connection.CreateCommand();
 
             if(typeof(TData) == typeof(Bar))
             {
@@ -161,9 +157,9 @@ namespace SqliteCommandsTests
                     SELECT * FROM BarsView
                     WHERE Ticker = '{ticker}'
                     AND Date >= '{dateRange.From.ToShortDateString()}' 
-                    AND Time >= '{dateRange.From.ToShortTimeString()}' 
+                    AND Time >= '{dateRange.From.TimeOfDay}' 
                     AND Date <= '{dateRange.To.ToShortDateString()}' 
-                    AND Time < '{dateRange.From.ToShortTimeString()}' 
+                    AND Time < '{dateRange.To.TimeOfDay}' 
                     AND Open IS NULL
                 ";
 
@@ -173,23 +169,20 @@ namespace SqliteCommandsTests
                     DateTime dateTime = DateTime.Parse(dr.GetString(1));
                     dateTime = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks);
                     object val = dr.GetValue(4);
-                    return new Bar() { Time = dateTime, Open = Convert.ToDouble(val ?? -1)};
+                    return new Bar() { Time = dateTime, Open = val is DBNull ? double.NaN : Convert.ToDouble(val)};
                 }));
             }
             else if (typeof(TData) == typeof(BidAsk))
             {
                 cmd.CommandText =
                 $@"
-                    SELECT FROM BidAsksView
-                    WHERE Ticker = (
-                        SELECT Tickers.Id FROM Tickers
-                        WHERE Tickers.Symbol = '{ticker}'
-                        AND Date >= '{dateRange.From.ToShortDateString()}' 
-                        AND Time >= '{dateRange.From.ToShortTimeString()}' 
-                        AND Date <= '{dateRange.To.ToShortDateString()}' 
-                        AND Time < '{dateRange.From.ToShortTimeString()}' 
-                        AND Bid IS NULL
-                    )
+                    SELECT * FROM BidAsksView
+                    WHERE Ticker = '{ticker}'
+                    AND Date >= '{dateRange.From.ToShortDateString()}' 
+                    AND Time >= '{dateRange.From.TimeOfDay}' 
+                    AND Date <= '{dateRange.To.ToShortDateString()}' 
+                    AND Time < '{dateRange.To.TimeOfDay}' 
+                    AND Bid IS NULL
                 ";
 
                 using SqliteDataReader reader = cmd.ExecuteReader();
@@ -198,23 +191,20 @@ namespace SqliteCommandsTests
                     DateTime dateTime = DateTime.Parse(dr.GetString(1));
                     dateTime = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks);
                     object val = dr.GetValue(3);
-                    return new BidAsk() { Time = dateTime, Bid = Convert.ToDouble(val ?? -1) };
+                    return new BidAsk() { Time = dateTime, Bid = val is DBNull ? double.NaN : Convert.ToDouble(val) };
                 }));
             }
             else if (typeof(TData) == typeof(Last))
             {
                 cmd.CommandText =
                 $@"
-                    SELECT FROM Lasts
-                    WHERE Ticker = (
-                        SELECT Tickers.Id FROM Tickers
-                        WHERE Tickers.Symbol = '{ticker}'
-                        AND Date >= '{dateRange.From.ToShortDateString()}' 
-                        AND Time >= '{dateRange.From.ToShortTimeString()}' 
-                        AND Date < '{dateRange.To.ToShortDateString()}' 
-                        AND Time < '{dateRange.From.ToShortTimeString()}' 
-                        AND Price IS NULL
-                    )
+                    SELECT * FROM LastsView
+                    WHERE Ticker = '{ticker}'
+                    AND Date >= '{dateRange.From.ToShortDateString()}' 
+                    AND Time >= '{dateRange.From.TimeOfDay}' 
+                    AND Date <= '{dateRange.To.ToShortDateString()}' 
+                    AND Time < '{dateRange.To.TimeOfDay}' 
+                    AND Price IS NULL
                 ";
 
                 using SqliteDataReader reader = cmd.ExecuteReader();
@@ -223,11 +213,25 @@ namespace SqliteCommandsTests
                     DateTime dateTime = DateTime.Parse(dr.GetString(1));
                     dateTime = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks);
                     object val = dr.GetValue(3);
-                    return new Last() { Time = dateTime, Price = Convert.ToDouble(val ?? -1) };
+                    return new Last() { Time = dateTime, Price = val is DBNull ? double.NaN : Convert.ToDouble(val) };
                 }));
             }
 
             return null;
+        }
+
+        async Task FillTestDataDb()
+        {
+            var path = _historicalProvider.DbPath;
+            try
+            {
+                _historicalProvider.DbPath = TestsUtils.TestDataDbPath;
+                await _historicalProvider.GetHistoricalDataAsync<TData>(Ticker, _dateRange.From, _dateRange.To);
+            }
+            finally
+            {
+                _historicalProvider.DbPath = path;
+            }
         }
     }
 }

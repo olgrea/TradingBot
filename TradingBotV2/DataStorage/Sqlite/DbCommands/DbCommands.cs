@@ -6,6 +6,13 @@ using TradingBotV2.Utils;
 
 namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 {
+    // *** OF NOTE : 
+    // A market data row with NULL values (except for Ticker and DateTime. These should never be NULL) indicates that the data for 
+    // a specific timestamp was attempted to be retrieved from the server but doesn't exist. 
+    // Examples :
+    // - when a stock has been halted, no bars will exists during the halt
+    // - for last traded prices, it's possible that no trade occured at a specific time
+    // - The Bid/Ask may not have changed for a specific time
     public abstract class DbCommand<TResult>
     {
         protected SqliteConnection _connection;

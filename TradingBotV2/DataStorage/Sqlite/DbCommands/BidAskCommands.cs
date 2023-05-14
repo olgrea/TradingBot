@@ -30,7 +30,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 AND Time >= {Sanitize(_dateRange.From.TimeOfDay)}
                 AND Date <= {Sanitize(_dateRange.To.Date)}
                 AND Time < {Sanitize(_dateRange.To.TimeOfDay)}
-                AND BidAsk IS NOT NULL
+                AND Bid IS NOT NULL
                 ORDER BY Time;
             ";
         }
@@ -42,9 +42,9 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
             {
                 Time = dateTime.AddTicks(TimeSpan.Parse(dr.GetString(2)).Ticks),
                 Bid = dr.GetDouble(3),
-                BidSize = dr.GetDecimal(4),
+                BidSize = Convert.ToDecimal(dr.GetDouble(4)),
                 Ask = dr.GetDouble(5),
-                AskSize = dr.GetDecimal(6),
+                AskSize = Convert.ToDecimal(dr.GetDouble(6)),
             };
             return ba;
         }
@@ -73,7 +73,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 SELECT 
                     Tickers.Id,
                     {Sanitize(data.Time.ToUnixTimeSeconds())},
-                    BidAskPrices.Id,
+                    BidAskPrices.Id
                 FROM BidAskPrices
                 LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)}  
                 WHERE Bid = {Sanitize(data.Bid)}
@@ -94,7 +94,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                     Tickers.Id,
                     {Sanitize(dateTime.ToUnixTimeSeconds())},
                     NULL
-                LEFT JOIN Tickers ON Symbol = {Sanitize(_symbol)} 
+                FROM Tickers WHERE Symbol = {Sanitize(_symbol)} 
             ";
 
             return command.ExecuteNonQuery();

@@ -1,4 +1,6 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using System.Data;
+using System.Xml.Linq;
+using Microsoft.Data.Sqlite;
 using NLog;
 using NLog.TradingBot;
 using NUnit.Framework;
@@ -12,6 +14,7 @@ namespace TradingBotV2.Tests
     internal static class TestsUtils
     {
         public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
+        public const string TestDataDbPath = @"C:\tradingbot\db\testsdata.sqlite3";
         
         public static void PrintCurrentTestName(this ILogger logger)
         {
@@ -66,10 +69,16 @@ namespace TradingBotV2.Tests
             }
         }
 
-        internal static void DeleteDataInTestDb<TData>(string ticker, DateRange dateRange) where TData : IMarketData, new()
+        internal static void DeleteDataInTestDb<TData>(string ticker, DateRange dateRange, SqliteConnection sqliteConnection = null) where TData : IMarketData, new()
         {
-            var connection = new SqliteConnection("Data Source=" + TestDbPath);
-            connection.Open();
+            var connection = sqliteConnection;
+            if (sqliteConnection == null)
+            {
+                connection = new SqliteConnection("Data Source=" + TestDbPath);
+                connection.Open();
+            }
+
+            NUnit.Framework.Assert.AreEqual(TestDbPath, sqliteConnection.DataSource);
 
             var cmd = connection.CreateCommand();
             cmd.CommandText =
@@ -84,7 +93,47 @@ namespace TradingBotV2.Tests
             ";
             cmd.ExecuteNonQuery();
 
-            connection.Close();
+            if(sqliteConnection == null)
+                connection.Close();
+        }
+
+        internal static void RestoreTestDb(SqliteConnection sqliteConnection)
+        {
+            var connection = sqliteConnection;
+            if (sqliteConnection == null)
+            {
+                connection = new SqliteConnection("Data Source=" + TestDbPath);
+                connection.Open();
+            }
+
+            NUnit.Framework.Assert.AreEqual(TestDbPath, connection.DataSource);
+
+            var cmd = connection.CreateCommand();
+            cmd.CommandText =$"SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name";
+
+            List<string> tableNames;
+            using (SqliteDataReader reader = cmd.ExecuteReader())
+                tableNames = reader.Cast<IDataRecord>().Select(dr => dr.GetString(0)).Where(s => s != "sqlite_sequence").ToList();
+
+            cmd.CommandText = "PRAGMA ignore_check_constraints = 1; PRAGMA foreign_keys = 0;";
+            foreach (var table in tableNames)
+                cmd.CommandText += $"DELETE FROM {table};\n";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = $"ATTACH '{TestDataDbPath}' AS TestDataDb";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = "";
+            foreach (var table in tableNames)
+                cmd.CommandText += $"INSERT INTO {table} SELECT * FROM TestDataDb.{table};\n";
+            cmd.CommandText += "PRAGMA ignore_check_constraints = 0; PRAGMA foreign_keys = 1;";
+            cmd.ExecuteNonQuery();
+
+            cmd.CommandText = $"DETACH DATABASE 'TestDataDb'";
+            cmd.ExecuteNonQuery();
+
+            if (sqliteConnection == null)
+                connection.Close();
         }
     }
 }
