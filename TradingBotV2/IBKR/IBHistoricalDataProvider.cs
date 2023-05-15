@@ -262,6 +262,9 @@ namespace TradingBotV2.IBKR
             if (!DbEnabled)
                 return;
 
+            if (!data.Any())
+                return;
+
             _token?.ThrowIfCancellationRequested();
             DbCommand<int> insertCmd = commandFactory.CreateInsertCommand(ticker, new DateRange(from, to), data);
             if (insertCmd.Execute() > 0 && insertCmd is InsertCommand<TData> iCmd)

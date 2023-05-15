@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Diagnostics;
 using Microsoft.Data.Sqlite;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Utils;
@@ -80,9 +81,13 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
 
     internal class InsertBarsCommand : InsertCommand<Bar>
     {
+        BarLength _barLength;
         public InsertBarsCommand(string symbol, DateRange dateRange, IEnumerable<Bar> dataCollection, SqliteConnection connection)
             : base(symbol, dateRange, dataCollection, connection)
         {
+            _barLength = dataCollection.First().BarLength;
+            if (dataCollection.Any(d => d.BarLength != _barLength))
+                throw new NotSupportedException("Bars insertions with different bar lenghts not supported");
         }
 
         protected override int InsertMarketData(SqliteCommand command, Bar data)
@@ -125,7 +130,7 @@ namespace TradingBotV2.DataStorage.Sqlite.DbCommands
                 SELECT 
                     Tickers.Id,
                     {Sanitize(dateTime.ToUnixTimeSeconds())},
-                    {Sanitize(_dataDict.Values.First().First().BarLength)},
+                    {Sanitize(_barLength)},
                     NULL, 
                     NULL, 
                     NULL, 

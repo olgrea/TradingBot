@@ -78,7 +78,7 @@ namespace TradingBotV2.Tests
                 connection.Open();
             }
 
-            NUnit.Framework.Assert.AreEqual(TestDbPath, sqliteConnection.DataSource);
+            NUnit.Framework.Assert.AreEqual(TestDbPath, connection.DataSource);
 
             var cmd = connection.CreateCommand();
             cmd.CommandText =
@@ -97,7 +97,7 @@ namespace TradingBotV2.Tests
                 connection.Close();
         }
 
-        internal static void RestoreTestDb(SqliteConnection sqliteConnection)
+        internal static void RestoreTestDb(SqliteConnection sqliteConnection = null)
         {
             var connection = sqliteConnection;
             if (sqliteConnection == null)
