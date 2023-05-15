@@ -4,7 +4,6 @@ using NUnit.Framework;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 using TradingBotV2.Tests;
-using TradingBotV2.Utils;
 
 namespace IBBrokerTests
 {
@@ -30,6 +29,7 @@ namespace IBBrokerTests
         [SetUp]
         public async Task SetUp()
         {
+            TestsUtils.RestoreTestDb();
             Debug.Assert(_historicalProvider.DbPath == TestsUtils.TestDbPath);
             _historicalProvider.DbEnabled = true;
             _historicalProvider.CacheEnabled = true;
