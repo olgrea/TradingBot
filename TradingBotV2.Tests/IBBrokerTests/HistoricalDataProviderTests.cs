@@ -118,7 +118,7 @@ namespace IBBrokerTests
 
             Assert.IsNotNull(results);
             Assert.IsNotEmpty(results);
-            Assert.Greater(_historicalProvider._nbRetrievedFromIBKR, 0);
+            Assert.Greater(_historicalProvider._lastOperationStats.NbRetrievedFromIBKR, 0);
         }
 
         [Test]
@@ -133,7 +133,7 @@ namespace IBBrokerTests
 
             Assert.IsNotNull(results);
             Assert.IsNotEmpty(results);
-            Assert.Greater(_historicalProvider._nbRetrievedFromDb, 0);
+            Assert.Greater(_historicalProvider._lastOperationStats.NbRetrievedFromDb, 0);
         }
 
         [Test]
@@ -150,7 +150,7 @@ namespace IBBrokerTests
             {
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
-                Assert.Greater(_historicalProvider._nbInsertedInDb, 0);
+                Assert.Greater(_historicalProvider._lastOperationStats.NbInsertedInDb, 0);
             }
             finally
             {
@@ -174,7 +174,7 @@ namespace IBBrokerTests
             {
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
-                Assert.Greater(_historicalProvider._nbInsertedInCache, 0);
+                Assert.Greater(_historicalProvider._lastOperationStats.NbInsertedInCache, 0);
             }
             finally
             {
@@ -197,12 +197,12 @@ namespace IBBrokerTests
             {
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
-                Assert.Greater(_historicalProvider._nbInsertedInCache, 0);
+                Assert.Greater(_historicalProvider._lastOperationStats.NbInsertedInCache, 0);
 
                 results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
-                Assert.Greater(_historicalProvider._nbRetrievedFromCache, 0);
+                Assert.Greater(_historicalProvider._lastOperationStats.NbRetrievedFromCache, 0);
             }
             finally
             {
@@ -226,8 +226,8 @@ namespace IBBrokerTests
             {
                 Assert.IsNotNull(results);
                 Assert.IsNotEmpty(results);
-                Assert.AreEqual(0, _historicalProvider._nbInsertedInCache);
-                Assert.AreEqual(0, _historicalProvider._nbInsertedInDb);
+                Assert.AreEqual(0, _historicalProvider._lastOperationStats.NbInsertedInCache);
+                Assert.AreEqual(0, _historicalProvider._lastOperationStats.NbInsertedInDb);
             }
             finally
             {

@@ -16,6 +16,7 @@ namespace TradingBotV2.Broker
         public IOrderManager OrderManager { get; }
 
         public Task<string> ConnectAsync();
+        public Task<string> ConnectAsync(CancellationToken token);
         public Task DisconnectAsync();
         public Task<Account> GetAccountAsync();
         public void RequestAccountUpdates();

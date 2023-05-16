@@ -48,7 +48,8 @@ namespace TradingBotV2.IBKR
 
         protected void OnFiveSecondsBarReceived(string ticker, IBApi.FiveSecBar IBApiBar)
         {
-            //_logger.Debug($"FiveSecondsBarReceived for {contract}");
+            if (!_barSubscriptions.ContainsKey(ticker))
+                return;
 
             var bar = (Bar)IBApiBar;
 

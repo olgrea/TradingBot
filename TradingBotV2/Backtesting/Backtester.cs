@@ -61,7 +61,7 @@ namespace TradingBotV2.Backtesting
         ConcurrentQueue<Action> _requestsQueue = new ConcurrentQueue<Action>();
 
         Task? _consumerTask;
-        Task? _marketDataBackgroundTask;
+        ConcurrentDictionary<string, Task> _marketDataBackgroundTasks = new();
         CancellationTokenSource? _cancellation;
         TaskCompletionSource<BacktestingResults>? _startTcs = null;
         bool _isRunning = false;
@@ -96,7 +96,7 @@ namespace TradingBotV2.Backtesting
 
             _broker = new IBBroker(191919, logger);
             LiveDataProvider = new BacktesterLiveDataProvider(this);
-            HistoricalDataProvider = new IBHistoricalDataProvider(_broker, logger);
+            HistoricalDataProvider = _broker.HistoricalDataProvider;
             OrderManager = new BacktesterOrderManager(this);
 
             ClockTick += OnClockTick_SendAccountUpdates;
@@ -109,7 +109,8 @@ namespace TradingBotV2.Backtesting
             await DisconnectAsync();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
-            _marketDataBackgroundTask?.Dispose();
+            foreach(Task t in _marketDataBackgroundTasks.Values)
+                t.Dispose();
             _startTcs?.TrySetException(new ObjectDisposedException(nameof(Backtester)));
         }
 
@@ -142,13 +143,18 @@ namespace TradingBotV2.Backtesting
         public event Action<PnL>? PnLUpdated;
         public event Action<BacktesterProgress>? ProgressHandler;
 
-        public Task<string> ConnectAsync()
+        public async Task<string> ConnectAsync()
+        {
+            return await ConnectAsync(CancellationToken.None);
+        }
+
+        public Task<string> ConnectAsync(CancellationToken token)
         {
             if (_consumerTask != null)
                 throw new ErrorMessage("Already connected");
 
             _logger?.Trace($"Backtester connected.");
-            _cancellation = new CancellationTokenSource();
+            _cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
             _cancellation.Token.Register(() => _startTcs?.TrySetCanceled());
             _consumerTask = Task.Factory.StartNew(ConsumeRequests, _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
             _consumerTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
@@ -173,27 +179,46 @@ namespace TradingBotV2.Backtesting
             {
                 _logger?.Trace($"Backtester disconnected.");
 
+                await _broker.DisconnectAsync();
                 _cancellation.Cancel();
+
                 try
                 {
-                    if(_consumerTask != null && _marketDataBackgroundTask != null)
-                        await Task.WhenAll(_consumerTask, _marketDataBackgroundTask);
-                    else if(_consumerTask != null)
-                        await _consumerTask;
-                    else if (_marketDataBackgroundTask != null)
-                        await _marketDataBackgroundTask;
+                    var list = new List<Task>();
+                    if (_consumerTask != null)
+                        list.Add(_consumerTask);
+
+                    if (_marketDataBackgroundTasks.Any())
+                        list.AddRange(_marketDataBackgroundTasks.Values);
+                    
+                    await Task.WhenAll(list);
                 }
                 catch (OperationCanceledException)
                 {
                     Logger?.Debug("Task stopped");
                 }
-
-                _cancellation?.Dispose();
-                _cancellation = null;
-                _consumerTask?.Dispose();
-                _consumerTask = null;
-                _marketDataBackgroundTask?.Dispose();
-                _marketDataBackgroundTask = null;
+                catch (AggregateException ae)
+                {
+                    ae.Handle(ex =>
+                    {
+                        if (ex is TaskCanceledException)
+                        {
+                            Logger?.Debug("Task stopped");
+                            return true;
+                        }
+                        else return false;
+                    });
+                }
+                finally
+                {
+                    _cancellation?.Dispose();
+                    _cancellation = null;
+                    _consumerTask?.Dispose();
+                    _consumerTask = null;
+                    foreach (Task t in _marketDataBackgroundTasks.Values)
+                        t.Dispose();
+                    _marketDataBackgroundTasks.Clear();
+                }
             }
         }
 
@@ -276,7 +301,6 @@ namespace TradingBotV2.Backtesting
                 {
                     if (!IsDayOver())
                     {
-
                         try
                         {
                             AdvanceTime();
@@ -345,7 +369,7 @@ namespace TradingBotV2.Backtesting
 
         bool IsDayOver() => _currentTime >= _end;
 
-        public async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
+        internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
         {
             if (from > to)
                 throw new ArgumentException($"'from' is greater than 'to'");
@@ -354,51 +378,56 @@ namespace TradingBotV2.Backtesting
                 .OrderBy(d => d.Time)
                 .Cast<TData>();
 
-            if (_marketDataBackgroundTask == null)
-            {
-                _marketDataBackgroundTask = Task.Run(async () =>
-                {
-                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
-                }, _cancellation!.Token);
-                _ = _marketDataBackgroundTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
-            }
+            // The rest on a background task
+            GetDailyData<TData>(ticker);
 
             return data;
         }
 
-        public async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime) where TData : IMarketData, new()
+        internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime) where TData : IMarketData, new()
         {
-            // Retrieving data in slices of ~10 mins (rounded up to the next 10 mins)
+            // Retrieving data in slices of 10 mins.
+            var lower = dateTime;
             var upper = dateTime.AddSeconds(1);
 
             var key = (ticker, typeof(TData));
             if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] < dateTime)
             {
-                var aroundTenMins = dateTime.Ceiling(TimeSpan.FromMinutes(10));
-                
-                upper = aroundTenMins;
+                upper = dateTime.Ceiling(TimeSpan.FromMinutes(10));
                 if (upper >= EndTime)
                     upper = EndTime;
+
+                lower = dateTime.Floor(TimeSpan.FromMinutes(10));
+                if (lower < StartTime)
+                    lower = StartTime;
 
                 Debug.Assert(upper - dateTime >= TimeSpan.FromSeconds(1));
                 _timeSlicesUpperBounds[key] = upper;
             }
 
-            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, dateTime, upper, _cancellation!.Token))
+            var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, lower, upper, _cancellation!.Token))
                 .Where(d => d.Time == dateTime)
                 .Cast<TData>();
 
             // The rest on a background task
-            if (_marketDataBackgroundTask == null)
-            {
-                _marketDataBackgroundTask = Task.Run(async () =>
-                {
-                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, upper, EndTime, _cancellation!.Token);
-                }, _cancellation!.Token);
-                _ = _marketDataBackgroundTask.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
-            }
+            GetDailyData<TData>(ticker);
 
             return data;
+        }
+
+        private void GetDailyData<TData>(string ticker) where TData : IMarketData, new()
+        {
+            _ = _marketDataBackgroundTasks.GetOrAdd(ticker, t =>
+            {
+                var task = Task.Run(async () =>
+                {
+                    await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, StartTime, EndTime, _cancellation!.Token);
+                }, _cancellation!.Token);
+
+                _ = task.ContinueWith(HandleTaskError, TaskContinuationOptions.OnlyOnFaulted);
+
+                return task;
+            });
         }
 
         public Task<Account> GetAccountAsync()

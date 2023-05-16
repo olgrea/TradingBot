@@ -79,6 +79,11 @@ namespace TradingBotV2.IBKR
             return await ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), CancellationToken.None);
         }
 
+        public async Task<string> ConnectAsync(CancellationToken token)
+        {
+            return await ConnectAsync(TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 5000), token);
+        }
+
         async Task<string> ConnectAsync(TimeSpan timeout, CancellationToken token)
         {
             // awaiting a TaskCompletionSource's task doesn't return on the main thread without this flag.

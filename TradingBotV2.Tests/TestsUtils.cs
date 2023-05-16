@@ -1,10 +1,10 @@
 ﻿using System.Data;
-using System.Xml.Linq;
 using Microsoft.Data.Sqlite;
 using NLog;
 using NLog.TradingBot;
 using NUnit.Framework;
 using TradingBotV2.Backtesting;
+using TradingBotV2.Broker;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.IBKR;
 using TradingBotV2.Utils;
@@ -42,6 +42,12 @@ namespace TradingBotV2.Tests
             var backtester = new Backtester(date);
             backtester.DbPath = TestDbPath;
             backtester.Logger = CreateLogger();
+
+            var historicalProvider = (IBHistoricalDataProvider)backtester.HistoricalDataProvider;
+            historicalProvider.DbPath = TestDbPath;
+
+            //historical data provider always has a logger
+            historicalProvider.Logger = CreateLogger();
 
             return backtester;
         }

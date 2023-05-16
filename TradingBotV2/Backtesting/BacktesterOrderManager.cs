@@ -222,7 +222,7 @@ namespace TradingBotV2.Backtesting
 
         public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync()
         {
-            var tcs = new TaskCompletionSource<IEnumerable<OrderExecutedResult>>();
+            var tcs = new TaskCompletionSource<IEnumerable<OrderExecutedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var ordersPlaced = new Dictionary<int, Order>();
             Action request = () =>
             {
