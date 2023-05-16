@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using NLog;
 using TradingBotV2.Broker.MarketData;
 using TradingBotV2.Broker.MarketData.Providers;
+using TradingBotV2.DataStorage.Sqlite;
 using TradingBotV2.DataStorage.Sqlite.DbCommandFactories;
 using TradingBotV2.DataStorage.Sqlite.DbCommands;
 using TradingBotV2.IBKR.Client;
@@ -13,8 +14,7 @@ namespace TradingBotV2.IBKR
 {
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
-        const int RequestTimeoutInMs = 30000;
-        public const string DefaultDbPath = @"C:\tradingbot\db\historicaldata.sqlite3";
+        public const string DefaultDbPath = Constants.DbPath;
 
         class MarketDataCache
         {
@@ -31,11 +31,16 @@ namespace TradingBotV2.IBKR
         CancellationToken? _token;
 
         // for unit tests
-        internal int _nbRetrievedFromIBKR = 0;
-        internal int _nbRetrievedFromDb = 0;
-        internal int _nbRetrievedFromCache = 0;
-        internal int _nbInsertedInCache = 0;
-        internal int _nbInsertedInDb = 0;
+        internal class OperationStats
+        {
+            public int NbRetrievedFromIBKR = 0;
+            public int NbRetrievedFromDb = 0;
+            public int NbRetrievedFromCache = 0;
+            public int NbInsertedInCache = 0;
+            public int NbInsertedInDb = 0;
+        }
+        internal OperationStats _lastOperationStats = new();
+
         internal void ClearCache() => _cache.Clear();
 
         PacingViolationChecker _pvc;
@@ -43,6 +48,7 @@ namespace TradingBotV2.IBKR
         IBBroker _broker;
         ILogger? _logger;
         private string dbPath = DefaultDbPath;
+        static SemaphoreSlim s_sem = new(1, 1);
 
         public IBHistoricalDataProvider(IBBroker broker, ILogger? logger)
         {
@@ -116,11 +122,11 @@ namespace TradingBotV2.IBKR
             _token?.ThrowIfCancellationRequested();
             ValidateDates(from, to);
 
-            _nbRetrievedFromCache = 0;
-            _nbRetrievedFromDb = 0;
-            _nbRetrievedFromIBKR = 0;
-            _nbInsertedInCache = 0;
-            _nbInsertedInDb = 0;
+            _lastOperationStats.NbRetrievedFromCache = 0;
+            _lastOperationStats.NbRetrievedFromDb = 0;
+            _lastOperationStats.NbRetrievedFromIBKR = 0;
+            _lastOperationStats.NbInsertedInCache = 0;
+            _lastOperationStats.NbInsertedInDb = 0;
 
             DbCommandFactory? cmdFactory = null;
             IEnumerable<IMarketData>? data;
@@ -181,7 +187,7 @@ namespace TradingBotV2.IBKR
             }
 
             int count = data.Count();
-            _nbRetrievedFromCache += count;
+            _lastOperationStats.NbRetrievedFromCache += count;
             _logger?.Debug($"Data {typeof(TData).Name} for {ticker} from ({from} to {to} retrieved from cache ({count}).");
             return true;
         }
@@ -224,7 +230,7 @@ namespace TradingBotV2.IBKR
                 }
             }
 
-            _nbInsertedInCache += nbInserted;
+            _lastOperationStats.NbInsertedInCache += nbInserted;
             if(nbInserted > 0)
                 _logger?.Debug($"{nbInserted} {typeof(TData).Name} inserted into cache.");
         }
@@ -249,7 +255,7 @@ namespace TradingBotV2.IBKR
             _token?.ThrowIfCancellationRequested();
             var selectCmd = cmdFactory.CreateSelectCommand(ticker, new DateRange(from, to));
             data = selectCmd.Execute();
-            _nbRetrievedFromDb += data.Count();
+            _lastOperationStats.NbRetrievedFromDb += data.Count();
 
             var dateStr = from.Date.ToShortDateString();
             _logger?.Debug($"{typeof(TData).Name} for {ticker} {dateStr} ({from}-{to}) retrieved from db.");
@@ -269,7 +275,7 @@ namespace TradingBotV2.IBKR
             DbCommand<int> insertCmd = commandFactory.CreateInsertCommand(ticker, new DateRange(from, to), data);
             if (insertCmd.Execute() > 0 && insertCmd is InsertCommand<TData> iCmd)
             {
-                _nbInsertedInDb += iCmd.NbInserted;
+                _lastOperationStats.NbInsertedInDb += iCmd.NbInserted;
                 if(iCmd.NbInserted > 0)
                     _logger?.Debug($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
             }
@@ -280,8 +286,19 @@ namespace TradingBotV2.IBKR
             _token?.ThrowIfCancellationRequested();
             if (!_broker.IsConnected())
             {
-                _logger?.Trace($"Connecting to TWS.");
-                await _broker.ConnectAsync();
+                await s_sem.WaitAsync();
+                try
+                {
+                    if (!_broker.IsConnected())
+                    {
+                        _logger?.Trace($"Connecting to TWS.");
+                        await _broker.ConnectAsync(_token!.Value);
+                    }
+                }
+                finally
+                {
+                    s_sem.Release();
+                }
             }
 
             DateTime current = to;
@@ -299,22 +316,31 @@ namespace TradingBotV2.IBKR
                     chunkBegin = from;
 
                 IEnumerable<IMarketData> data;
-                if (typeof(TData) == typeof(Bar))
+                await s_sem.WaitAsync();
+                try
                 {
-                    data = await FetchBars<TData>(ticker, chunkBegin, chunkEnd);
+                    if (typeof(TData) == typeof(Bar))
+                    {
+                        data = FetchBars<TData>(ticker, chunkBegin, chunkEnd).Result;
+                    }
+                    else
+                    {
+                        data = FetchTooMuchData<TData>(ticker, chunkBegin, chunkEnd).Result;
+                    }
+                    _lastOperationStats.NbRetrievedFromIBKR += data.Count();
+
+                    _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin}-{chunkEnd}) received from TWS.");
+
+                    _token?.ThrowIfCancellationRequested();
+                    Debug.Assert(data != null);
+
+                    onChunckReceived?.Invoke(chunkBegin, chunkEnd, data);
                 }
-                else
+                finally
                 {
-                    data = await FetchTooMuchData<TData>(ticker, chunkBegin, chunkEnd);
+                    s_sem.Release();
                 }
-                _nbRetrievedFromIBKR += data.Count();
 
-                _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin}-{chunkEnd}) received from TWS.");
-
-                _token?.ThrowIfCancellationRequested();
-                Debug.Assert(data != null);
-
-                onChunckReceived?.Invoke(chunkBegin, chunkEnd, data);
                 _token?.ThrowIfCancellationRequested();
 
                 current = current.AddSeconds(-chunkSizeInSec);
@@ -335,6 +361,8 @@ namespace TradingBotV2.IBKR
 
             var tmpList = new LinkedList<Bar>();
             var tcs = new TaskCompletionSource<IEnumerable<Bar>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _token!.Value.Register(() => tcs.TrySetCanceled());
+
             var reqId = -1;
 
             var historicalData = new Action<int, IBApi.Bar>((rId, IBApiBar) =>
@@ -408,7 +436,7 @@ namespace TradingBotV2.IBKR
             string edt = endDateTime == DateTime.MinValue ? string.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
 
             _logger?.Trace($"Retrieving {count} bars from TWS for '{ticker}' descending from {endDateTime}.");
-            var contract = _client.ContractsCache.Get(ticker);
+            var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             BarRequest req = new(contract, edt, durationStr, barSizeStr, "TRADES");
             _pvc.CheckRequest(req);
 
@@ -478,13 +506,11 @@ namespace TradingBotV2.IBKR
         {
             _token?.ThrowIfCancellationRequested();
 
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
-
             int reqId = -1;
             var tmpList = new LinkedList<BidAsk>();
 
             var tcs = new TaskCompletionSource<IEnumerable<BidAsk>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalBidAsksAsync")));
+            _token!.Value.Register(() => tcs.TrySetCanceled());
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickBidAsk>, bool>((rId, data, isDone) =>
             {
                 if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
@@ -513,7 +539,7 @@ namespace TradingBotV2.IBKR
             });
 
             _logger?.Trace($"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
-            var contract = _client.ContractsCache.Get(ticker);
+            var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK");
             _pvc.CheckRequest(req);
 
@@ -544,13 +570,12 @@ namespace TradingBotV2.IBKR
         {
             _token?.ThrowIfCancellationRequested();
 
-            CancellationTokenSource source = new CancellationTokenSource(Debugger.IsAttached ? -1 : RequestTimeoutInMs);
-
             int reqId = -1;
             var tmpList = new LinkedList<Last>();
 
             var tcs = new TaskCompletionSource<IEnumerable<Last>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            source.Token.Register(() => tcs.TrySetException(new TimeoutException($"GetHistoricalLastsAsync")));
+            _token!.Value.Register(() => tcs.TrySetCanceled());
+            
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
             {
                 if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
@@ -579,7 +604,7 @@ namespace TradingBotV2.IBKR
             });
 
             _logger?.Trace($"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
-            var contract = _client.ContractsCache.Get(ticker);
+            var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES");
             _pvc.CheckRequest(req);
 

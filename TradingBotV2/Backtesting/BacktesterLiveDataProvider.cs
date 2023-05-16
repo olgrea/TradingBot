@@ -32,6 +32,10 @@ namespace TradingBotV2.Backtesting
 
         public override void Dispose()
         {
+            _subscriptions.RealtimeBarCallback -= OnFiveSecondsBarReceived;
+            _subscriptions.TickByTickBidAskCallback -= TickByTickBidAsk;
+            _subscriptions.TickByTickLastCallback -= TickByTickLast;
+
             _backtester.ClockTick -= OnClockTick_UpdateBar;
             _backtester.ClockTick -= OnClockTick_UpdateBidAsk;
             _backtester.ClockTick -= OnClockTick_UpdateLast;
