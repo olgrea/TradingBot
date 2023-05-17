@@ -93,13 +93,14 @@ namespace BacktesterTests
         }
 
         [Test]
-        public async Task Backtester_WhenStopped_AndAwaitingStartTask_Throws()
+        public async Task Backtester_CanBeStopped()
         {
             var task = _backtester.Start();
             await Task.Delay(2000);
             _backtester.Stop();
-
-            Assert.ThrowsAsync<BacktesterStoppedException>(async () => await task);
+            var currentTime = _backtester.CurrentTime;
+            await Task.Delay(1000);
+            Assert.AreEqual(currentTime, _backtester.CurrentTime);  
         }
 
         [Test]

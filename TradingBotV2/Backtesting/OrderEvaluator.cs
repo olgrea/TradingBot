@@ -26,16 +26,19 @@ namespace TradingBotV2.Backtesting
         internal event Action<string, OrderExecution>? OrderExecuted;
         internal event Action<Position>? PositionUpdated;
 
-        void OnClockTick_EvaluateOrders(DateTime newTime)
+        void OnClockTick_EvaluateOrders(DateTime newTime, CancellationToken token)
         {
             foreach (Order o in _orderTracker.OpenOrders.Values)
             {
+                token.ThrowIfCancellationRequested();
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
                 
-                IEnumerable<BidAsk> latestBidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime).Result;
+                IEnumerable<BidAsk> latestBidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime, token).Result;
                 foreach (BidAsk bidAsk in latestBidAsks)
                 {
-                    if(_orderTracker.OpenOrders.ContainsKey(o.Id))
+                    token.ThrowIfCancellationRequested();
+
+                    if (_orderTracker.OpenOrders.ContainsKey(o.Id))
                         EvaluateOrder(ticker, o, bidAsk);
                 }
             }
