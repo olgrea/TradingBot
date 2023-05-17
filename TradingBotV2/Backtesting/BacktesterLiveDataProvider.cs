@@ -52,7 +52,7 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        void OnClockTick_UpdateBar(DateTime newTime)
+        void OnClockTick_UpdateBar(DateTime newTime, CancellationToken token)
         {
             if (newTime.Second % 5 != 0)
                 return;
@@ -63,7 +63,9 @@ namespace TradingBotV2.Backtesting
                 DateTime current = newTime;
                 for (int i = 0; i < 5; i++)
                 {
-                    bars[i] = _backtester.GetAsync<Bar>(ticker, current).Result.First();
+                    token.ThrowIfCancellationRequested();
+
+                    bars[i] = _backtester.GetAsync<Bar>(ticker, current, token).Result.First();
                     current = current.AddSeconds(1);
                 }
 
@@ -109,13 +111,16 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        void OnClockTick_UpdateBidAsk(DateTime newTime)
+        void OnClockTick_UpdateBidAsk(DateTime newTime, CancellationToken token)
         {
             foreach (string ticker in _subscriptions.BidAsk)
             {
-                IEnumerable<BidAsk> bidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime).Result;
+                token.ThrowIfCancellationRequested();
+
+                IEnumerable<BidAsk> bidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime, token).Result;
                 foreach (BidAsk ba in bidAsks)
                 {
+                    token.ThrowIfCancellationRequested();
                     _subscriptions.TickByTickBidAskCallback?.Invoke(ticker, (IBApi.BidAsk)ba);
                 }
             }
@@ -157,13 +162,16 @@ namespace TradingBotV2.Backtesting
             });
         }
 
-        void OnClockTick_UpdateLast(DateTime newTime)
+        void OnClockTick_UpdateLast(DateTime newTime, CancellationToken token)
         {
             foreach (string ticker in _subscriptions.Last)
             {
-                IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, newTime).Result;
+                token.ThrowIfCancellationRequested();
+
+                IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, newTime, token).Result;
                 foreach (Last last in lasts)
                 {
+                    token.ThrowIfCancellationRequested();
                     _subscriptions.TickByTickLastCallback?.Invoke(ticker, (IBApi.Last)last);
                 }
             }
