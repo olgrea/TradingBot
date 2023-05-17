@@ -179,9 +179,9 @@ namespace TradingBotV2.Backtesting
             await _broker.DisconnectAsync();
             _cancellation.Cancel();
 
+            var list = new List<Task>();
             try
             {
-                var list = new List<Task>();
                 if (_consumerTask != null)
                     list.Add(_consumerTask);
 
@@ -192,7 +192,7 @@ namespace TradingBotV2.Backtesting
             }
             catch (AggregateException ae)
             {
-                ae.Handle(ex =>
+                ae.Flatten().Handle(ex =>
                 {
                     if (ex is TaskCanceledException)
                     {
@@ -372,7 +372,7 @@ namespace TradingBotV2.Backtesting
 
         internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
         {
-            return await GetAsync<TData>(ticker, from, to, CancellationToken.None);
+            return await GetAsync<TData>(ticker, from, to, _cancellation!.Token);
         }
 
         internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime from, DateTime to, CancellationToken token) where TData : IMarketData, new()
@@ -392,7 +392,7 @@ namespace TradingBotV2.Backtesting
 
         internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime) where TData : IMarketData, new()
         {
-            return await GetAsync<TData>(ticker, dateTime, CancellationToken.None);
+            return await GetAsync<TData>(ticker, dateTime, _cancellation!.Token);
         }
 
         internal async Task<IEnumerable<TData>> GetAsync<TData>(string ticker, DateTime dateTime, CancellationToken token) where TData : IMarketData, new()

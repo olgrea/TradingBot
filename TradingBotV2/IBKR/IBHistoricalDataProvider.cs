@@ -15,6 +15,7 @@ namespace TradingBotV2.IBKR
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
         public const string DefaultDbPath = Constants.DbPath;
+        readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
         class MarketDataCache
         {
@@ -448,7 +449,7 @@ namespace TradingBotV2.IBKR
                 reqId = _client.RequestHistoricalData(contract, edt, durationStr, barSizeStr, "TRADES", false);
                 _pvc.NbRequest++;
 
-                await tcs.Task;
+                await tcs.Task.WaitAsync(Timeout, _token!.Value);
 
                 if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
                     _client.CancelHistoricalData(reqId);
@@ -551,7 +552,7 @@ namespace TradingBotV2.IBKR
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc.
                 _pvc.NbRequest++; 
                 _pvc.NbRequest++;
-                await tcs.Task;
+                await tcs.Task.WaitAsync(Timeout, _token!.Value);
 
                 if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
                     _client.CancelHistoricalData(reqId);
@@ -615,7 +616,7 @@ namespace TradingBotV2.IBKR
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES", false, true);
 
                 _pvc.NbRequest++;
-                await tcs.Task;
+                await tcs.Task.WaitAsync(Timeout, _token!.Value);
 
                 if (tcs.Task.IsFaulted || tcs.Task.IsCanceled)
                     _client.CancelHistoricalData(reqId);
