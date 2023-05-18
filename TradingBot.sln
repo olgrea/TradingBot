@@ -5,23 +5,7 @@ VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "TradingBot\TradingBot.csproj", "{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DevTesting", "DevTesting\DevTesting.csproj", "{C7B2E750-72B9-4311-9369-7D1CF6DF778E}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester", "Backtester\Backtester.csproj", "{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataFetcher", "HistoricalDataFetcher\HistoricalDataFetcher.csproj", "{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBClient.Tests", "IBClient.Tests\IBClient.Tests.csproj", "{0C28DC91-24D4-4325-8FEF-698FB8145F99}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBClient", "IBClient\IBClient.csproj", "{3966C751-61BF-4847-8DAB-BC0F778DDBD8}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataStorage", "DataStorage\DataStorage.csproj", "{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Backtester.Tests", "Backtester.Tests\Backtester.Tests.csproj", "{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot.Tests", "TradingBot.Tests\TradingBot.Tests.csproj", "{C9DB210E-D440-4D17-948A-F936839EA7B5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBotV2", "TradingBotV2\TradingBotV2.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
 EndProject
@@ -31,9 +15,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataGetterApp", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLog.TradingBot", "NLog.TradingBot\NLog.TradingBot.csproj", "{C0BA45C4-FAD1-4D42-9D3A-63BF2201DBFD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TraderApp", "TraderApp\TraderApp.csproj", "{9874910E-782E-4968-8B77-500BC8A6637F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TraderApp", "TraderApp\TraderApp.csproj", "{9874910E-782E-4968-8B77-500BC8A6637F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BacktesterApp", "BacktesterApp\BacktesterApp.csproj", "{2C3E092B-208A-4ADA-A388-4CA187330B99}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BacktesterApp", "BacktesterApp\BacktesterApp.csproj", "{2C3E092B-208A-4ADA-A388-4CA187330B99}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,42 +29,10 @@ Global
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C6E18C3-D7FC-4145-8E0F-60D5604B190E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C7B2E750-72B9-4311-9369-7D1CF6DF778E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C09F6AD6-D647-4FC8-B97A-8199615E5D9B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CC8AA39C-DD0F-4BBA-8645-D85C5FF59C0D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0C28DC91-24D4-4325-8FEF-698FB8145F99}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3966C751-61BF-4847-8DAB-BC0F778DDBD8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FA90F72F-C931-4E32-8DBE-FFA7B096AECB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DB6E78CB-ADFC-4521-9FF1-AA2A0D9A9BC5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C9DB210E-D440-4D17-948A-F936839EA7B5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}.Release|Any CPU.ActiveCfg = Release|Any CPU

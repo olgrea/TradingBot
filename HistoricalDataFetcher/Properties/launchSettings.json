@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "HistoricalDataFetcher": {
-      "commandName": "Project",
-      "commandLineArgs": "-t U -s 2022-11-08"
-    }
-  }
-}
