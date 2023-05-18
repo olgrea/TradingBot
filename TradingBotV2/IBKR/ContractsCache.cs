@@ -21,15 +21,19 @@ namespace TradingBotV2.IBKR
         public Contract Get(string ticker, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if (!_cache.ContainsKey(ticker))
+            if(!_cache.TryGetValue(ticker, out Contract? contract))
             {
-                lock(_cache)
+                lock (_cache)
                 {
                     token.ThrowIfCancellationRequested();
-                    if (!_cache.ContainsKey(ticker))
+                    if (!_cache.TryGetValue(ticker, out contract))
                         _cache[ticker] = GetContractAsync(ticker, "SMART", token).Result;
+                    else
+                        _client.Logger?.Debug($"Contract {contract.ConId} for {ticker} retrieved from cache.");
                 }
             }
+            else
+                _client.Logger?.Debug($"Contract {contract.ConId} for {ticker} retrieved from cache.");
 
             return _cache[ticker];
         }
@@ -45,6 +49,7 @@ namespace TradingBotV2.IBKR
             };
 
             var contractDetails = await GetContractDetailsAsync(sampleContract, token);
+            _client.Logger?.Trace($"contractDetails : ({string.Join(", ", contractDetails.Select(cd => cd.Contract.ConId.ToString()))})");
             return contractDetails.First().Contract;
         }
 
@@ -78,6 +83,7 @@ namespace TradingBotV2.IBKR
 
             try
             {
+                _client.Logger?.Debug($"Retrieving contract details for {contract.Symbol}.");
                 reqId = _client.RequestContractDetails(contract);
                 return await tcs.Task;
             }

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using NLog;
+using NLog.TradingBot;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
@@ -90,6 +91,8 @@ namespace TradingBotV2.Backtesting
 
             if (from.Date == DateTime.Now.Date || to.Date == DateTime.Now.Date)
                 throw new ArgumentException("Can't backtest the current day.");
+
+            logger ??= LogManager.GetLogger($"Backtester");
 
             _fakeAccount.Time = _currentTime = _result.Start = _start = from;
             _end = _result.End = to;
@@ -192,15 +195,7 @@ namespace TradingBotV2.Backtesting
             }
             catch (AggregateException ae)
             {
-                ae.Flatten().Handle(ex =>
-                {
-                    if (ex is TaskCanceledException)
-                    {
-                        Logger?.Debug("Task stopped");
-                        return true;
-                    }
-                    else return false;
-                });
+                ae.Flatten().Handle(ex => ex is TaskCanceledException);
             }
             finally
             {
@@ -222,7 +217,7 @@ namespace TradingBotV2.Backtesting
                 throw new InvalidOperationException($"Not connected");
             else if (IsDayOver())
             {
-                _logger?.Debug($"Backtesting of {_start.Date} already complete");
+                _logger?.Debug($"Backtesting of {_start.Date} already completed.");
                 return Task.FromResult(_result);
             }
 
@@ -244,6 +239,7 @@ namespace TradingBotV2.Backtesting
                 return;
 
             _isRunning = false;
+            // We wait until the latest AdvanceTime() iteration is complete
             _advanceTimeEvent.Wait();
 
             _totalRuntimeStopwatch.Stop();

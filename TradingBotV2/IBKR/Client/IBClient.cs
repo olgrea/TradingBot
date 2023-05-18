@@ -32,7 +32,7 @@ namespace TradingBotV2.IBKR.Client
         public const string DefaultIP = "127.0.0.1";
 
         ILogger? _logger;
-        EClientSocket _clientSocket;
+        EClientSocket _socket;
         EReaderSignal _signal;
         EReader? _reader;
         Task? _processMsgTask;
@@ -49,7 +49,7 @@ namespace TradingBotV2.IBKR.Client
             _logger = logger;
             _signal = new EReaderMonitorSignal();
             Responses = new IBResponses(_requestIdsToContracts, logger);
-            _clientSocket = new EClientSocket(Responses, _signal);
+            _socket = new EClientSocket(Responses, _signal);
 
             _contractsCache = new ContractsCache(this);
 
@@ -71,6 +71,7 @@ namespace TradingBotV2.IBKR.Client
 
         public IBResponses Responses { get; }
         internal ContractsCache ContractsCache => _contractsCache;
+        internal ILogger? Logger => _logger;
 
         // TODO : need to handle market data connection losses if the bot trades for multiple days. It seems to happen everyday at around 8pm
 
@@ -79,41 +80,51 @@ namespace TradingBotV2.IBKR.Client
         public void Connect(string host, int port, int clientId)
         {
             _clientId = clientId;
-            _clientSocket.eConnect(host, port, clientId);
-            _reader = new EReader(_clientSocket, _signal);
+            _socket.eConnect(host, port, clientId);
+            _reader = new EReader(_socket, _signal);
             _reader.Start();
             _processMsgTask = Task.Factory.StartNew(ProcessMsg, TaskCreationOptions.LongRunning);
-            _processMsgTask.ContinueWith(t => Responses.error(t.Exception ?? new Exception("Unknown EReader Thread exception")), TaskContinuationOptions.OnlyOnFaulted);
+            _processMsgTask.ContinueWith(t =>
+            {
+                Exception e = t.Exception ?? new Exception("Unknown EReader Thread exception");
+                _logger?.Fatal(e, $"EReader Thread failure.");
+                Responses.error(e);
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         void ProcessMsg()
         {
-            while (_clientSocket.IsConnected())
+            while (_socket.IsConnected())
             {
                 ArgumentNullException.ThrowIfNull(_reader);
                 _signal.waitForSignal();
+                _logger?.Trace("EReader Thread : process message.");
                 _reader.processMsgs();
             }
         }
 
         internal bool IsConnected()
         {
-            return _clientSocket.IsConnected();
+            _logger?.Trace($"{nameof(IsConnected)}");
+            return _socket.IsConnected();
         }
 
         public void Disconnect()
         {
-            _clientSocket.eDisconnect();
+            _logger?.Trace($"{nameof(Disconnect)}");
+            _socket.eDisconnect();
         }
 
         public void RequestValidOrderIds()
         {
-            _clientSocket.reqIds(-1); // param is deprecated
+            _logger?.Trace($"{nameof(RequestValidOrderIds)}");
+            _socket.reqIds(-1); // param is deprecated
         }
 
         public void RequestManagedAccounts()
         {
-            _clientSocket.reqManagedAccts();
+            _logger?.Trace($"{nameof(RequestManagedAccounts)}");
+            _socket.reqManagedAccts();
         }
 
         // https://interactivebrokers.github.io/tws-api/account_updates.html
@@ -123,29 +134,34 @@ namespace TradingBotV2.IBKR.Client
         // So you don't have any reliable ways of knowing when an update has finished...
         public void RequestAccountUpdates(string accountCode)
         {
-            _clientSocket.reqAccountUpdates(true, accountCode);
+            _logger?.Trace($"{nameof(_socket.reqAccountUpdates)}(true, {accountCode})");
+            _socket.reqAccountUpdates(true, accountCode);
         }
 
         public void CancelAccountUpdates(string accountCode)
         {
-            _clientSocket.reqAccountUpdates(false, accountCode);
+            _logger?.Trace($"{nameof(_socket.reqAccountUpdates)}(false, {accountCode})");
+            _socket.reqAccountUpdates(false, accountCode);
         }
 
         public int RequestContractDetails(Contract contract)
         {
             int reqId = NextValidId;
-            _clientSocket.reqContractDetails(reqId, contract);
+            _logger?.Trace($"{nameof(_socket.reqContractDetails)}(reqId : {reqId}, ConId : {contract.ConId})");
+            _socket.reqContractDetails(reqId, contract);
             return reqId;
         }
 
         public void RequestPositionsUpdates()
         {
-            _clientSocket.reqPositions();
+            _logger?.Trace($"{nameof(_socket.reqPositions)}");
+            _socket.reqPositions();
         }
 
         public void CancelPositionsUpdates()
         {
-            _clientSocket.cancelPositions();
+            _logger?.Trace($"{nameof(_socket.cancelPositions)}");
+            _socket.cancelPositions();
         }
 
         public void RequestPnLUpdates(string ticker)
@@ -158,7 +174,8 @@ namespace TradingBotV2.IBKR.Client
                 _contractsToRequestIds.Pnl[contract] = reqId;
 
                 // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-                _clientSocket.reqPnLSingle(reqId, _accountCode, "", contract.ConId);
+                _logger?.Trace($"{nameof(_socket.reqPnLSingle)}(reqId : {reqId}, conId : {contract.ConId})");
+                _socket.reqPnLSingle(reqId, _accountCode, "", contract.ConId);
             }
         }
 
@@ -167,7 +184,9 @@ namespace TradingBotV2.IBKR.Client
             var contract = ContractsCache.Get(ticker);
             if (_contractsToRequestIds.Pnl.TryGetValue(contract, out int reqId))
             {
-                _clientSocket.cancelPnLSingle(reqId);
+                _logger?.Trace($"{nameof(_socket.cancelPnLSingle)}(reqId : {reqId})");
+                _socket.cancelPnLSingle(reqId);
+
                 _requestIdsToContracts.Pnl.TryRemove(reqId, out _);
                 _contractsToRequestIds.Pnl.TryRemove(contract, out _);
             }
@@ -183,7 +202,8 @@ namespace TradingBotV2.IBKR.Client
                 _contractsToRequestIds.FiveSecBars[contract] = reqId;
 
                 // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
-                _clientSocket.reqRealTimeBars(reqId, contract, 5, "TRADES", true, null);
+                _logger?.Trace($"{nameof(_socket.reqRealTimeBars)}(reqId : {reqId}, conId : {contract.ConId})");
+                _socket.reqRealTimeBars(reqId, contract, 5, "TRADES", true, null);
             }
         }
 
@@ -192,7 +212,8 @@ namespace TradingBotV2.IBKR.Client
             var contract = ContractsCache.Get(ticker);
             if (_contractsToRequestIds.FiveSecBars.TryGetValue(contract, out var reqId))
             {
-                _clientSocket.cancelRealTimeBars(reqId);
+                _logger?.Trace($"{nameof(_socket.cancelRealTimeBars)}(reqId : {reqId})");
+                _socket.cancelRealTimeBars(reqId);
                 _requestIdsToContracts.FiveSecBars.TryRemove(reqId, out _);
                 _contractsToRequestIds.FiveSecBars.TryRemove(contract, out _);
             }
@@ -210,7 +231,9 @@ namespace TradingBotV2.IBKR.Client
                 int reqId = NextValidId;
                 idToC[reqId] = contract;
                 cToIds[contract] = reqId;
-                _clientSocket.reqTickByTickData(reqId, contract, tickType, 0, false);
+
+                _logger?.Trace($"{nameof(_socket.reqTickByTickData)}(reqId : {reqId}, conId : {contract.ConId}, tickType:{tickType})");
+                _socket.reqTickByTickData(reqId, contract, tickType, 0, false);
             }
         }
 
@@ -223,7 +246,8 @@ namespace TradingBotV2.IBKR.Client
 
             if (cToIds.TryGetValue(contract, out int reqId))
             {
-                _clientSocket.cancelTickByTickData(reqId);
+                _logger?.Trace($"{nameof(_socket.cancelTickByTickData)}(reqId : {reqId})");
+                _socket.cancelTickByTickData(reqId);
                 idToC.TryRemove(reqId, out _);
                 cToIds.TryRemove(contract, out _);
             }
@@ -254,49 +278,58 @@ namespace TradingBotV2.IBKR.Client
 
         public void RequestOpenOrders()
         {
-            _clientSocket.reqAllOpenOrders();
+            _logger?.Trace($"{nameof(_socket.reqAllOpenOrders)}");
+            _socket.reqAllOpenOrders();
         }
 
         public void PlaceOrder(Contract contract, Order order)
         {
             Debug.Assert(order.OrderId > 0);
             Debug.Assert(order.TotalQuantity > 0);
-            _clientSocket.placeOrder(order.OrderId, contract, order);
+
+            _logger?.Trace($"{nameof(_socket.placeOrder)}(orderId: {order.OrderId} conId: {contract.ConId})");
+            _socket.placeOrder(order.OrderId, contract, order);
         }
 
         public void CancelOrder(int orderId)
         {
             Debug.Assert(orderId > 0);
-            _clientSocket.cancelOrder(orderId, string.Empty);
+            _logger?.Trace($"{nameof(_socket.cancelOrder)}(orderId: {orderId})");
+            _socket.cancelOrder(orderId, string.Empty);
         }
 
         public void CancelAllOrders()
         {
-            _clientSocket.reqGlobalCancel();
+            _logger?.Trace($"{nameof(_socket.reqGlobalCancel)}");
+            _socket.reqGlobalCancel();
         }
 
         public int RequestHistoricalData(Contract contract, string endDateTime, string durationStr, string barSizeStr, string whatToShow, bool onlyRTH)
         {
             int reqId = NextValidId;
-            _clientSocket.reqHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, whatToShow, Convert.ToInt32(onlyRTH), 1, false, null);
+            _logger?.Trace($"{nameof(_socket.reqHistoricalData)}(reqId: {reqId}, conId: {contract.ConId}, endDateTime: {endDateTime}, durationStr: {durationStr}, barSize: {barSizeStr}, whatToShow: {whatToShow})");
+            _socket.reqHistoricalData(reqId, contract, endDateTime, durationStr, barSizeStr, whatToShow, Convert.ToInt32(onlyRTH), 1, false, null);
             return reqId;
         }
 
         public int RequestHistoricalTicks(Contract contract, string startDateTime, string endDateTime, int nbOfTicks, string whatToShow, bool onlyRTH, bool ignoreSize)
         {
             int reqId = NextValidId;
-            _clientSocket.reqHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, Convert.ToInt32(onlyRTH), ignoreSize, null);
+            _logger?.Trace($"{nameof(_socket.reqHistoricalTicks)}(reqId: {reqId}, conId: {contract.ConId}, startDateTime: {startDateTime}, endDateTime: {endDateTime}, nbOfTicks: {nbOfTicks}, whatToShow: {whatToShow})");
+            _socket.reqHistoricalTicks(reqId, contract, startDateTime, endDateTime, nbOfTicks, whatToShow, Convert.ToInt32(onlyRTH), ignoreSize, null);
             return reqId;
         }
 
         public void CancelHistoricalData(int reqId)
         {
-            _clientSocket.cancelHistoricalData(reqId);
+            _logger?.Trace($"{nameof(_socket.cancelHistoricalData)}(reqId: {reqId})");
+            _socket.cancelHistoricalData(reqId);
         }
 
         public void RequestServerTime()
         {
-            _clientSocket.reqCurrentTime();
+            _logger?.Trace($"{nameof(_socket.reqCurrentTime)}");
+            _socket.reqCurrentTime();
         }
     }
 }

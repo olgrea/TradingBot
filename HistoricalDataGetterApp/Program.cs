@@ -55,7 +55,7 @@ namespace HistoricalDataGetterApp
 
         public static async Task FetchEverything(string ticker, DateTime startDate, DateTime endDate, MarketDataOptions marketDataOptions)
         {
-            var logger = LogManager.GetLogger($"{nameof(HistoricalDataGetterApp)}");
+            var logger = LogManager.GetLogger($"HistoricalDataGetterAppDebug");
             var broker = new IBBroker(800, logger);
             await broker.ConnectAsync();
 
