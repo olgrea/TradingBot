@@ -53,6 +53,8 @@ namespace TradingBotV2.IBKR
 
         public IBHistoricalDataProvider(IBBroker broker, ILogger? logger)
         {
+            logger ??= LogManager.GetLogger($"IBHistoricalDataProvider");
+
             _broker = broker;
             _client = broker.Client;
             _logger = logger;
@@ -469,7 +471,7 @@ namespace TradingBotV2.IBKR
         {
             // Max nb of ticks per request is 1000, but since there can be multiple BidAsk/Last per second it's not possible to know how many
             // ticks are needed for the specified timerange.
-            // So we just do requests as long as the time range is filled.
+            // So we just do requests as long as the time range is not filled.
             // Inefficient because we're potentially retrieving more data than we need but it works...
             IEnumerable<IMarketData> data = new LinkedList<IMarketData>();
 

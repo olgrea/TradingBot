@@ -1,6 +1,8 @@
 ﻿using System.Globalization;
+using System.Runtime.InteropServices;
 using IBApi;
 using NLog;
+using NLog.Fluent;
 using static TradingBotV2.IBKR.Client.IBClient;
 
 namespace TradingBotV2.IBKR.Client
@@ -20,21 +22,21 @@ namespace TradingBotV2.IBKR.Client
         public Action? ConnectAck;
         public void connectAck()
         {
-            //_logger.Trace($"Connecting client to TWS...");
+            _logger?.Trace($"{nameof(connectAck)}");
             ConnectAck?.Invoke();
         }
 
         public Action? ConnectionClosed;
         public void connectionClosed()
         {
-            //_logger.Trace($"Connection closed");
+            _logger?.Trace($"{nameof(connectionClosed)}");
             ConnectionClosed?.Invoke();
         }
 
         public Action<IEnumerable<string>>? ManagedAccounts;
         public void managedAccounts(string accountsList)
         {
-            //_logger.Trace($"Account list : {accountsList}");
+            _logger?.Trace($"{accountsList}");
             var accounts = accountsList.Split(',');
             ManagedAccounts?.Invoke(accounts);
         }
@@ -42,21 +44,21 @@ namespace TradingBotV2.IBKR.Client
         public Action<int>? NextValidId;
         public void nextValidId(int orderId)
         {
-            //_logger.Trace($"NextValidId : {orderId}");
+            _logger?.Trace($"{orderId}");
             NextValidId?.Invoke(orderId);
         }
 
         public Action<DateTime>? UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
-            //_logger.Trace($"Getting account time : {timestamp}");
+            _logger?.Trace($"{timestamp}");
             UpdateAccountTime?.Invoke(DateTime.Parse(timestamp, CultureInfo.InvariantCulture));
         }
 
         public Action<AccountValue>? UpdateAccountValue;
         public void updateAccountValue(string key, string value, string currency, string accountName)
         {
-            //_logger.Trace($"account value : {key} {value} {currency}");
+            _logger?.Trace($"key: {key}, val:{value}, currency: {currency})");
             UpdateAccountValue?.Invoke(new AccountValue()
             {
                 Key = key,
@@ -71,28 +73,28 @@ namespace TradingBotV2.IBKR.Client
         {
             var pos = new Position(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL);
 
-            //_logger.Trace($"Getting portfolio : \n{pos}");
+            _logger?.Trace($"conId: {contract.ConId}, position:{position}, marketPrice: {marketPrice}, marketValue: {marketValue}, averageCost: {averageCost}, unrealizedPNL: {unrealizedPNL}, realizedPNL: {realizedPNL}, accName: {accountName}");
             UpdatePortfolio?.Invoke(pos);
         }
 
         public Action<string>? AccountDownloadEnd;
         public void accountDownloadEnd(string account)
         {
-            //_logger.Trace($"accountDownloadEnd ({account})");
+            _logger?.Trace($"{account}");
             AccountDownloadEnd?.Invoke(account);
         }
 
         public Action<int, string, string, string, string>? AccountSummary;
         public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
-            //_logger.Trace($"accountSummary reqId={reqId} account={account} tag={tag} value={value} currency={currency}");
+            _logger?.Trace($"reqId={reqId} account={account} tag={tag} value={value} currency={currency}");
             AccountSummary?.Invoke(reqId, account, tag, value, currency);
         }
 
         public Action<int>? AccountSummaryEnd;
         public void accountSummaryEnd(int reqId)
         {
-            //_logger.Trace($"accountSummaryEnd ({reqId})");
+            _logger?.Trace($"{reqId}");
             AccountSummaryEnd?.Invoke(reqId);
         }
 
@@ -101,21 +103,21 @@ namespace TradingBotV2.IBKR.Client
         {
             var p = new Position(contract, pos, avgCost);
 
-            //_logger.Trace($"position received for account {account} : contract={p.Contract} pos={pos} avgCost={avgCost}");
+            _logger?.Trace($"account {account}, conId: {contract.ConId}, pos: {pos}, avgCost: {avgCost}");
             Position?.Invoke(p);
         }
 
         public Action? PositionEnd;
         public void positionEnd()
         {
-            //_logger.Trace($"positionEnd");
+            _logger?.Trace($"positionEnd");
             PositionEnd?.Invoke();
         }
 
         public Action<PnL>? PnlSingle;
         public void pnlSingle(int reqId, decimal pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
-            //_logger.Trace($"PnL ({reqId}): {pnl}");
+            _logger?.Trace($"reqId: {reqId}, pos: {pos}, dailyPNL: {dailyPnL}, unrealizedPNL: {unrealizedPnL}, realizedPNL: {realizedPnL}, value :{value}");
             if(_requestIdsToContracts.Pnl.TryGetValue(reqId, out var contract))
                 PnlSingle?.Invoke(new PnL(contract.Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value));
         }
@@ -137,7 +139,7 @@ namespace TradingBotV2.IBKR.Client
                     Date = date
                 };
 
-                //_logger.Trace($"realtimeBar ({reqId}) : {bar}");
+                _logger?.Trace($"reqId: {reqId}, date: {date}, open: {open}, high: {high}, low: {low}, close: {close}, volume: {volume}, WAP: {WAP}, count: {count}");
                 RealtimeBar?.Invoke(contract.Symbol, bar);
             }
         }
@@ -156,8 +158,7 @@ namespace TradingBotV2.IBKR.Client
                     AskSize = askSize,
                     TickAttribBidAsk = tickAttribBidAsk
                 };
-
-                //_logger.Trace($"tickByTickBidAsk ({reqId}) : {bidAsk}");
+                _logger?.Trace($"reqId: {reqId}, time: {time}, bidPrice: {bidPrice}, askPrice: {askPrice}, bidSize: {bidSize}, askSize: {askSize}, attrib: {tickAttribBidAsk}");
                 TickByTickBidAsk?.Invoke(contract.Symbol, bidAsk);
             }
         }
@@ -177,7 +178,7 @@ namespace TradingBotV2.IBKR.Client
                     SpecialConditions = specialConditions,
                 };
 
-                //_logger.Trace($"tickByTickAllLast ({reqId}) : {last}");
+                _logger?.Trace($"reqId: {reqId}, tickType: {tickType}, time: {time}, price: {price}, size: {size}, exchange: {exchange}, specialConditions: {specialConditions}");
                 TickByTickAllLast?.Invoke(contract.Symbol, last);
             }
         }
@@ -185,23 +186,23 @@ namespace TradingBotV2.IBKR.Client
         public Action<int, IBApi.ContractDetails>? ContractDetails;
         public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
         {
-            //_logger.Trace($"contractDetails ({reqId}) : {contractDetails.Contract.Symbol}");
+            _logger?.Trace($"reqId: {reqId}, contract details of : {contractDetails.Contract.ConId}");
             ContractDetails?.Invoke(reqId, contractDetails);
         }
 
         public Action<int>? ContractDetailsEnd;
         public void contractDetailsEnd(int reqId)
         {
-            //_logger.Trace($"contractDetailsEnd ({reqId})");
+            _logger?.Trace($"reqId: {reqId}");
             ContractDetailsEnd?.Invoke(reqId);
         }
 
         public Action<Contract, Order, OrderState>? OpenOrder;
         public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            //_logger.Trace($"openOrder {orderId} : {c}, {o}, {os.Status}");
-            // if (!string.IsNullOrEmpty(os.WarningText))
-                //_logger.Warn($"openOrder {orderId} : Warning {os.WarningText}");
+            _logger?.Trace($"orderId: {orderId}, conId: {contract.ConId}, orderState: {orderState.Status}");
+            if (!string.IsNullOrEmpty(orderState.WarningText))
+                _logger?.Warn($"Warning : {orderState.WarningText}");
 
             OpenOrder?.Invoke(contract, order, orderState);
         }
@@ -211,7 +212,7 @@ namespace TradingBotV2.IBKR.Client
         // This is not called when placing an order.
         public void openOrderEnd()
         {
-            //_logger.Trace($"openOrderEnd");
+            _logger?.Trace($"openOrderEnd");
             OpenOrderEnd?.Invoke();
         }
 
@@ -232,37 +233,37 @@ namespace TradingBotV2.IBKR.Client
                 MktCapPrice = mktCapPrice,
             };
 
-            //_logger.Trace($"orderStatus {orderId} : {os}");
+            _logger?.Trace($"orderId: {orderId}, status: {status}, filled: {filled}, remaining: {remaining}, avgFillPrice: {avgFillPrice}, permId: {permId}, parentId : {parentId}, lastFillPrice: {lastFillPrice}, clientId: {clientId}, whyHeld: {whyHeld}, mktCapPrice: {mktCapPrice}");
             OrderStatus?.Invoke(os);
         }
 
         public Action<Contract, Execution>? ExecDetails;
         public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
         {
-            //_logger.Trace($"execDetails ({reqId}) : {ex}");
+            _logger?.Trace($"reqId: {reqId}, conId: {contract.ConId}, execId: {execution.ExecId}");
             ExecDetails?.Invoke(contract, execution);
         }
 
         public Action<int>? ExecDetailsEnd;
         public void execDetailsEnd(int reqId)
         {
-            //_logger.Trace($"execDetailsEnd : reqId={reqId}");
+            _logger?.Trace($"reqId: {reqId}");
             ExecDetailsEnd?.Invoke(reqId);
         }
 
         public Action<CommissionReport>? CommissionReport;
         public void commissionReport(CommissionReport commissionReport)
         {
-            //_logger.Trace($"commissionReport : commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
+            _logger?.Trace($"execId: {commissionReport.ExecId}, commission={commissionReport.Commission} Currency={commissionReport.Currency} RealizedPNL={commissionReport.RealizedPNL}");
             CommissionReport?.Invoke(commissionReport);
         }
 
         public Action<Contract, Order, OrderState>? CompletedOrder;
         public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
         {
-            //_logger.Trace($"completedOrder {o.Id} : {c}, {o}, {os.Status}");
-            // if (!string.IsNullOrEmpty(os.WarningText))
-                //_logger.Warn($"completedOrder {o.Id} : Warning {os.WarningText}");
+            _logger?.Trace($"conId: {contract.ConId}, orderState: {orderState.Status}");
+            if (!string.IsNullOrEmpty(orderState.WarningText))
+                _logger?.Warn($"Warning {orderState.WarningText}");
 
             CompletedOrder?.Invoke(contract, order, orderState);
         }
@@ -270,42 +271,44 @@ namespace TradingBotV2.IBKR.Client
         public Action? CompletedOrdersEnd;
         public void completedOrdersEnd()
         {
-            //_logger.Trace($"completedOrdersEnd");
+            _logger?.Trace($"completedOrdersEnd");
             CompletedOrdersEnd?.Invoke();
         }
 
         public Action<int, Bar>? HistoricalData;
         public void historicalData(int reqId, IBApi.Bar bar)
         {
+            _logger?.Trace($"reqId: {reqId}, Time: {bar.Time}, Open: {bar.Open}, High: {bar.High}, Low: {bar.Low}, Close: {bar.Close}, Volume: {bar.Volume}, WAP: {bar.WAP}, Count: {bar.Count}");
             HistoricalData?.Invoke(reqId, bar);
-            //_logger.Trace($"historicalData : {bar}");
         }
 
         public Action<int, string, string>? HistoricalDataEnd;
         public void historicalDataEnd(int reqId, string start, string end)
         {
+            _logger?.Trace($"reqId: {reqId}, start: {start}, end: {end}");
             HistoricalDataEnd?.Invoke(reqId, start, end);
-            //_logger.Trace($"historicalDataEnd");
         }
 
         public Action<int, IEnumerable<HistoricalTickBidAsk>, bool>? HistoricalTicksBidAsk;
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
+            foreach(var tick in ticks)
+                _logger?.Trace($"reqId: {reqId}, time: {tick.Time}, PriceBid: {tick.PriceBid}, PriceAsk: {tick.PriceAsk}, SizeBid: {tick.SizeBid}, SizeAsk: {tick.SizeAsk}, done: {done}");
             HistoricalTicksBidAsk?.Invoke(reqId, ticks, done);
-            //_logger.Trace($"historicalTicksBidAsk");
         }
 
         public Action<int, IEnumerable<HistoricalTickLast>, bool>? HistoricalTicksLast;
         public void historicalTicksLast(int reqId, HistoricalTickLast[] ticks, bool done)
         {
+            foreach (var tick in ticks)
+                _logger?.Trace($"reqId: {reqId}, time: {tick.Time}, Price: {tick.Price}, Size: {tick.Size}, done: {done}");
             HistoricalTicksLast?.Invoke(reqId, ticks, done);
-            //_logger.Trace($"historicalTicksLast");
         }
 
         public Action<long>? CurrentTime;
         public void currentTime(long time)
         {
-            //_logger.Trace($"currentTime");
+            _logger?.Trace($"time: {time}");
             CurrentTime?.Invoke(time);
         }
 
@@ -357,10 +360,8 @@ namespace TradingBotV2.IBKR.Client
                 return;
             else if (msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
                 return;
-
-            // TODO : investigate which is better. Ideally it would be nice if I could just throw
-            //throw ex;
-            //_logger?.Error(ex);
+            
+            _logger?.Error(msg);
             Error?.Invoke(msg);
         }
 

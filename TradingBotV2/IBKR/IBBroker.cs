@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using NLog;
+using NLog.TradingBot;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;
@@ -24,6 +25,9 @@ namespace TradingBotV2.IBKR
         {
             _port = GetPort();
             _clientId = clientId;
+
+            logger ??= LogManager.GetLogger($"IBBroker");
+
             _client = new IBClient(logger);
             _logger = logger;
 
@@ -58,14 +62,14 @@ namespace TradingBotV2.IBKR
             var ibGatewayProc = Process.GetProcessesByName("ibgateway").FirstOrDefault();
             if (ibGatewayProc != null)
             {
-                _logger?.Trace($"ibgateway is running");
+                _logger?.Debug($"ibgateway is running");
                 return IBClient.DefaultIBGatewayPort;
             }
 
             var twsProc = Process.GetProcessesByName("tws").FirstOrDefault();
             if (twsProc != null)
             {
-                _logger?.Trace($"TWS is running");
+                _logger?.Debug($"TWS is running");
                 return IBClient.DefaultTWSPort;
             }
 
@@ -127,6 +131,7 @@ namespace TradingBotV2.IBKR
 
                 await tcs.Task;
                 _account = new Account(tcs.Task.Result);
+                _logger?.Debug($"Connected. Account Code : {_account.Code}");
             }
             finally
             {
@@ -155,6 +160,7 @@ namespace TradingBotV2.IBKR
                 _logger?.Debug($"Disconnecting from TWS");
                 _client.Disconnect();
                 await tcs.Task;
+                _logger?.Debug($"Disconnected.");
                 _account = null;
             }
             finally
@@ -174,8 +180,11 @@ namespace TradingBotV2.IBKR
             _client.Responses.ManagedAccounts += managedAccount;
             try
             {
+                _logger?.Debug($"Requesting managed account list...");
                 _client.RequestManagedAccounts();
-                return await tcs.Task;
+                var result = await tcs.Task;
+                _logger?.Debug($"ManagedAccountlist received.");
+                return result;
             }
             finally
             {
@@ -212,7 +221,9 @@ namespace TradingBotV2.IBKR
             {
                 _logger?.Debug($"Retrieving Account {_account.Code}");
                 RequestAccountUpdates();
-                return await tcs.Task;
+                var result = await tcs.Task;
+                _logger?.Debug($"Account received");
+                return result;
             }
             finally
             {
@@ -234,7 +245,7 @@ namespace TradingBotV2.IBKR
         public void RequestAccountUpdates()
         {
             Debug.Assert(_account != null);
-            _logger?.Debug($"Requesting account {_account.Code} updates...");
+            _logger?.Debug($"Requesting account updates for {_account.Code}...");
 
 
             // TODO : Handle connection lost
@@ -249,7 +260,7 @@ namespace TradingBotV2.IBKR
         {
             Debug.Assert(_account != null);
             CancelPnLUpdates();
-            _logger?.Debug($"Cancelling account {_account.Code} updates...");
+            _logger?.Debug($"Cancelling account updates for {_account.Code}...");
             _client.CancelAccountUpdates(_account.Code);
             _client.CancelPositionsUpdates();
         }
@@ -272,7 +283,6 @@ namespace TradingBotV2.IBKR
         {
             Debug.Assert(_account != null);
             string curr = !string.IsNullOrEmpty(accValue.Currency) ? $"currency={accValue.Currency}" : string.Empty;
-            _logger?.Trace($"OnAccountValueUpdate : key={accValue.Key}, value={accValue.Value} {curr}");
             switch (accValue.Key)
             {
                 case "AccountReady":
@@ -307,14 +317,12 @@ namespace TradingBotV2.IBKR
         {
             Debug.Assert(_account != null);
             Position pos = (Position)ibPos;
-            _logger?.Trace($"OnPortfolioUpdate : {pos}");
             _account.Positions[ibPos.Contract.Symbol] = pos;
         }
 
         void OnAccountDownloadEnd(string account)
         {
             Debug.Assert(_account != null);
-            _logger?.Trace($"OnAccountDownloadEnd");
         }
 
         void OnPositionReceived(IBApi.Position ibPos)
@@ -347,7 +355,6 @@ namespace TradingBotV2.IBKR
         void OnPositionReceptionEnd()
         {
             Debug.Assert(_account != null);
-            _logger?.Trace($"OnPositionReceptionEnd");
         }
 
         void RequestPnLUpdate(Position pos)
@@ -355,10 +362,10 @@ namespace TradingBotV2.IBKR
             if (pos.PositionAmount <= 0)
                 return;
 
-            _logger?.Trace($"Requesting live PnL updates for ticker {pos.Ticker}...");
+            _logger?.Debug($"Requesting live PnL updates for ticker {pos.Ticker}...");
 
-            // PnL subscriptions are requested after receiving a position update. Since these updates are supplied
-            // by the EReader thread, we start a Task in order to prevent a deadlock.
+            // PnL subscriptions are requested after receiving a position update. These updates are supplied
+            // by the EReader thread so we start a Task in order to prevent a deadlock.
             // TODO : implement some kind of custom SynchronizationContext in order to prevent having to do this?
             Task.Run(() => _client.RequestPnLUpdates(pos.Ticker!));
             _pnlSubscriptions.Add(pos.Ticker!);
@@ -370,7 +377,6 @@ namespace TradingBotV2.IBKR
             if(!_pnlTraces.Contains(pnl.Ticker))
             {
                 _pnlTraces.Add(pnl.Ticker);
-                _logger?.Trace($"pnl received : {pnl.Ticker}");
             }
 
             PnLUpdated?.Invoke((PnL)pnl);
@@ -385,7 +391,7 @@ namespace TradingBotV2.IBKR
 
         void CancelPnLUpdate(string ticker)
         {
-            _logger?.Trace($"Cancelling live PnL updates for ticker {ticker}...");
+            _logger?.Debug($"Cancelling live PnL updates for ticker {ticker}...");
             Task.Run(() => _client.CancelPnLUpdates(ticker));
             _pnlTraces.Remove(ticker);
             _pnlSubscriptions.Remove(ticker);
@@ -405,8 +411,12 @@ namespace TradingBotV2.IBKR
             {
                 _client.Responses.CurrentTime += currentTime;
                 _client.Responses.Error += error;
+                
+                _logger?.Debug($"Requesting current server time...");
                 _client.RequestServerTime();
-                return await tcs.Task;
+                var result = await tcs.Task;
+                _logger?.Debug($"Server time : {result}");
+                return result;
             }
             finally
             {
