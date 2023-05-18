@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "DevTesting": {
-      "commandName": "Project",
-      "commandLineArgs": "-t GME -s 9:30"
-    }
-  }
-}
