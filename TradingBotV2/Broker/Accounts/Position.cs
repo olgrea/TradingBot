@@ -14,6 +14,14 @@
                 MarketValue = pnl.MarketValue,
             };
         }
+
+        public override string? ToString()
+        {
+            var unrealized = UnrealizedPnL == double.MaxValue ? 0.0 : UnrealizedPnL;
+            var realized = RealizedPnL == double.MaxValue ? 0.0 : RealizedPnL;
+            var daily = DailyPnL == double.MaxValue ? 0.0 : DailyPnL;
+            return $"{Pos} {Ticker} : unrealized {unrealized:c} realized : {realized:c} daily : {daily:c}";
+        }
     }
 
     public class Position

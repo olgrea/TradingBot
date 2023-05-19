@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Reflection;
 using NLog;
-using NLog.TradingBot;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.MarketData;
@@ -76,7 +75,7 @@ namespace TradingBotV2.Backtesting
         DateTime _end;
         DateTime _currentTime;
         DateTime? _lastProcessedTime;
-        Dictionary<(string, Type), DateTime> _timeSlicesUpperBounds = new();
+        Dictionary<(string, string), DateTime> _timeSlicesUpperBounds = new();
         
         BacktesterProgress _progress = new BacktesterProgress();
         BacktestingResults _result = new BacktestingResults();
@@ -89,8 +88,8 @@ namespace TradingBotV2.Backtesting
             if(to - from > TimeSpan.FromDays(1))
                 throw new ArgumentException("Can only backtest a single day.");
 
-            if (from.Date == DateTime.Now.Date || to.Date == DateTime.Now.Date)
-                throw new ArgumentException("Can't backtest the current day.");
+            if (from >= DateTime.Now || to >= DateTime.Now)
+                throw new ArgumentException("Can't backtest the future!");
 
             logger ??= LogManager.GetLogger($"Backtester");
 
@@ -157,7 +156,7 @@ namespace TradingBotV2.Backtesting
             if (_consumerTask != null)
                 throw new ErrorMessage("Already connected");
 
-            _logger?.Trace($"Backtester connected.");
+            _logger?.Debug($"Backtester connected.");
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
             _cancellation.Token.Register(() => _startTcs?.TrySetCanceled());
             _consumerTask = Task.Factory.StartNew(() => ConsumeRequests(_cancellation.Token), _cancellation.Token, TaskCreationOptions.LongRunning, TaskScheduler.Current);
@@ -207,7 +206,7 @@ namespace TradingBotV2.Backtesting
                     t.Dispose();
                 _marketDataBackgroundTasks.Clear();
 
-                _logger?.Trace($"Backtester disconnected.");
+                _logger?.Debug($"Backtester disconnected.");
             }
         }
 
@@ -226,6 +225,7 @@ namespace TradingBotV2.Backtesting
             else
                 _logger?.Debug($"Backtester resumed at {_currentTime}");
 
+            _logger?.Debug($"Current db : {DbPath}");
             _startTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
             _totalRuntimeStopwatch.Start();
@@ -292,18 +292,15 @@ namespace TradingBotV2.Backtesting
                         _logger?.Trace($"Request consumed : {action.GetMethodInfo().Name}");
                     }
 
-                    if (!_isRunning)
-                        continue;
-                    
-                    if (!IsDayOver())
-                        AdvanceTime(token);
-                    else
+                    if(IsDayOver())
                     {
                         Stop();
                         _result.RunTime = _totalRuntimeStopwatch.Elapsed;
-                        _logger?.Debug($"Backtester finished. Runtime : {_result.RunTime}");
+                        _logger?.Debug($"Backtesting finished. Runtime : {_result.RunTime}");
                         _startTcs?.TrySetResult(_result);
                     }
+                    else if (_isRunning)
+                        AdvanceTime(token);
                 }
             }
             catch (OperationCanceledException)
@@ -355,13 +352,15 @@ namespace TradingBotV2.Backtesting
 
             // µs resolution. Not always super accurate but it's good enough
             long nbMicroSecToWait = timeToWait.Ticks / 10;
-            double microSecPerTick = 1000000D / Stopwatch.Frequency;
+            double microSecPerTick = 1_000_000.0 / Stopwatch.Frequency;
 
             _µsWaitStopwatch.Restart();
             Thread.SpinWait(10);
             while((long)(_µsWaitStopwatch.ElapsedTicks * microSecPerTick) < nbMicroSecToWait)
                 Thread.SpinWait(10);
             _µsWaitStopwatch.Stop();
+            
+            _logger?.Trace($"expected : {nbMicroSecToWait} µs, actual : {_µsWaitStopwatch.ElapsedTicks*microSecPerTick} µs");
         }
 
         bool IsDayOver() => _currentTime >= _end;
@@ -397,8 +396,8 @@ namespace TradingBotV2.Backtesting
             var lower = dateTime;
             var upper = dateTime.AddSeconds(1);
 
-            var key = (ticker, typeof(TData));
-            if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] < dateTime)
+            var key = (ticker, typeof(TData).Name);
+            if (!_timeSlicesUpperBounds.ContainsKey(key) || _timeSlicesUpperBounds[key] <= dateTime)
             {
                 upper = dateTime.Ceiling(TimeSpan.FromMinutes(10));
                 if (upper >= EndTime)
@@ -424,6 +423,7 @@ namespace TradingBotV2.Backtesting
 
         private void GetDailyDataOnBackgroundTask<TData>(string ticker, CancellationToken token) where TData : IMarketData, new()
         {
+            _logger?.Debug($"Market data background task started for {ticker}");
             _ = _marketDataBackgroundTasks.GetOrAdd(ticker, t =>
             {
                 var task = Task.Run(async () =>
@@ -473,6 +473,7 @@ namespace TradingBotV2.Backtesting
         internal void SendAccountUpdates()
         {
             AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, _currentTime.ToString()));
+            _logger?.Trace($"Sending account update : time : {_currentTime}");
             Account.Time = _currentTime;
             _lastAccountUpdateTime = _currentTime;
         }

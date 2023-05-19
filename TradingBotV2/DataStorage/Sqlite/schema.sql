@@ -38,7 +38,8 @@ Bars.WAP,
 Bars.NbTrades
 FROM Bars 
 LEFT JOIN Tickers ON Tickers.Id = Bars.Ticker 
-LEFT JOIN OHLC ON OHLC.Id = Bars.OHLC;
+LEFT JOIN OHLC ON OHLC.Id = Bars.OHLC
+ORDER BY DateTime;
 
 -- View: BidAsksView
 CREATE VIEW BidAsksView AS SELECT Tickers.Symbol AS Ticker, 
@@ -50,7 +51,8 @@ BidAskPrices.Ask,
 BidAskPrices.AskSize
 FROM BidAsks 
 LEFT JOIN Tickers ON Tickers.Id = BidAsks.Ticker 
-LEFT JOIN BidAskPrices ON BidAskPrices.Id = BidAsks.BidAsk;
+LEFT JOIN BidAskPrices ON BidAskPrices.Id = BidAsks.BidAsk
+ORDER BY DateTime;
 
 -- View: LastsView
 CREATE VIEW LastsView AS SELECT Tickers.Symbol AS Ticker, 
@@ -59,7 +61,8 @@ time(DateTime, 'unixepoch', 'localtime') AS Time,
 Lasts.Price,
 Lasts.Size
 FROM Lasts
-LEFT JOIN Tickers ON Tickers.Id = Lasts.Ticker;
+LEFT JOIN Tickers ON Tickers.Id = Lasts.Ticker
+ORDER BY DateTime;
 
 COMMIT TRANSACTION;
 PRAGMA foreign_keys = on;
