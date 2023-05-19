@@ -4,8 +4,8 @@ namespace TradingBotV2.Strategies
 {
     public interface IStrategy
     {
-        TimeSpan StartTime { get; }
-        TimeSpan EndTime { get; }
+        DateTime StartTime { get; }
+        DateTime EndTime { get; }
         Task Start();
         Task Initialize();
     }

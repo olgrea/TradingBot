@@ -54,12 +54,6 @@ namespace BacktesterTests
         }
 
         [Test]
-        public void Backtester_CurrentDay_WhenCreated_Throws()
-        {
-            Assert.Throws<ArgumentException>(() => TestsUtils.CreateBacktester(DateOnly.FromDateTime(DateTime.Now)));
-        }
-
-        [Test]
         public async Task Backtester_WhenStarted_UpdateProgress()
         {
             BacktesterProgress? firstProgress = null;

@@ -71,6 +71,12 @@ namespace TradingBotV2.Utils
             return (new DateTime(date.Date.Ticks + startTime.Ticks), new DateTime(date.Date.Ticks + endTime.Ticks));
         }
 
+        public static (DateTime, DateTime) ToMarketHours(this DateOnly date, bool extendedHours = false)
+        {
+            var (startTime, endTime) = extendedHours ? ExtendedHoursTimeRange : MarketDayTimeRange;
+            return (date.ToDateTime(TimeOnly.FromTimeSpan(startTime)), date.ToDateTime(TimeOnly.FromTimeSpan(endTime)));
+        }
+
         public static IEnumerable<(DateTime, DateTime)> GetMarketDays(DateTime start, DateTime end, bool extendedHours = false)
         {
             var (startTime, endTime) = extendedHours ? ExtendedHoursTimeRange : MarketDayTimeRange;

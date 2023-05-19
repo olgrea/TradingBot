@@ -205,7 +205,7 @@ namespace TradingBotV2.Backtesting
 
         void ExecuteOrder(string ticker, Order order, double price)
         {
-            _logger?.Info($"{order} : Executing at price {price:c}");
+            _logger?.Debug($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
             Account account = _backtester.Account;

@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TradingBotV2.Broker.Accounts;
-
-namespace TradingBotV2.Broker.Orders
+﻿namespace TradingBotV2.Broker.Orders
 {
     internal class OrderValidator
     {

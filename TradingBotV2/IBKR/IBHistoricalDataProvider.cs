@@ -15,7 +15,7 @@ namespace TradingBotV2.IBKR
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
         public const string DefaultDbPath = Constants.DbPath;
-        readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
+        TimeSpan Timeout => !Debugger.IsAttached ? TimeSpan.FromSeconds(15) : TimeSpan.FromMilliseconds(-1);
 
         class MarketDataCache
         {
@@ -103,14 +103,12 @@ namespace TradingBotV2.IBKR
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateOnly date, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} on {date.ToShortDateString()} from {MarketDataUtils.MarketStartTime} to {MarketDataUtils.MarketStartTime}");
             var marketHours = date.ToDateTime(default).ToMarketHours();
             return await GetHistoricalDataAsync<TData>(ticker, marketHours.Item1, marketHours.Item2, token);
         }
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime dateTime, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} at {dateTime}");
             return await GetHistoricalDataAsync<TData>(ticker, dateTime, dateTime.AddSeconds(1), token);
         }
 
@@ -235,7 +233,7 @@ namespace TradingBotV2.IBKR
 
             _lastOperationStats.NbInsertedInCache += nbInserted;
             if(nbInserted > 0)
-                _logger?.Debug($"{nbInserted} {typeof(TData).Name} inserted into cache.");
+                _logger?.Trace($"{nbInserted} {typeof(TData).Name} inserted into cache.");
         }
 
         bool TryGetFromDb<TData>(string ticker, DateTime from, DateTime to, DbCommandFactory cmdFactory, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
@@ -280,7 +278,7 @@ namespace TradingBotV2.IBKR
             {
                 _lastOperationStats.NbInsertedInDb += iCmd.NbInserted;
                 if(iCmd.NbInserted > 0)
-                    _logger?.Debug($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
+                    _logger?.Trace($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
             }
         }
 
@@ -419,6 +417,11 @@ namespace TradingBotV2.IBKR
             {
                 case BarLength._1Sec:
                     durationStr = $"{count} S";
+                    if (count == 1)
+                    {
+                        // For some reasons requesting a single 1 sec bar from TWS is invalid
+                        throw new ArgumentException("Requesting a single 1 sec bar is not permitted");
+                    }
                     barSizeStr = "1 secs";
                     break;
 

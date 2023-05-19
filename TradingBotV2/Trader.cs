@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using NLog;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
+using TradingBotV2.Broker.Orders;
 using TradingBotV2.Strategies;
 using TradingBotV2.Strategies.TestStrategies;
 using TradingBotV2.Utils;
@@ -11,10 +11,14 @@ using TradingBotV2.Utils;
 [assembly: InternalsVisibleTo("TradingBotV2.Tests")]
 namespace TradingBotV2
 {
-    public struct TradeResults
+    // TODO : read record doc again
+    public record struct Trade(OrderAction Action, double Qty, string Ticker, double Price, double Commission, DateTime Time);
+
+    public class TradeResults
     {
         public DateTime Start { get; set; }
         public DateTime End { get; set; }
+        public List<Trade> Trades { get; set; } = new();
     }
 
     public class Trader
@@ -29,14 +33,13 @@ namespace TradingBotV2
         {
             _broker = broker;
             _logger = logger;
-            AddStrategy(new BollingerBandsStrategy(MarketDataUtils.MarketStartTime, MarketDataUtils.MarketEndTime, "GME", this));
         }
 
         internal ILogger? Logger => _logger;
         internal IBroker Broker => _broker;
         internal Account Account => _account!;
 
-        void AddStrategy(IStrategy newStrat)
+        public void AddStrategy(IStrategy newStrat)
         {
             foreach (IStrategy strat in _strategies)
             {
@@ -49,43 +52,79 @@ namespace TradingBotV2
 
         public async Task<TradeResults> Start()
         {
-            if (!_strategies.Any())
-                throw new Exception("No strategies set for this trader");
-
-            var accCode = await _broker.ConnectAsync();
-            if (accCode != "DU5962304" && accCode != "FAKEACCOUNT123")
-                throw new Exception($"Only paper trading and tests are allowed for now");
-
-            _broker.AccountValueUpdated += OnAccountValueUpdated;
-            _broker.PositionUpdated += OnPositionUpdated;
-            _broker.PnLUpdated += OnPnLUpdated;
-            _account = await _broker.GetAccountAsync();
-            Debug.Assert(_account != null);
-
-            if (!_account.CashBalances.ContainsKey("USD"))
-                throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
-
-            foreach(IStrategy strat in _strategies.OrderBy(s => s.StartTime))
+            try
             {
-                await strat.Start();
-            }
+                if (!_strategies.Any())
+                    throw new Exception("No strategies set for this trader");
 
-            return _results;
+                var accCode = await _broker.ConnectAsync();
+                if (accCode != "DU5962304" && accCode != "FAKEACCOUNT123")
+                    throw new Exception($"Only paper trading and tests are allowed for now");
+
+                _broker.AccountValueUpdated += OnAccountValueUpdated;
+                _broker.PositionUpdated += OnPositionUpdated;
+                _broker.PnLUpdated += OnPnLUpdated;
+                _broker.OrderManager.OrderExecuted += OrderExecuted;
+
+                _account = await _broker.GetAccountAsync();
+                Debug.Assert(_account != null);
+
+                if (!_account.CashBalances.ContainsKey("USD"))
+                    throw new Exception($"No USD cash funds in account {_account.Code}. This trader only trades in USD.");
+
+                IOrderedEnumerable<IStrategy> orderedStrats = _strategies.OrderBy(s => s.StartTime);
+                _results.Start = orderedStrats.First().StartTime;
+                _results.End = orderedStrats.Last().EndTime;
+            
+                _logger?.Info($"Trader started. Starting cash balance : {_account.CashBalances["USD"]:c} USD in account {_account.Code}");
+                foreach (IStrategy strat in orderedStrats)
+                {
+                    await strat.Start();
+                }
+
+                return _results;
+            }
+            finally
+            {
+                await _broker.OrderManager.CancelAllOrdersAsync();
+                await _broker.OrderManager.SellAllPositionsAsync();
+            }
+        }
+
+        void OrderExecuted(string ticker, OrderExecution oe)
+        {
+            _logger?.Info($"{oe}");
+            _results.Trades.Add(new Trade(
+                Action: oe.Action,
+                Qty: oe.Shares,
+                Ticker: ticker, 
+                Price: oe.AvgPrice,
+                Commission: oe.CommissionInfo!.Commission,
+                Time: oe.Time
+                ));
         }
 
         void OnAccountValueUpdated(AccountValue val)
         {
-            // TODO : log
+            switch (val.Key) 
+            {
+                case AccountValueKey.CashBalance:
+                    _logger?.Info($"Cash balance : {val.Value:c} {val.Currency}");
+                    break;
+                case AccountValueKey.RealizedPnL:
+                    _logger?.Info($"RealizedPnL : {val.Value:c} {val.Currency}");
+                    break;
+            }
         }
 
         void OnPositionUpdated(Position pos)
         {
-            
+            _logger?.Info($"Position : {pos}");
         }
 
         void OnPnLUpdated(PnL pnl)
         {
-            
+            _logger?.Info($"PnL : {pnl}");
         }
 
         bool AreOverlapping(IStrategy s1, IStrategy s2)

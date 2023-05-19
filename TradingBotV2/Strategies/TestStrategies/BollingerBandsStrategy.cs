@@ -19,7 +19,7 @@ namespace TradingBotV2.Strategies.TestStrategies
 
         ActionBlock<DateTime>? _executeStrategyBlock;
 
-        public BollingerBandsStrategy(TimeSpan start, TimeSpan end, string ticker, Trader trader)
+        public BollingerBandsStrategy(DateTime start, DateTime end, string ticker, Trader trader)
         {
             _trader = trader;
             _ticker = ticker;
@@ -33,8 +33,8 @@ namespace TradingBotV2.Strategies.TestStrategies
         }
 
         BollingerBands BollingerBands { get; init; }
-        public TimeSpan StartTime { get; init; }
-        public TimeSpan EndTime { get; init; }
+        public DateTime StartTime { get; init; }
+        public DateTime EndTime { get; init; }
 
         public async Task Start()
         {
@@ -49,11 +49,11 @@ namespace TradingBotV2.Strategies.TestStrategies
         async Task ExecuteStrategy(DateTime time)
         {
             Debug.Assert(_executeStrategyBlock != null);
-            if (time.TimeOfDay < StartTime)
+            if (time < StartTime)
             {
                 return;
             }
-            else if (time.TimeOfDay >= EndTime)
+            else if (time >= EndTime)
             {
                 _executeStrategyBlock.Complete();
                 return;
@@ -69,7 +69,6 @@ namespace TradingBotV2.Strategies.TestStrategies
 
                 var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
                 await _trader.Broker.OrderManager.PlaceOrderAsync(_ticker, buyOrder);
-
             }
             else if (signals.Contains(BollingerBandsSignals.Overbought))
             {
