@@ -1,0 +1,47 @@
+﻿using System.Globalization;
+using TradingBot.Utils;
+
+namespace TradingBot.Broker.Orders
+{
+    public class OrderExecution
+    {
+        public OrderExecution(string execId, int orderId)
+        {
+            ExecId = execId;
+            OrderId = orderId;
+        }
+
+        internal string ExecId { get; set; } 
+        public int OrderId { get; set; }
+        public DateTime Time { get; set; }
+        public string? AcctNumber { get; set; } 
+        public string? Exchange { get; set; } 
+        public OrderAction Action { get; set; }
+        public double Shares { get; set; }
+        public double Price { get; set; }
+        public double AvgPrice { get; set; }
+        public CommissionInfo? CommissionInfo { get; set; }
+
+        public override string ToString()
+        {
+            return $"[{OrderId}] : {Action} {Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange} time={Time} execId={ExecId}";
+        }
+
+        public static explicit operator OrderExecution(IBApi.Execution exec)
+        {
+            var time = exec.Time.Substring(0, exec.Time.Length - exec.Time.LastIndexOf(' '));
+
+            return new OrderExecution(exec.ExecId, exec.OrderId)
+            {
+                Exchange = exec.Exchange,
+                Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,
+                Shares = Convert.ToDouble(exec.Shares),
+                Price = exec.Price,
+                AvgPrice = exec.AvgPrice,
+
+                // TODO : confirm that format is correct. It changed when updating to API v10.16
+                Time = DateTime.SpecifyKind(DateTime.ParseExact(time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
+            };
+        }
+    }
+}
