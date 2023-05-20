@@ -10,6 +10,7 @@ namespace TradingBot.Indicators
         Oversold,
     }
 
+    // https://dotnet.stockindicators.dev/indicators/Rsi/
     internal class Rsi : IndicatorBase<RsiResult, RsiSignal>
     {
         const double _oversoldThreshold = 30.0;

@@ -5,41 +5,51 @@ namespace TradingBot.Indicators
 {
     internal enum BollingerBandsSignals
     {
-        None = 0,
-        Overbought,
-        Oversold,
-        OverSma, 
-        UnderSma,
+        CrossedUpperBandUpward,
+        CrossedUpperBandDownward,
+        CrossedLowerBandUpward,
+        CrossedLowerBandDownward,
     }
 
+    // https://dotnet.stockindicators.dev/indicators/BollingerBands/
     internal class BollingerBands : IndicatorBase<BollingerBandsResult, BollingerBandsSignals>
     {
-        public BollingerBands(BarLength barLength, int nbPeriods = 20) : base(barLength, nbPeriods, nbPeriods)
+        double _stDev;
+        public BollingerBands(BarLength barLength, int nbPeriods = 20, double stDev = 2.0) : base(barLength, nbPeriods, nbPeriods)
         {
+            _stDev = stDev;
         }
 
         protected override IEnumerable<BollingerBandsResult> ComputeResults()
         {
-            return _quotes!.Use(CandlePart.Close).GetBollingerBands();
+            return _quotes.GetBollingerBands(NbPeriods, _stDev);
         }
 
         protected override IEnumerable<BollingerBandsSignals> ComputeSignals()
         {
-            List<BollingerBandsSignals> signals = new List<BollingerBandsSignals>();
-            if (IsReady && _results.Any() && _quotes.Any())
+            List<BollingerBandsSignals> signals = new();
+            if (IsReady && _results.Count() > 1 && _quotes.Count() > 1)
             {
-                var latestVal = Convert.ToDouble(_quotes.Last().Close);
                 var latestResult = _results.Last();
+                var latestClose = Convert.ToDouble(_quotes.Last().Close);
+                var previousClose = Convert.ToDouble(_quotes.TakeLast(1).Last().Close);
 
-                if (latestVal > latestResult.Sma)
-                    signals.Add(BollingerBandsSignals.OverSma);
-                else
-                    signals.Add(BollingerBandsSignals.UnderSma);
-
-                if(latestVal > latestResult.UpperBand)
-                    signals.Add(BollingerBandsSignals.Overbought);
-                else if(latestVal < latestResult.LowerBand)
-                    signals.Add(BollingerBandsSignals.Oversold);
+                if (latestResult.LowerBand.HasValue && previousClose >= latestResult.LowerBand && latestClose < latestResult.LowerBand)
+                {
+                    signals.Add(BollingerBandsSignals.CrossedLowerBandDownward);
+                }
+                else if (latestResult.LowerBand.HasValue && previousClose <= latestResult.LowerBand && latestClose > latestResult.LowerBand)
+                {
+                    signals.Add(BollingerBandsSignals.CrossedLowerBandUpward);
+                }
+                else if (latestResult.UpperBand.HasValue && previousClose >= latestResult.UpperBand && latestClose < latestResult.UpperBand)
+                {
+                    signals.Add(BollingerBandsSignals.CrossedUpperBandDownward);
+                }
+                else if (latestResult.UpperBand.HasValue && previousClose <= latestResult.UpperBand && latestClose > latestResult.UpperBand)
+                {
+                    signals.Add(BollingerBandsSignals.CrossedUpperBandUpward);
+                }
             }
 
             return signals;

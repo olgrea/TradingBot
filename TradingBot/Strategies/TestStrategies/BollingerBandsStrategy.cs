@@ -61,7 +61,7 @@ namespace TradingBot.Strategies.TestStrategies
 
             var signals = BollingerBands.Signals.ToList();
 
-            if (signals.Contains(BollingerBandsSignals.Oversold))
+            if (signals.Contains(BollingerBandsSignals.CrossedLowerBandDownward))
             {
                 int qty = (int)Math.Floor(_trader.Account.AvailableBuyingPower / _latestBidAsk.Ask);
                 if (qty <= 0)
@@ -70,7 +70,7 @@ namespace TradingBot.Strategies.TestStrategies
                 var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
                 await _trader.Broker.OrderManager.PlaceOrderAsync(_ticker, buyOrder);
             }
-            else if (signals.Contains(BollingerBandsSignals.Overbought))
+            else if (signals.Contains(BollingerBandsSignals.CrossedUpperBandUpward))
             {
                 if (!_trader.Account.Positions.TryGetValue(_ticker, out var position))
                     return;
@@ -108,6 +108,7 @@ namespace TradingBot.Strategies.TestStrategies
             await InitIndicator();
         }
 
+        // TODO : move that to a base class
         async Task InitIndicator()
         {
             if (BollingerBands.IsReady)
