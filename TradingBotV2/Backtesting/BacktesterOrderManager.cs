@@ -17,7 +17,7 @@ namespace TradingBotV2.Backtesting
         public BacktesterOrderManager(Backtester backtester)
         {
             _orderTracker = new OrderTracker();
-            _validator = new OrderValidator(backtester, _orderTracker);
+            _validator = new OrderValidator(_orderTracker);
             
             _backtester = backtester;
             _orderEvaluator = new OrderEvaluator(_backtester, _orderTracker);

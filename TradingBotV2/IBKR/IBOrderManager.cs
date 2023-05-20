@@ -21,7 +21,7 @@ namespace TradingBotV2.IBKR
             _broker = broker;
             _client = broker.Client;
             _orderTracker = new OrderTracker();
-            _validator = new OrderValidator(broker, _orderTracker);
+            _validator = new OrderValidator(_orderTracker);
 
             _client.Responses.OpenOrder += OnOrderOpened;
             _client.Responses.OrderStatus += OnOrderStatus;

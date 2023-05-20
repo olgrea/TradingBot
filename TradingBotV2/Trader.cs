@@ -108,11 +108,17 @@ namespace TradingBotV2
         {
             switch (val.Key) 
             {
-                case AccountValueKey.CashBalance:
-                    _logger?.Info($"Cash balance : {val.Value:c} {val.Currency}");
+                case AccountValueKey.Time:
+                    _logger?.Info($"Server time : {DateTime.Parse(val.Value)}");
                     break;
+                case AccountValueKey.CashBalance:
+                    _logger?.Info($"Cash balance : {double.Parse(val.Value):c} {val.Currency}");
+                    break;
+                //case AccountValueKey.UnrealizedPnL:
+                //    _logger?.Info($"UnrealizedPnL : {val.Value:c} {val.Currency}");
+                //    break;
                 case AccountValueKey.RealizedPnL:
-                    _logger?.Info($"RealizedPnL : {val.Value:c} {val.Currency}");
+                    _logger?.Info($"RealizedPnL : {double.Parse(val.Value):c} {val.Currency}");
                     break;
             }
         }

@@ -8,20 +8,19 @@ namespace BacktesterApp
 {
     internal class BacktesterApp
     {
-        const string LogsPath = "D:\\tradingbot\\logs";
+        const string LogsPath = "C:\\tradingbot\\logs";
 
         static async Task Main(string[] args)
         {
             //TODO : handle args
 
-            //var latestTradingDay = MarketDataUtils.FindLastOpenDay(DateTime.Now.AddDays(-1));
             var latestTradingDay = new DateOnly(2023, 05, 18);
 
             var logger = LogManager.GetLogger($"Backtester");
-            
+
             var broker = new Backtester(latestTradingDay, logger);
-            broker.TimeCompression.Factor = 0.0025;
-            var trader = new Trader(broker);
+            broker.TimeCompression.Factor = 0.0015;
+            var trader = new Trader(broker, logger);
 
             var marketHours = latestTradingDay.ToMarketHours();
             trader.AddStrategy(new BollingerBandsStrategy(marketHours.Item1, marketHours.Item2, "GME", trader));
@@ -32,6 +31,8 @@ namespace BacktesterApp
             await Task.WhenAll(traderTask, backtesterTask);
             var results = traderTask.Result;
             var bkResults = backtesterTask.Result;
+
+            TradingViewIndicatorGenerator.GenerateReport(Path.Combine(LogsPath, $"tvResults-{latestTradingDay}.txt"), results);
         }
     }
 }

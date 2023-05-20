@@ -20,7 +20,7 @@ namespace TradingBotV2.Indicators
 
         protected override IEnumerable<BollingerBandsResult> ComputeResults()
         {
-            return _quotes!.Use(CandlePart.HLC3).GetBollingerBands();
+            return _quotes!.Use(CandlePart.Close).GetBollingerBands();
         }
 
         protected override IEnumerable<BollingerBandsSignals> ComputeSignals()

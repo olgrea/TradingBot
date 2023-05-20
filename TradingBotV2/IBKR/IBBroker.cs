@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using NLog;
-using NLog.TradingBot;
 using TradingBotV2.Broker;
 using TradingBotV2.Broker.Accounts;
 using TradingBotV2.Broker.Contracts;

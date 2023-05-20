@@ -53,7 +53,7 @@ namespace TradingBotV2.Strategies.TestStrategies
             {
                 return;
             }
-            else if (time >= EndTime)
+            else if (time == EndTime.AddMinutes(-1))
             {
                 _executeStrategyBlock.Complete();
                 return;
@@ -63,7 +63,7 @@ namespace TradingBotV2.Strategies.TestStrategies
 
             if (signals.Contains(BollingerBandsSignals.Oversold))
             {
-                int qty = (int)Math.Round(_trader.Account.AvailableBuyingPower / _latestBidAsk.Ask);
+                int qty = (int)Math.Floor(_trader.Account.AvailableBuyingPower / _latestBidAsk.Ask);
                 if (qty <= 0)
                     return;
 
@@ -119,8 +119,7 @@ namespace TradingBotV2.Strategies.TestStrategies
             int nbOfOneSecBarsNeeded = BollingerBands.NbWarmupPeriods * nbSecs;
             IEnumerable<IMarketData> oneSecBars = Enumerable.Empty<Bar>();
 
-            DateTime serverTime = await _trader.Broker.GetServerTimeAsync();
-            var to = serverTime;
+            var to = await _trader.Broker.GetServerTimeAsync();
             while (oneSecBars.Count() < nbOfOneSecBarsNeeded)
             {
                 var from = to.AddSeconds(-nbOfOneSecBarsNeeded);
@@ -146,14 +145,10 @@ namespace TradingBotV2.Strategies.TestStrategies
             // build bar collections from 1 sec bars
             var combinedBars = new LinkedList<Bar>();
             var tmp = new LinkedList<Bar>();
-            IEnumerable<Bar> ttttt = oneSecBars.OrderBy(b => b.Time).Cast<Bar>();
 
             Bar? last = null;
-            foreach (Bar oneSecBar in ttttt)
+            foreach (Bar oneSecBar in oneSecBars.OrderBy(b => b.Time).Cast<Bar>())
             {
-                if (last != null && last.Time - oneSecBar.Time > TimeSpan.FromSeconds(1))
-                    Debugger.Break();
-
                 tmp.AddLast(oneSecBar);
                 if (tmp.Count == nbSecs)
                 {

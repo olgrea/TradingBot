@@ -3,11 +3,9 @@
     internal class OrderValidator
     {
         OrderTracker _orderTracker;
-        IBroker _broker;
 
-        public OrderValidator(IBroker broker, OrderTracker orderTracker)
+        public OrderValidator(OrderTracker orderTracker)
         {
-            _broker = broker;
             _orderTracker = orderTracker;
         }
 
