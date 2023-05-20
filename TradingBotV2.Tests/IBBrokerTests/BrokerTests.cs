@@ -123,6 +123,8 @@ namespace IBBrokerTests
             Assert.AreEqual(receiveUntil, nbPnLReceived);
         }
 
+        // TODO : need tests for account, positions and PnL updates
+
         [Test]
         [Ignore("TWS account updates are not implemented correctly. See IBClient.RequestAccountUpdates.")]
         public async Task RequestAccountUpdates_NoChangeInPositions_ReceivesThemAtThreeMinutesInterval()
@@ -173,7 +175,6 @@ namespace IBBrokerTests
         }
 
         [Test]
-        [Ignore("TWS account updates are not implemented correctly. See IBClient.RequestAccountUpdates.")]
         public async Task RequestAccountUpdates_ChangeInPosition_ReceivesThemOnPositionChange()
         {
             TestsUtils.Assert.MarketIsOpen();

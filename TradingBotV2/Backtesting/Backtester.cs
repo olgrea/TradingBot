@@ -36,20 +36,17 @@ namespace TradingBotV2.Backtesting
         {
             Code = FakeAccountCode,
             CashBalances = new Dictionary<string, double>()
-                {
-                    { "BASE", 25000.00 },
-                    { "USD", 25000.00 },
-                },
+            {
+                { "USD", 25000.00 },
+            },
             UnrealizedPnL = new Dictionary<string, double>()
-                {
-                    { "BASE", 0.00},
-                    { "USD", 0.00 },
-                },
+            {
+                { "USD", 0.00 },
+            },
             RealizedPnL = new Dictionary<string, double>()
-                {
-                    { "BASE", 0.00 },
-                    { "USD", 0.00 },
-                }
+            {
+                { "USD", 0.00 },
+            }
         };
 
         bool _accountUpdatesRequested = false;
@@ -292,6 +289,9 @@ namespace TradingBotV2.Backtesting
                         _logger?.Trace($"Request consumed : {action.GetMethodInfo().Name}");
                     }
 
+                    if (!_isRunning)
+                        continue;
+
                     if(IsDayOver())
                     {
                         Stop();
@@ -299,7 +299,7 @@ namespace TradingBotV2.Backtesting
                         _logger?.Debug($"Backtesting finished. Runtime : {_result.RunTime}");
                         _startTcs?.TrySetResult(_result);
                     }
-                    else if (_isRunning)
+                    else 
                         AdvanceTime(token);
                 }
             }
@@ -423,9 +423,9 @@ namespace TradingBotV2.Backtesting
 
         private void GetDailyDataOnBackgroundTask<TData>(string ticker, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Market data background task started for {ticker}");
             _ = _marketDataBackgroundTasks.GetOrAdd(ticker, t =>
             {
+                _logger?.Debug($"Market data background task started for {ticker}");
                 var task = Task.Run(async () =>
                 {
                     try
@@ -447,11 +447,16 @@ namespace TradingBotV2.Backtesting
         public Task<Account> GetAccountAsync()
         {
             _lastAccountUpdateTime = _currentTime;
+            _accountUpdatesRequested = true;
+            SendAccountUpdates();
             return Task.FromResult(_fakeAccount);
         }
 
         public void RequestAccountUpdates()
         {
+            if (_accountUpdatesRequested)
+                return;
+
             EnqueueRequest(() =>
             {
                 _accountUpdatesRequested = true;
@@ -472,7 +477,11 @@ namespace TradingBotV2.Backtesting
 
         internal void SendAccountUpdates()
         {
+            AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.CashBalance, Account.CashBalances["USD"].ToString(), "USD"));
+            AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.RealizedPnL, Account.RealizedPnL["USD"].ToString(), "USD"));
+            AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.UnrealizedPnL, Account.UnrealizedPnL["USD"].ToString(), "USD"));
             AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, _currentTime.ToString()));
+
             _logger?.Trace($"Sending account update : time : {_currentTime}");
             Account.Time = _currentTime;
             _lastAccountUpdateTime = _currentTime;
@@ -495,7 +504,6 @@ namespace TradingBotV2.Backtesting
 
         internal void UpdateCashBalance(double total)
         {
-            _fakeAccount.CashBalances["BASE"] += total;
             _fakeAccount.CashBalances["USD"] += total;
         }
 
@@ -505,7 +513,6 @@ namespace TradingBotV2.Backtesting
             var realized = totalQty * (price - position.AverageCost);
 
             position.RealizedPNL += realized;
-            _fakeAccount.RealizedPnL["BASE"] += realized;
             _fakeAccount.RealizedPnL["USD"] += realized;
 
             Logger?.Debug($"Account {_fakeAccount.Code} :  Realized PnL  : {position.RealizedPNL:c}");
@@ -523,7 +530,6 @@ namespace TradingBotV2.Backtesting
 
             position.UnrealizedPNL = unrealizedPnL;
             _fakeAccount.UnrealizedPnL["USD"] = unrealizedPnL;
-            _fakeAccount.UnrealizedPnL["BASE"] = unrealizedPnL;
 
             //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
@@ -557,7 +563,9 @@ namespace TradingBotV2.Backtesting
                 var lasts = GetAsync<Last>(pos.Key, newTime, token).Result;
                 if(lasts.Any())
                 {
+                    // TODO : why the average?
                     var lastPriceAvg = lasts.Average(l => l.Price);
+
                     UpdateUnrealizedPNL(pos.Key, lastPriceAvg);
                     PnLUpdated?.Invoke(pos.Value.ToPnL());
                 }

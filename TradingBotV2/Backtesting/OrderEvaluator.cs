@@ -217,7 +217,7 @@ namespace TradingBotV2.Backtesting
             if (order.Action == OrderAction.BUY)
             {
                 // TODO implement on client-side
-                if (total > _backtester.Account.CashBalances["USD"])
+                if (total > _backtester.Account.AvailableBuyingPower)
                 {
                     _logger?.Error($"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {account.CashBalances["USD"]}");
 

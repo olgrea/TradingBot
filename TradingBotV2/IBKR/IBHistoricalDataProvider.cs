@@ -114,7 +114,7 @@ namespace TradingBotV2.IBKR
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to, CancellationToken token) where TData : IMarketData, new()
         {
-            _logger?.Debug($"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
+            _logger?.Trace($"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
             _logger?.Trace($"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
 
             _token = token;
@@ -189,7 +189,7 @@ namespace TradingBotV2.IBKR
 
             int count = data.Count();
             _lastOperationStats.NbRetrievedFromCache += count;
-            _logger?.Debug($"Data {typeof(TData).Name} for {ticker} from ({from} to {to} retrieved from cache ({count}).");
+            _logger?.Trace($"Timestamps in cache. {count} retrieved.");
             return true;
         }
 
@@ -259,7 +259,7 @@ namespace TradingBotV2.IBKR
             _lastOperationStats.NbRetrievedFromDb += data.Count();
 
             var dateStr = from.Date.ToShortDateString();
-            _logger?.Debug($"{typeof(TData).Name} for {ticker} {dateStr} ({from}-{to}) retrieved from db.");
+            _logger?.Trace($"Timestamps in db. {_lastOperationStats.NbRetrievedFromDb} retrieved.");
 
             return true;
         }
@@ -287,6 +287,7 @@ namespace TradingBotV2.IBKR
             _token?.ThrowIfCancellationRequested();
             if (!_broker.IsConnected())
             {
+                // Equivalent to lock(){ await ... }
                 await s_sem.WaitAsync();
                 try
                 {
@@ -317,6 +318,8 @@ namespace TradingBotV2.IBKR
                     chunkBegin = from;
 
                 IEnumerable<IMarketData> data;
+
+                // Equivalent to lock(){ await ... }
                 await s_sem.WaitAsync();
                 try
                 {
@@ -328,9 +331,11 @@ namespace TradingBotV2.IBKR
                     {
                         data = FetchTooMuchData<TData>(ticker, chunkBegin, chunkEnd).Result;
                     }
-                    _lastOperationStats.NbRetrievedFromIBKR += data.Count();
 
-                    _logger?.Trace($"{typeof(TData).Name} for {ticker} {current.Date.ToShortDateString()} ({chunkBegin}-{chunkEnd}) received from TWS.");
+                    int count = data.Count();
+                    _lastOperationStats.NbRetrievedFromIBKR += count;
+
+                    _logger?.Trace($"{chunkBegin}-{chunkEnd} received from TWS (count: {count}).");
 
                     _token?.ThrowIfCancellationRequested();
                     Debug.Assert(data != null);
@@ -347,7 +352,7 @@ namespace TradingBotV2.IBKR
                 current = current.AddSeconds(-chunkSizeInSec);
             }
 
-            _logger?.Debug($"{typeof(TData).Name} for {ticker} from {from} to {to}) retrieved from TWS server.");
+            _logger?.Trace($"{_lastOperationStats.NbRetrievedFromIBKR} retrieved from TWS server.");
         }
 
         async Task<IEnumerable<IMarketData>> FetchBars<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
@@ -736,7 +741,7 @@ namespace TradingBotV2.IBKR
                     if (elapsed < _15sec)
                     {
                         TimeSpan toWait = _15sec - elapsed + TimeSpan.FromMilliseconds(250);
-                        _logger?.Debug($"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
+                        _logger?.Trace($"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
 
                         Task.Delay(toWait).Wait(_token ?? CancellationToken.None);
                     }
@@ -749,7 +754,7 @@ namespace TradingBotV2.IBKR
             {
                 if (_nbRequestIn10Mins != 0 && _nbRequestIn10Mins % 60 == 0)
                 {
-                    _logger?.Debug($"60 requests made within 10 min.");
+                    _logger?.Trace($"60 requests made within 10 min.");
 
                     var now = DateTime.Now;
                     var times = _requestTimes.SkipWhile(t => now - t > TimeSpan.FromMinutes(10));
@@ -758,18 +763,18 @@ namespace TradingBotV2.IBKR
                     var toWait = TimeSpan.FromSeconds(10);
                     var countUnder10Sec = times.TakeWhile( rt => rt - first < toWait).Count();
 
-                    _logger?.Debug($"Waiting 10 seconds...");
+                    _logger?.Trace($"Waiting 10 seconds...");
                     WaitFor(toWait);
-                    _logger?.Debug($"Resuming.");
+                    _logger?.Trace($"Resuming.");
 
                     _nbRequestIn10Mins -= countUnder10Sec;
                     _requestTimes = times.Skip(countUnder10Sec).ToList();
                 }
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
-                    _logger?.Debug($"5 requests made : waiting 2 seconds...");
+                    _logger?.Trace($"5 requests made : waiting 2 seconds...");
                     Task.Delay(2000).Wait(_token ?? CancellationToken.None);
-                    _logger?.Debug($"Resuming.");
+                    _logger?.Trace($"Resuming.");
                 }
             }
 
@@ -791,7 +796,7 @@ namespace TradingBotV2.IBKR
                     }
 
                     if(current > TimeSpan.Zero) 
-                        _logger?.Debug($"{current} left...");
+                        _logger?.Trace($"{current} left...");
                 }
             }
         }
