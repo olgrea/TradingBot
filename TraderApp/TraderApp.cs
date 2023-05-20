@@ -1,8 +1,8 @@
 ﻿using NLog;
-using TradingBotV2;
-using TradingBotV2.IBKR;
-using TradingBotV2.Strategies.TestStrategies;
-using TradingBotV2.Utils;
+using TradingBot;
+using TradingBot.IBKR;
+using TradingBot.Strategies.TestStrategies;
+using TradingBot.Utils;
 
 namespace TraderApp
 {

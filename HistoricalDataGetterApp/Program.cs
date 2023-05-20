@@ -1,8 +1,8 @@
 ﻿using CommandLine;
 using NLog;
-using TradingBotV2.Broker.MarketData;
-using TradingBotV2.IBKR;
-using TradingBotV2.Utils;
+using TradingBot.Broker.MarketData;
+using TradingBot.IBKR;
+using TradingBot.Utils;
 
 namespace HistoricalDataGetterApp
 {
