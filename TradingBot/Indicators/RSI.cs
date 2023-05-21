@@ -3,7 +3,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    internal enum RsiSignal
+    public enum RsiSignal
     {
         None = 0,
         Overbought,
@@ -11,12 +11,12 @@ namespace TradingBot.Indicators
     }
 
     // https://dotnet.stockindicators.dev/indicators/Rsi/
-    internal class Rsi : IndicatorBase<RsiResult, RsiSignal>
+    public class RSI : IndicatorBase<RsiResult, RsiSignal>
     {
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
 
-        public Rsi(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods, 10*nbPeriods)
+        public RSI(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods, 10*nbPeriods)
         {
         }
         

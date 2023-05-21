@@ -32,6 +32,9 @@ namespace TradingBot.Strategies
         // TODO : move that to a base class
         protected async Task InitIndicators()
         {
+            if (!Indicators.Any())
+                throw new ArgumentException("Indicators empty.");
+
             if (Indicators.All(i => i.IsReady))
                 return;
 
