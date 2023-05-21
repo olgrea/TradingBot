@@ -1,4 +1,4 @@
-﻿using Skender.Stock.Indicators;
+﻿using TradingBot.Indicators;
 
 namespace TradingBot.Strategies
 {
@@ -6,6 +6,7 @@ namespace TradingBot.Strategies
     {
         DateTime StartTime { get; }
         DateTime EndTime { get; }
+        IEnumerable<IIndicator> Indicators { get; init; }
         Task Start();
         Task Initialize();
     }

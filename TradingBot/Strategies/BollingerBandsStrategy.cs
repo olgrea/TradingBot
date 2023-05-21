@@ -3,40 +3,29 @@ using System.Threading.Tasks.Dataflow;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
-using TradingBot.Utils;
 
 namespace TradingBot.Strategies
 {
-    public class BollingerBandsStrategy : IStrategy
+    public class BollingerBandsStrategy : StrategyBase
     {
-        Trader _trader;
-        string _ticker;
-
-        LinkedList<Bar> _bars;
         LinkedList<Last> _lasts;
         BidAsk _latestBidAsk = new();
         Last _latestLast = new();
 
         ActionBlock<DateTime>? _executeStrategyBlock;
 
-        public BollingerBandsStrategy(DateTime start, DateTime end, string ticker, Trader trader)
+        public BollingerBandsStrategy(DateTime start, DateTime end, string ticker, Trader trader) : base(start, end, ticker, trader)
         {
-            _trader = trader;
-            _ticker = ticker;
-
-            StartTime = start;
-            EndTime = end;
-
             BollingerBands = new BollingerBands(BarLength._1Min);
-            _bars = new LinkedListWithFixedSize<Bar>(BollingerBands.NbWarmupPeriods * 2);
+            Indicators = new List<IIndicator>() { BollingerBands };
             _lasts = new LinkedList<Last>();
         }
 
         BollingerBands BollingerBands { get; init; }
-        public DateTime StartTime { get; init; }
-        public DateTime EndTime { get; init; }
 
-        public async Task Start()
+        public override IEnumerable<IIndicator> Indicators { get; init; }
+
+        public async override Task Start()
         {
             await Initialize();
             Debug.Assert(_executeStrategyBlock != null);
@@ -84,7 +73,7 @@ namespace TradingBot.Strategies
             }
         }
 
-        public async Task Initialize()
+        public async override Task Initialize()
         {
             if (_executeStrategyBlock == null)
             {
@@ -105,90 +94,20 @@ namespace TradingBot.Strategies
                 _trader.Broker.LiveDataProvider.RequestLastTradedPriceUpdates(_ticker);
             }
 
-            await InitIndicator();
-        }
-
-        // TODO : move that to a base class
-        async Task InitIndicator()
-        {
-            if (BollingerBands.IsReady)
-                return;
-
-            var st = Stopwatch.StartNew();
-            _trader.Logger?.Debug($"Initializing Bollinger Bands indicator.");
-            var nbSecs = (int)BollingerBands.BarLength;
-            int nbOfOneSecBarsNeeded = BollingerBands.NbWarmupPeriods * nbSecs;
-            IEnumerable<IMarketData> oneSecBars = Enumerable.Empty<Bar>();
-
-            var to = await _trader.Broker.GetServerTimeAsync();
-            while (oneSecBars.Count() < nbOfOneSecBarsNeeded)
-            {
-                var from = to.AddSeconds(-nbOfOneSecBarsNeeded);
-                from = from.Floor(TimeSpan.FromSeconds(nbSecs));
-
-                if (from.TimeOfDay < MarketDataUtils.PreMarketStartTime)
-                    from = to.ToMarketHours(extendedHours: true).Item1;
-
-                var retrieved = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, from, to);
-                oneSecBars = retrieved.Concat(oneSecBars);
-
-                to = from;
-                if (to.TimeOfDay == MarketDataUtils.PreMarketStartTime)
-                {
-                    // Fetch the ones from the previous market day is still not enough
-                    DateOnly previousMarketDay = MarketDataUtils.FindLastOpenDay(to.AddDays(-1), extendedHours: true);
-                    to = previousMarketDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.AfterHoursEndTime));
-                }
-            }
-
-            _trader.Logger?.Debug($"1 sec bars retrieved (count : {oneSecBars.Count()}, time : {st.Elapsed})");
-
-            // build bar collections from 1 sec bars
-            var combinedBars = new LinkedList<Bar>();
-            var tmp = new LinkedList<Bar>();
-
-            Bar? last = null;
-            foreach (Bar oneSecBar in oneSecBars.OrderBy(b => b.Time).Cast<Bar>())
-            {
-                tmp.AddLast(oneSecBar);
-                if (tmp.Count == nbSecs)
-                {
-                    Bar newBar = MarketDataUtils.CombineBars(tmp, BollingerBands.BarLength);
-                    Debug.Assert(newBar.Time.Second % nbSecs == 0);
-                    combinedBars.AddLast(newBar);
-                    tmp.Clear();
-                }
-
-                last = oneSecBar;
-            }
-
-            _trader.Logger?.Debug($" {BollingerBands.BarLength} bars built (count : {combinedBars.Count()}, time : {st.Elapsed}).");
-
-            // Update all indicators.
-            lock (_bars)
-                _bars = new LinkedList<Bar>(combinedBars.OrderBy(b => b.Time).Concat(_bars));
-
-            Debug.Assert(_bars.All(b => b.Time.Second % nbSecs == 0));
-            BollingerBands.Compute(_bars);
-            Debug.Assert(BollingerBands.IsReady);
-
-            st.Stop();
-            _trader.Logger?.Debug($" {BollingerBands.BarLength} bars built (count : {combinedBars.Count()}, time : {st.Elapsed}).");
-            _trader.Logger?.Info("Indicators Initialized");
+            await InitIndicators();
         }
 
         void OnBarReceived(string ticker, Bar bar)
         {
             if (ticker == _ticker && bar.BarLength == BollingerBands.BarLength)
             {
-                lock (_bars)
-                    _bars.AddLast(bar);
+                _bars[bar.BarLength].AddLast(bar);
 
                 _lasts.Clear();
 
                 if (BollingerBands.IsReady)
                 {
-                    BollingerBands.Compute(_bars);
+                    BollingerBands.Compute(_bars[bar.BarLength]);
                     Debug.Assert(_executeStrategyBlock != null);
                     _executeStrategyBlock.Post(bar.Time);
                 }
