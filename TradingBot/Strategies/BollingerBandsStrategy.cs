@@ -5,7 +5,7 @@ using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
 using TradingBot.Utils;
 
-namespace TradingBot.Strategies.TestStrategies
+namespace TradingBot.Strategies
 {
     public class BollingerBandsStrategy : IStrategy
     {
@@ -86,12 +86,12 @@ namespace TradingBot.Strategies.TestStrategies
 
         public async Task Initialize()
         {
-            if(_executeStrategyBlock == null)
+            if (_executeStrategyBlock == null)
             {
                 _trader.Broker.LiveDataProvider.BarReceived += OnBarReceived;
                 _trader.Broker.LiveDataProvider.BidAskReceived += OnBidAskReceived;
                 _trader.Broker.LiveDataProvider.LastReceived += OnLastReceived;
-                
+
                 _executeStrategyBlock = new ActionBlock<DateTime>(ExecuteStrategy);
                 _ = _executeStrategyBlock.Completion.ContinueWith(t =>
                 {
@@ -126,14 +126,14 @@ namespace TradingBot.Strategies.TestStrategies
                 var from = to.AddSeconds(-nbOfOneSecBarsNeeded);
                 from = from.Floor(TimeSpan.FromSeconds(nbSecs));
 
-                if(from.TimeOfDay < MarketDataUtils.PreMarketStartTime)
+                if (from.TimeOfDay < MarketDataUtils.PreMarketStartTime)
                     from = to.ToMarketHours(extendedHours: true).Item1;
 
                 var retrieved = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, from, to);
                 oneSecBars = retrieved.Concat(oneSecBars);
 
                 to = from;
-                if(to.TimeOfDay == MarketDataUtils.PreMarketStartTime)
+                if (to.TimeOfDay == MarketDataUtils.PreMarketStartTime)
                 {
                     // Fetch the ones from the previous market day is still not enough
                     DateOnly previousMarketDay = MarketDataUtils.FindLastOpenDay(to.AddDays(-1), extendedHours: true);
@@ -171,7 +171,7 @@ namespace TradingBot.Strategies.TestStrategies
             Debug.Assert(_bars.All(b => b.Time.Second % nbSecs == 0));
             BollingerBands.Compute(_bars);
             Debug.Assert(BollingerBands.IsReady);
-            
+
             st.Stop();
             _trader.Logger?.Debug($" {BollingerBands.BarLength} bars built (count : {combinedBars.Count()}, time : {st.Elapsed}).");
             _trader.Logger?.Info("Indicators Initialized");
@@ -179,14 +179,14 @@ namespace TradingBot.Strategies.TestStrategies
 
         void OnBarReceived(string ticker, Bar bar)
         {
-            if(ticker == _ticker && bar.BarLength == BollingerBands.BarLength)
+            if (ticker == _ticker && bar.BarLength == BollingerBands.BarLength)
             {
                 lock (_bars)
                     _bars.AddLast(bar);
-                
+
                 _lasts.Clear();
 
-                if(BollingerBands.IsReady)
+                if (BollingerBands.IsReady)
                 {
                     BollingerBands.Compute(_bars);
                     Debug.Assert(_executeStrategyBlock != null);

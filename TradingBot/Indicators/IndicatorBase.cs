@@ -3,7 +3,7 @@ using TradingBot.Broker.MarketData;
 
 namespace TradingBot.Indicators
 {
-    internal abstract class IndicatorBase<TResult, TSignal> : IIndicator where TResult : ResultBase
+    public abstract class IndicatorBase<TResult, TSignal> : IIndicator where TResult : ResultBase
     {
         protected BarLength _barLength;
         protected int _nbPeriods;

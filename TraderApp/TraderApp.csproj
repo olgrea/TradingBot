@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\TradingBot.Private\TradingBot.Private\TradingBot.Private.csproj" />
     <ProjectReference Include="..\TradingBot\TradingBot.csproj" />
   </ItemGroup>
 

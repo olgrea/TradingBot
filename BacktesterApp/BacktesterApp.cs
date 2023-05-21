@@ -1,7 +1,7 @@
 ﻿using NLog;
 using TradingBot;
 using TradingBot.Backtesting;
-using TradingBot.Strategies.TestStrategies;
+using TradingBot.Strategies;
 using TradingBot.Utils;
 
 namespace BacktesterApp
