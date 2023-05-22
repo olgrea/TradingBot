@@ -17,7 +17,6 @@ namespace TradingBot.IBKR
         IBClient _client;
         ILogger? _logger;
         Account? _account;
-        DateTime? _lastTimeUpdate = null;
         HashSet<string> _pnlSubscriptions = new HashSet<string>();
         
         public IBBroker(int clientId, ILogger? logger = null)
@@ -269,13 +268,8 @@ namespace TradingBot.IBKR
             Debug.Assert(_account != null);
             _account.Time = time;
 
-            // The same timestamp is received multiple times...
-            if(_lastTimeUpdate == null || _lastTimeUpdate < time)
-            {
-                _logger?.Debug($"OnAccountTimeUpdate : {time}");
-                _lastTimeUpdate = time;
-                AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, time.ToString()));
-            }
+            _logger?.Debug($"OnAccountTimeUpdate : {time}");
+            AccountValueUpdated?.Invoke(new AccountValue(AccountValueKey.Time, time.ToString()));
         }
 
         void OnAccountValueUpdate(IBApi.AccountValue accValue)

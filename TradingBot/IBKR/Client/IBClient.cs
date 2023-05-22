@@ -129,9 +129,12 @@ namespace TradingBot.IBKR.Client
 
         // https://interactivebrokers.github.io/tws-api/account_updates.html
         // Updates are first sent instantly when reqAccountUpdates(true, code) is called and then, if no change in positions occured,
-        // at a FIXED interval of three minutes (not 3 minutes after the first call).
-        // IMPORTANT also : accountDownloadEnd() is ONLY called on the first reqAccountUpdates(true, code) call, NOT during updates...
-        // So you don't have any reliable ways of knowing when an update has finished...
+        // at a FIXED interval of 3 minutes (not 3 minutes after the first call).
+        // IMPORTANT NOTES :
+        // - IBResponses.accountDownloadEnd() is ONLY called on the first reqAccountUpdates(true, code) call, NOT during updates... So you don't
+        //   have any reliable ways of knowing when an update has finished...
+        // - The precision of timestamps received by IBResponses.updateAccountTime() is minutes
+        // - IBResponses.updateAccountTime() can receive timestamps that can go as far as 6 minutes behind...
         public void RequestAccountUpdates(string accountCode)
         {
             _logger?.Trace($"{nameof(_socket.reqAccountUpdates)}(true, {accountCode})");

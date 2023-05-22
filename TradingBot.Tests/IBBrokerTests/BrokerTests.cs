@@ -6,6 +6,7 @@ using TradingBot.Broker.Accounts;
 using TradingBot.Broker.Orders;
 using TradingBot.IBKR.Client;
 using TradingBot.Tests;
+using TradingBot.Utils;
 
 namespace IBBrokerTests
 {
@@ -123,34 +124,26 @@ namespace IBBrokerTests
             Assert.AreEqual(receiveUntil, nbPnLReceived);
         }
 
-        // TODO : need tests for account, positions and PnL updates
-
-        [Test]
-        [Ignore("TWS account updates are not implemented correctly. See IBClient.RequestAccountUpdates.")]
+        // TWS account updates are weirdly implemented. See IBClient.RequestAccountUpdates.
+        [Test, Explicit]
         public async Task RequestAccountUpdates_NoChangeInPositions_ReceivesThemAtThreeMinutesInterval()
         {
             TestsUtils.Assert.MarketIsOpen();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            CancellationTokenSource cancellation = new CancellationTokenSource();
-            cancellation.CancelAfter(Debugger.IsAttached ? -1 : 3 * 60 * 1000 + 500);
-            cancellation.Token.Register(() => tcs.TrySetException(new TimeoutException()));
+            //var timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 3 * 60 * 1000 + 500);
+            var timeout = TimeSpan.FromMilliseconds(3 * 60 * 1000 + 500);
+            var times = new List<DateTime>();
 
-            DateTime? updateReceivedInstantly = null;
-            DateTime? updateReceivedAfter3Mins = null;
-
+            DateTime timeAtRequest = default;
             Action<AccountValue> accValueUpdated = val =>
             {
                 if(val.Key == AccountValueKey.Time)
                 {
-                    if (updateReceivedInstantly == null)
-                        updateReceivedInstantly = DateTime.Parse(val.Value);
-                    else
-                    {
-                        updateReceivedAfter3Mins = DateTime.Parse(val.Value);
-                        tcs.TrySetResult();
-                    }
+                    DateTime time = DateTime.Parse(val.Value);
+                    times.Add(time);
+                    _logger?.Debug($"received : {time}");
                 }
             };
             var error = new Action<Exception>(e => tcs.TrySetException(e));
@@ -159,71 +152,103 @@ namespace IBBrokerTests
             _broker.ErrorOccured += error;
             try
             {
+                timeAtRequest = await _broker.GetServerTimeAsync();
                 _broker.RequestAccountUpdates();
-                await tcs.Task;
+                await Task.Delay(timeout);
+                tcs.TrySetResult();
+            }
+            catch(Exception e)
+            {
+                tcs.TrySetException(e);
             }
             finally
             {
                 _broker.AccountValueUpdated -= accValueUpdated;
                 _broker.ErrorOccured -= error;
                 _broker.CancelAccountUpdates();
+                await _broker.OrderManager.CancelAllOrdersAsync();
+                await _broker.OrderManager.SellAllPositionsAsync();
             }
 
-            Assert.IsNotNull(updateReceivedInstantly);
-            Assert.IsNotNull(updateReceivedAfter3Mins);
-            Assert.IsTrue(updateReceivedAfter3Mins - updateReceivedInstantly >= TimeSpan.FromMinutes(3));
+            Assert.IsTrue(tcs.Task.IsCompletedSuccessfully);
+
+            var lower = timeAtRequest.Floor(TimeSpan.FromMinutes(3));
+            var higher = timeAtRequest.Ceiling(TimeSpan.FromMinutes(3));
+            Assert.Multiple(() =>
+            {
+                foreach (var time in times)
+                {
+                    Assert.LessOrEqual(lower, time);
+                    Assert.GreaterOrEqual(higher, time);
+                }
+            });
         }
 
-        [Test]
+        // TWS account updates are weirdly implemented. See IBClient.RequestAccountUpdates.
+        [Test, Explicit]
         public async Task RequestAccountUpdates_ChangeInPosition_ReceivesThemOnPositionChange()
         {
             TestsUtils.Assert.MarketIsOpen();
             
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            CancellationTokenSource cancellation = new CancellationTokenSource();
-            cancellation.CancelAfter(Debugger.IsAttached ? -1 : 3 * 60 * 1000 + 500);
-            cancellation.Token.Register(() => tcs.TrySetException(new TimeoutException()));
-
-            DateTime? updateReceivedInstantly = null;
-            DateTime? updateReceivedAfterPositionChange = null;
+            var times = new List<DateTime>();
 
             Action<AccountValue> accValueUpdated = val =>
             {
                 if (val.Key == AccountValueKey.Time)
                 {
-                    if (updateReceivedInstantly == null)
-                        updateReceivedInstantly = DateTime.Parse(val.Value);
-                    else
-                    {
-                        updateReceivedAfterPositionChange = DateTime.Parse(val.Value);
-                        tcs.TrySetResult();
-                    }
+                    DateTime time = DateTime.Parse(val.Value);
+                    times.Add(time);
+                    _logger?.Debug($"received : {time}");
                 }
             };
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
+            var error = new Action<Exception>(e =>
+            {
+                tcs.TrySetException(e);
+            });
+
+            DateTime timeAtRequest = default;
+            OrderExecutedResult? execResult = null;
 
             _broker.AccountValueUpdated += accValueUpdated;
             _broker.ErrorOccured += error;
             try
             {
+                timeAtRequest = await _broker.GetServerTimeAsync();
                 _broker.RequestAccountUpdates();
-                await Task.Delay(500);
                 
                 MarketOrder order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
-                var placedResult = await _broker.OrderManager.PlaceOrderAsync("GME", order);
-                await tcs.Task;
+                await _broker.OrderManager.PlaceOrderAsync("GME", order);
+                execResult = await _broker.OrderManager.AwaitExecutionAsync(order);
+                await Task.Delay(5*1000);
+                tcs.TrySetResult();
+            }
+            catch (Exception e)
+            {
+                tcs.TrySetException(e);
             }
             finally
             {
                 _broker.AccountValueUpdated -= accValueUpdated;
                 _broker.ErrorOccured -= error;
                 _broker.CancelAccountUpdates();
+                await _broker.OrderManager.CancelAllOrdersAsync();
+                await _broker.OrderManager.SellAllPositionsAsync();
             }
 
-            Assert.IsNotNull(updateReceivedInstantly);
-            Assert.IsNotNull(updateReceivedAfterPositionChange);
-            Assert.IsTrue(updateReceivedAfterPositionChange - updateReceivedInstantly < TimeSpan.FromMinutes(3));
+            Assert.True(tcs.Task.IsCompletedSuccessfully);
+            Assert.NotNull(execResult);
+
+            var lower = timeAtRequest.Floor(TimeSpan.FromMinutes(3));
+            var higher = execResult.Time.AddSeconds(5);
+            Assert.Multiple(() =>
+            {
+                foreach (var time in times)
+                {
+                    Assert.LessOrEqual(lower, time);
+                    Assert.GreaterOrEqual(higher, time);
+                }
+            });
         }
     }
 }

@@ -344,8 +344,9 @@ namespace TradingBot.Backtesting
         void WaitOneSecond(CancellationToken mainToken)
         {
             var timeToWait = TimeCompression.OneSecond;
-            if (timeToWait.TotalMilliseconds > 10)
+            if (timeToWait.TotalMilliseconds > 20)
             {
+                // resolution of Delay is around 15 milliseconds on Windows
                 Task.Delay(timeToWait).Wait(mainToken);
                 return;
             }

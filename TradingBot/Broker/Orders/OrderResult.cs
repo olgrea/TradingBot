@@ -16,5 +16,6 @@
         public string? Ticker { get; set; } 
         public Order? Order { get; set; }
         public OrderExecution? OrderExecution { get; set; }
+        public DateTime Time => OrderExecution?.Time ?? default;
     }
 }

@@ -1,8 +1,6 @@
 ﻿using System.Globalization;
-using System.Runtime.InteropServices;
 using IBApi;
 using NLog;
-using NLog.Fluent;
 using static TradingBot.IBKR.Client.IBClient;
 
 namespace TradingBot.IBKR.Client
@@ -48,6 +46,7 @@ namespace TradingBot.IBKR.Client
             NextValidId?.Invoke(orderId);
         }
 
+        // precision of timestamps received : minutes
         public Action<DateTime>? UpdateAccountTime;
         public void updateAccountTime(string timestamp)
         {
@@ -77,6 +76,7 @@ namespace TradingBot.IBKR.Client
             UpdatePortfolio?.Invoke(pos);
         }
 
+        // ONLY called on the first IBClient.reqAccountUpdates(true, code) call, NOT during updates... 
         public Action<string>? AccountDownloadEnd;
         public void accountDownloadEnd(string account)
         {
