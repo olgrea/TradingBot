@@ -13,8 +13,7 @@ namespace TradingBot.Broker.MarketData
             return new Last()
             {
                 Price = last.Price,
-                // TODO : update db schema. Loss of data is acceptable for now.
-                Size = Convert.ToInt32(last.Size),
+                Size = last.Size,
                 Time = DateTimeOffset.FromUnixTimeSeconds(last.Time).DateTime.ToLocalTime(),
             };
         }

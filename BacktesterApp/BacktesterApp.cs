@@ -1,6 +1,7 @@
 ﻿using NLog;
 using TradingBot;
 using TradingBot.Backtesting;
+using TradingBot.Reports;
 using TradingBot.Strategies;
 using TradingBot.Utils;
 

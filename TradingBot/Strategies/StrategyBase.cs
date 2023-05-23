@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
 using TradingBot.Utils;
@@ -9,7 +10,7 @@ namespace TradingBot.Strategies
     {
         protected Trader _trader;
         protected string _ticker;
-        protected Dictionary<BarLength, LinkedList<Bar>> _bars = new();
+        protected ConcurrentDictionary<BarLength, LinkedList<Bar>> _bars = new();
 
         protected StrategyBase(DateTime startTime, DateTime endTime, string ticker, Trader trader)
         {
@@ -48,19 +49,27 @@ namespace TradingBot.Strategies
             // build bar collections from 1 sec bars for each bar length
             foreach (IGrouping<BarLength, IIndicator> group in Indicators.GroupBy(i => i.BarLength))
             {
-                // lock necessary?
-                BarLength barLength = group.Key;
-                if (!_bars.ContainsKey(barLength))
-                {
-                    var combinedBars = BuildCombinedBars(oneSecBars, barLength);
-                    Debug.Assert(combinedBars.All(b => b.Time.Second % largestNbSecs == 0));
-                    _bars[barLength] = new LinkedList<Bar>(combinedBars.OrderBy(b => b.Time));
-                }
+                token.ThrowIfCancellationRequested();
 
-                foreach (IIndicator indicator in group)
+                BarLength barLength = group.Key;
+                lock(_bars)
                 {
-                    indicator.Compute(_bars[barLength]);
-                    Debug.Assert(indicator.IsReady);
+                    if (!_bars.ContainsKey(barLength))
+                        _bars[barLength] = new LinkedList<Bar>();
+
+                    var combinedBars = BuildCombinedBars(oneSecBars, barLength, token);
+                    Debug.Assert(combinedBars.All(b => b.Time.Second % largestNbSecs == 0));
+
+                    // It's possible that we already have received some live bars. So append them at the end.
+                    _bars[barLength] = new LinkedListWithMaxSize<Bar>(2 * largestNbWarmupPeriods, combinedBars.OrderBy(b => b.Time).Concat(_bars[barLength]));
+
+                    foreach (IIndicator indicator in group)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        indicator.Compute(_bars[barLength]);
+                        Debug.Assert(indicator.IsReady);
+                    }
                 }
             }
 

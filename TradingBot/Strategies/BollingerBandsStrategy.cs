@@ -113,7 +113,14 @@ namespace TradingBot.Strategies
         {
             if (ticker == _ticker && bar.BarLength == BollingerBands.BarLength)
             {
-                _bars[bar.BarLength].AddLast(bar);
+                _trader.Logger?.Debug($"bar received : {bar}");
+
+                lock (_bars)
+                {
+                    if (!_bars.ContainsKey(bar.BarLength))
+                        _bars[bar.BarLength] = new LinkedList<Bar>();
+                    _bars[bar.BarLength].AddLast(bar);
+                }
 
                 _lasts.Clear();
 

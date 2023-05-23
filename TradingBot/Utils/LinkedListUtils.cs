@@ -1,11 +1,18 @@
 ﻿namespace TradingBot.Utils
 {
-    public class LinkedListWithFixedSize<T> : LinkedList<T>
+    public class LinkedListWithMaxSize<T> : LinkedList<T>
     {
         int _capacity;
-        public LinkedListWithFixedSize(int capacity)
+        public LinkedListWithMaxSize(int capacity)
         {
             _capacity = capacity;
+        }
+
+        public LinkedListWithMaxSize(int capacity, IEnumerable<T> values) 
+            : this(capacity) 
+        {
+            foreach(T value in values)
+                AddLast(value);
         }
 
         public new void AddLast(T value)
