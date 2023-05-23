@@ -1,7 +1,5 @@
-﻿using System.Collections.Generic;
-using NLog;
+﻿using NLog;
 using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.IBKR.Client;
 
@@ -32,28 +30,31 @@ namespace TradingBot.IBKR
         public event Action<string, Order, OrderStatus>? OrderUpdated;
         public event Action<string, OrderExecution>? OrderExecuted;
 
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order)
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
         {
             _validator.ValidateOrderPlacement(order);
-            return await PlaceOrderInternalAsync(ticker, order);
+            return await PlaceOrderInternalAsync(ticker, order, token);
         }
 
-        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order)
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order) => await ModifyOrderAsync(order, CancellationToken.None);
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order, CancellationToken token)
         {
             _validator.ValidateOrderModification(order);
-            return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order);
+            return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order, token);
         }
 
         // TODO : investigate/implement/test partially filled orders
-        async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, Order order)
+        async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, Order order, CancellationToken token)
         {
             var orderPlacedResult = new OrderPlacedResult();
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
 
             var contract = _client.ContractsCache.Get(ticker);
 
             if (order.Id < 0)
-                order.Id = await GetNextValidOrderIdAsync();
+                order.Id = await GetNextValidOrderIdAsync(token);
 
             var openOrder = new Action<IBApi.Contract, IBApi.Order, IBApi.OrderState>((c, o, oState) =>
             {
@@ -110,7 +111,8 @@ namespace TradingBot.IBKR
             }
         }
 
-        public async Task<OrderStatus> CancelOrderAsync(int orderId)
+        public async Task<OrderStatus> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
+        public async Task<OrderStatus> CancelOrderAsync(int orderId, CancellationToken token)
         {
             _validator.ValidateOrderCancellation(orderId);
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -148,7 +150,8 @@ namespace TradingBot.IBKR
             }
         }
 
-        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync(CancellationToken token)
         {
             int nbRetries = 0;
             const int maxRetries = 5;
@@ -157,7 +160,8 @@ namespace TradingBot.IBKR
             {
                 try
                 {
-                    results = await CancelAllOrdersInternal();
+                    token.ThrowIfCancellationRequested();
+                    results = await CancelAllOrdersInternal(token);
                 }
                 catch (ErrorMessageException msg)
                 {
@@ -174,12 +178,14 @@ namespace TradingBot.IBKR
             return results!;
         }
 
-        async Task<IEnumerable<OrderStatus>> CancelAllOrdersInternal()
+        async Task<IEnumerable<OrderStatus>> CancelAllOrdersInternal(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             var cancelledOrders = new Dictionary<int, OrderStatus>();
 
-            IEnumerable<OrderPlacedResult> openOrders = await GetOpenOrdersAsync();
+            IEnumerable<OrderPlacedResult> openOrders = await GetOpenOrdersAsync(token);
             var openOrdersCount = openOrders.Count();
 
             if (openOrdersCount == 0)
@@ -224,7 +230,8 @@ namespace TradingBot.IBKR
             }
         }
 
-        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync()
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync() => await SellAllPositionsAsync(CancellationToken.None);
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync(CancellationToken token)
         {
             var list = new List<OrderExecutedResult>();
             var account = await _broker.GetAccountAsync();
@@ -244,7 +251,8 @@ namespace TradingBot.IBKR
             return list;
         }
 
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order)
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order) => await AwaitExecutionAsync(order, CancellationToken.None);
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order, CancellationToken token)
         {
             _validator.ValidateExecutionAwaiting(order.Id);
             if(_orderTracker.OrdersExecuted.ContainsKey(order.Id))
@@ -258,6 +266,8 @@ namespace TradingBot.IBKR
             }
 
             var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
             {
                 if (oe.OrderId == order.Id)
@@ -353,9 +363,10 @@ namespace TradingBot.IBKR
             OrderExecuted?.Invoke(_orderTracker.OrderIdsToTicker[exec.OrderId], exec);
         }
 
-        async Task<int> GetNextValidOrderIdAsync()
+        async Task<int> GetNextValidOrderIdAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
 
             var nextValidId = new Action<int>(id => tcs.SetResult(id));
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
@@ -375,10 +386,11 @@ namespace TradingBot.IBKR
             }
         }
 
-        internal async Task<IEnumerable<OrderPlacedResult>> GetOpenOrdersAsync()
+        internal async Task<IEnumerable<OrderPlacedResult>> GetOpenOrdersAsync(CancellationToken token)
         {
             var orderPlacedResults = new Dictionary<int, OrderPlacedResult>();
             var tcs = new TaskCompletionSource<IEnumerable<OrderPlacedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
 
             var openOrder = new Action<IBApi.Contract, IBApi.Order, IBApi.OrderState>((c, o, oState) =>
             {

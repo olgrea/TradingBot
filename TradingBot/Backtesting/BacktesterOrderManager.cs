@@ -29,9 +29,12 @@ namespace TradingBot.Backtesting
 
         int NextOrderId => _nextOrderId++;
 
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order)
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             Action request = new Action(() =>
             {
                 try
@@ -58,9 +61,12 @@ namespace TradingBot.Backtesting
             }
         }
 
-        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order)
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order) => await ModifyOrderAsync(order, CancellationToken.None);
+        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             Action request = () =>
             {
                 try
@@ -88,10 +94,13 @@ namespace TradingBot.Backtesting
                 _backtester.ErrorOccured -= error;
             }
         }
-                
-        public async Task<OrderStatus> CancelOrderAsync(int orderId)
+
+        public async Task<OrderStatus> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
+        public async Task<OrderStatus> CancelOrderAsync(int orderId, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             Action request = () =>
             {
                 try
@@ -120,9 +129,12 @@ namespace TradingBot.Backtesting
             }
         }
 
-        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync()
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
+        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             Action request = () =>
             {
                 var list = new List<OrderStatus>();
@@ -160,9 +172,12 @@ namespace TradingBot.Backtesting
             }
         }
 
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order)
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order) => await AwaitExecutionAsync(order, CancellationToken.None);
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order, CancellationToken token)
         {
             var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             Action request = () =>
             {
                 try
@@ -220,9 +235,12 @@ namespace TradingBot.Backtesting
             }
         }
 
-        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync()
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync() => await SellAllPositionsAsync(CancellationToken.None);
+        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<IEnumerable<OrderExecutedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             var ordersPlaced = new Dictionary<int, Order>();
             Action request = () =>
             {

@@ -170,9 +170,10 @@ namespace TradingBot.IBKR
             }
         }
         
-        async Task<IEnumerable<string>> GetManagedAccountsList()
+        async Task<IEnumerable<string>> GetManagedAccountsList(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<IEnumerable<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
 
             var managedAccount = new Action<IEnumerable<string>>(list => tcs.SetResult(list));
             var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
@@ -193,12 +194,15 @@ namespace TradingBot.IBKR
             }
         }
 
-        public async Task<Account> GetAccountAsync()
+        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public async Task<Account> GetAccountAsync(CancellationToken token)
         {
             Debug.Assert(_account != null);
-            await ValidateAccount();
+            await ValidateAccount(token);
 
             var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => tcs.TrySetCanceled());
+
             bool accDownloaded = false;
             bool posDownloaded = false;
 
@@ -232,9 +236,9 @@ namespace TradingBot.IBKR
             }
         }
 
-        async Task ValidateAccount()
+        async Task ValidateAccount(CancellationToken token)
         {
-            var accList = await GetManagedAccountsList();
+            var accList = await GetManagedAccountsList(token);
             if (accList.Count() > 1)
             {
                 throw new NotSupportedException("Multiple-account structures not supported.");
@@ -392,7 +396,8 @@ namespace TradingBot.IBKR
             _pnlSubscriptions.Remove(ticker);
         }
 
-        public async Task<DateTime> GetServerTimeAsync()
+        public async Task<DateTime> GetServerTimeAsync() => await GetServerTimeAsync(CancellationToken.None);
+        public async Task<DateTime> GetServerTimeAsync(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<DateTime>(TaskCreationOptions.RunContinuationsAsynchronously);
             var currentTime = new Action<long>(time =>

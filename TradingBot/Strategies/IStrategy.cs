@@ -7,7 +7,7 @@ namespace TradingBot.Strategies
         DateTime StartTime { get; }
         DateTime EndTime { get; }
         IEnumerable<IIndicator> Indicators { get; init; }
-        Task Start();
-        Task Initialize();
+        Task Start(CancellationToken token);
+        Task Initialize(CancellationToken token);
     }
 }

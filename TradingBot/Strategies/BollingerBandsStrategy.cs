@@ -11,12 +11,12 @@ namespace TradingBot.Strategies
         LinkedList<Last> _lasts;
         BidAsk _latestBidAsk = new();
         Last _latestLast = new();
-
+        CancellationToken _token = CancellationToken.None;
         ActionBlock<DateTime>? _executeStrategyBlock;
 
         public BollingerBandsStrategy(DateTime start, DateTime end, string ticker, Trader trader) : base(start, end, ticker, trader)
         {
-            BollingerBands = new BollingerBands(BarLength._1Min);
+            BollingerBands = new BollingerBands(BarLength._5Sec);
             Indicators = new List<IIndicator>() { BollingerBands };
             _lasts = new LinkedList<Last>();
         }
@@ -25,12 +25,16 @@ namespace TradingBot.Strategies
 
         public override IEnumerable<IIndicator> Indicators { get; init; }
 
-        public async override Task Start()
+        public async override Task Start(CancellationToken token)
         {
-            await Initialize();
+            _token = token;
+            await Initialize(token);
+
+            _token.ThrowIfCancellationRequested();
             Debug.Assert(_executeStrategyBlock != null);
             await _executeStrategyBlock.Completion;
-
+            
+            _token.ThrowIfCancellationRequested();
             await _trader.Broker.OrderManager.CancelAllOrdersAsync();
             await _trader.Broker.OrderManager.SellAllPositionsAsync();
         }
@@ -38,20 +42,26 @@ namespace TradingBot.Strategies
         async Task ExecuteStrategy(DateTime time)
         {
             Debug.Assert(_executeStrategyBlock != null);
+
             if (time < StartTime)
             {
+                _trader.Logger?.Debug($"Strategy not started yet. Starts at {StartTime}");
                 return;
             }
             else if (time == EndTime.AddMinutes(-1))
             {
                 _executeStrategyBlock.Complete();
+                _trader.Logger?.Debug($"Strategy Completed.");
                 return;
             }
 
+            _trader.Logger?.Debug($"Executing strategy at {time}");
             var signals = BollingerBands.Signals.ToList();
 
             if (signals.Contains(BollingerBandsSignals.CrossedLowerBandDownward))
             {
+                _token.ThrowIfCancellationRequested();
+
                 int qty = (int)Math.Floor(_trader.Account.AvailableBuyingPower / _latestBidAsk.Ask);
                 if (qty <= 0)
                     return;
@@ -61,6 +71,8 @@ namespace TradingBot.Strategies
             }
             else if (signals.Contains(BollingerBandsSignals.CrossedUpperBandUpward))
             {
+                _token.ThrowIfCancellationRequested();
+
                 if (!_trader.Account.Positions.TryGetValue(_ticker, out var position))
                     return;
 
@@ -73,7 +85,7 @@ namespace TradingBot.Strategies
             }
         }
 
-        public async override Task Initialize()
+        public async override Task Initialize(CancellationToken token)
         {
             if (_executeStrategyBlock == null)
             {
@@ -81,7 +93,7 @@ namespace TradingBot.Strategies
                 _trader.Broker.LiveDataProvider.BidAskReceived += OnBidAskReceived;
                 _trader.Broker.LiveDataProvider.LastReceived += OnLastReceived;
 
-                _executeStrategyBlock = new ActionBlock<DateTime>(ExecuteStrategy);
+                _executeStrategyBlock = new ActionBlock<DateTime>(ExecuteStrategy, new ExecutionDataflowBlockOptions() { CancellationToken = token});
                 _ = _executeStrategyBlock.Completion.ContinueWith(t =>
                 {
                     _trader.Broker.LiveDataProvider.BarReceived -= OnBarReceived;
@@ -94,7 +106,7 @@ namespace TradingBot.Strategies
                 _trader.Broker.LiveDataProvider.RequestLastTradedPriceUpdates(_ticker);
             }
 
-            await InitIndicators();
+            await InitIndicators(token);
         }
 
         void OnBarReceived(string ticker, Bar bar)

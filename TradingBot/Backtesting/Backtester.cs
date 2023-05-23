@@ -445,7 +445,8 @@ namespace TradingBot.Backtesting
             });
         }
 
-        public Task<Account> GetAccountAsync()
+        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public Task<Account> GetAccountAsync(CancellationToken token)
         {
             _lastAccountUpdateTime = _currentTime;
             _accountUpdatesRequested = true;
@@ -573,7 +574,8 @@ namespace TradingBot.Backtesting
             }
         }
 
-        public Task<DateTime> GetServerTimeAsync()
+        public async Task<DateTime> GetServerTimeAsync() => await GetServerTimeAsync(CancellationToken.None);
+        public Task<DateTime> GetServerTimeAsync(CancellationToken token)
         {
             return Task.FromResult(_currentTime);
         }

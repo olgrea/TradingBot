@@ -21,9 +21,11 @@ namespace TradingBot.Broker
         public Task<string> ConnectAsync(CancellationToken token);
         public Task DisconnectAsync();
         public Task<Account> GetAccountAsync();
+        public Task<Account> GetAccountAsync(CancellationToken token);
         public void RequestAccountUpdates();
         public void CancelAccountUpdates();
 
         public Task<DateTime> GetServerTimeAsync();
+        public Task<DateTime> GetServerTimeAsync(CancellationToken token);
     }
 }

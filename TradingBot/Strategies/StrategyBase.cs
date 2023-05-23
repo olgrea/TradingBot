@@ -16,7 +16,7 @@ namespace TradingBot.Strategies
             StartTime = startTime;
             EndTime = endTime;
             _ticker = ticker;
-            _trader = trader;   
+            _trader = trader;
         }
 
         public DateTime StartTime { get; init; }
@@ -25,12 +25,11 @@ namespace TradingBot.Strategies
 
         public abstract IEnumerable<IIndicator> Indicators { get; init; }
 
-        public abstract Task Initialize();
+        public abstract Task Initialize(CancellationToken token);
 
-        public abstract Task Start();
+        public abstract Task Start(CancellationToken token);
 
-        // TODO : move that to a base class
-        protected async Task InitIndicators()
+        protected async Task InitIndicators(CancellationToken token)
         {
             if (!Indicators.Any())
                 throw new ArgumentException("Indicators empty.");
@@ -44,7 +43,7 @@ namespace TradingBot.Strategies
             var largestNbWarmupPeriods = Indicators.Max(i => i.NbWarmupPeriods);
             int nbOfOneSecBarsNeeded = largestNbWarmupPeriods * largestNbSecs;
 
-            var oneSecBars = await RetrieveOneSecBars(nbOfOneSecBarsNeeded, largestNbSecs);
+            var oneSecBars = await RetrieveOneSecBars(nbOfOneSecBarsNeeded, largestNbSecs, token);
 
             // build bar collections from 1 sec bars for each bar length
             foreach (IGrouping<BarLength, IIndicator> group in Indicators.GroupBy(i => i.BarLength))
@@ -65,10 +64,11 @@ namespace TradingBot.Strategies
                 }
             }
 
+            token.ThrowIfCancellationRequested();
             _trader.Logger?.Info("Indicators Initialized");
         }
 
-        LinkedList<Bar> BuildCombinedBars(IEnumerable<Bar> oneSecBars, BarLength barLength)
+        LinkedList<Bar> BuildCombinedBars(IEnumerable<Bar> oneSecBars, BarLength barLength, CancellationToken token)
         {
             var combinedBars = new LinkedList<Bar>();
             var tmp = new LinkedList<Bar>();
@@ -77,6 +77,8 @@ namespace TradingBot.Strategies
             int nbSecs = (int)barLength;
             foreach (Bar oneSecBar in oneSecBars.OrderBy(b => b.Time))
             {
+                token.ThrowIfCancellationRequested();
+
                 tmp.AddLast(oneSecBar);
                 if (tmp.Count == nbSecs)
                 {
@@ -89,24 +91,27 @@ namespace TradingBot.Strategies
                 last = oneSecBar;
             }
 
+            token.ThrowIfCancellationRequested();
             _trader.Logger?.Debug($" bars of length {barLength} built (count : {combinedBars.Count()}).");
             return combinedBars;
         }
 
-        async Task<IEnumerable<Bar>> RetrieveOneSecBars(int nbOfOneSecBarsNeeded, int largestNbSecs)
+        async Task<IEnumerable<Bar>> RetrieveOneSecBars(int nbOfOneSecBarsNeeded, int largestNbSecs, CancellationToken token)
         {
             IEnumerable<IMarketData> oneSecBars = Enumerable.Empty<Bar>();
 
             var to = await _trader.Broker.GetServerTimeAsync();
             while (oneSecBars.Count() < nbOfOneSecBarsNeeded)
             {
+                token.ThrowIfCancellationRequested();
+
                 var from = to.AddSeconds(-nbOfOneSecBarsNeeded);
                 from = from.Floor(TimeSpan.FromSeconds(largestNbSecs));
 
                 if (from.TimeOfDay < MarketDataUtils.PreMarketStartTime)
                     from = to.ToMarketHours(extendedHours: true).Item1;
 
-                var retrieved = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, from, to);
+                var retrieved = await _trader.Broker.HistoricalDataProvider.GetHistoricalDataAsync<Bar>(_ticker, from, to, token);
                 oneSecBars = retrieved.Concat(oneSecBars);
 
                 to = from;
@@ -118,6 +123,7 @@ namespace TradingBot.Strategies
                 }
             }
 
+            token.ThrowIfCancellationRequested();
             _trader.Logger?.Debug($"1 sec bars retrieved (count : {oneSecBars.Count()})");
             return oneSecBars.Cast<Bar>();
         }
