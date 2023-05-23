@@ -1,18 +1,18 @@
 ﻿using System.Text;
 
-namespace TradingBot.Utils
+namespace TradingBot.Reports
 {
     /// <summary>
     /// Results from trading are coded into an indicator that can be displayed in TradingView
     /// </summary>
-    public class TradingViewIndicatorGenerator
+    public class TradingViewIndicatorGenerator : IReportGenerator
     {
         const string header = "//@version=5\r\nindicator(title=\"trades\", shorttitle=\"trades\", overlay=true, max_lines_count=500, max_labels_count=500)";
 
         const string labelFormat = "label.new(timestamp(\"{0}-04:00\"), na, text=\"{1}\", xloc=xloc.bar_time, yloc={2}, color = color.white, textcolor=color.gray, size=size.large, style={3})";
-        
+
         const string dateFormat = "yyyy-MM-ddTHH:mm:ss";
-        
+
         const string buyYLocBar = "yloc.belowbar";
         const string sellYLocBar = "yloc.abovebar";
         const string buyArrowStyle = "label.style_arrowup";
@@ -22,9 +22,9 @@ namespace TradingBot.Utils
         {
             var sb = new StringBuilder();
             sb.AppendLine(header);
-            foreach(var trade in results.Trades)
+            foreach (var trade in results.Trades)
             {
-                if(trade.Action == Broker.Orders.OrderAction.BUY)
+                if (trade.Action == Broker.Orders.OrderAction.BUY)
                     sb.AppendLine(string.Format(labelFormat, trade.Time.ToString(dateFormat), $"BUY {Convert.ToInt32(trade.Qty)} at {trade.Price:c}", buyYLocBar, buyArrowStyle));
                 else
                     sb.AppendLine(string.Format(labelFormat, trade.Time.ToString(dateFormat), $"SELL {Convert.ToInt32(trade.Qty)} at {trade.Price:c}", sellYLocBar, sellArrowStyle));
