@@ -37,7 +37,7 @@ namespace IBBrokerTests
         [Test]
         public void ConnectAsync_AlreadyConnected_ThrowsError()
         {
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.ConnectAsync());
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.ConnectAsync());
         }
 
         [Test]

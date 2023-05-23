@@ -123,7 +123,7 @@ namespace IBBrokerTests
             {
                 _broker.LiveDataProvider.RequestBidAskUpdates(expectedTicker);
                 //_broker.MarketDataProvider.RequestLastTradedPriceUpdates(expectedTicker);
-                Assert.Throws<ErrorMessage>(() => _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker));
+                Assert.Throws<ErrorMessageException>(() => _broker.LiveDataProvider.RequestLastTradedPriceUpdates(expectedTicker));
             }
             finally
             {
@@ -152,7 +152,7 @@ namespace IBBrokerTests
                     if (i < tickers.Length - 1)
                         _broker.LiveDataProvider.RequestBidAskUpdates(tickers[i]);
                     else
-                        Assert.Throws<ErrorMessage>(() => _broker.LiveDataProvider.RequestBidAskUpdates(tickers[i]));
+                        Assert.Throws<ErrorMessageException>(() => _broker.LiveDataProvider.RequestBidAskUpdates(tickers[i]));
                 }
             }
             finally

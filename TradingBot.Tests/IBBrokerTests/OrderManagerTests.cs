@@ -84,7 +84,7 @@ namespace IBBrokerTests
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = qty };
 
             // Test
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, order));
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, order));
         }
 
         [Test]
@@ -101,7 +101,7 @@ namespace IBBrokerTests
 
             // Test
             var sellOrder = new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = 10 };
-            Assert.ThrowsAsync<ErrorMessage>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, sellOrder));
+            Assert.ThrowsAsync<ErrorMessageException>(async () => await _broker.OrderManager.PlaceOrderAsync(ticker, sellOrder));
         }
 
         [Test]

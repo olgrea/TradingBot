@@ -137,7 +137,7 @@ namespace TradingBot.Backtesting
         public IHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
         public event Action<Exception>? ErrorOccured;
-
+        public event Action<Message>? MessageReceived;
         public event Action<AccountValue>? AccountValueUpdated;
         public event Action<Position>? PositionUpdated;
         public event Action<PnL>? PnLUpdated;
@@ -151,7 +151,7 @@ namespace TradingBot.Backtesting
         public Task<string> ConnectAsync(CancellationToken token)
         {
             if (_consumerTask != null)
-                throw new ErrorMessage("Already connected");
+                throw new ErrorMessageException("Already connected");
 
             _logger?.Debug($"Backtester connected.");
             _cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);

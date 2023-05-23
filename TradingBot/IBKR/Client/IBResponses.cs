@@ -312,57 +312,41 @@ namespace TradingBot.IBKR.Client
             CurrentTime?.Invoke(time);
         }
 
-        public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
-
-        //// https://interactivebrokers.github.io/tws-api/message_codes.html
-        //// https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClientErrors.html
-        //public static bool IsSystemMessage(int code) => code >= 1100 && code <= 1300;
-        //public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200;
-        //public static bool IsClientErrorMessage(int code) => 
-        //    (code >= 501 && code <= 508 && code != 507) ||
-        //    (code >= 510 && code <= 549) ||
-        //    (code >= 551 && code <= 584) ||
-        //    code == 10038;
-
-        //public static bool IsTWSErrorMessage(int code) =>
-        //    (code >= 100 && code <= 168) ||
-        //    (code >= 200 && code <= 449) ||
-        //    code == 507 ||
-        //    (code >= 10000 && code <= 10027) ||
-        //    code == 10090 ||
-        //    (code >= 10148 && code <= 10284);
-
-
-        public Action<ErrorMessage>? Error;
+        public Action<ErrorMessageException>? Error;
+        public Action<Message>? MessageReceived;
         public void error(Exception e)
         {
-            HandleError(new ErrorMessage(e));
+            ErrorMessageException eme = new ErrorMessageException(e);
+            Error?.Invoke(eme);
+            MessageReceived?.Invoke(eme.ErrorMessage);
         }
 
         public void error(string str)
         {
-            HandleError(new ErrorMessage(str));
+            //No code => assume it's an error
+            ErrorMessageException eme = new ErrorMessageException(str);
+            Error?.Invoke(eme);
+            MessageReceived?.Invoke(eme.ErrorMessage);
         }
 
         public void error(int id, int errorCode, string errorMsg, string advancedOrderRejectJson)
         {
-            HandleError(new ErrorMessage(id, errorCode, errorMsg, new Exception(advancedOrderRejectJson)));
-        }
-
-        void HandleError(ErrorMessage msg)
-        {
-            if (IsWarningMessage(msg.ErrorCode))
+            var msg = new Message(id, errorCode, errorMsg);
+            if (Message.IsWarningMessage(errorCode))
             {
                 _logger?.Warn(msg);
-                return;
             }
-            else if (msg.ErrorCode == 202) // Order cancelled
-                return;
-            else if (msg.ErrorCode == 399 && msg.Message.Contains("your order will not be placed at the exchange until"))
-                return;
+            else
+            {
+                Exception? inner = null;
+                if(!string.IsNullOrEmpty(advancedOrderRejectJson))
+                    inner = new Exception(advancedOrderRejectJson);
             
-            _logger?.Error(msg);
-            Error?.Invoke(msg);
+                _logger?.Error(msg);
+                Error?.Invoke(new ErrorMessageException(msg, inner));
+            }
+
+            MessageReceived?.Invoke(msg);
         }
 
         #region Not Implemented

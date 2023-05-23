@@ -83,7 +83,13 @@ namespace TradingBot.IBKR
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg =>
+            {
+                if (msg.ErrorMessage.Code == MessageCode.OrderMessageError && msg.Message.Contains("your order will not be placed at the exchange until"))
+                    return;
+
+                tcs.TrySetException(msg);
+            });
 
             _client.Responses.OpenOrder += openOrder;
             _client.Responses.OrderStatus += orderStatus;
@@ -121,7 +127,11 @@ namespace TradingBot.IBKR
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg =>
+            {
+                if (msg.ErrorMessage.Code == MessageCode.OrderCancelledCode) return;
+                tcs.TrySetException(msg);
+            });
 
             _client.Responses.OrderStatus += orderStatus;
             _client.Responses.Error += error;
@@ -149,9 +159,9 @@ namespace TradingBot.IBKR
                 {
                     results = await CancelAllOrdersInternal();
                 }
-                catch (ErrorMessage msg)
+                catch (ErrorMessageException msg)
                 {
-                    if(msg.ErrorCode == 161)// Code 161 : Cancel attempted when order is not in a cancellable state.
+                    if(msg.ErrorMessage.Code == MessageCode.OrderNotCancellableCode)
                     {
                         nbRetries++;
                         _logger?.Trace($"Retrying...{nbRetries}/{maxRetries}");
@@ -192,7 +202,11 @@ namespace TradingBot.IBKR
                 }
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg =>
+            {
+                if (msg.ErrorMessage.Code == MessageCode.OrderCancelledCode) return;
+                tcs.TrySetException(msg);
+            });
 
             _client.Responses.OrderStatus += orderStatus;
             _client.Responses.Error += error;
@@ -344,7 +358,7 @@ namespace TradingBot.IBKR
             var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var nextValidId = new Action<int>(id => tcs.SetResult(id));
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.NextValidId += nextValidId;
             _client.Responses.Error += error;
@@ -391,7 +405,7 @@ namespace TradingBot.IBKR
                 tcs.TrySetResult(results);
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.OpenOrder += openOrder;
             _client.Responses.OrderStatus += orderStatus;

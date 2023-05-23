@@ -75,7 +75,7 @@ namespace TradingBot.IBKR
                     tcs.SetResult(tmpDetails);
                 }
             });
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.ContractDetails += contractDetails;
             _client.Responses.ContractDetailsEnd += contractDetailsEnd;

@@ -43,12 +43,14 @@ namespace TradingBot.IBKR
             _client.Responses.PnlSingle += OnPnLReceived;
 
             _client.Responses.Error += e => ErrorOccured?.Invoke(e);
+            _client.Responses.MessageReceived += m => MessageReceived?.Invoke(m);
         }
 
         public event Action<AccountValue>? AccountValueUpdated;
         public event Action<Position>? PositionUpdated;
         public event Action<PnL>? PnLUpdated;
         public event Action<Exception>? ErrorOccured;
+        public event Action<Message>? MessageReceived;
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
@@ -113,7 +115,7 @@ namespace TradingBot.IBKR
                     tcs.TrySetResult(accountCode);
             });
 
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.NextValidId += nextValidId;
             _client.Responses.ManagedAccounts += managedAccounts;
@@ -149,7 +151,7 @@ namespace TradingBot.IBKR
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var disconnect = new Action(() => tcs.TrySetResult());
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.ConnectionClosed += disconnect;
             _client.Responses.Error += error;
@@ -173,7 +175,7 @@ namespace TradingBot.IBKR
             var tcs = new TaskCompletionSource<IEnumerable<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var managedAccount = new Action<IEnumerable<string>>(list => tcs.SetResult(list));
-            var error = new Action<ErrorMessage>(msg => tcs.TrySetException(msg));
+            var error = new Action<ErrorMessageException>(msg => tcs.TrySetException(msg));
 
             _client.Responses.ManagedAccounts += managedAccount;
             try
@@ -398,7 +400,7 @@ namespace TradingBot.IBKR
                 DateTime result = DateTimeOffset.FromUnixTimeSeconds(time).DateTime.ToLocalTime();
                 tcs.TrySetResult(result);
             });
-            var error = new Action<ErrorMessage>(e => tcs.TrySetException(e));
+            var error = new Action<ErrorMessageException>(e => tcs.TrySetException(e));
 
             try
             {

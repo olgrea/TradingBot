@@ -393,9 +393,9 @@ namespace TradingBot.IBKR
                     tcs.TrySetResult(tmpList);
             });
 
-            var error = new Action<ErrorMessage>(msg =>
+            var error = new Action<ErrorMessageException>(msg =>
             {
-                if (msg.ErrorCode == 162) // query returned no data
+                if (msg.ErrorMessage.Code == MessageCode.HistoricalMarketDataServiceErrorCode && msg.Message.ToLower().Contains("returned no data")) 
                     tcs.TrySetResult(tmpList);
                 else
                     tcs.TrySetException(msg);
@@ -541,9 +541,9 @@ namespace TradingBot.IBKR
                         tcs.TrySetResult(tmpList);
                 }
             });
-            var error = new Action<ErrorMessage>(msg =>
+            var error = new Action<ErrorMessageException>(msg =>
             {
-                if (msg.ErrorCode == 162) // query returned no data
+                if (msg.ErrorMessage.Code == MessageCode.HistoricalMarketDataServiceErrorCode && msg.Message.ToLower().Contains("returned no data"))
                     tcs.TrySetResult(tmpList);
                 else
                     tcs.TrySetException(msg);
@@ -606,9 +606,9 @@ namespace TradingBot.IBKR
                         tcs.TrySetResult(tmpList);
                 }
             });
-            var error = new Action<ErrorMessage>(msg =>
+            var error = new Action<ErrorMessageException>(msg =>
             {
-                if (msg.ErrorCode == 162) // query returned no data
+                if (msg.ErrorMessage.Code == MessageCode.HistoricalMarketDataServiceErrorCode && msg.Message.ToLower().Contains("returned no data")) // query returned no data
                     tcs.TrySetResult(tmpList);
                 else
                     tcs.TrySetException(msg);

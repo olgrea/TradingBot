@@ -1,6 +1,7 @@
 ﻿using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData.Providers;
 using TradingBot.Broker.Orders;
+using TradingBot.IBKR.Client;
 
 namespace TradingBot.Broker
 {
@@ -10,6 +11,7 @@ namespace TradingBot.Broker
         public event Action<Position>? PositionUpdated;
         public event Action<PnL>? PnLUpdated;
         public event Action<Exception>? ErrorOccured;
+        public event Action<Message>? MessageReceived;
 
         public ILiveDataProvider LiveDataProvider { get; }
         public IHistoricalDataProvider HistoricalDataProvider { get; }
