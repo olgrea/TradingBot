@@ -11,8 +11,6 @@ namespace TradingBot.Strategies
         LinkedList<Last> _lasts;
         BidAsk _latestBidAsk = new();
         Last _latestLast = new();
-        CancellationToken _token = CancellationToken.None;
-        ActionBlock<DateTime>? _executeStrategyBlock;
 
         public BollingerBandsStrategy(DateTime start, DateTime end, string ticker, Trader trader) : base(start, end, ticker, trader)
         {
@@ -25,21 +23,7 @@ namespace TradingBot.Strategies
 
         public override IEnumerable<IIndicator> Indicators { get; init; }
 
-        public async override Task Start(CancellationToken token)
-        {
-            _token = token;
-            await Initialize(token);
-
-            _token.ThrowIfCancellationRequested();
-            Debug.Assert(_executeStrategyBlock != null);
-            await _executeStrategyBlock.Completion;
-            
-            _token.ThrowIfCancellationRequested();
-            await _trader.Broker.OrderManager.CancelAllOrdersAsync();
-            await _trader.Broker.OrderManager.SellAllPositionsAsync();
-        }
-
-        async Task ExecuteStrategy(DateTime time)
+        protected override async Task ExecuteStrategy(DateTime time)
         {
             Debug.Assert(_executeStrategyBlock != null);
 
@@ -85,28 +69,26 @@ namespace TradingBot.Strategies
             }
         }
 
-        public async override Task Initialize(CancellationToken token)
+        protected override void RequestMarketData()
         {
-            if (_executeStrategyBlock == null)
-            {
-                _trader.Broker.LiveDataProvider.BarReceived += OnBarReceived;
-                _trader.Broker.LiveDataProvider.BidAskReceived += OnBidAskReceived;
-                _trader.Broker.LiveDataProvider.LastReceived += OnLastReceived;
+            _trader.Broker.LiveDataProvider.BarReceived += OnBarReceived;
+            _trader.Broker.LiveDataProvider.BidAskReceived += OnBidAskReceived;
+            _trader.Broker.LiveDataProvider.LastReceived += OnLastReceived;
 
-                _executeStrategyBlock = new ActionBlock<DateTime>(ExecuteStrategy, new ExecutionDataflowBlockOptions() { CancellationToken = token});
-                _ = _executeStrategyBlock.Completion.ContinueWith(t =>
-                {
-                    _trader.Broker.LiveDataProvider.BarReceived -= OnBarReceived;
-                    _trader.Broker.LiveDataProvider.BidAskReceived -= OnBidAskReceived;
-                    _trader.Broker.LiveDataProvider.LastReceived -= OnLastReceived;
-                });
+            _trader.Broker.LiveDataProvider.RequestBarUpdates(_ticker, BollingerBands.BarLength);
+            _trader.Broker.LiveDataProvider.RequestBidAskUpdates(_ticker);
+            _trader.Broker.LiveDataProvider.RequestLastTradedPriceUpdates(_ticker);
+        }
 
-                _trader.Broker.LiveDataProvider.RequestBarUpdates(_ticker, BollingerBands.BarLength);
-                _trader.Broker.LiveDataProvider.RequestBidAskUpdates(_ticker);
-                _trader.Broker.LiveDataProvider.RequestLastTradedPriceUpdates(_ticker);
-            }
+        protected override void CancelMarketData()
+        {
+            _trader.Broker.LiveDataProvider.BarReceived -= OnBarReceived;
+            _trader.Broker.LiveDataProvider.BidAskReceived -= OnBidAskReceived;
+            _trader.Broker.LiveDataProvider.LastReceived -= OnLastReceived;
 
-            await InitIndicators(token);
+            _trader.Broker.LiveDataProvider.CancelBarUpdates(_ticker, BollingerBands.BarLength);
+            _trader.Broker.LiveDataProvider.CancelBidAskUpdates(_ticker);
+            _trader.Broker.LiveDataProvider.CancelLastTradedPriceUpdates(_ticker);
         }
 
         void OnBarReceived(string ticker, Bar bar)

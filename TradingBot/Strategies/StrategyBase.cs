@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Threading.Tasks.Dataflow;
 using TradingBot.Broker.MarketData;
 using TradingBot.Indicators;
 using TradingBot.Utils;
@@ -11,6 +12,8 @@ namespace TradingBot.Strategies
         protected Trader _trader;
         protected string _ticker;
         protected ConcurrentDictionary<BarLength, LinkedList<Bar>> _bars = new();
+        protected ActionBlock<DateTime>? _executeStrategyBlock;
+        protected CancellationToken _token = CancellationToken.None;
 
         protected StrategyBase(DateTime startTime, DateTime endTime, string ticker, Trader trader)
         {
@@ -26,9 +29,38 @@ namespace TradingBot.Strategies
 
         public abstract IEnumerable<IIndicator> Indicators { get; init; }
 
-        public abstract Task Initialize(CancellationToken token);
+        public virtual async Task Start(CancellationToken token)
+        {
+            _token = token;
+            await Initialize(token);
 
-        public abstract Task Start(CancellationToken token);
+            _token.ThrowIfCancellationRequested();
+            Debug.Assert(_executeStrategyBlock != null);
+            await _executeStrategyBlock.Completion;
+
+            _token.ThrowIfCancellationRequested();
+            await _trader.Broker.OrderManager.CancelAllOrdersAsync();
+            await _trader.Broker.OrderManager.SellAllPositionsAsync();
+        }
+
+        public virtual async Task Initialize(CancellationToken token)
+        {
+            if (_executeStrategyBlock == null || _executeStrategyBlock.Completion.IsCompleted)
+            {
+                _executeStrategyBlock?.Completion.Dispose();
+                _executeStrategyBlock = new ActionBlock<DateTime>(ExecuteStrategy, new ExecutionDataflowBlockOptions() { CancellationToken = token });
+                _ = _executeStrategyBlock.Completion.ContinueWith(t => CancelMarketData());
+                RequestMarketData();
+            }
+
+            await InitIndicators(token);
+        }
+
+        protected abstract Task ExecuteStrategy(DateTime time);
+
+        protected abstract void RequestMarketData();
+
+        protected abstract void CancelMarketData();
 
         protected async Task InitIndicators(CancellationToken token)
         {
@@ -126,7 +158,7 @@ namespace TradingBot.Strategies
                 to = from;
                 if (to.TimeOfDay == MarketDataUtils.PreMarketStartTime)
                 {
-                    // Fetch the ones from the previous market day is still not enough
+                    // Fetch the ones from the previous market day if still not enough
                     DateOnly previousMarketDay = MarketDataUtils.FindLastOpenDay(to.AddDays(-1), extendedHours: true);
                     to = previousMarketDay.ToDateTime(TimeOnly.FromTimeSpan(MarketDataUtils.AfterHoursEndTime));
                 }
