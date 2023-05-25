@@ -407,16 +407,40 @@ namespace TradingBot.IBKR
             });
             var error = new Action<ErrorMessageException>(e => tcs.TrySetException(e));
 
+            const int MaxRetries = 3;
+            int nbRetries = 0;
+            TimeSpan timeout = TimeSpan.FromSeconds(1);
+
             try
             {
                 _client.Responses.CurrentTime += currentTime;
                 _client.Responses.Error += error;
-                
-                _logger?.Debug($"Requesting current server time...");
-                _client.RequestServerTime();
-                var result = await tcs.Task;
-                _logger?.Debug($"Server time : {result}");
-                return result;
+
+                // Server time is not received when multiple quick calls are made.
+                // So we just retry.
+                while (nbRetries < MaxRetries && !tcs.Task.IsCompleted)
+                {
+                    try
+                    {
+                        _logger?.Debug($"Requesting current server time...");
+                        _client.RequestServerTime();
+                        DateTime result = await tcs.Task.WaitAsync(timeout, token);
+                        _logger?.Debug($"Server time : {result}");
+                        return result;
+                    }
+                    catch (TimeoutException)
+                    {
+                        if (nbRetries < MaxRetries)
+                        {
+                            nbRetries++;
+                            _logger?.Debug($"Timeout. Retrying... ({nbRetries}/{MaxRetries})");
+                        }
+                        else
+                            throw;
+                    }
+                }
+
+                return tcs.Task.Result;
             }
             finally
             {

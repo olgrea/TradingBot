@@ -250,5 +250,17 @@ namespace IBBrokerTests
                 }
             });
         }
+
+        [Test]
+        public async Task GetServerTime_ReceivesIt()
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            var times = new List<DateTime>();
+            for (int i = 0; i < 5; i++)
+                times.Add(await _broker.GetServerTimeAsync());
+
+            Assert.AreEqual(5, times.Count);  
+        }
     }
 }
