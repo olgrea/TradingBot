@@ -34,7 +34,11 @@ namespace TradingBot.IBKR
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
         {
-            _validator.ValidateOrderPlacement(order);
+            if (order.Id < 0)
+                order.Id = await GetNextValidOrderIdAsync(token);
+            else 
+                _validator.ValidateOrderPlacement(order);
+
             return await PlaceOrderInternalAsync(ticker, order, token);
         }
 
@@ -302,6 +306,7 @@ namespace TradingBot.IBKR
             }
         }
 
+        // TODO : check if this callback is called when Order.Transmit == false
         void OnOrderOpened(IBApi.Contract c, IBApi.Order o, IBApi.OrderState s)
         {
             var ticker = c.Symbol;

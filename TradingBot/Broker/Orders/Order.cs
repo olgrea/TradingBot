@@ -74,6 +74,9 @@ namespace TradingBot.Broker.Orders
             Algorithm.Strategy = ibo.AlgoStrategy;
             Algorithm.Params = ibo.AlgoParams;
 
+            OrderConditions = ibo.Conditions;
+            ConditionsTriggerOrderCancellation = ibo.ConditionsCancelOrder;
+
             OrderType type = Enum.Parse<OrderType>(ibo.OrderType.Replace(' ', '_'));
             if (OrderType != type)
                 throw new ArgumentException($"IBKR order is of type {type} but needs to be {OrderType}");
@@ -81,6 +84,11 @@ namespace TradingBot.Broker.Orders
 
         internal RequestInfo Info { get; set; } = new RequestInfo();
         IBAlgorithm Algorithm { get; set; } = new IBAlgorithm();
+
+        // TODO : create wrapper for OrderCondition?
+        internal List<OrderCondition> OrderConditions { get; set; } = new List<OrderCondition>();
+        public bool ConditionsTriggerOrderCancellation { get; set; } = false;
+        internal bool NeedsConditionFulfillmentToBeOpened => OrderConditions.Any() && !ConditionsTriggerOrderCancellation;
 
         internal int Id
         {
@@ -114,6 +122,28 @@ namespace TradingBot.Broker.Orders
         {
             Algorithm.Strategy = "Adaptive";
             Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString())};
+        }
+
+        public void AddCondition(PriceCondition condition)
+        {
+            OrderConditions.Add(condition);
+            if(NeedsConditionFulfillmentToBeOpened)
+                Info.Transmit = false;
+            //TODO : need to check if I can use this flag when using conditions
+        }
+
+        public void AddCondition(PercentChangeCondition condition)
+        {
+            OrderConditions.Add(condition);
+            if (NeedsConditionFulfillmentToBeOpened)
+                Info.Transmit = false;
+        }
+
+        public void AddCondition(TimeCondition condition)
+        {
+            OrderConditions.Add(condition);
+            if (NeedsConditionFulfillmentToBeOpened)
+                Info.Transmit = false;
         }
 
         public static explicit operator Order(IBApi.Order ibo)
@@ -164,6 +194,8 @@ namespace TradingBot.Broker.Orders
                 AlgoStrategy = order.Algorithm.Strategy,
                 AlgoParams = order.Algorithm.Params,
 
+                Conditions = order.OrderConditions,
+                ConditionsCancelOrder = order.ConditionsTriggerOrderCancellation,
             };
         }
     }
