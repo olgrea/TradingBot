@@ -1,6 +1,4 @@
-﻿using System.Data;
-using System.Diagnostics;
-using TradingBot.Broker.Accounts;
+﻿using System.Diagnostics;
 
 namespace TradingBot.Broker.Orders
 {
@@ -17,6 +15,26 @@ namespace TradingBot.Broker.Orders
         REDUCE_NON_BLOCK = 3,
     }
 
+    public enum OrderType
+    {
+        MKT, 
+        LMT, 
+        MIT,
+        STP,
+        TRAIL,
+    }
+
+    public enum TimeInForce
+    {
+        DAY, 
+        GTC, 
+        IOC, 
+        GTD, 
+        OPG, 
+        FOK, 
+        DTC,
+    }
+
     internal class RequestInfo
     {
         public int OrderId { get; set; } = -1;
@@ -26,14 +44,38 @@ namespace TradingBot.Broker.Orders
         public bool Transmit { get; set; } = true; // if false, order will be created but not transmitted
         public string? OcaGroup { get; set; }
         public OcaType OcaType { get; set; }
+        public TimeInForce TimeInForce { get; set; } = TimeInForce.DAY;
     }
 
     // TODO : to investigate/implement : 
     // Order conditioning
     // order algos
     // "One cancels all" groups
+    // These order types : Passive Relative, Auction, Pegged to Primary
     public abstract class Order
     {
+        protected Order() { }
+        protected Order(IBApi.Order ibo) 
+        {
+            Action = Enum.Parse<OrderAction>(ibo.Action);
+            TotalQuantity = Convert.ToDouble(ibo.TotalQuantity);
+            Info = new RequestInfo()
+            {
+                OrderId = ibo.OrderId,
+                ClientId = ibo.ClientId,
+                Transmit = ibo.Transmit,
+                ParentId = ibo.ParentId,
+                PermId = ibo.PermId,
+                OcaGroup = ibo.OcaGroup,
+                OcaType = (OcaType)ibo.OcaType,
+                TimeInForce = Enum.Parse<TimeInForce>(ibo.Tif),
+            };
+
+            OrderType type = Enum.Parse<OrderType>(ibo.OrderType);
+            if (OrderType != type)
+                throw new ArgumentException($"IBKR order is of type {type} but needs to be {OrderType}");
+        }
+
         internal RequestInfo Info { get; set; } = new RequestInfo();
         internal int Id
         {
@@ -41,8 +83,7 @@ namespace TradingBot.Broker.Orders
             set => Info.OrderId = value;
         }
 
-        public readonly string OrderType;
-        protected Order(string orderType) => OrderType = orderType;
+        public abstract OrderType OrderType { get; }
         public OrderAction Action { get; set; }
         public double TotalQuantity { get; set; }
 
@@ -90,30 +131,9 @@ namespace TradingBot.Broker.Orders
 
         public static explicit operator IBApi.Order(Order order)
         {
-            if (order is MarketOrder mo)
-                return (IBApi.Order)mo;
-            else if (order is MarketIfTouchedOrder mit)
-                return (IBApi.Order)mit;
-            else if (order is LimitOrder lo)
-                return (IBApi.Order)lo;
-            else if (order is StopOrder so)
-                return (IBApi.Order)so;
-            else if (order is TrailingStopOrder tso)
-                return (IBApi.Order)tso;
-            else
-                throw new NotImplementedException($"{order.OrderType}");
-        }
-    }
-
-    public class MarketOrder : Order
-    {
-        public MarketOrder() : base("MKT") { }
-
-        public static explicit operator IBApi.Order(MarketOrder order)
-        {
             return new IBApi.Order()
             {
-                OrderType = order.OrderType,
+                OrderType = order.OrderType.ToString(),
                 Action = order.Action.ToString(),
                 TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
 
@@ -126,34 +146,34 @@ namespace TradingBot.Broker.Orders
                 OcaType = (int)order.Info.OcaType,
 
                 OutsideRth = false,
-                Tif = "DAY"
-            };
-        }
-
-        public static explicit operator MarketOrder(IBApi.Order ibo)
-        {
-            return new MarketOrder()
-            {
-                Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
-                Info = new RequestInfo()
-                {
-                    OrderId = ibo.OrderId,
-                    ClientId = ibo.ClientId,
-                    Transmit = ibo.Transmit,
-                    ParentId = ibo.ParentId,
-                    PermId = ibo.PermId,
-                    OcaGroup = ibo.OcaGroup,
-                    OcaType = (OcaType)ibo.OcaType,
-                },
+                Tif = order.Info.TimeInForce.ToString(),
             };
         }
     }
 
+    public class MarketOrder : Order
+    {
+        public MarketOrder() { }
+        public MarketOrder(IBApi.Order ibo) : base(ibo) {}
+
+        public override OrderType OrderType => OrderType.MKT;
+
+        public static explicit operator IBApi.Order(MarketOrder order) => (IBApi.Order)(order as Order);
+
+        public static explicit operator MarketOrder(IBApi.Order ibo) => new MarketOrder(ibo);
+    }
+
     public class MarketIfTouchedOrder : Order
     {
-        public MarketIfTouchedOrder() : base("MIT") { }
+        public MarketIfTouchedOrder() { }
+        public MarketIfTouchedOrder(IBApi.Order ibo) : base(ibo) 
+        {
+            TouchPrice = ibo.AuxPrice;
+        }
+
         public double TouchPrice { get; set; }
+
+        public override OrderType OrderType => OrderType.MIT;
 
         public override string ToString()
         {
@@ -162,53 +182,25 @@ namespace TradingBot.Broker.Orders
 
         public static explicit operator IBApi.Order(MarketIfTouchedOrder order)
         {
-            return new IBApi.Order()
-            {
-                OrderType = order.OrderType,
-                Action = order.Action.ToString(),
-                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
-
-                OrderId = order.Id,
-                ClientId = order.Info.ClientId,
-                ParentId = order.Info.ParentId,
-                PermId = order.Info.PermId,
-                Transmit = order.Info.Transmit,
-                OcaGroup = order.Info.OcaGroup,
-                OcaType = (int)order.Info.OcaType,
-
-                OutsideRth = false,
-                Tif = "DAY",
-
-                AuxPrice = order.TouchPrice,
-            };
+            var ibo = (IBApi.Order)(order as Order);
+            ibo.AuxPrice = order.TouchPrice;
+            return ibo;
         }
 
-        public static explicit operator MarketIfTouchedOrder(IBApi.Order ibo)
-        {
-            return new MarketIfTouchedOrder()
-            {
-                Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
-                Info = new RequestInfo()
-                {
-                    OrderId = ibo.OrderId,
-                    ClientId = ibo.ClientId,
-                    Transmit = ibo.Transmit,
-                    ParentId = ibo.ParentId,
-                    PermId = ibo.PermId,
-                    OcaGroup = ibo.OcaGroup,
-                    OcaType = (OcaType)ibo.OcaType,
-                },
-
-                TouchPrice = ibo.AuxPrice,
-            };
-        }
+        public static explicit operator MarketIfTouchedOrder(IBApi.Order ibo) => new MarketIfTouchedOrder(ibo);
     }
 
     public class LimitOrder : Order
     {
-        public LimitOrder() : base("LMT") { }
+        public LimitOrder() { }
+        public LimitOrder(IBApi.Order ibo) : base(ibo) 
+        {
+            LmtPrice = ibo.LmtPrice;
+        }
+
         public double LmtPrice { get; set; }
+
+        public override OrderType OrderType => OrderType.LMT;
 
         public override string ToString()
         {
@@ -217,53 +209,24 @@ namespace TradingBot.Broker.Orders
 
         public static explicit operator IBApi.Order(LimitOrder order)
         {
-            return new IBApi.Order()
-            {
-                OrderType = order.OrderType,
-                Action = order.Action.ToString(),
-                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
-
-                OrderId = order.Id,
-                ClientId = order.Info.ClientId,
-                ParentId = order.Info.ParentId,
-                PermId = order.Info.PermId,
-                Transmit = order.Info.Transmit,
-                OcaGroup = order.Info.OcaGroup,
-                OcaType = (int)order.Info.OcaType,
-
-                OutsideRth = false,
-                Tif = "DAY",
-
-                LmtPrice = order.LmtPrice,
-            };
+            var ibo = (IBApi.Order)(order as Order);
+            ibo.LmtPrice = order.LmtPrice;
+            return ibo;
         }
 
-        public static explicit operator LimitOrder(IBApi.Order ibo)
-        {
-            return new LimitOrder()
-            {
-                Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
-                Info = new RequestInfo()
-                {
-                    OrderId = ibo.OrderId,
-                    ClientId = ibo.ClientId,
-                    Transmit = ibo.Transmit,
-                    ParentId = ibo.ParentId,
-                    PermId = ibo.PermId,
-                    OcaGroup = ibo.OcaGroup,
-                    OcaType = (OcaType)ibo.OcaType,
-                },
-
-                LmtPrice = ibo.LmtPrice,
-            };
-        }
+        public static explicit operator LimitOrder(IBApi.Order ibo) => new LimitOrder(ibo);
     }
 
     public class StopOrder : Order
     {
-        public StopOrder() : base("STP") { }
+        public StopOrder() { }
+        public StopOrder(IBApi.Order ibo) : base(ibo) 
+        {
+            StopPrice = ibo.AuxPrice;
+        }
         public double StopPrice { get; set; }
+
+        public override OrderType OrderType => OrderType.STP;
 
         public override string ToString()
         {
@@ -272,47 +235,12 @@ namespace TradingBot.Broker.Orders
 
         public static explicit operator IBApi.Order(StopOrder order)
         {
-            return new IBApi.Order()
-            {
-                OrderType = order.OrderType,
-                Action = order.Action.ToString(),
-                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
-
-                OrderId = order.Id,
-                ClientId = order.Info.ClientId,
-                ParentId = order.Info.ParentId,
-                PermId = order.Info.PermId,
-                Transmit = order.Info.Transmit,
-                OcaGroup = order.Info.OcaGroup,
-                OcaType = (int)order.Info.OcaType,
-
-                OutsideRth = false,
-                Tif = "DAY",
-
-                AuxPrice = order.StopPrice,
-            };
+            var ibo = (IBApi.Order)(order as Order);
+            ibo.AuxPrice = order.StopPrice;
+            return ibo;
         }
 
-        public static explicit operator StopOrder(IBApi.Order ibo)
-        {
-            return new StopOrder()
-            {
-                Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
-                Info = new RequestInfo()
-                {
-                    OrderId = ibo.OrderId,
-                    ClientId = ibo.ClientId,
-                    Transmit = ibo.Transmit,
-                    ParentId = ibo.ParentId,
-                    PermId = ibo.PermId,
-                    OcaGroup = ibo.OcaGroup,
-                    OcaType = (OcaType)ibo.OcaType,
-                },
-
-                StopPrice = ibo.AuxPrice,
-            };
-        }
+        public static explicit operator StopOrder(IBApi.Order ibo) => new StopOrder(ibo);
     }
 
     public enum TrailingAmountUnits
@@ -326,7 +254,25 @@ namespace TradingBot.Broker.Orders
         double? _trailingAmount;
         TrailingAmountUnits? _units;
 
-        public TrailingStopOrder() : base("TRAIL") { }
+        public TrailingStopOrder() { }
+        public TrailingStopOrder(IBApi.Order ibo) : base(ibo)
+        {
+            StopPrice = ibo.TrailStopPrice;
+
+            // TrailingPercent takes precedence apparently. See comments of IBApi.Order.TrailingPercent 
+            if (ibo.TrailingPercent != double.MaxValue)
+            {
+                TrailingAmount = ibo.TrailingPercent;
+                TrailingAmountUnits = Orders.TrailingAmountUnits.Percent;
+            }
+            else if (ibo.AuxPrice != double.MaxValue)
+            {
+                TrailingAmount = ibo.AuxPrice;
+                TrailingAmountUnits = Orders.TrailingAmountUnits.Absolute;
+            }
+            else
+                throw new ArgumentException($"Neither Trailing percent or trailing amount is set in IBKR order");
+        }
         
         public double? StopPrice { get; set; }
         public double? TrailingAmount
@@ -353,6 +299,8 @@ namespace TradingBot.Broker.Orders
             }
         }
 
+        public override OrderType OrderType => OrderType.TRAIL;
+
         public override string ToString()
         {
             if (_units == Orders.TrailingAmountUnits.Percent)
@@ -365,71 +313,22 @@ namespace TradingBot.Broker.Orders
 
         public static explicit operator IBApi.Order(TrailingStopOrder order)
         {
-            var o = new IBApi.Order()
-            {
-                OrderType = order.OrderType,
-                Action = order.Action.ToString(),
-                TotalQuantity = Convert.ToDecimal(order.TotalQuantity),
-
-                OrderId = order.Id,
-                ClientId = order.Info.ClientId,
-                ParentId = order.Info.ParentId,
-                PermId = order.Info.PermId,
-                Transmit = order.Info.Transmit,
-                OcaGroup = order.Info.OcaGroup,
-                OcaType = (int)order.Info.OcaType,
-
-                OutsideRth = false,
-                Tif = "DAY",
-                TrailStopPrice = order.StopPrice is null ? double.MaxValue : order.StopPrice.Value,
-            };
+            var ibo = (IBApi.Order)(order as Order);
+            ibo.TrailStopPrice = order.StopPrice is null ? double.MaxValue : order.StopPrice.Value;
 
             ArgumentNullException.ThrowIfNull(order.TrailingAmount, nameof(order.TrailingAmount));
             ArgumentNullException.ThrowIfNull(order.TrailingAmountUnits, nameof(order.TrailingAmountUnits));
 
             if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Absolute)
-                o.AuxPrice = order.TrailingAmount.Value;
+                ibo.AuxPrice = order.TrailingAmount.Value;
             else if (order.TrailingAmountUnits == Orders.TrailingAmountUnits.Percent)
-                o.TrailingPercent = order.TrailingAmount.Value;
+                ibo.TrailingPercent = order.TrailingAmount.Value;
             else
                 throw new NotImplementedException($"{order.TrailingAmountUnits}");
 
-            return o;
+            return ibo;
         }
 
-        public static explicit operator TrailingStopOrder(IBApi.Order ibo)
-        {
-            var o = new TrailingStopOrder()
-            {
-                Action = Enum.Parse<OrderAction>(ibo.Action),
-                TotalQuantity = Convert.ToDouble(ibo.TotalQuantity),
-                Info = new RequestInfo()
-                {
-                    OrderId = ibo.OrderId,
-                    ClientId = ibo.ClientId,
-                    Transmit = ibo.Transmit,
-                    ParentId = ibo.ParentId,
-                    PermId = ibo.PermId,
-                    OcaGroup = ibo.OcaGroup,
-                    OcaType = (OcaType)ibo.OcaType,
-                },
-
-                StopPrice = ibo.TrailStopPrice,
-            };
-
-            // TrailingPercent takes precedence apparently. See comments of IBApi.Order.TrailingPercent 
-            if (ibo.TrailingPercent != double.MaxValue)
-            {
-                o.TrailingAmount = ibo.TrailingPercent;
-                o.TrailingAmountUnits = Orders.TrailingAmountUnits.Percent;
-            }
-            else if(ibo.AuxPrice != double.MaxValue)
-            {
-                o.TrailingAmount = ibo.AuxPrice;
-                o.TrailingAmountUnits = Orders.TrailingAmountUnits.Absolute;
-            }
-
-            return o;
-        }
+        public static explicit operator TrailingStopOrder(IBApi.Order ibo) => new TrailingStopOrder(ibo);
     }
 }
