@@ -1,18 +1,11 @@
 ﻿using System.Diagnostics;
+using IBApi;
 
 namespace TradingBot.Broker.Orders
 {
     public enum OrderAction
     {
         BUY, SELL
-    }
-
-    public enum OcaType
-    {
-        NONE = 0,
-        CANCEL_WITH_BLOCK = 1,
-        REDUCE_WITH_BLOCK = 2,
-        REDUCE_NON_BLOCK = 3,
     }
 
     public enum OrderType
@@ -43,18 +36,25 @@ namespace TradingBot.Broker.Orders
         public int ParentId { get; set; }
         public int PermId { get; set; }
         public bool Transmit { get; set; } = true; // if false, order will be created but not transmitted
-        public string? OcaGroup { get; set; }
-        public OcaType OcaType { get; set; }
         public TimeInForce TimeInForce { get; set; } = TimeInForce.DAY;
+    }
+
+    public enum AdaptiveAlgorithmPriority
+    {
+        Urgent, Normal, Patient,
     }
 
     // TODO : to investigate/implement : 
     // Order conditioning
-    // order algos
-    // "One cancels all" groups
-    // These order types : Passive Relative, Pegged to Primary
     public abstract class Order
     {
+        class IBAlgorithm
+        {
+            public string? Id { get; set; }
+            public string? Strategy { get; set; }
+            public List<TagValue> Params { get; set; } = new List<TagValue>();
+        }
+
         protected Order() { }
         protected Order(IBApi.Order ibo) 
         {
@@ -67,10 +67,12 @@ namespace TradingBot.Broker.Orders
                 Transmit = ibo.Transmit,
                 ParentId = ibo.ParentId,
                 PermId = ibo.PermId,
-                OcaGroup = ibo.OcaGroup,
-                OcaType = (OcaType)ibo.OcaType,
                 TimeInForce = Enum.Parse<TimeInForce>(ibo.Tif),
             };
+
+            Algorithm.Id = ibo.AlgoId;
+            Algorithm.Strategy = ibo.AlgoStrategy;
+            Algorithm.Params = ibo.AlgoParams;
 
             OrderType type = Enum.Parse<OrderType>(ibo.OrderType.Replace(' ', '_'));
             if (OrderType != type)
@@ -78,6 +80,8 @@ namespace TradingBot.Broker.Orders
         }
 
         internal RequestInfo Info { get; set; } = new RequestInfo();
+        IBAlgorithm Algorithm { get; set; } = new IBAlgorithm();
+
         internal int Id
         {
             get => Info.OrderId;
@@ -104,6 +108,12 @@ namespace TradingBot.Broker.Orders
         public override string ToString()
         {
             return $"[{Id}] : {Action} {TotalQuantity} {OrderType}";
+        }
+
+        public void SetAsAdaptiveAlgo(AdaptiveAlgorithmPriority priority)
+        {
+            Algorithm.Strategy = "Adaptive";
+            Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString())};
         }
 
         public static explicit operator Order(IBApi.Order ibo)
@@ -146,11 +156,14 @@ namespace TradingBot.Broker.Orders
                 ParentId = order.Info.ParentId,
                 PermId = order.Info.PermId,
                 Transmit = order.Info.Transmit,
-                OcaGroup = order.Info.OcaGroup,
-                OcaType = (int)order.Info.OcaType,
 
                 OutsideRth = false,
                 Tif = order.Info.TimeInForce.ToString(),
+
+                AlgoId = order.Algorithm.Id,
+                AlgoStrategy = order.Algorithm.Strategy,
+                AlgoParams = order.Algorithm.Params,
+
             };
         }
     }

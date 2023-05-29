@@ -30,6 +30,7 @@ namespace TradingBot.IBKR
         public event Action<string, Order, OrderStatus>? OrderUpdated;
         public event Action<string, OrderExecution>? OrderExecuted;
 
+        // TODO : re-implement client-side order chains?
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
         {

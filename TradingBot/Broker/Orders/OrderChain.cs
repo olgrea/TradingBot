@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace TradingBot.Broker.Orders
+﻿namespace TradingBot.Broker.Orders
 {
     public class OrderChain
     {

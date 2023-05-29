@@ -4,8 +4,8 @@
     {
         public IDictionary<int, string> OrderIdsToTicker { get; private set; } = new Dictionary<int, string>();
         public IDictionary<int, Order> OrdersRequested { get; private set; } = new Dictionary<int, Order>();
-        public IDictionary<int, Order> OrdersOpened { get; private set; } = new Dictionary<int, Order>();
-        public IDictionary<int, Order> OpenOrders { get; private set; } = new Dictionary<int, Order>();
+        public IDictionary<int, Order> OrdersOpened { get; private set; } = new Dictionary<int, Order>(); // contains already executed/cancelled orders
+        public IDictionary<int, Order> OpenOrders { get; private set; } = new Dictionary<int, Order>(); // only contains currently open orders
         public IDictionary<int, OrderExecution> OrdersExecuted { get; private set; } = new Dictionary<int, OrderExecution>();
         public IDictionary<int, Order> OrdersCancelled { get; private set; } = new Dictionary<int, Order>();
         public IDictionary<string, OrderExecution> ExecIdsToExecutions { get; private set; } = new Dictionary<string, OrderExecution>();
