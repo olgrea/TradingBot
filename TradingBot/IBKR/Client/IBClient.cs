@@ -176,7 +176,6 @@ namespace TradingBot.IBKR.Client
                 _requestIdsToContracts.Pnl[reqId] = contract;
                 _contractsToRequestIds.Pnl[contract] = reqId;
 
-                // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
                 _logger?.Trace($"{nameof(_socket.reqPnLSingle)}(reqId : {reqId}, conId : {contract.ConId})");
                 _socket.reqPnLSingle(reqId, _accountCode, "", contract.ConId);
             }
@@ -204,7 +203,6 @@ namespace TradingBot.IBKR.Client
                 _requestIdsToContracts.FiveSecBars[reqId] = contract;
                 _contractsToRequestIds.FiveSecBars[contract] = reqId;
 
-                // TODO : "It may be necessary to remake real time bars subscriptions after the IB server reset or between trading sessions."
                 _logger?.Trace($"{nameof(_socket.reqRealTimeBars)}(reqId : {reqId}, conId : {contract.ConId})");
                 _socket.reqRealTimeBars(reqId, contract, 5, "TRADES", true, null);
             }

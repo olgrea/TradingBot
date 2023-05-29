@@ -3,6 +3,7 @@ using System.Threading.Tasks.Dataflow;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
+using TradingBot.Utils;
 
 namespace TradingBot.Strategies
 {
@@ -39,7 +40,7 @@ namespace TradingBot.Strategies
                 return;
             }
 
-            _trader.Logger?.Debug($"Executing strategy at {time}");
+            _trader.Logger?.Info($"Executing strategy at {time}");
             var signals = BollingerBands.Signals.ToList();
 
             if (signals.Contains(BollingerBandsSignals.CrossedLowerBandDownward))
@@ -129,14 +130,12 @@ namespace TradingBot.Strategies
             {
                 _latestLast = last;
 
-                //_lasts.AddLast(last);
-                //var partialBar = MarketDataUtils.MakeBarFromLasts(_lasts, BollingerBands.BarLength);
-                //if(partialBar is not null)
-                //{
-                //    BollingerBands.Compute(_bars.Append(partialBar));
-                //    Debug.Assert(_executeStrategyBlock != null);
-                //    _executeStrategyBlock.Post(last.Time);
-                //}
+                _lasts.AddLast(last);
+                var partialBar = MarketDataUtils.MakeBarFromLasts(_lasts, BollingerBands.BarLength);
+                if (partialBar is not null)
+                {
+                    BollingerBands.Compute(_bars[BollingerBands.BarLength].Append(partialBar));
+                }
             }
         }
     }

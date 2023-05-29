@@ -251,10 +251,6 @@ namespace TradingBot.IBKR
             Debug.Assert(_account != null);
             _logger?.Debug($"Requesting account updates for {_account.Code}...");
 
-
-            // TODO : Handle connection lost
-            // Market data farm connection is OK:cashfarm(code = 2104)
-            // Market data farm connection is broken:cashfarm(code = 2103)
             _client.CancelAccountUpdates(_account.Code); // we need to cancel it first
             _client.RequestAccountUpdates(_account.Code);
             _client.RequestPositionsUpdates();
