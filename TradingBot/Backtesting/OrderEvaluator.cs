@@ -1,4 +1,5 @@
-﻿using NLog;
+﻿using System.Diagnostics;
+using NLog;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
@@ -67,6 +68,10 @@ namespace TradingBot.Backtesting
             else if (order is MarketIfTouchedOrder mito)
             {
                 EvaluateMarketIfTouchedOrder(ticker, bidAsk, mito);
+            }
+            else if (order is RelativeOrder ro)
+            {
+                EvaluateRelativeOrder(ticker, bidAsk, ro);
             }
         }
 
@@ -203,8 +208,42 @@ namespace TradingBot.Backtesting
             }
         }
 
+        private void EvaluateRelativeOrder(string ticker, BidAsk bidAsk, RelativeOrder o)
+        {
+            if (o.Action == OrderAction.BUY)
+            {
+                if (o.CurrentPrice == null || o.CurrentPrice.Value < bidAsk.Bid)
+                    o.CurrentPrice = bidAsk.Bid + o.OffsetAmount;
+
+                if (o.PriceCap != 0)
+                    o.CurrentPrice = Math.Min(o.CurrentPrice.Value, o.PriceCap);
+
+                if(o.CurrentPrice.Value >= bidAsk.Ask)
+                {
+                    _logger?.Debug($"{o} : lmt price of {o.CurrentPrice.Value:c} reached. Ask : {bidAsk.Ask:c}");
+                    ExecuteOrder(ticker, o, bidAsk.Ask);
+                }
+            }
+            else if (o.Action == OrderAction.SELL)
+            {
+                if (o.CurrentPrice == null || o.CurrentPrice.Value > bidAsk.Ask)
+                    o.CurrentPrice = bidAsk.Ask - o.OffsetAmount;
+
+                if (o.PriceCap != 0)
+                    o.CurrentPrice = Math.Max(o.CurrentPrice.Value, o.PriceCap);
+
+                if (o.CurrentPrice.Value <= bidAsk.Bid)
+                {
+                    _logger?.Debug($"{o} : lmt price of {o.CurrentPrice.Value:c} reached. Bid : {bidAsk.Bid:c}");
+                    ExecuteOrder(ticker, o, bidAsk.Bid);
+                }
+            }
+        }
+
         void ExecuteOrder(string ticker, Order order, double price)
         {
+            Debug.Assert(!_orderTracker.IsExecuted(order, out _));
+
             _logger?.Debug($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
@@ -219,10 +258,9 @@ namespace TradingBot.Backtesting
                 // TODO implement on client-side
                 if (total > _backtester.Account.AvailableBuyingPower)
                 {
-                    _logger?.Error($"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {account.CashBalances["USD"]}");
-
-                    //CancelOrder(order.Id);
-                    return;
+                    string errorMsg = $"{order} Cannot execute BUY order! Not enough funds (required : {total}, actual : {account.CashBalances["USD"]}";
+                    _logger?.Error(errorMsg);
+                    throw new InvalidOperationException(errorMsg);
                 }
 
                 position.AverageCost = position.PositionAmount != 0 ? (position.AverageCost + price) / 2 : price;
@@ -238,9 +276,9 @@ namespace TradingBot.Backtesting
                 // TODO implement on client-side
                 if (position.PositionAmount < order.TotalQuantity)
                 {
-                    _logger?.Error($"{order} Cannot execute SELL order! Not enough position (required : {order.TotalQuantity}, actual : {position.PositionAmount}");
-                    //CancelOrderInternal(order.Id);
-                    return;
+                    string errorMsg = $"{order} Cannot execute SELL order! Not enough position (required : {order.TotalQuantity}, actual : {position.PositionAmount}";
+                    _logger?.Error(errorMsg);
+                    throw new InvalidOperationException(errorMsg);
                 }
 
                 position.PositionAmount -= order.TotalQuantity;

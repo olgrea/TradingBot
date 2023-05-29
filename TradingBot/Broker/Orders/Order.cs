@@ -21,6 +21,7 @@ namespace TradingBot.Broker.Orders
         LMT, 
         MIT,
         STP,
+        REL,
         TRAIL,
     }
 
@@ -51,7 +52,7 @@ namespace TradingBot.Broker.Orders
     // Order conditioning
     // order algos
     // "One cancels all" groups
-    // These order types : Passive Relative, Auction, Pegged to Primary
+    // These order types : Passive Relative, Pegged to Primary
     public abstract class Order
     {
         protected Order() { }
@@ -71,7 +72,7 @@ namespace TradingBot.Broker.Orders
                 TimeInForce = Enum.Parse<TimeInForce>(ibo.Tif),
             };
 
-            OrderType type = Enum.Parse<OrderType>(ibo.OrderType);
+            OrderType type = Enum.Parse<OrderType>(ibo.OrderType.Replace(' ', '_'));
             if (OrderType != type)
                 throw new ArgumentException($"IBKR order is of type {type} but needs to be {OrderType}");
         }
@@ -124,6 +125,9 @@ namespace TradingBot.Broker.Orders
                 case "MIT":
                     return (MarketIfTouchedOrder)ibo;
 
+                case "REL":
+                    return (MarketIfTouchedOrder)ibo;
+
                 default:
                     throw new NotImplementedException($"{ibo.OrderType}");
             }
@@ -148,6 +152,18 @@ namespace TradingBot.Broker.Orders
                 OutsideRth = false,
                 Tif = order.Info.TimeInForce.ToString(),
             };
+        }
+    }
+    public class MarketOnOpen : MarketOrder
+    {
+        public MarketOnOpen()
+        {
+            Info.TimeInForce = TimeInForce.OPG;
+        }
+
+        public MarketOnOpen(IBApi.Order ibo) : base(ibo)
+        {
+            Info.TimeInForce = TimeInForce.OPG;
         }
     }
 
@@ -330,5 +346,33 @@ namespace TradingBot.Broker.Orders
         }
 
         public static explicit operator TrailingStopOrder(IBApi.Order ibo) => new TrailingStopOrder(ibo);
+    }
+
+    public class RelativeOrder : Order
+    {
+        public RelativeOrder(){}
+
+        public RelativeOrder(IBApi.Order ibo) : base(ibo)
+        {
+            PriceCap = ibo.LmtPrice;
+            OffsetAmount = ibo.AuxPrice;
+        }
+
+        // Optional if set to zero.
+        public double PriceCap { get; set; } = 0.0;
+        public double OffsetAmount { get; set; }
+        internal double? CurrentPrice { get; set; }
+
+        public override OrderType OrderType => OrderType.REL;
+
+        public static explicit operator IBApi.Order(RelativeOrder order)
+        {
+            var ibo = (IBApi.Order)(order as Order);
+            ibo.LmtPrice = order.PriceCap;
+            ibo.AuxPrice = order.OffsetAmount;
+            return ibo;
+        }
+
+        public static explicit operator RelativeOrder(IBApi.Order ibo) => new RelativeOrder(ibo);
     }
 }

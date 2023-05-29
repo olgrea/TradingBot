@@ -3,18 +3,31 @@ using TradingBot.Backtesting;
 using TradingBot.Broker.Accounts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
+using TradingBot.IBKR;
 using TradingBot.Tests;
 
 namespace BacktesterTests
 {
     internal class OrderEvaluatorTests
     {
-        const string Ticker = "SPY";
+        class SpyTestData
+        {
+            public const string Ticker = "SPY";
+            public static readonly (DateTime, DateTime) Downward =   (new DateTime(2023, 04, 10, 11, 50, 00), new DateTime(2023, 04, 10, 12, 10, 00));
+            public static readonly (DateTime, DateTime) Upward =     (new DateTime(2023, 04, 10, 12, 30, 00), new DateTime(2023, 04, 10, 12, 45, 00));
+            public static readonly (DateTime, DateTime) DownThenUp = (new DateTime(2023, 04, 10, 12, 00, 00), new DateTime(2023, 04, 10, 12, 20, 00));
+            public static readonly (DateTime, DateTime) UpThenDown = (new DateTime(2023, 04, 10, 10, 00, 00), new DateTime(2023, 04, 10, 10, 30, 00));
+        }
 
-        (DateTime, DateTime) _downwardTimeRange =   (new DateTime(2023, 04, 10, 11, 50, 00), new DateTime(2023, 04, 10, 12, 10, 00));
-        (DateTime, DateTime) _upwardTimeRange =     (new DateTime(2023, 04, 10, 12, 30, 00), new DateTime(2023, 04, 10, 12, 45, 00));
-        (DateTime, DateTime) _downThenUpTimeRange = (new DateTime(2023, 04, 10, 12, 00, 00), new DateTime(2023, 04, 10, 12, 20, 00));
-        (DateTime, DateTime) _upThenDownTimeRange = (new DateTime(2023, 04, 10, 10, 00, 00), new DateTime(2023, 04, 10, 10, 30, 00));
+        // Needed test data with larger spread for relative orders
+        class GrndTestData
+        {
+            public const string Ticker = "GRND";
+            public static readonly (DateTime, DateTime) Upward = (new DateTime(2023, 05, 26, 15, 33, 00), new DateTime(2023, 05, 26, 15, 45, 00));
+            public static readonly (DateTime, DateTime) UpThenDown = (new DateTime(2023, 05, 26, 15, 33, 00), new DateTime(2023, 05, 26, 15, 54, 00));
+            public static readonly (DateTime, DateTime) Downward = (new DateTime(2023, 05, 26, 13, 12, 00), new DateTime(2023, 05, 26, 13, 28, 00));
+            public static readonly (DateTime, DateTime) DownThenUp = (new DateTime(2023, 05, 26, 13, 18, 00), new DateTime(2023, 05, 26, 14, 14, 00));
+        }
 
         Backtester _backtester;
 
@@ -38,7 +51,7 @@ namespace BacktesterTests
         public async Task MarketOrder_Buy_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
 
             var order = new MarketOrder()
@@ -50,7 +63,7 @@ namespace BacktesterTests
             _ = _backtester.Start();
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
@@ -58,7 +71,7 @@ namespace BacktesterTests
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time , TimeSpan.FromSeconds(1));
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -70,7 +83,7 @@ namespace BacktesterTests
         public async Task MarketOrder_Sell_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
 
             var order = new MarketOrder()
@@ -79,7 +92,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -88,7 +101,7 @@ namespace BacktesterTests
             _ = _backtester.Start();
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
@@ -96,7 +109,7 @@ namespace BacktesterTests
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -108,11 +121,11 @@ namespace BacktesterTests
         public async Task LimitOrder_Buy_OverAskPrice_GetsFilledAtCurrentAskPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
             
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var limitPrice = bidAsks.Select(ba => ba.Ask).Average() + 0.5;
             var order = new LimitOrder()
             {
@@ -125,14 +138,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResults = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResults = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResults.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -144,11 +157,11 @@ namespace BacktesterTests
         public async Task LimitOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Downward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var limitPrice = bidAsks.Select(ba => ba.Ask).Average() - 0.5;
             var order = new LimitOrder()
             {
@@ -161,14 +174,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -180,11 +193,11 @@ namespace BacktesterTests
         public async Task LimitOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var limitPrice = bidAsks.Select(ba => ba.Bid).Average() + 0.5;
             var order = new LimitOrder()
             {
@@ -193,7 +206,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -203,14 +216,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -222,11 +235,11 @@ namespace BacktesterTests
         public async Task LimitOrder_Sell_UnderBidPrice_GetsFilledAtCurrentBidPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var limitPrice = bidAsks.Select(ba => ba.Bid).Average() - 0.5;
             var order = new LimitOrder()
             {
@@ -235,7 +248,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -245,14 +258,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -264,11 +277,11 @@ namespace BacktesterTests
         public async Task StopOrder_Buy_OverAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var stopPrice = bidAsks.Select(ba => ba.Ask).Average() + 0.5;
             var order = new StopOrder()
             {
@@ -281,14 +294,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -300,11 +313,11 @@ namespace BacktesterTests
         public async Task StopOrder_Buy_UnderAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var stopPrice = bidAsks.Select(ba => ba.Ask).Average() - 0.5;
             var order = new StopOrder()
             {
@@ -317,14 +330,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -336,11 +349,11 @@ namespace BacktesterTests
         public async Task StopOrder_Sell_OverBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var stopPrice = bidAsks.Select(ba => ba.Bid).Average() + 0.5;
             var order = new StopOrder()
             {
@@ -349,7 +362,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -359,14 +372,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -378,11 +391,11 @@ namespace BacktesterTests
         public async Task StopOrder_Sell_UnderBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Downward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var stopPrice = bidAsks.Select(ba => ba.Bid).Average() - 0.5;
             var order = new StopOrder()
             {
@@ -391,7 +404,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -401,14 +414,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.Greater(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -420,11 +433,11 @@ namespace BacktesterTests
         public async Task MarketIfTouchedOrder_Buy_OverAskPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var touchPrice = bidAsks.Select(ba => ba.Ask).Average() + 0.5;
             var order = new MarketIfTouchedOrder()
             {
@@ -437,14 +450,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
             Assert.LessOrEqual(execResult.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, execResult.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, execResult.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = execResult.OrderExecution.AvgPrice;
@@ -456,11 +469,11 @@ namespace BacktesterTests
         public async Task MarketIfTouchedOrder_Buy_UnderAskPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Downward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var touchPrice = bidAsks.Select(ba => ba.Ask).Average() - 0.5;
             var order = new MarketIfTouchedOrder()
             {
@@ -473,14 +486,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
             Assert.Greater(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = result.OrderExecution.AvgPrice;
@@ -492,11 +505,11 @@ namespace BacktesterTests
         public async Task MarketIfTouchedOrder_Sell_OverBidPrice_GetsFilledWhenPriceIsReached()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var touchPrice = bidAsks.Select(ba => ba.Bid).Average() + 0.5;
             var order = new MarketIfTouchedOrder()
             {
@@ -505,7 +518,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -515,14 +528,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
             Assert.Greater(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = result.OrderExecution.AvgPrice;
@@ -534,11 +547,11 @@ namespace BacktesterTests
         public async Task MarketIfTouchedOrder_Sell_UnderBidPrice_GetsFilledAtCurrentPrice()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement);
             var touchPrice = bidAsks.Select(ba => ba.Bid).Average() - 0.5;
             var order = new MarketIfTouchedOrder()
             {
@@ -547,7 +560,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -557,14 +570,14 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
             Assert.LessOrEqual(result.OrderExecution.Time - placedResult.Time, TimeSpan.FromSeconds(1));
 
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = result.OrderExecution.AvgPrice;
@@ -576,11 +589,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Buy_TrailingAmout_StopPriceFallsWhenMarketFalls()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Downward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
             
             var trailingAmount = 0.5;
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) + trailingAmount;
@@ -599,7 +612,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -611,11 +624,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Buy_TrailingPercent_StopPriceFallsWhenMarketFalls()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Downward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
 
             var trailingAmount = 0.05; // %
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) * (1 + trailingAmount);
@@ -634,7 +647,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -646,11 +659,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Sell_TrailingAmout_StopPriceRisesWhenMarketRises()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
 
             var trailingAmount = 0.5;
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) - trailingAmount;
@@ -663,7 +676,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -675,7 +688,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -687,11 +700,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Sell_TrailingPercent_StopPriceRisesWhenMarketRises()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upwardTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.Upward;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
 
             var trailingAmount = 0.5;
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) * (1 - trailingAmount);
@@ -704,7 +717,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -716,7 +729,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -728,11 +741,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Buy_GetsFilledWhenMarketChangesDirection_DownThenUp()
         {
             // Setup
-            (DateTime, DateTime) timerange = _downThenUpTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.DownThenUp;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(5);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
 
             var trailingAmount = 0.2;
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Ask) + trailingAmount;
@@ -749,11 +762,11 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Ask).Min();
             var highest = bidAsks.Select(ba => ba.Ask).Max();
             var actualPrice = result.OrderExecution.AvgPrice;
@@ -766,11 +779,11 @@ namespace BacktesterTests
         public async Task TrailingStopOrder_Sell_GetsFilledWhenMarketChangesDirection_UpThenDown()
         {
             // Setup
-            (DateTime, DateTime) timerange = _upThenDownTimeRange;
+            (DateTime, DateTime) timerange = SpyTestData.UpThenDown;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1.AddMinutes(6);
 
-            var bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, timeOfOrderPlacement, timerange.Item2);
+            var bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, timeOfOrderPlacement, timerange.Item2);
 
             var trailingAmount = 0.2;
             var initialStopPrice = bidAsks.Where(ba => ba.Time == timeOfOrderPlacement).Average(ba => ba.Bid) - trailingAmount;
@@ -783,7 +796,7 @@ namespace BacktesterTests
                 TotalQuantity = 50
             };
 
-            _backtester.Account.Positions[Ticker] = new Position(Ticker)
+            _backtester.Account.Positions[SpyTestData.Ticker] = new Position(SpyTestData.Ticker)
             {
                 PositionAmount = 50,
                 AverageCost = 413.94,
@@ -793,15 +806,216 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(Ticker, order);
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
-            bidAsks = await _backtester.GetAsync<BidAsk>(Ticker, result.OrderExecution.Time);
+            bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
             var lowest = bidAsks.Select(ba => ba.Bid).Min();
             var highest = bidAsks.Select(ba => ba.Bid).Max();
             var actualPrice = result.OrderExecution.AvgPrice;
             Assert.LessOrEqual(actualPrice, order.StopPrice.Value);
+            Assert.GreaterOrEqual(actualPrice, lowest);
+            Assert.LessOrEqual(actualPrice, highest);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Buy_PriceFollowsBidWhenMarketRises()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.Upward;
+            string ticker = GrndTestData.Ticker;
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+            
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.BUY,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+            };
+
+            var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, timeOfOrderPlacement, timerange.Item2);
+            var expectedCurrentPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Max(ba => ba.Bid + order.OffsetAmount);
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            await backtestingTask;
+
+            // Assert
+            var actualCurrentPrice = order.CurrentPrice!.Value;
+            Assert.AreEqual(expectedCurrentPrice, actualCurrentPrice, 0.01);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Buy_PriceCappedAtPriceCap()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.Upward;
+            string ticker = GrndTestData.Ticker;
+
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.BUY,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+                PriceCap = 5.95,
+            };
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            await backtestingTask;
+
+            // Assert
+            var actualCurrentPrice = order.CurrentPrice!.Value;
+            Assert.AreEqual(order.PriceCap, actualCurrentPrice, 0.01);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Sell_PriceFollowsAskWhenMarketFalls()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.Downward;
+            string ticker = GrndTestData.Ticker;
+
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+            };
+
+            var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, timeOfOrderPlacement, timerange.Item2);
+            var expectedCurrentPrice = bidAsks.SkipWhile(ba => ba.Time < timeOfOrderPlacement).Min(ba => ba.Ask - order.OffsetAmount);
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            await backtestingTask;
+
+            // Assert
+            var actualCurrentPrice = order.CurrentPrice!.Value;
+            Assert.AreEqual(expectedCurrentPrice, actualCurrentPrice, 0.01);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Sell_PriceCappedAtPriceCap()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.Downward;
+            string ticker = GrndTestData.Ticker;
+
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+                PriceCap = 5.91,
+            };
+
+            var backtestingTask = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            await backtestingTask;
+
+            // Assert
+            var actualCurrentPrice = order.CurrentPrice!.Value;
+            Assert.AreEqual(order.PriceCap, actualCurrentPrice, 0.01);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Buy_GetsFilledWhenMarketChangesDirection_UpThenDown()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.UpThenDown;
+            string ticker = GrndTestData.Ticker;
+
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.BUY,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+            };
+
+            _ = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+
+            // Assert
+            var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, result.OrderExecution.Time);
+            var lowest = bidAsks.Select(ba => ba.Ask).Min();
+            var highest = bidAsks.Select(ba => ba.Ask).Max();
+            var actualPrice = result.OrderExecution.AvgPrice;
+            Assert.GreaterOrEqual(actualPrice, lowest);
+            Assert.LessOrEqual(actualPrice, highest);
+        }
+
+        [Test]
+        public async Task RelativeOrder_Sell_GetsFilledWhenMarketChangesDirection_DownThenUp()
+        {
+            // Setup
+            (DateTime, DateTime) timerange = GrndTestData.DownThenUp;
+            string ticker = GrndTestData.Ticker;
+
+            _backtester = await CreateBacktesterAndConnect(timerange);
+            DateTime timeOfOrderPlacement = timerange.Item1;
+
+            var offsetAmount = 0.005;
+            var order = new RelativeOrder()
+            {
+                Action = OrderAction.SELL,
+                TotalQuantity = 50,
+                OffsetAmount = offsetAmount,
+            };
+
+            _backtester.Account.Positions[ticker] = new Position(ticker)
+            {
+                PositionAmount = 50,
+                AverageCost = 6.94,
+            };
+
+            _ = _backtester.Start();
+            await WaitUntilTimeIsReached(timeOfOrderPlacement);
+
+            // Test
+            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+
+            // Assert
+            var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, result.OrderExecution.Time);
+            var lowest = bidAsks.Select(ba => ba.Bid).Min();
+            var highest = bidAsks.Select(ba => ba.Bid).Max();
+            var actualPrice = result.OrderExecution.AvgPrice;
             Assert.GreaterOrEqual(actualPrice, lowest);
             Assert.LessOrEqual(actualPrice, highest);
         }
@@ -815,6 +1029,30 @@ namespace BacktesterTests
                     tcs.TrySetResult();
             });
             await tcs.Task;
+        }
+
+        public async Task FillTestDataDb()
+        {
+            (DateTime, DateTime)[] timeranges = new (DateTime, DateTime)[4]
+            {
+                SpyTestData.Downward,
+                SpyTestData.Upward,
+                SpyTestData.DownThenUp,
+                SpyTestData.UpThenDown,
+            };
+
+            foreach (var timerange in timeranges) 
+            {
+                await using(var backtester = await CreateBacktesterAndConnect(timerange))
+                {
+                    var provider = backtester.HistoricalDataProvider as IBHistoricalDataProvider;
+                    provider.DbPath = TestsUtils.TestDataDbPath;
+
+                    await provider.GetHistoricalDataAsync<Bar>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
+                    await provider.GetHistoricalDataAsync<BidAsk>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
+                    await provider.GetHistoricalDataAsync<Last>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
+                }
+            }
         }
     }
 }
