@@ -67,9 +67,9 @@ namespace TradingBot.Backtesting
                     if (!lasts.Any())
                         condResult = false;
                     else if (priceCond.IsMore)
-                        condResult = lasts.Any(l => priceCond.Price > l.Price);
+                        condResult = lasts.Any(l => priceCond.Price >= l.Price);
                     else
-                        condResult = lasts.Any(l => priceCond.Price < l.Price);
+                        condResult = lasts.Any(l => priceCond.Price <= l.Price);
                 }
                 else if(condition is IBApi.PercentChangeCondition percentCond)
                 {
@@ -81,18 +81,18 @@ namespace TradingBot.Backtesting
                         var latestLasts = groups.Last();
                         var previousLasts = groups.SkipLast(1).Last();
                         if (percentCond.IsMore)
-                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent < percent));
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent <= percent));
                         else
-                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent > percent));
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent >= percent));
                     }
                 }
                 else if (condition is IBApi.TimeCondition timeCond)
                 {
                     var t = DateTime.Parse(timeCond.Time);
                     if (timeCond.IsMore)
-                        condResult = t > time;
+                        condResult = t >= time;
                     else
-                        condResult = t < time;
+                        condResult = t <= time;
                 }
 
                 ret = previousOp ? ret & condResult : ret | condResult;

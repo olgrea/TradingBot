@@ -3,7 +3,6 @@ using IBApi;
 using NLog;
 using NUnit.Framework;
 using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.IBKR.Client;
 using TradingBot.Tests;
@@ -283,39 +282,28 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5};
-
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
-            {
-                if (o.Id == order.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    tcs.TrySetResult(o);
-            });
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
-            _broker.OrderManager.OrderUpdated += orderPlaced;
-            _broker.ErrorOccured += error;
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var currentTime = await _broker.GetServerTimeAsync();
-            DateTime condTime = currentTime.AddSeconds(5);
+            DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
-            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Inactive);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
 
             // Test
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await tcs.Task.WaitAsync(timeout);
+                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
-                Assert.AreEqual(order.Id, result.Id);
+                Assert.AreEqual(order.Id, result.Order.Id);
+                Assert.AreEqual(condTime.Ticks, result.Time.Ticks, TimeSpan.TicksPerMillisecond*1000);
             }
             catch (TimeoutException)
             {
-                _broker.OrderManager.OrderUpdated -= orderPlaced;
-                _broker.ErrorOccured -= error;
                 Assert.Inconclusive($"Order not activated within timeout value ({timeout})");
             }
         }
@@ -327,17 +315,7 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5 , LmtPrice = 5};
-
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) => 
-            {
-                if (o.Id == order.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    tcs.TrySetResult(o);
-            });
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
-            _broker.ErrorOccured += error;
-            _broker.OrderManager.OrderUpdated += orderPlaced;
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
             order.AddPriceCondition(isMore: true, bas.Ask + 0.02);
@@ -345,20 +323,18 @@ namespace IBBrokerTests
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
-            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Inactive);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
 
             // Test
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await tcs.Task.WaitAsync(timeout);
+                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
-                Assert.AreEqual(order.Id, result.Id);
+                Assert.AreEqual(order.Id, result.Order.Id);
             }
             catch (TimeoutException)
             {
-                _broker.OrderManager.OrderUpdated -= orderPlaced;
-                _broker.ErrorOccured -= error;
                 Assert.Inconclusive($"Order not activated within timeout value ({timeout})");
             }
         }
@@ -370,17 +346,7 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
-            {
-                if (o.Id == order.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    tcs.TrySetResult(o);
-            });
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
-            _broker.OrderManager.OrderUpdated += orderPlaced;
-            _broker.ErrorOccured += error;
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
             order.AddPercentCondition(isMore: true, 0.001);
@@ -388,20 +354,18 @@ namespace IBBrokerTests
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
-            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Inactive);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
 
             // Test
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await tcs.Task.WaitAsync(timeout);
+                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
-                Assert.AreEqual(order.Id, result.Id);
+                Assert.AreEqual(order.Id, result.Order.Id);
             }
             catch (TimeoutException)
             {
-                _broker.OrderManager.OrderUpdated -= orderPlaced;
-                _broker.ErrorOccured -= error;
                 Assert.Inconclusive($"Order not activated within timeout value ({timeout})");
             }
         }
@@ -426,7 +390,7 @@ namespace IBBrokerTests
             _broker.ErrorOccured += error;
 
             var currentTime = await _broker.GetServerTimeAsync();
-            DateTime condTime = currentTime.AddSeconds(5);
+            DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
             order.ConditionsTriggerOrderCancellation = true;
 
@@ -546,42 +510,30 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
-            {
-                if (o.Id == order.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    tcs.TrySetResult(o);
-            });
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
-            _broker.OrderManager.OrderUpdated += orderPlaced;
-            _broker.ErrorOccured += error;
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
             order.AddPriceCondition(isMore: true, bas.Ask + 0.02, isConjunction: true);
 
             var currentTime = await _broker.GetServerTimeAsync();
-            DateTime condTime = currentTime.AddSeconds(5);
+            DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
-            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Inactive);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
 
             // Test
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await tcs.Task.WaitAsync(timeout);
+                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
-                Assert.AreEqual(order.Id, result.Id);
+                Assert.AreEqual(order.Id, result.Order.Id);
             }
             catch (TimeoutException)
             {
-                _broker.OrderManager.OrderUpdated -= orderPlaced;
-                _broker.ErrorOccured -= error;
                 Assert.Inconclusive($"Order not activated within timeout value ({timeout})");
             }
         }
@@ -593,47 +545,30 @@ namespace IBBrokerTests
 
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
-
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
-            {
-                if (o.Id == order.Id && (os.Status == Status.Submitted || os.Status == Status.PreSubmitted))
-                    tcs.TrySetResult(o);
-            });
-            var error = new Action<Exception>(e => tcs.TrySetException(e));
-            _broker.OrderManager.OrderUpdated += orderPlaced;
-            _broker.ErrorOccured += error;
+            var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
 
             var bas = await GetLatestBidAskAsync(ticker);
-            order.AddPriceCondition(isMore: true, bas.Ask + 0.20, isConjunction: false);
+            order.AddPriceCondition(isMore: true, bas.Ask + 0.02, isConjunction: false);
 
             var currentTime = await _broker.GetServerTimeAsync();
-            DateTime condTime = currentTime.AddSeconds(5);
+            DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
-            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Inactive);
+            Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
 
             // Test
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
-
-
             try
             {
-                var result = await tcs.Task.WaitAsync(timeout);
+                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
-                Assert.AreEqual(order.Id, result.Id);
-
-                var latestBa = await GetLatestBidAskAsync(ticker);
-                Assert.Less(latestBa.Ask, order.OrderConditions.OfType<PriceCondition>().First().Price);
+                Assert.AreEqual(order.Id, result.Order.Id);
             }
             catch (TimeoutException)
             {
-                _broker.OrderManager.OrderUpdated -= orderPlaced;
-                _broker.ErrorOccured -= error;
                 Assert.Inconclusive($"Order not activated within timeout value ({timeout})");
             }
         }

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Security.Cryptography;
 using IBApi;
+using TradingBot.Utils;
 
 namespace TradingBot.Broker.Orders
 {
@@ -50,8 +51,6 @@ namespace TradingBot.Broker.Orders
     // Order conditioning
     public abstract class Order
     {
-        bool _conditionsTriggerOrderCancellation = false;
-
         class IBAlgorithm
         {
             public string? Id { get; set; }
@@ -92,16 +91,9 @@ namespace TradingBot.Broker.Orders
 
         // TODO : create wrapper for OrderCondition?
         internal List<OrderCondition> OrderConditions { get; set; } = new List<OrderCondition>();
-        public bool ConditionsTriggerOrderCancellation
-        {
-            get => _conditionsTriggerOrderCancellation;
-            set
-            {
-                Info.Transmit = _conditionsTriggerOrderCancellation = value;
-            }
-        }
-
+        public bool ConditionsTriggerOrderCancellation { get; set; } = false;
         internal bool NeedsConditionFulfillmentToBeOpened => OrderConditions.Any() && !ConditionsTriggerOrderCancellation;
+        internal bool ConditionsFulfilled { get; set; }
 
         internal int Id
         {
@@ -145,8 +137,6 @@ namespace TradingBot.Broker.Orders
             cond.IsConjunctionConnection = isConjunction;
             
             OrderConditions.Add(cond);
-            if(NeedsConditionFulfillmentToBeOpened)
-                Info.Transmit = false;
             //TODO : need to check if I can use this flag when using conditions
         }
 
@@ -158,20 +148,16 @@ namespace TradingBot.Broker.Orders
             cond.IsConjunctionConnection = isConjunction;
 
             OrderConditions.Add(cond);
-            if (NeedsConditionFulfillmentToBeOpened)
-                Info.Transmit = false;
         }
 
         public void AddTimeCondition(bool isMore, DateTime time, bool isConjunction = true)
         {
             var cond = (TimeCondition)OrderCondition.Create(OrderConditionType.Time);
             cond.IsMore = isMore;
-            cond.Time = time.ToString();
+            cond.Time = time.ToString(MarketDataUtils.TWSTimeFormat);
             cond.IsConjunctionConnection = isConjunction;
 
             OrderConditions.Add(cond);
-            if (NeedsConditionFulfillmentToBeOpened)
-                Info.Transmit = false;
         }
 
         public static explicit operator Order(IBApi.Order ibo)
