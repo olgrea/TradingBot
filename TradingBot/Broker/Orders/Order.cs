@@ -131,7 +131,7 @@ namespace TradingBot.Broker.Orders
             return $"[{Id}] : {Action} {TotalQuantity} {OrderType}";
         }
 
-        public void SetAsAdaptiveAlgo(AdaptiveAlgorithmPriority priority)
+        protected void SetAdaptiveAlgoParams(AdaptiveAlgorithmPriority priority)
         {
             Algorithm.Strategy = "Adaptive";
             Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString())};
@@ -252,6 +252,11 @@ namespace TradingBot.Broker.Orders
 
         public override OrderType OrderType => OrderType.MKT;
 
+        public void AsAdaptiveAlgo(AdaptiveAlgorithmPriority priority)
+        {
+            SetAdaptiveAlgoParams(priority);
+        }
+
         public static explicit operator IBApi.Order(MarketOrder order) => (IBApi.Order)(order as Order);
 
         public static explicit operator MarketOrder(IBApi.Order ibo) => new MarketOrder(ibo);
@@ -300,6 +305,11 @@ namespace TradingBot.Broker.Orders
         public double LmtPrice { get; set; }
 
         public override OrderType OrderType => OrderType.LMT;
+
+        public void AsAdaptiveAlgo(AdaptiveAlgorithmPriority priority)
+        {
+            SetAdaptiveAlgoParams(priority);
+        }
 
         public override string ToString()
         {

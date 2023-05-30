@@ -652,10 +652,11 @@ namespace IBBrokerTests
         {
             // Setup
             string ticker = "GME";
-            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5,  };
-            order.SetAsAdaptiveAlgo(AdaptiveAlgorithmPriority.Urgent);
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 1 };
+            order.AsAdaptiveAlgo(AdaptiveAlgorithmPriority.Urgent);
 
             await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            await _broker.OrderManager.AwaitExecutionAsync(order);
         }
 
         async Task<BidAsk> GetLatestBidAskAsync(string ticker)
