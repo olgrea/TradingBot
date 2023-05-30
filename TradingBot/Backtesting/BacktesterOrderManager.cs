@@ -35,7 +35,7 @@ namespace TradingBot.Backtesting
 
         void OnClockTick_EvaluateConditions(DateTime newTime, CancellationToken token)
         {
-            foreach(Order order in _orderTracker.OrdersRequested.Values.Where(o => o.NeedsConditionFulfillmentToBeOpened))
+            foreach(Order order in _orderTracker.OrdersRequested.Values.Where(o => o.NeedsConditionFulfillmentToBeOpened && !_orderTracker.HasBeenOpened(o)))
             {
                 if (EvaluateConditions(order, newTime))
                 {
@@ -44,7 +44,7 @@ namespace TradingBot.Backtesting
                 }
             }
 
-            foreach (Order order in _orderTracker.OrdersRequested.Values.Where(o => o.ConditionsTriggerOrderCancellation))
+            foreach (Order order in _orderTracker.OrdersRequested.Values.Where(o => o.ConditionsTriggerOrderCancellation && !_orderTracker.IsCancelled(o)))
             {
                 if (EvaluateConditions(order, newTime))
                 {
@@ -73,18 +73,22 @@ namespace TradingBot.Backtesting
                 }
                 else if(condition is IBApi.PercentChangeCondition percentCond)
                 {
-                    IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, time).Result;
-                    IEnumerable<Last> previousLasts = _backtester.GetAsync<Last>(ticker, time.AddSeconds(-1)).Result;
-                    if (!lasts.Any() || !previousLasts.Any())
-                        condResult = false;
-                    else if (percentCond.IsMore)
-                        condResult = lasts.Any(l => previousLasts.Select(pl => l.Price / pl.Price).Any(percent => percentCond.ChangePercent > percent);
-                    else
-                        condResult = lasts.Any(l => previousLasts.Select(pl => l.Price / pl.Price).Any(percent => percentCond.ChangePercent < percent);
+                    var groups = _backtester.GetAsync<Last>(ticker, time.AddSeconds(-15), time).Result.GroupBy(l => l.Time);
+
+                    condResult = false;
+                    if (groups.Count() > 1)
+                    {
+                        var latestLasts = groups.Last();
+                        var previousLasts = groups.SkipLast(1).Last();
+                        if (percentCond.IsMore)
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent < percent));
+                        else
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent > percent));
+                    }
                 }
                 else if (condition is IBApi.TimeCondition timeCond)
                 {
-                    var t = DateTime.SpecifyKind(DateTime.ParseExact(timeCond.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local);
+                    var t = DateTime.Parse(timeCond.Time);
                     if (timeCond.IsMore)
                         condResult = t > time;
                     else
@@ -438,7 +442,8 @@ namespace TradingBot.Backtesting
         {
             _validator.ValidateOrderCancellation(orderId);
 
-            order = _orderTracker.OpenOrders[orderId];
+            order = _orderTracker.OrdersRequested[orderId];
+
             _orderTracker.TrackCancellation(order);
 
             OrderStatus os = new OrderStatus()

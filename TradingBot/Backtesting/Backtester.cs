@@ -583,6 +583,9 @@ namespace TradingBot.Backtesting
 
         internal IBApi.Contract GetContract(string ticker)
         {
+            if (!_broker.IsConnected())
+                _broker.ConnectAsync().Wait();
+
             return _broker.Client.ContractsCache.Get(ticker);
         }
     }

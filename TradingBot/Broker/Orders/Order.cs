@@ -48,6 +48,8 @@ namespace TradingBot.Broker.Orders
     // Order conditioning
     public abstract class Order
     {
+        bool _conditionsTriggerOrderCancellation = false;
+
         class IBAlgorithm
         {
             public string? Id { get; set; }
@@ -87,7 +89,15 @@ namespace TradingBot.Broker.Orders
 
         // TODO : create wrapper for OrderCondition?
         internal List<OrderCondition> OrderConditions { get; set; } = new List<OrderCondition>();
-        public bool ConditionsTriggerOrderCancellation { get; set; } = false;
+        public bool ConditionsTriggerOrderCancellation
+        {
+            get => _conditionsTriggerOrderCancellation;
+            set
+            {
+                Info.Transmit = _conditionsTriggerOrderCancellation = value;
+            }
+        }
+
         internal bool NeedsConditionFulfillmentToBeOpened => OrderConditions.Any() && !ConditionsTriggerOrderCancellation;
 
         internal int Id
