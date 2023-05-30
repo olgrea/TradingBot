@@ -39,7 +39,6 @@ namespace TradingBot.Broker.Orders
                 Price = exec.Price,
                 AvgPrice = exec.AvgPrice,
 
-                // TODO : confirm that format is correct. It changed when updating to API v10.16
                 Time = DateTime.SpecifyKind(DateTime.ParseExact(time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture), DateTimeKind.Local)
             };
         }

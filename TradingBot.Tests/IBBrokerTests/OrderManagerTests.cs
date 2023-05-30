@@ -638,6 +638,26 @@ namespace IBBrokerTests
             }
         }
 
+        [Test, Explicit]
+        public async Task MarketOnOpenOrder_BecomesActiveOnMarketOpen()
+        {
+            // Setup
+            string ticker = "GME";
+            var order = new MarketOnOpen() { Action = OrderAction.BUY, TotalQuantity = 5};
+            await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+        }
+
+        [Test, Explicit]
+        public async Task AdaptiveAlgo()
+        {
+            // Setup
+            string ticker = "GME";
+            var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5,  };
+            order.SetAsAdaptiveAlgo(AdaptiveAlgorithmPriority.Urgent);
+
+            await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+        }
+
         async Task<BidAsk> GetLatestBidAskAsync(string ticker)
         {
             var tcs = new TaskCompletionSource<BidAsk>(TaskCreationOptions.RunContinuationsAsynchronously);
