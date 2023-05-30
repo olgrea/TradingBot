@@ -124,24 +124,39 @@ namespace TradingBot.Broker.Orders
             Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString())};
         }
 
-        public void AddCondition(PriceCondition condition)
+        public void AddPriceCondition(bool isMore, double price, bool isConjunction = true)
         {
-            OrderConditions.Add(condition);
+            var cond = (PriceCondition)OrderCondition.Create(OrderConditionType.Price);
+            cond.IsMore = isMore;
+            cond.Price = price;
+            cond.IsConjunctionConnection = isConjunction;
+            
+            OrderConditions.Add(cond);
             if(NeedsConditionFulfillmentToBeOpened)
                 Info.Transmit = false;
             //TODO : need to check if I can use this flag when using conditions
         }
 
-        public void AddCondition(PercentChangeCondition condition)
+        public void AddPercentCondition(bool isMore, double percent, bool isConjunction = true)
         {
-            OrderConditions.Add(condition);
+            var cond = (PercentChangeCondition)OrderCondition.Create(OrderConditionType.PercentCange);
+            cond.IsMore = isMore;
+            cond.ChangePercent = percent;
+            cond.IsConjunctionConnection = isConjunction;
+
+            OrderConditions.Add(cond);
             if (NeedsConditionFulfillmentToBeOpened)
                 Info.Transmit = false;
         }
 
-        public void AddCondition(TimeCondition condition)
+        public void AddTimeCondition(bool isMore, DateTime time, bool isConjunction = true)
         {
-            OrderConditions.Add(condition);
+            var cond = (TimeCondition)OrderCondition.Create(OrderConditionType.Time);
+            cond.IsMore = isMore;
+            cond.Time = time.ToString();
+            cond.IsConjunctionConnection = isConjunction;
+
+            OrderConditions.Add(cond);
             if (NeedsConditionFulfillmentToBeOpened)
                 Info.Transmit = false;
         }
