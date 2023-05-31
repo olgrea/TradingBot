@@ -1,5 +1,8 @@
-﻿using TradingBot.Broker.Accounts;
+﻿using System.Globalization;
+using TradingBot.Broker.Accounts;
+using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
+using TradingBot.Utils;
 
 namespace TradingBot.Backtesting
 {
@@ -20,6 +23,7 @@ namespace TradingBot.Backtesting
             _validator = new OrderValidator(_orderTracker);
             
             _backtester = backtester;
+            _backtester.ClockTick += OnClockTick_EvaluateConditions;
             _orderEvaluator = new OrderEvaluator(_backtester, _orderTracker);
             _orderEvaluator.OrderExecuted += OnOrderExecuted;
         }
@@ -28,6 +32,75 @@ namespace TradingBot.Backtesting
         public event Action<string, OrderExecution>? OrderExecuted;
 
         int NextOrderId => _nextOrderId++;
+
+        void OnClockTick_EvaluateConditions(DateTime newTime, CancellationToken token)
+        {
+            foreach(Order order in _orderTracker.OrdersRequested.Values.Where(o => o.NeedsConditionFulfillmentToBeOpened && !_orderTracker.HasBeenOpened(o)))
+            {
+                if (EvaluateConditions(order, newTime))
+                {
+                    order.Info.Transmit = true;
+                    ModifyOrderInternal(order);
+                }
+            }
+
+            foreach (Order order in _orderTracker.OrdersRequested.Values.Where(o => o.ConditionsTriggerOrderCancellation && !_orderTracker.IsCancelled(o)))
+            {
+                if (EvaluateConditions(order, newTime))
+                {
+                    CancelOrderInternal(order.Id, out _);
+                }
+            }
+        }
+
+        bool EvaluateConditions(Order order, DateTime time)
+        {
+            bool ret = true;
+            bool previousOp = true;
+            foreach(IBApi.OrderCondition condition in order.OrderConditions)
+            {
+                bool condResult = false;
+                string ticker = _orderTracker.OrderIdsToTicker[order.Id];
+                if(condition is IBApi.PriceCondition priceCond)
+                {
+                    IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, time).Result;
+                    if (!lasts.Any())
+                        condResult = false;
+                    else if (priceCond.IsMore)
+                        condResult = lasts.Any(l => priceCond.Price >= l.Price);
+                    else
+                        condResult = lasts.Any(l => priceCond.Price <= l.Price);
+                }
+                else if(condition is IBApi.PercentChangeCondition percentCond)
+                {
+                    var groups = _backtester.GetAsync<Last>(ticker, time.AddSeconds(-15), time).Result.GroupBy(l => l.Time);
+
+                    condResult = false;
+                    if (groups.Count() > 1)
+                    {
+                        var latestLasts = groups.Last();
+                        var previousLasts = groups.SkipLast(1).Last();
+                        if (percentCond.IsMore)
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent <= percent));
+                        else
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent >= percent));
+                    }
+                }
+                else if (condition is IBApi.TimeCondition timeCond)
+                {
+                    var t = DateTime.Parse(timeCond.Time);
+                    if (timeCond.IsMore)
+                        condResult = t >= time;
+                    else
+                        condResult = t <= time;
+                }
+
+                ret = previousOp ? ret & condResult : ret | condResult;
+                previousOp = condition.IsConjunctionConnection;
+            }
+
+            return ret;
+        }
 
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
         public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
@@ -72,8 +145,6 @@ namespace TradingBot.Backtesting
                 try
                 {
                     OrderPlacedResult result = ModifyOrderInternal(order);
-                    string ticker = _orderTracker.OrderIdsToTicker[order.Id];
-                    OrderUpdated?.Invoke(ticker, order, result.OrderStatus!);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -106,8 +177,6 @@ namespace TradingBot.Backtesting
                 try
                 {
                     OrderStatus os = CancelOrderInternal(orderId, out Order order);
-                    string ticker = _orderTracker.OrderIdsToTicker[order.Id];
-                    OrderUpdated?.Invoke(ticker, order, os);
                     tcs.TrySetResult(os);
                 }
                 catch (Exception e)
@@ -300,14 +369,24 @@ namespace TradingBot.Backtesting
             order.Id = NextOrderId;
             _validator.ValidateOrderPlacement(order);
             _orderTracker.TrackRequest(ticker, order);
-            _orderTracker.TrackOpening(order);
+
+            // TODO : to test with TWS 
+            if(order.Info.Transmit)
+                _orderTracker.TrackOpening(order);
+
+            foreach (var cond in order.OrderConditions.OfType<IBApi.ContractCondition>())
+            {
+                IBApi.Contract contract = _backtester.GetContract(ticker);
+                cond.ConId = contract.ConId;
+                cond.Exchange = contract.Exchange;
+            }
 
             var result = new OrderPlacedResult()
             {
                 Order = order,
                 OrderStatus = new OrderStatus()
                 {
-                    Status = Status.Submitted,
+                    Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                     Remaining = order.TotalQuantity,
                     Info = new RequestInfo()
                     {
@@ -316,7 +395,7 @@ namespace TradingBot.Backtesting
                 },
                 OrderState = new OrderState()
                 {
-                    Status = Status.Submitted,
+                    Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                 },
                 Time = _backtester.CurrentTime,
             };
@@ -328,14 +407,19 @@ namespace TradingBot.Backtesting
         OrderPlacedResult ModifyOrderInternal(Order order)
         {
             _validator.ValidateOrderModification(order);
-            _orderTracker.TrackOpening(order);
+
+            if (_orderTracker.OrdersRequested.ContainsKey(order.Id))
+                _orderTracker.OrdersRequested[order.Id] = order;
+
+            if (_orderTracker.OpenOrders.ContainsKey(order.Id) || order.Info.Transmit)
+                _orderTracker.TrackOpening(order);
 
             var result = new OrderPlacedResult()
             {
                 Order = order,
                 OrderStatus = new OrderStatus()
                 {
-                    Status = Status.Submitted,
+                    Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                     Remaining = order.TotalQuantity,
                     Info = new RequestInfo()
                     {
@@ -344,10 +428,13 @@ namespace TradingBot.Backtesting
                 },
                 OrderState = new OrderState()
                 {
-                    Status = Status.Submitted,
+                    Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                 },
                 Time = _backtester.CurrentTime,
             };
+
+            string ticker = _orderTracker.OrderIdsToTicker[order.Id];
+            OrderUpdated?.Invoke(ticker, order, result.OrderStatus!);
             return result;
         }
 
@@ -355,10 +442,11 @@ namespace TradingBot.Backtesting
         {
             _validator.ValidateOrderCancellation(orderId);
 
-            order = _orderTracker.OpenOrders[orderId];
+            order = _orderTracker.OrdersRequested[orderId];
+
             _orderTracker.TrackCancellation(order);
 
-            return new OrderStatus()
+            OrderStatus os = new OrderStatus()
             {
                 Status = Status.Cancelled,
                 Remaining = order.TotalQuantity,
@@ -367,6 +455,10 @@ namespace TradingBot.Backtesting
                     OrderId = order.Id,
                 },
             };
+
+            string ticker = _orderTracker.OrderIdsToTicker[order.Id];
+            OrderUpdated?.Invoke(ticker, order, os);
+            return os;
         }
 
         void EnqueueRequest<TResult>(TaskCompletionSource<TResult> tcs, Action request)

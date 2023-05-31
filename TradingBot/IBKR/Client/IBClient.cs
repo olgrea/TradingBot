@@ -73,8 +73,6 @@ namespace TradingBot.IBKR.Client
         internal ContractsCache ContractsCache => _contractsCache;
         internal ILogger? Logger => _logger;
 
-        // TODO : need to handle market data connection losses if the bot trades for multiple days. It seems to happen everyday at around 8pm
-
         public void Connect() => Connect(DefaultIP, DefaultTWSPort, new Random().Next());
 
         public void Connect(string host, int port, int clientId)
@@ -287,6 +285,12 @@ namespace TradingBot.IBKR.Client
         {
             Debug.Assert(order.OrderId > 0);
             Debug.Assert(order.TotalQuantity > 0);
+
+            foreach(var cond in order.Conditions.OfType<ContractCondition>())
+            {
+                cond.ConId = contract.ConId;
+                cond.Exchange = contract.Exchange;
+            }
 
             _logger?.Trace($"{nameof(_socket.placeOrder)}(orderId: {order.OrderId} conId: {contract.ConId})");
             _socket.placeOrder(order.OrderId, contract, order);

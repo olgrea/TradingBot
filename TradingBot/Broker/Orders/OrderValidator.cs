@@ -11,21 +11,18 @@
 
         internal void ValidateOrderPlacement(Order order)
         {
-            if (order.Id > 0)
-            {
-                if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been executed.");
-                else if (_orderTracker.OrdersCancelled.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been cancelled.");
-                else if (_orderTracker.OpenOrders.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) is already opened.");
-                else if (_orderTracker.OrdersRequested.ContainsKey(order.Id))
-                    throw new ArgumentException($"This order ({order.Id}) has already been requested.");
+            if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
+                throw new ArgumentException($"This order ({order.Id}) has already been executed.");
+            else if (_orderTracker.OrdersCancelled.ContainsKey(order.Id))
+                throw new ArgumentException($"This order ({order.Id}) has already been cancelled.");
+            else if (_orderTracker.OpenOrders.ContainsKey(order.Id))
+                throw new ArgumentException($"This order ({order.Id}) is already opened.");
+            else if (_orderTracker.OrdersRequested.ContainsKey(order.Id))
+                throw new ArgumentException($"This order ({order.Id}) has already been requested.");
 
-                // TODO : add these client-side verifications? For Trader only? 
-                // not enough funds when buying
-                // not enough positions when selling
-            }
+            // TODO : add these client-side verifications? For Trader only? 
+            // not enough funds when buying
+            // not enough positions when selling
         }
 
         internal void ValidateOrderModification(Order order)
@@ -36,7 +33,7 @@
                 throw new ArgumentException($"This order ({order.Id}) has already been executed.");
             else if (_orderTracker.OrdersCancelled.ContainsKey(order.Id))
                 throw new ArgumentException($"This order ({order.Id}) has already been cancelled.");
-            else if (!_orderTracker.OpenOrders.ContainsKey(order.Id))
+            else if (!_orderTracker.OrdersRequested.ContainsKey(order.Id))
                 throw new ArgumentException($"No open order with id {order.Id} to modify.");
         }
 
@@ -48,7 +45,7 @@
                 throw new ArgumentException($"This order ({orderId}) has already been executed.");
             else if (_orderTracker.OrdersCancelled.ContainsKey(orderId))
                 throw new ArgumentException($"This order ({orderId}) has already been cancelled.");
-            else if (!_orderTracker.OpenOrders.ContainsKey(orderId))
+            else if (!_orderTracker.OpenOrders.ContainsKey(orderId) && _orderTracker.OrdersRequested.TryGetValue(orderId, out Order? o) && o.Info.Transmit)
                 throw new ArgumentException($"No opened order with id {orderId} to modify.");
         }
 

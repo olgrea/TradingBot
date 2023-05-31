@@ -4,6 +4,7 @@ using System.Reflection;
 using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
+using TradingBot.Broker.Contracts;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.MarketData.Providers;
 using TradingBot.Broker.Orders;
@@ -578,6 +579,14 @@ namespace TradingBot.Backtesting
         public Task<DateTime> GetServerTimeAsync(CancellationToken token)
         {
             return Task.FromResult(_currentTime);
+        }
+
+        internal IBApi.Contract GetContract(string ticker)
+        {
+            if (!_broker.IsConnected())
+                _broker.ConnectAsync().Wait();
+
+            return _broker.Client.ContractsCache.Get(ticker);
         }
     }
 }

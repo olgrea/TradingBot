@@ -90,7 +90,8 @@ namespace TradingBot.IBKR
 
         async Task<string> ConnectAsync(TimeSpan timeout, CancellationToken token)
         {
-            // awaiting a TaskCompletionSource's task doesn't return on the main thread without this flag.
+            // NOTE : TaskCompletionSource should always be used with the RunContinuationsAsynchronously flag
+            // https://devblogs.microsoft.com/premier-developer/the-danger-of-taskcompletionsourcet-class/
             var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 

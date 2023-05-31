@@ -16,6 +16,7 @@ namespace BacktesterTests
             DateTime from = new DateTime(2023, 04, 10, 10, 55, 00);
             DateTime to = new DateTime(2023, 04, 10).ToMarketHours().Item2;
             _backtester = TestsUtils.CreateBacktester(from, to);
+            _backtester.TimeCompression.Factor = 0.002;
             _broker = _backtester;
 
             await Task.CompletedTask;

@@ -45,6 +45,8 @@ namespace TradingBot.Backtesting
             }
         }
 
+        // TODO : check if I need to implement specific trigger methods
+        // https://interactivebrokers.github.io/tws-api/trigger_method_limit.html
         void EvaluateOrder(string ticker, Order order, BidAsk bidAsk)
         {
             _logger?.Debug($"Evaluating Order {order} at BidAsk : {bidAsk}");
