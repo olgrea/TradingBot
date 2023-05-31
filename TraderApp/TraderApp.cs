@@ -20,7 +20,7 @@ namespace TraderApp
             trader.AddStrategy(new BollingerBandsStrategy(today.Item1, today.Item2, "GME", trader));
             var results = await trader.Start();
 
-            TradingViewIndicatorGenerator.GenerateReport(Path.Combine(LogsPath, $"tvResults-{DateTime.Now.Date}.txt"), results);
+            TradingViewIndicatorGenerator.GenerateReport(Path.Combine(LogsPath, $"tvResults-{DateTime.Now.ToShortDateString()}.txt"), results);
             CSVReportGenerator.GenerateReport(Path.Combine(LogsPath, $"csvResults-{DateTime.Now.Date}.csv"), results);
         }
     }

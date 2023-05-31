@@ -33,7 +33,7 @@ namespace BacktesterApp
             var results = traderTask.Result;
             var bkResults = backtesterTask.Result;
 
-            TradingViewIndicatorGenerator.GenerateReport(Path.Combine(LogsPath, $"tvResults-{latestTradingDay}.txt"), results);
+            TradingViewIndicatorGenerator.GenerateReport(Path.Combine(LogsPath, $"tvResults-{latestTradingDay.ToShortDateString()}.txt"), results);
         }
     }
 }

@@ -43,7 +43,7 @@
                 {
                     baseMsg += " (";
                     if (Code >= 0)
-                        baseMsg += $" code={Code} ";
+                        baseMsg += $" code={(int)Code} ";
                     if (Id >= 0)
                         baseMsg += $" rId={Id} ";
                     baseMsg += ")";
