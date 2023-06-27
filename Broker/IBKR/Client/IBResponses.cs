@@ -1,9 +1,9 @@
 ﻿using System.Globalization;
 using IBApi;
 using NLog;
-using static TradingBot.IBKR.Client.IBClient;
+using static Broker.IBKR.Client.IBClient;
 
-namespace TradingBot.IBKR.Client
+namespace Broker.IBKR.Client
 {
     // NOTE : TWS API uses double.MaxValue for an unset value
     public class IBResponses : EWrapper
@@ -68,7 +68,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<Position>? UpdatePortfolio;
-        public void updatePortfolio(IBApi.Contract contract, decimal position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
+        public void updatePortfolio(Contract contract, decimal position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
             var pos = new Position(contract, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL);
 
@@ -76,7 +76,7 @@ namespace TradingBot.IBKR.Client
             UpdatePortfolio?.Invoke(pos);
         }
 
-        // ONLY called on the first IBClient.reqAccountUpdates(true, code) call, NOT during updates... 
+        // ONLY called on the first IBIBApi.reqAccountUpdates(true, code) call, NOT during updates... 
         public Action<string>? AccountDownloadEnd;
         public void accountDownloadEnd(string account)
         {
@@ -99,7 +99,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<Position>? Position;
-        public void position(string account, IBApi.Contract contract, decimal pos, double avgCost)
+        public void position(string account, Contract contract, decimal pos, double avgCost)
         {
             var p = new Position(contract, pos, avgCost);
 
@@ -118,7 +118,7 @@ namespace TradingBot.IBKR.Client
         public void pnlSingle(int reqId, decimal pos, double dailyPnL, double unrealizedPnL, double realizedPnL, double value)
         {
             _logger?.Trace($"reqId: {reqId}, pos: {pos}, dailyPNL: {dailyPnL}, unrealizedPNL: {unrealizedPnL}, realizedPNL: {realizedPnL}, value :{value}");
-            if(_requestIdsToContracts.Pnl.TryGetValue(reqId, out var contract))
+            if (_requestIdsToContracts.Pnl.TryGetValue(reqId, out var contract))
                 PnlSingle?.Invoke(new PnL(contract.Symbol, pos, dailyPnL, unrealizedPnL, realizedPnL, value));
         }
 
@@ -183,8 +183,8 @@ namespace TradingBot.IBKR.Client
             }
         }
 
-        public Action<int, IBApi.ContractDetails>? ContractDetails;
-        public void contractDetails(int reqId, IBApi.ContractDetails contractDetails)
+        public Action<int, ContractDetails>? ContractDetails;
+        public void contractDetails(int reqId, ContractDetails contractDetails)
         {
             _logger?.Trace($"reqId: {reqId}, contract details of : {contractDetails.Contract.ConId}");
             ContractDetails?.Invoke(reqId, contractDetails);
@@ -198,7 +198,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<Contract, Order, OrderState>? OpenOrder;
-        public void openOrder(int orderId, IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
         {
             _logger?.Trace($"orderId: {orderId}, conId: {contract.ConId}, orderState: {orderState.Status}");
             if (!string.IsNullOrEmpty(orderState.WarningText))
@@ -238,7 +238,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<Contract, Execution>? ExecDetails;
-        public void execDetails(int reqId, IBApi.Contract contract, Execution execution)
+        public void execDetails(int reqId, Contract contract, Execution execution)
         {
             _logger?.Trace($"reqId: {reqId}, conId: {contract.ConId}, execId: {execution.ExecId}");
             ExecDetails?.Invoke(contract, execution);
@@ -259,7 +259,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<Contract, Order, OrderState>? CompletedOrder;
-        public void completedOrder(IBApi.Contract contract, IBApi.Order order, IBApi.OrderState orderState)
+        public void completedOrder(Contract contract, Order order, OrderState orderState)
         {
             _logger?.Trace($"conId: {contract.ConId}, orderState: {orderState.Status}");
             if (!string.IsNullOrEmpty(orderState.WarningText))
@@ -276,7 +276,7 @@ namespace TradingBot.IBKR.Client
         }
 
         public Action<int, Bar>? HistoricalData;
-        public void historicalData(int reqId, IBApi.Bar bar)
+        public void historicalData(int reqId, Bar bar)
         {
             _logger?.Trace($"reqId: {reqId}, Time: {bar.Time}, Open: {bar.Open}, High: {bar.High}, Low: {bar.Low}, Close: {bar.Close}, Volume: {bar.Volume}, WAP: {bar.WAP}, Count: {bar.Count}");
             HistoricalData?.Invoke(reqId, bar);
@@ -292,7 +292,7 @@ namespace TradingBot.IBKR.Client
         public Action<int, IEnumerable<HistoricalTickBidAsk>, bool>? HistoricalTicksBidAsk;
         public void historicalTicksBidAsk(int reqId, HistoricalTickBidAsk[] ticks, bool done)
         {
-            foreach(var tick in ticks)
+            foreach (var tick in ticks)
                 _logger?.Trace($"reqId: {reqId}, time: {tick.Time}, PriceBid: {tick.PriceBid}, PriceAsk: {tick.PriceAsk}, SizeBid: {tick.SizeBid}, SizeAsk: {tick.SizeAsk}, done: {done}");
             HistoricalTicksBidAsk?.Invoke(reqId, ticks, done);
         }
@@ -339,9 +339,9 @@ namespace TradingBot.IBKR.Client
             else
             {
                 Exception? inner = null;
-                if(!string.IsNullOrEmpty(advancedOrderRejectJson))
+                if (!string.IsNullOrEmpty(advancedOrderRejectJson))
                     inner = new Exception(advancedOrderRejectJson);
-            
+
                 _logger?.Error(msg);
                 Error?.Invoke(new ErrorMessageException(msg, inner));
             }
@@ -361,7 +361,7 @@ namespace TradingBot.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void bondContractDetails(int reqId, IBApi.ContractDetails contract)
+        public void bondContractDetails(int reqId, ContractDetails contract)
         {
             throw new NotImplementedException();
         }
@@ -401,7 +401,7 @@ namespace TradingBot.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void historicalDataUpdate(int reqId, IBApi.Bar bar)
+        public void historicalDataUpdate(int reqId, Bar bar)
         {
             throw new NotImplementedException();
         }
@@ -461,7 +461,7 @@ namespace TradingBot.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void positionMulti(int requestId, string account, string modelCode, IBApi.Contract contract, decimal pos, double avgCost)
+        public void positionMulti(int requestId, string account, string modelCode, Contract contract, decimal pos, double avgCost)
         {
             throw new NotImplementedException();
         }
@@ -491,7 +491,7 @@ namespace TradingBot.IBKR.Client
             throw new NotImplementedException();
         }
 
-        public void scannerData(int reqId, int rank, IBApi.ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
+        public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
             throw new NotImplementedException();
         }

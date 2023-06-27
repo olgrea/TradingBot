@@ -1,7 +1,7 @@
-﻿using Skender.Stock.Indicators;
-using TradingBot.Broker.MarketData;
+﻿using Broker.MarketData;
+using Skender.Stock.Indicators;
 
-namespace TradingBot.Indicators
+namespace Broker.Indicators
 {
     public enum RsiSignal
     {
@@ -16,10 +16,10 @@ namespace TradingBot.Indicators
         const double _oversoldThreshold = 30.0;
         const double _overboughtThreshold = 70.0;
 
-        public RSI(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods, 10*nbPeriods)
+        public RSI(BarLength barLength, int nbPeriods = 14) : base(barLength, nbPeriods, 10 * nbPeriods)
         {
         }
-        
+
         protected override IEnumerable<RsiResult> ComputeResults()
         {
             return _quotes.GetRsi(NbPeriods);
@@ -28,11 +28,11 @@ namespace TradingBot.Indicators
         protected override IEnumerable<RsiSignal> ComputeSignals()
         {
             List<RsiSignal> signals = new List<RsiSignal>();
-            if(IsReady && _results.Any())
+            if (IsReady && _results.Any())
             {
                 if (_results.Last().Rsi > _overboughtThreshold)
                     signals.Add(RsiSignal.Overbought);
-                else if(_results.Last().Rsi < _oversoldThreshold)
+                else if (_results.Last().Rsi < _oversoldThreshold)
                     signals.Add(RsiSignal.Oversold);
             }
 

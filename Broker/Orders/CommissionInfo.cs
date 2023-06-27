@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker.Orders
+﻿namespace Broker.Orders
 {
     public class CommissionInfo
     {
@@ -7,9 +7,9 @@
             ExecId = execId;
         }
 
-        public string ExecId { get; set; } 
+        public string ExecId { get; set; }
         public double Commission { get; set; }
-        public string? Currency { get; set; } 
+        public string? Currency { get; set; }
         public double? RealizedPNL { get; set; }
 
         public override string ToString()

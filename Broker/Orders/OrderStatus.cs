@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker.Orders
+﻿namespace Broker.Orders
 {
     public class OrderStatus
     {

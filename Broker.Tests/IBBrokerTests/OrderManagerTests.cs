@@ -1,14 +1,14 @@
 ﻿using System.Diagnostics;
+using Broker;
+using Broker.IBKR.Client;
+using Broker.Orders;
 using IBApi;
 using NLog;
 using NUnit.Framework;
-using TradingBot.Broker;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR.Client;
-using TradingBot.Tests;
-using BidAsk = TradingBot.Broker.MarketData.BidAsk;
-using Order = TradingBot.Broker.Orders.Order;
-using OrderStatus = TradingBot.Broker.Orders.OrderStatus;
+using Broker.Tests;
+using BidAsk = Broker.MarketData.BidAsk;
+using Order = Broker.Orders.Order;
+using OrderStatus = Broker.Orders.OrderStatus;
 
 namespace IBBrokerTests
 {

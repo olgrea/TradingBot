@@ -1,11 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
-using TradingBot.Broker.MarketData;
-using TradingBot.Indicators;
-using TradingBot.Utils;
+using Broker.Indicators;
+using Broker.MarketData;
+using Broker.Utils;
 
-namespace TradingBot.Strategies
+namespace Broker.Strategies
 {
     public abstract class StrategyBase : IStrategy
     {
@@ -84,7 +84,7 @@ namespace TradingBot.Strategies
                 token.ThrowIfCancellationRequested();
 
                 BarLength barLength = group.Key;
-                lock(_bars)
+                lock (_bars)
                 {
                     if (!_bars.ContainsKey(barLength))
                         _bars[barLength] = new LinkedList<Bar>();

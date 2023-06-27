@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Utils
+﻿namespace Broker.Utils
 {
     public class LinkedListWithMaxSize<T> : LinkedList<T>
     {
@@ -8,10 +8,10 @@
             _capacity = capacity;
         }
 
-        public LinkedListWithMaxSize(int capacity, IEnumerable<T> values) 
-            : this(capacity) 
+        public LinkedListWithMaxSize(int capacity, IEnumerable<T> values)
+            : this(capacity)
         {
-            foreach(T value in values)
+            foreach (T value in values)
                 AddLast(value);
         }
 

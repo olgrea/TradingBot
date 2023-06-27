@@ -1,9 +1,8 @@
-﻿using NLog;
-using TradingBot.Broker;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR.Client;
+﻿using Broker.IBKR.Client;
+using Broker.Orders;
+using NLog;
 
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     internal class IBOrderManager : IOrderManager
     {
@@ -36,7 +35,7 @@ namespace TradingBot.IBKR
         {
             if (order.Id < 0)
                 order.Id = await GetNextValidOrderIdAsync(token);
-            else 
+            else
                 _validator.ValidateOrderPlacement(order);
 
             return await PlaceOrderInternalAsync(ticker, order, token);
@@ -170,7 +169,7 @@ namespace TradingBot.IBKR
                 }
                 catch (ErrorMessageException msg)
                 {
-                    if(msg.ErrorMessage.Code == MessageCode.OrderNotCancellableCode)
+                    if (msg.ErrorMessage.Code == MessageCode.OrderNotCancellableCode)
                     {
                         nbRetries++;
                         _logger?.Trace($"Retrying...{nbRetries}/{maxRetries}");
@@ -240,13 +239,13 @@ namespace TradingBot.IBKR
         {
             var list = new List<OrderExecutedResult>();
             var account = await _broker.GetAccountAsync();
-            foreach(KeyValuePair<string, Broker.Accounts.Position> pos in account.Positions) 
+            foreach (KeyValuePair<string, Accounts.Position> pos in account.Positions)
             {
                 if (pos.Value.PositionAmount <= 0)
                     continue;
 
                 var placedResult = await PlaceOrderAsync(pos.Key, new MarketOrder() { Action = OrderAction.SELL, TotalQuantity = pos.Value.PositionAmount });
-                if(placedResult?.Order != null)
+                if (placedResult?.Order != null)
                 {
                     var execRes = await AwaitExecutionAsync(placedResult.Order);
                     list.Add(execRes);
@@ -260,7 +259,7 @@ namespace TradingBot.IBKR
         public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order, CancellationToken token)
         {
             _validator.ValidateExecutionAwaiting(order.Id);
-            if(_orderTracker.OrdersExecuted.ContainsKey(order.Id))
+            if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
             {
                 return new OrderExecutedResult()
                 {
@@ -286,9 +285,9 @@ namespace TradingBot.IBKR
                 }
             });
 
-            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) => 
-            { 
-                if(o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
+            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) =>
+            {
+                if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
             });
 
@@ -400,7 +399,7 @@ namespace TradingBot.IBKR
 
             var openOrder = new Action<IBApi.Contract, IBApi.Order, IBApi.OrderState>((c, o, oState) =>
             {
-                if(!orderPlacedResults.ContainsKey(o.OrderId))
+                if (!orderPlacedResults.ContainsKey(o.OrderId))
                     orderPlacedResults[o.OrderId] = new OrderPlacedResult();
 
                 orderPlacedResults[o.OrderId].Ticker = c.Symbol;

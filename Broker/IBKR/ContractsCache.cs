@@ -1,7 +1,7 @@
-﻿using IBApi;
-using TradingBot.IBKR.Client;
+﻿using Broker.IBKR.Client;
+using IBApi;
 
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     internal class ContractsCache
     {
@@ -21,7 +21,7 @@ namespace TradingBot.IBKR
         public Contract Get(string ticker, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if(!_cache.TryGetValue(ticker, out Contract? contract))
+            if (!_cache.TryGetValue(ticker, out Contract? contract))
             {
                 lock (_cache)
                 {

@@ -1,16 +1,15 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using Broker.Accounts;
+using Broker.Contracts;
+using Broker.IBKR.Client;
+using Broker.MarketData.Providers;
+using Broker.Orders;
 using NLog;
-using TradingBot.Broker;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Contracts;
-using TradingBot.Broker.MarketData.Providers;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR.Client;
 
 [assembly: InternalsVisibleTo("Broker.Tests")]
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     public class IBBroker : IBroker
     {
@@ -20,7 +19,7 @@ namespace TradingBot.IBKR
         ILogger? _logger;
         Account? _account;
         HashSet<string> _pnlSubscriptions = new HashSet<string>();
-        
+
         public IBBroker(int clientId, ILogger? logger = null)
         {
             _port = GetPort();
@@ -104,7 +103,7 @@ namespace TradingBot.IBKR
             {
                 Debug.Assert(id > 0);
                 nextId = id;
-                if(nextId > 0 && !string.IsNullOrEmpty(accountCode))
+                if (nextId > 0 && !string.IsNullOrEmpty(accountCode))
                     tcs.TrySetResult(accountCode);
             });
 
@@ -126,7 +125,7 @@ namespace TradingBot.IBKR
 
             try
             {
-                if(timeout.Milliseconds > 0)
+                if (timeout.Milliseconds > 0)
                     _ = Task.Delay(timeout, token).ContinueWith(t => tcs.TrySetException(new TimeoutException($"{nameof(ConnectAsync)}")));
 
                 _logger?.Debug($"Connecting client id {_clientId} to {IBClient.DefaultIP}:{_port}");
@@ -172,7 +171,7 @@ namespace TradingBot.IBKR
                 _client.Responses.Error -= error;
             }
         }
-        
+
         async Task<IEnumerable<string>> GetManagedAccountsList(CancellationToken token)
         {
             var tcs = new TaskCompletionSource<IEnumerable<string>>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -305,7 +304,7 @@ namespace TradingBot.IBKR
                     _account.UnrealizedPnL[accValue.Currency] = double.Parse(accValue.Value, CultureInfo.InvariantCulture);
                     AccountValueUpdated?.Invoke((AccountValue)accValue);
                     break;
-                
+
                 default:
                     break;
             }
@@ -332,12 +331,12 @@ namespace TradingBot.IBKR
             Position pos = (Position)ibPos;
 
             string msg = $"Position received :  {pos}";
-            if(pos.PositionAmount > 0)
+            if (pos.PositionAmount > 0)
                 _logger?.Debug(msg);
             else
                 _logger?.Trace(msg);
 
-            if(pos.PositionAmount > 0 && !_pnlSubscriptions.Contains(pos.Ticker!))
+            if (pos.PositionAmount > 0 && !_pnlSubscriptions.Contains(pos.Ticker!))
             {
                 RequestPnLUpdate(pos);
             }
@@ -372,7 +371,7 @@ namespace TradingBot.IBKR
         HashSet<string> _pnlTraces = new HashSet<string>();
         void OnPnLReceived(IBApi.PnL pnl)
         {
-            if(!_pnlTraces.Contains(pnl.Ticker))
+            if (!_pnlTraces.Contains(pnl.Ticker))
             {
                 _pnlTraces.Add(pnl.Ticker);
             }

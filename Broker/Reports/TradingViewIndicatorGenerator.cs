@@ -1,6 +1,7 @@
 ﻿using System.Text;
+using Broker;
 
-namespace TradingBot.Reports
+namespace Broker.Reports
 {
     /// <summary>
     /// Results from trading are coded into an indicator that can be displayed in TradingView
@@ -24,7 +25,7 @@ namespace TradingBot.Reports
             sb.AppendLine(header);
             foreach (var trade in results.Trades)
             {
-                if (trade.Action == Broker.Orders.OrderAction.BUY)
+                if (trade.Action == Orders.OrderAction.BUY)
                     sb.AppendLine(string.Format(labelFormat, trade.Time.ToString(dateFormat), $"BUY {Convert.ToInt32(trade.Qty)} at {trade.Price:c}", buyYLocBar, buyArrowStyle));
                 else
                     sb.AppendLine(string.Format(labelFormat, trade.Time.ToString(dateFormat), $"SELL {Convert.ToInt32(trade.Qty)} at {trade.Price:c}", sellYLocBar, sellArrowStyle));

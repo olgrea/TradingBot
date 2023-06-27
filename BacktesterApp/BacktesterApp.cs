@@ -1,9 +1,9 @@
-﻿using NLog;
-using TradingBot;
-using TradingBot.Backtesting;
-using TradingBot.Reports;
-using TradingBot.Strategies;
-using TradingBot.Utils;
+﻿using Broker;
+using Broker.Backtesting;
+using Broker.Reports;
+using Broker.Strategies;
+using Broker.Utils;
+using NLog;
 
 namespace BacktesterApp
 {

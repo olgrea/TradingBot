@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Utils
+﻿namespace Broker.Utils
 {
     public record struct DateRange(DateTime From, DateTime To);
 

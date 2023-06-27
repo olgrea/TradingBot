@@ -1,10 +1,10 @@
-﻿using NUnit.Framework;
-using TradingBot.Backtesting;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR;
-using TradingBot.Tests;
+﻿using Broker.Accounts;
+using Broker.Backtesting;
+using Broker.IBKR;
+using Broker.MarketData;
+using Broker.Orders;
+using Broker.Tests;
+using NUnit.Framework;
 
 namespace BacktesterTests
 {

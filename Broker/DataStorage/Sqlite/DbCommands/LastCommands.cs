@@ -1,9 +1,9 @@
 ﻿using System.Data;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommands
+namespace Broker.DataStorage.Sqlite.DbCommands
 {
     internal class LastExistsCommand : ExistsCommand<Last>
     {
@@ -15,7 +15,7 @@ namespace TradingBot.DataStorage.Sqlite.DbCommands
 
     internal class SelectLastsCommand : SelectCommand<Last>
     {
-        public SelectLastsCommand(string symbol, DateRange dateRange, SqliteConnection connection) 
+        public SelectLastsCommand(string symbol, DateRange dateRange, SqliteConnection connection)
             : base(symbol, dateRange, connection)
         {
         }

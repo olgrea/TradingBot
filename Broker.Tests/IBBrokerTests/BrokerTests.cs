@@ -1,12 +1,11 @@
-﻿using System.Diagnostics;
+﻿using Broker;
+using Broker.Accounts;
+using Broker.IBKR.Client;
+using Broker.Orders;
+using Broker.Utils;
 using NLog;
 using NUnit.Framework;
-using TradingBot.Broker;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR.Client;
-using TradingBot.Tests;
-using TradingBot.Utils;
+using Broker.Tests;
 
 namespace IBBrokerTests
 {

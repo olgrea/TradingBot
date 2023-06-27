@@ -1,8 +1,8 @@
-﻿using NUnit.Framework;
-using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
-using TradingBot.IBKR.Client;
-using TradingBot.Tests;
+﻿using Broker;
+using Broker.IBKR.Client;
+using Broker.MarketData;
+using NUnit.Framework;
+using Broker.Tests;
 
 namespace IBBrokerTests
 {

@@ -1,4 +1,4 @@
-﻿namespace TradingBot.IBKR.Client
+﻿namespace Broker.IBKR.Client
 {
     // https://interactivebrokers.github.io/tws-api/message_codes.html
     // https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClientErrors.html
@@ -58,7 +58,7 @@
             return Text;
         }
 
-        public static bool IsWarningMessage(int code) => (code >= 2100 && code < 2200) || code == 1101 || code == 1102;
+        public static bool IsWarningMessage(int code) => code >= 2100 && code < 2200 || code == 1101 || code == 1102;
         public static bool IsConnectionLostCode(MessageCode code)
         {
             return code == MessageCode.MarketDataConnectionLost
@@ -91,13 +91,13 @@
         //    (code >= 10148 && code <= 10284);
     }
 
-    public class ErrorMessageException: Exception
+    public class ErrorMessageException : Exception
     {
         public ErrorMessageException(Exception innerException) : this(innerException.Message, innerException) { }
         public ErrorMessageException(string msg, Exception? innerException = null) : this(-1, -1, msg, innerException) { }
         public ErrorMessageException(int errorCode, string msg, Exception? innerException = null) : this(-1, errorCode, msg, innerException) { }
         public ErrorMessageException(int id, int errorCode, string msg, Exception? innerException = null) : this(new Message(id, errorCode, msg), innerException) { }
-        public ErrorMessageException(Message msg, Exception? innerException = null) : base(msg.Text, innerException) 
+        public ErrorMessageException(Message msg, Exception? innerException = null) : base(msg.Text, innerException)
         {
             ErrorMessage = msg;
         }

@@ -1,8 +1,8 @@
-﻿using TradingBot.Broker.MarketData;
-using TradingBot.DataStorage.Sqlite.DbCommands;
-using TradingBot.Utils;
+﻿using Broker.DataStorage.Sqlite.DbCommands;
+using Broker.MarketData;
+using Broker.Utils;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommandFactories
+namespace Broker.DataStorage.Sqlite.DbCommandFactories
 {
     public class BidAskCommandFactory : DbCommandFactory
     {

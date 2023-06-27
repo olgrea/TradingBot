@@ -1,7 +1,7 @@
-﻿using Skender.Stock.Indicators;
-using TradingBot.Broker.MarketData;
+﻿using Broker.MarketData;
+using Skender.Stock.Indicators;
 
-namespace TradingBot.Indicators
+namespace Broker.Indicators
 {
     public interface IIndicator
     {

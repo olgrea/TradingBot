@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics;
+using Broker.Accounts;
+using Broker.MarketData;
+using Broker.Orders;
 using NLog;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
 
-namespace TradingBot.Backtesting
+namespace Broker.Backtesting
 {
     internal class OrderEvaluator
     {
@@ -33,7 +33,7 @@ namespace TradingBot.Backtesting
             {
                 token.ThrowIfCancellationRequested();
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
-                
+
                 IEnumerable<BidAsk> latestBidAsks = _backtester.GetAsync<BidAsk>(ticker, newTime, token).Result;
                 foreach (BidAsk bidAsk in latestBidAsks)
                 {
@@ -115,7 +115,7 @@ namespace TradingBot.Backtesting
                     if (o.TrailingAmountUnits == TrailingAmountUnits.Percent)
                         o.StopPrice = bidAsk.Ask * (1 + o.TrailingAmount);
                     else if (o.TrailingAmountUnits == TrailingAmountUnits.Absolute)
-                        o.StopPrice = bidAsk.Ask  + o.TrailingAmount;
+                        o.StopPrice = bidAsk.Ask + o.TrailingAmount;
                 }
 
                 if (o.StopPrice <= bidAsk.Ask)
@@ -220,7 +220,7 @@ namespace TradingBot.Backtesting
                 if (o.PriceCap != 0)
                     o.CurrentPrice = Math.Min(o.CurrentPrice.Value, o.PriceCap);
 
-                if(o.CurrentPrice.Value >= bidAsk.Ask)
+                if (o.CurrentPrice.Value >= bidAsk.Ask)
                 {
                     _logger?.Debug($"{o} : lmt price of {o.CurrentPrice.Value:c} reached. Ask : {bidAsk.Ask:c}");
                     ExecuteOrder(ticker, o, bidAsk.Ask);
@@ -250,7 +250,7 @@ namespace TradingBot.Backtesting
             var total = order.TotalQuantity * price;
 
             Account account = _backtester.Account;
-            if(!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
+            if (!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
             {
                 position = _backtester.Account.Positions[ticker] = new Position(ticker);
             }

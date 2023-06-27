@@ -1,4 +1,4 @@
-﻿namespace TradingBot.DataStorage.Sqlite
+﻿namespace Broker.DataStorage.Sqlite
 {
     public static class Constants
     {

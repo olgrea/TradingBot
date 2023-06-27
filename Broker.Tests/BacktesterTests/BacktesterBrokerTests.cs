@@ -1,7 +1,7 @@
-﻿using NUnit.Framework;
-using TradingBot.Backtesting;
-using TradingBot.Tests;
-using TradingBot.Utils;
+﻿using Broker.Backtesting;
+using Broker.Utils;
+using NUnit.Framework;
+using Broker.Tests;
 
 namespace BacktesterTests
 {

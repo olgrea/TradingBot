@@ -1,8 +1,8 @@
-﻿using TradingBot.Broker.MarketData;
-using TradingBot.Broker.MarketData.Providers;
-using TradingBot.Utils;
+﻿using Broker.MarketData;
+using Broker.MarketData.Providers;
+using Broker.Utils;
 
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     internal abstract class LiveDataProviderBase : ILiveDataProvider
     {
@@ -56,7 +56,7 @@ namespace TradingBot.IBKR
             LinkedList<Bar> list = _barSubscriptions[ticker].FiveSecBars;
             list.AddLast(bar);
             // arbitrarily keeping 10 minutes of bars
-            if (list.Count > 5*12*10)
+            if (list.Count > 5 * 12 * 10)
                 list.RemoveFirst();
 
             foreach (BarLength barLength in Enum.GetValues(typeof(BarLength)).OfType<BarLength>())
@@ -85,7 +85,7 @@ namespace TradingBot.IBKR
                 return;
 
             _barSubscriptions[ticker].BarLengthsWanted.Remove(barLength);
-            if(_barSubscriptions[ticker].BarLengthsWanted.Count == 0)
+            if (_barSubscriptions[ticker].BarLengthsWanted.Count == 0)
             {
                 CancelFiveSecondsBarsUpdates(ticker);
                 _barSubscriptions.Remove(ticker);
@@ -115,7 +115,7 @@ namespace TradingBot.IBKR
 
         protected void TickByTickBidAsk(string ticker, IBApi.BidAsk bidAsk)
         {
-            if(_bidAskSubscriptions.Contains(ticker))
+            if (_bidAskSubscriptions.Contains(ticker))
             {
                 BidAskReceived?.Invoke(ticker, (BidAsk)bidAsk);
             }

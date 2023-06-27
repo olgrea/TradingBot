@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
-using TradingBot.Utils;
+using Broker.Utils;
 
-namespace TradingBot.Broker.Orders
+namespace Broker.Orders
 {
     public class OrderExecution
     {
@@ -11,11 +11,11 @@ namespace TradingBot.Broker.Orders
             OrderId = orderId;
         }
 
-        internal string ExecId { get; set; } 
+        internal string ExecId { get; set; }
         public int OrderId { get; set; }
         public DateTime Time { get; set; }
-        public string? AcctNumber { get; set; } 
-        public string? Exchange { get; set; } 
+        public string? AcctNumber { get; set; }
+        public string? Exchange { get; set; }
         public OrderAction Action { get; set; }
         public double Shares { get; set; }
         public double Price { get; set; }

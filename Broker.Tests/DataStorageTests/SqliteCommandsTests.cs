@@ -1,11 +1,11 @@
 ﻿using System.Data;
+using Broker.DataStorage.Sqlite.DbCommandFactories;
+using Broker.IBKR;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
 using NUnit.Framework;
-using TradingBot.Broker.MarketData;
-using TradingBot.DataStorage.Sqlite.DbCommandFactories;
-using TradingBot.IBKR;
-using TradingBot.Tests;
-using TradingBot.Utils;
+using Broker.Tests;
 
 namespace SqliteCommandsTests
 {

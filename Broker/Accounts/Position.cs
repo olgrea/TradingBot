@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker.Accounts
+﻿namespace Broker.Accounts
 {
     public record struct PnL(string Ticker, decimal Pos, double DailyPnL, double UnrealizedPnL, double RealizedPnL, double MarketValue)
     {
@@ -8,9 +8,9 @@
             {
                 Ticker = pnl.Ticker,
                 Pos = pnl.Pos,
-                DailyPnL= pnl.DailyPnL,
-                UnrealizedPnL= pnl.UnrealizedPnL,
-                RealizedPnL= pnl.RealizedPnL,
+                DailyPnL = pnl.DailyPnL,
+                UnrealizedPnL = pnl.UnrealizedPnL,
+                RealizedPnL = pnl.RealizedPnL,
                 MarketValue = pnl.MarketValue,
             };
         }

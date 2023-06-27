@@ -1,9 +1,9 @@
 ﻿using System.Data;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommands
+namespace Broker.DataStorage.Sqlite.DbCommands
 {
     internal class BidAskExistsCommand : ExistsCommand<BidAsk>
     {

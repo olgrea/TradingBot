@@ -1,10 +1,9 @@
 ﻿using System.Globalization;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Utils;
+using Broker.Accounts;
+using Broker.MarketData;
+using Broker.Orders;
 
-namespace TradingBot.Backtesting
+namespace Broker.Backtesting
 {
     internal class BacktesterOrderManager : IOrderManager
     {
@@ -21,7 +20,7 @@ namespace TradingBot.Backtesting
         {
             _orderTracker = new OrderTracker();
             _validator = new OrderValidator(_orderTracker);
-            
+
             _backtester = backtester;
             _backtester.ClockTick += OnClockTick_EvaluateConditions;
             _orderEvaluator = new OrderEvaluator(_backtester, _orderTracker);
@@ -35,7 +34,7 @@ namespace TradingBot.Backtesting
 
         void OnClockTick_EvaluateConditions(DateTime newTime, CancellationToken token)
         {
-            foreach(Order order in _orderTracker.OrdersRequested.Values.Where(o => o.NeedsConditionFulfillmentToBeOpened && !_orderTracker.HasBeenOpened(o)))
+            foreach (Order order in _orderTracker.OrdersRequested.Values.Where(o => o.NeedsConditionFulfillmentToBeOpened && !_orderTracker.HasBeenOpened(o)))
             {
                 if (EvaluateConditions(order, newTime))
                 {
@@ -57,11 +56,11 @@ namespace TradingBot.Backtesting
         {
             bool ret = true;
             bool previousOp = true;
-            foreach(IBApi.OrderCondition condition in order.OrderConditions)
+            foreach (IBApi.OrderCondition condition in order.OrderConditions)
             {
                 bool condResult = false;
                 string ticker = _orderTracker.OrderIdsToTicker[order.Id];
-                if(condition is IBApi.PriceCondition priceCond)
+                if (condition is IBApi.PriceCondition priceCond)
                 {
                     IEnumerable<Last> lasts = _backtester.GetAsync<Last>(ticker, time).Result;
                     if (!lasts.Any())
@@ -71,7 +70,7 @@ namespace TradingBot.Backtesting
                     else
                         condResult = lasts.Any(l => priceCond.Price <= l.Price);
                 }
-                else if(condition is IBApi.PercentChangeCondition percentCond)
+                else if (condition is IBApi.PercentChangeCondition percentCond)
                 {
                     var groups = _backtester.GetAsync<Last>(ticker, time.AddSeconds(-15), time).Result.GroupBy(l => l.Time);
 
@@ -81,9 +80,9 @@ namespace TradingBot.Backtesting
                         var latestLasts = groups.Last();
                         var previousLasts = groups.SkipLast(1).Last();
                         if (percentCond.IsMore)
-                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent <= percent));
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => l.Price / pl.Price - 1).Any(percent => percentCond.ChangePercent <= percent));
                         else
-                            condResult = latestLasts.Any(l => previousLasts.Select(pl => (l.Price / pl.Price) - 1).Any(percent => percentCond.ChangePercent >= percent));
+                            condResult = latestLasts.Any(l => previousLasts.Select(pl => l.Price / pl.Price - 1).Any(percent => percentCond.ChangePercent >= percent));
                     }
                 }
                 else if (condition is IBApi.TimeCondition timeCond)
@@ -262,7 +261,7 @@ namespace TradingBot.Backtesting
                         });
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     tcs.TrySetException(ex);
                 }
@@ -287,7 +286,7 @@ namespace TradingBot.Backtesting
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
             });
             var error = new Action<Exception>(e => tcs.TrySetException(e));
-            
+
             _backtester.ErrorOccured += error;
             OrderExecuted += orderExecuted;
             OrderUpdated += orderUpdated;
@@ -316,7 +315,7 @@ namespace TradingBot.Backtesting
                 try
                 {
                     var positions = _backtester.Account.Positions.Where(p => p.Value.PositionAmount > 0);
-                    if(!positions.Any())
+                    if (!positions.Any())
                         tcs.TrySetResult(Enumerable.Empty<OrderExecutedResult>());
 
                     foreach (KeyValuePair<string, Position> pos in positions)
@@ -371,7 +370,7 @@ namespace TradingBot.Backtesting
             _orderTracker.TrackRequest(ticker, order);
 
             // TODO : to test with TWS 
-            if(order.Info.Transmit)
+            if (order.Info.Transmit)
                 _orderTracker.TrackOpening(order);
 
             foreach (var cond in order.OrderConditions.OfType<IBApi.ContractCondition>())

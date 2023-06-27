@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
+using Broker.IBKR;
+using Broker.MarketData;
 using NLog;
 using NUnit.Framework;
-using TradingBot.Broker.MarketData;
-using TradingBot.IBKR;
-using TradingBot.Tests;
+using Broker.Tests;
 
 namespace IBBrokerTests
 {

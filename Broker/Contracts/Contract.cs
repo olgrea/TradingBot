@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-namespace TradingBot.Broker.Contracts
+namespace Broker.Contracts
 {
     public enum OptionType
     {

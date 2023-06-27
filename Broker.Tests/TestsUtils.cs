@@ -1,15 +1,14 @@
 ﻿using System.Data;
+using Broker.Backtesting;
+using Broker.IBKR;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
 using NLog;
 using NLog.TradingBot;
 using NUnit.Framework;
-using TradingBot.Backtesting;
-using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
-using TradingBot.IBKR;
-using TradingBot.Utils;
 
-namespace TradingBot.Tests
+namespace Broker.Tests
 {
     internal static class TestsUtils
     {

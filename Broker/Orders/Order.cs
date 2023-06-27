@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Security.Cryptography;
+using Broker.Utils;
 using IBApi;
-using TradingBot.Utils;
 
-namespace TradingBot.Broker.Orders
+namespace Broker.Orders
 {
     public enum OrderAction
     {
@@ -12,8 +12,8 @@ namespace TradingBot.Broker.Orders
 
     public enum OrderType
     {
-        MKT, 
-        LMT, 
+        MKT,
+        LMT,
         MIT,
         STP,
         REL,
@@ -22,12 +22,12 @@ namespace TradingBot.Broker.Orders
 
     public enum TimeInForce
     {
-        DAY, 
-        GTC, 
-        IOC, 
-        GTD, 
-        OPG, 
-        FOK, 
+        DAY,
+        GTC,
+        IOC,
+        GTD,
+        OPG,
+        FOK,
         DTC,
     }
 
@@ -59,7 +59,7 @@ namespace TradingBot.Broker.Orders
         }
 
         protected Order() { }
-        protected Order(IBApi.Order ibo) 
+        protected Order(IBApi.Order ibo)
         {
             Action = Enum.Parse<OrderAction>(ibo.Action);
             TotalQuantity = Convert.ToDouble(ibo.TotalQuantity);
@@ -126,7 +126,7 @@ namespace TradingBot.Broker.Orders
         protected void SetAdaptiveAlgoParams(AdaptiveAlgorithmPriority priority)
         {
             Algorithm.Strategy = "Adaptive";
-            Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString())};
+            Algorithm.Params = new List<TagValue>() { new TagValue("adaptivePriority", priority.ToString()) };
         }
 
         public void AddPriceCondition(bool isMore, double price, bool isConjunction = true)
@@ -135,7 +135,7 @@ namespace TradingBot.Broker.Orders
             cond.IsMore = isMore;
             cond.Price = price;
             cond.IsConjunctionConnection = isConjunction;
-            
+
             OrderConditions.Add(cond);
             //TODO : need to check if I can use this flag when using conditions
         }
@@ -234,7 +234,7 @@ namespace TradingBot.Broker.Orders
     public class MarketOrder : Order
     {
         public MarketOrder() { }
-        public MarketOrder(IBApi.Order ibo) : base(ibo) {}
+        public MarketOrder(IBApi.Order ibo) : base(ibo) { }
 
         public override OrderType OrderType => OrderType.MKT;
 
@@ -251,7 +251,7 @@ namespace TradingBot.Broker.Orders
     public class MarketIfTouchedOrder : Order
     {
         public MarketIfTouchedOrder() { }
-        public MarketIfTouchedOrder(IBApi.Order ibo) : base(ibo) 
+        public MarketIfTouchedOrder(IBApi.Order ibo) : base(ibo)
         {
             TouchPrice = ibo.AuxPrice;
         }
@@ -283,7 +283,7 @@ namespace TradingBot.Broker.Orders
     public class LimitOrder : Order
     {
         public LimitOrder() { }
-        public LimitOrder(IBApi.Order ibo) : base(ibo) 
+        public LimitOrder(IBApi.Order ibo) : base(ibo)
         {
             LmtPrice = ibo.LmtPrice;
         }
@@ -320,7 +320,7 @@ namespace TradingBot.Broker.Orders
     public class StopOrder : Order
     {
         public StopOrder() { }
-        public StopOrder(IBApi.Order ibo) : base(ibo) 
+        public StopOrder(IBApi.Order ibo) : base(ibo)
         {
             StopPrice = ibo.AuxPrice;
         }
@@ -378,7 +378,7 @@ namespace TradingBot.Broker.Orders
             else
                 throw new ArgumentException($"Neither Trailing percent or trailing amount is set in IBKR order");
         }
-        
+
         public double? StopPrice { get; set; }
         public double? TrailingAmount
         {
@@ -431,12 +431,12 @@ namespace TradingBot.Broker.Orders
 
             if (TrailingAmountUnits == Orders.TrailingAmountUnits.Absolute)
             {
-                if(TrailingAmount.HasValue)
+                if (TrailingAmount.HasValue)
                     ibo.AuxPrice = TrailingAmount.Value;
             }
             else if (TrailingAmountUnits == Orders.TrailingAmountUnits.Percent)
             {
-                if(TrailingAmount.HasValue)
+                if (TrailingAmount.HasValue)
                     ibo.TrailingPercent = TrailingAmount.Value;
             }
             else
@@ -450,7 +450,7 @@ namespace TradingBot.Broker.Orders
 
     public class RelativeOrder : Order
     {
-        public RelativeOrder(){}
+        public RelativeOrder() { }
 
         public RelativeOrder(IBApi.Order ibo) : base(ibo)
         {

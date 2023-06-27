@@ -1,9 +1,9 @@
-﻿using NLog;
-using TradingBot;
-using TradingBot.IBKR;
-using TradingBot.Reports;
-using TradingBot.Strategies;
-using TradingBot.Utils;
+﻿using Broker;
+using Broker.IBKR;
+using Broker.Reports;
+using Broker.Strategies;
+using Broker.Utils;
+using NLog;
 
 namespace TraderApp
 {

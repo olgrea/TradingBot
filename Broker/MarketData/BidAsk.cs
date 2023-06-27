@@ -1,6 +1,6 @@
-﻿using TradingBot.Utils;
+﻿using Broker.Utils;
 
-namespace TradingBot.Broker.MarketData
+namespace Broker.MarketData
 {
     public class BidAsk : IMarketData
     {

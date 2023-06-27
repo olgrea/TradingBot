@@ -1,16 +1,16 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using Broker.DataStorage.Sqlite;
+using Broker.DataStorage.Sqlite.DbCommandFactories;
+using Broker.DataStorage.Sqlite.DbCommands;
+using Broker.IBKR.Client;
+using Broker.MarketData;
+using Broker.MarketData.Providers;
+using Broker.Utils;
 using NLog;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.MarketData.Providers;
-using TradingBot.DataStorage.Sqlite;
-using TradingBot.DataStorage.Sqlite.DbCommandFactories;
-using TradingBot.DataStorage.Sqlite.DbCommands;
-using TradingBot.IBKR.Client;
-using TradingBot.Utils;
 
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     internal class IBHistoricalDataProvider : IHistoricalDataProvider
     {
@@ -76,7 +76,7 @@ namespace TradingBot.IBKR
             get => dbPath;
             internal set
             {
-                if(!File.Exists(value))
+                if (!File.Exists(value))
                     DbEnabled = false;
 
                 dbPath = value;
@@ -232,7 +232,7 @@ namespace TradingBot.IBKR
             }
 
             _lastOperationStats.NbInsertedInCache += nbInserted;
-            if(nbInserted > 0)
+            if (nbInserted > 0)
                 _logger?.Trace($"{nbInserted} {typeof(TData).Name} inserted into cache.");
         }
 
@@ -277,7 +277,7 @@ namespace TradingBot.IBKR
             if (insertCmd.Execute() > 0 && insertCmd is InsertCommand<TData> iCmd)
             {
                 _lastOperationStats.NbInsertedInDb += iCmd.NbInserted;
-                if(iCmd.NbInserted > 0)
+                if (iCmd.NbInserted > 0)
                     _logger?.Trace($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
             }
         }
@@ -395,7 +395,7 @@ namespace TradingBot.IBKR
 
             var error = new Action<ErrorMessageException>(msg =>
             {
-                if (msg.ErrorMessage.Code == MessageCode.HistoricalMarketDataServiceErrorCode && msg.Message.ToLower().Contains("returned no data")) 
+                if (msg.ErrorMessage.Code == MessageCode.HistoricalMarketDataServiceErrorCode && msg.Message.ToLower().Contains("returned no data"))
                     tcs.TrySetResult(tmpList);
                 else
                     tcs.TrySetException(msg);
@@ -560,7 +560,7 @@ namespace TradingBot.IBKR
             {
                 reqId = _client.RequestHistoricalTicks(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK", false, true);
                 // Note that when BID_ASK historical data is requested, each request is counted twice according to the doc.
-                _pvc.NbRequest++; 
+                _pvc.NbRequest++;
                 _pvc.NbRequest++;
                 await tcs.Task.WaitAsync(Timeout, _token!.Value);
 
@@ -586,7 +586,7 @@ namespace TradingBot.IBKR
 
             var tcs = new TaskCompletionSource<IEnumerable<Last>>(TaskCreationOptions.RunContinuationsAsynchronously);
             _token!.Value.Register(() => tcs.TrySetCanceled());
-            
+
             var historicalTicks = new Action<int, IEnumerable<IBApi­.HistoricalTickLast>, bool>((rId, data, isDone) =>
             {
                 if (_token != null && _token.HasValue && _token.Value.IsCancellationRequested)
@@ -650,7 +650,7 @@ namespace TradingBot.IBKR
             if (DateTime.Now - from > TimeSpan.FromDays(6 * 30))
                 throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {from}");
 
-            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to, extendedHours : true).ToList();
+            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to, extendedHours: true).ToList();
             if (!days.Any())
                 throw new ArgumentException($"Market was closed from {from} to {to}");
         }
@@ -668,7 +668,7 @@ namespace TradingBot.IBKR
             int _nbRequest = 0;
             int _nbRequestIn10Mins = 0;
 
-            Dictionary<BarRequest, DateTime> _barRequests = new ();
+            Dictionary<BarRequest, DateTime> _barRequests = new();
             Dictionary<TickRequest, DateTime> _tickRequests = new();
             List<DateTime> _requestTimes;
             CancellationToken? _token;
@@ -699,7 +699,7 @@ namespace TradingBot.IBKR
             void WriteRequestFile()
             {
                 File.WriteAllText(
-                    RequestFileName, 
+                    RequestFileName,
                     string.Join(Environment.NewLine, _requestTimes
                         .Where(rt => DateTime.Now - rt < TimeSpan.FromMinutes(10))
                         .Select(rt => rt.ToString())
@@ -758,10 +758,10 @@ namespace TradingBot.IBKR
 
                     var now = DateTime.Now;
                     var times = _requestTimes.SkipWhile(t => now - t > TimeSpan.FromMinutes(10));
-                    
+
                     var first = times.First();
                     var toWait = TimeSpan.FromSeconds(10);
-                    var countUnder10Sec = times.TakeWhile( rt => rt - first < toWait).Count();
+                    var countUnder10Sec = times.TakeWhile(rt => rt - first < toWait).Count();
 
                     _logger?.Trace($"Waiting 10 seconds...");
                     WaitFor(toWait);
@@ -782,9 +782,9 @@ namespace TradingBot.IBKR
             {
                 TimeSpan oneMin = TimeSpan.FromMinutes(1);
                 var current = toWait;
-                while(current > TimeSpan.Zero)
+                while (current > TimeSpan.Zero)
                 {
-                    if(current - oneMin >= TimeSpan.Zero)
+                    if (current - oneMin >= TimeSpan.Zero)
                     {
                         Task.Delay(oneMin).Wait(_token ?? CancellationToken.None);
                         current -= oneMin;
@@ -795,7 +795,7 @@ namespace TradingBot.IBKR
                         current = TimeSpan.Zero;
                     }
 
-                    if(current > TimeSpan.Zero) 
+                    if (current > TimeSpan.Zero)
                         _logger?.Trace($"{current} left...");
                 }
             }

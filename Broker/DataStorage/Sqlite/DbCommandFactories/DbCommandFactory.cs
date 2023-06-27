@@ -1,9 +1,9 @@
-﻿using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.DataStorage.Sqlite.DbCommands;
-using TradingBot.Utils;
+﻿using Broker.DataStorage.Sqlite.DbCommands;
+using Broker.MarketData;
+using Broker.Utils;
+using Microsoft.Data.Sqlite;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommandFactories
+namespace Broker.DataStorage.Sqlite.DbCommandFactories
 {
     public abstract class DbCommandFactory
     {

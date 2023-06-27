@@ -1,6 +1,6 @@
-﻿using TradingBot.Broker.MarketData;
+﻿using Broker.MarketData;
 
-namespace TradingBot.Utils
+namespace Broker.Utils
 {
     public static class MarketDataUtils
     {

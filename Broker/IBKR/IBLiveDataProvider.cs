@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
-using TradingBot.IBKR.Client;
+using Broker.IBKR.Client;
 
-namespace TradingBot.IBKR
+namespace Broker.IBKR
 {
     internal class IBLiveDataProvider : LiveDataProviderBase
     {
@@ -32,7 +32,7 @@ namespace TradingBot.IBKR
         {
             _client.Responses.RealtimeBar -= OnFiveSecondsBarReceived;
         }
-        
+
         protected override void RequestBidAskData(string ticker)
         {
             _client.RequestTickByTickData(ticker, "BidAsk");

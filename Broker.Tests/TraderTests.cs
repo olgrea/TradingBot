@@ -1,13 +1,12 @@
 ﻿using System.Diagnostics;
+using Broker;
+using Broker.Indicators;
+using Broker.MarketData;
+using Broker.Orders;
+using Broker.Strategies;
 using NLog;
 using NUnit.Framework;
-using TradingBot;
-using TradingBot.Broker;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.Orders;
-using TradingBot.Indicators;
-using TradingBot.Strategies;
-using TradingBot.Tests;
+using Broker.Tests;
 
 namespace TraderTests
 {

@@ -1,4 +1,6 @@
-﻿namespace TradingBot.Broker.Accounts
+﻿using Broker.IBKR.Client;
+
+namespace Broker.Accounts
 {
     public enum AccountValueKey
     {
@@ -21,7 +23,7 @@
             return new AccountValue()
             {
                 Key = key,
-                Value= val.Value,
+                Value = val.Value,
                 Currency = val.Currency,
             };
         }

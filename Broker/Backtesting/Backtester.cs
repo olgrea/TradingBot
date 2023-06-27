@@ -1,18 +1,16 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using Broker.Accounts;
+using Broker.IBKR;
+using Broker.IBKR.Client;
+using Broker.MarketData;
+using Broker.MarketData.Providers;
+using Broker.Orders;
+using Broker.Utils;
 using NLog;
-using TradingBot.Broker;
-using TradingBot.Broker.Accounts;
-using TradingBot.Broker.Contracts;
-using TradingBot.Broker.MarketData;
-using TradingBot.Broker.MarketData.Providers;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR;
-using TradingBot.IBKR.Client;
-using TradingBot.Utils;
 
-namespace TradingBot.Backtesting
+namespace Broker.Backtesting
 {
     public class TimeCompression
     {
@@ -25,9 +23,9 @@ namespace TradingBot.Backtesting
 
     public struct BacktestingResults
     {
-        public DateTime Start {get; set;}
-        public DateTime End {get; set;}
-        public TimeSpan RunTime { get; set; } 
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+        public TimeSpan RunTime { get; set; }
     }
 
     public class Backtester : IBroker, IAsyncDisposable
@@ -68,13 +66,13 @@ namespace TradingBot.Backtesting
         TimeCompression _timeCompression = new();
         Stopwatch _totalRuntimeStopwatch = new Stopwatch();
         Stopwatch _µsWaitStopwatch = new Stopwatch();
-        
+
         DateTime _start;
         DateTime _end;
         DateTime _currentTime;
         DateTime? _lastProcessedTime;
         Dictionary<(string, string), DateTime> _timeSlicesUpperBounds = new();
-        
+
         BacktesterProgress _progress = new BacktesterProgress();
         BacktestingResults _result = new BacktestingResults();
         ILogger? _logger;
@@ -83,7 +81,7 @@ namespace TradingBot.Backtesting
 
         public Backtester(DateTime from, DateTime to, ILogger? logger = null)
         {
-            if(to - from > TimeSpan.FromDays(1))
+            if (to - from > TimeSpan.FromDays(1))
                 throw new ArgumentException("Can only backtest a single day.");
 
             if (from >= DateTime.Now || to >= DateTime.Now)
@@ -110,7 +108,7 @@ namespace TradingBot.Backtesting
             await DisconnectAsync();
             _cancellation?.Dispose();
             _consumerTask?.Dispose();
-            foreach(Task t in _marketDataBackgroundTasks.Values)
+            foreach (Task t in _marketDataBackgroundTasks.Values)
                 t.Dispose();
             _startTcs?.TrySetException(new ObjectDisposedException(nameof(Backtester)));
         }
@@ -129,7 +127,7 @@ namespace TradingBot.Backtesting
             get => (HistoricalDataProvider as IBHistoricalDataProvider)?.DbPath;
             set
             {
-                if(HistoricalDataProvider is IBHistoricalDataProvider ibh)
+                if (HistoricalDataProvider is IBHistoricalDataProvider ibh)
                     ibh.DbPath = value!;
             }
         }
@@ -210,7 +208,7 @@ namespace TradingBot.Backtesting
 
         public Task<BacktestingResults> Start()
         {
-            if(_consumerTask == null)
+            if (_consumerTask == null)
                 throw new InvalidOperationException($"Not connected");
             else if (IsDayOver())
             {
@@ -293,14 +291,14 @@ namespace TradingBot.Backtesting
                     if (!_isRunning)
                         continue;
 
-                    if(IsDayOver())
+                    if (IsDayOver())
                     {
                         Stop();
                         _result.RunTime = _totalRuntimeStopwatch.Elapsed;
                         _logger?.Debug($"Backtesting finished. Runtime : {_result.RunTime}");
                         _startTcs?.TrySetResult(_result);
                     }
-                    else 
+                    else
                         AdvanceTime(token);
                 }
             }
@@ -358,11 +356,11 @@ namespace TradingBot.Backtesting
 
             _µsWaitStopwatch.Restart();
             Thread.SpinWait(10);
-            while((long)(_µsWaitStopwatch.ElapsedTicks * microSecPerTick) < nbMicroSecToWait)
+            while ((long)(_µsWaitStopwatch.ElapsedTicks * microSecPerTick) < nbMicroSecToWait)
                 Thread.SpinWait(10);
             _µsWaitStopwatch.Stop();
-            
-            _logger?.Trace($"expected : {nbMicroSecToWait} µs, actual : {_µsWaitStopwatch.ElapsedTicks*microSecPerTick} µs");
+
+            _logger?.Trace($"expected : {nbMicroSecToWait} µs, actual : {_µsWaitStopwatch.ElapsedTicks * microSecPerTick} µs");
         }
 
         bool IsDayOver() => _currentTime >= _end;
@@ -376,7 +374,7 @@ namespace TradingBot.Backtesting
         {
             if (from > to)
                 throw new ArgumentException($"'from' is greater than 'to'");
-            
+
             var data = (await _broker.HistoricalDataProvider.GetHistoricalDataAsync<TData>(ticker, from, to, token))
                 .OrderBy(d => d.Time)
                 .Cast<TData>();
@@ -469,7 +467,7 @@ namespace TradingBot.Backtesting
 
         void OnClockTick_SendAccountUpdates(DateTime newTime, CancellationToken token)
         {
-            if (!_accountUpdatesRequested || token!.IsCancellationRequested) 
+            if (!_accountUpdatesRequested || token!.IsCancellationRequested)
                 return;
 
             if (_lastAccountUpdateTime == null || _currentTime - _lastAccountUpdateTime > TimeSpan.FromMinutes(3))
@@ -564,7 +562,7 @@ namespace TradingBot.Backtesting
                 token.ThrowIfCancellationRequested();
 
                 var lasts = GetAsync<Last>(pos.Key, newTime, token).Result;
-                if(lasts.Any())
+                if (lasts.Any())
                 {
                     // TODO : why the average?
                     var lastPriceAvg = lasts.Average(l => l.Price);

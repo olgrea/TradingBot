@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker.MarketData.Providers
+﻿namespace Broker.MarketData.Providers
 {
     public interface ILiveDataProvider : IDisposable
     {

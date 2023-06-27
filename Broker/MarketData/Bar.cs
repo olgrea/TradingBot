@@ -1,8 +1,9 @@
 ﻿using System.Globalization;
+using Broker.IBKR.Client;
+using Broker.Utils;
 using Skender.Stock.Indicators;
-using TradingBot.Utils;
 
-namespace TradingBot.Broker.MarketData
+namespace Broker.MarketData
 {
     public enum BarLength
     {

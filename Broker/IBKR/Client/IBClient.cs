@@ -1,9 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using Broker.IBKR;
 using IBApi;
 using NLog;
 
-namespace TradingBot.IBKR.Client
+namespace Broker.IBKR.Client
 {
     internal class IBClient
     {
@@ -40,8 +41,8 @@ namespace TradingBot.IBKR.Client
         int _clientId = -1;
         string _accountCode = string.Empty;
         int _nextValidId = -1;
-        RequestIdsToContracts _requestIdsToContracts = new ();
-        ContractsToRequestIds _contractsToRequestIds = new ();
+        RequestIdsToContracts _requestIdsToContracts = new();
+        ContractsToRequestIds _contractsToRequestIds = new();
         ContractsCache _contractsCache;
 
         public IBClient(ILogger? logger = null)
@@ -286,7 +287,7 @@ namespace TradingBot.IBKR.Client
             Debug.Assert(order.OrderId > 0);
             Debug.Assert(order.TotalQuantity > 0);
 
-            foreach(var cond in order.Conditions.OfType<ContractCondition>())
+            foreach (var cond in order.Conditions.OfType<ContractCondition>())
             {
                 cond.ConId = contract.ConId;
                 cond.Exchange = contract.Exchange;

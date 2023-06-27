@@ -1,10 +1,10 @@
 ﻿using System.Data;
 using System.Globalization;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommands
+namespace Broker.DataStorage.Sqlite.DbCommands
 {
     // *** OF NOTE : 
     // A market data row with NULL values (except for Ticker and DateTime. These should never be NULL) indicates that the data for 
@@ -137,7 +137,7 @@ namespace TradingBot.DataStorage.Sqlite.DbCommands
             _dataDict = new Dictionary<DateTime, List<TMarketData>>();
             foreach (var data in dataCollection)
             {
-                if(!_dataDict.ContainsKey(data.Time))
+                if (!_dataDict.ContainsKey(data.Time))
                     _dataDict[data.Time] = new List<TMarketData>();
                 _dataDict[data.Time].Add(data);
             }
@@ -166,7 +166,7 @@ namespace TradingBot.DataStorage.Sqlite.DbCommands
 
             for (DateTime i = _dateRange.From; i < _dateRange.To; i = i.AddSeconds(1))
             {
-                if(_dataDict.TryGetValue(i, out List<TMarketData>? data))
+                if (_dataDict.TryGetValue(i, out List<TMarketData>? data))
                 {
                     foreach (var d in data)
                         nbInserted += InsertMarketData(insertCmd, d);

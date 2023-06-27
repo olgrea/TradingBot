@@ -1,4 +1,4 @@
-﻿namespace TradingBot.Broker.Orders
+﻿namespace Broker.Orders
 {
     internal class OrderTracker
     {
@@ -30,7 +30,7 @@
             OrderIdsToTicker[order.Id] = ticker;
             OrdersRequested[order.Id] = order;
         }
-        
+
         public void TrackOpening(Order order)
         {
             OrdersOpened[order.Id] = order;

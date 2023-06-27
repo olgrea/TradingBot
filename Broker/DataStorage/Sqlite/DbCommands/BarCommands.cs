@@ -1,10 +1,10 @@
 ﻿using System.Data;
 using System.Diagnostics;
+using Broker.MarketData;
+using Broker.Utils;
 using Microsoft.Data.Sqlite;
-using TradingBot.Broker.MarketData;
-using TradingBot.Utils;
 
-namespace TradingBot.DataStorage.Sqlite.DbCommands
+namespace Broker.DataStorage.Sqlite.DbCommands
 {
     internal class BarExistsCommand : ExistsCommand<Bar>
     {
@@ -92,7 +92,7 @@ namespace TradingBot.DataStorage.Sqlite.DbCommands
 
         protected override int InsertMarketData(SqliteCommand command, Bar data)
         {
-            var columns = new string[] { "Open", "Close", "High", "Low"};
+            var columns = new string[] { "Open", "Close", "High", "Low" };
             var values = new object[] { data.Open, data.Close, data.High, data.Low };
             Insert(command, "OHLC", columns, values);
             return InsertFromSelect(command, data);

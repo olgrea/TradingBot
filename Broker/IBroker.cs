@@ -1,9 +1,9 @@
-﻿using TradingBot.Broker.Accounts;
-using TradingBot.Broker.MarketData.Providers;
-using TradingBot.Broker.Orders;
-using TradingBot.IBKR.Client;
+﻿using Broker.Accounts;
+using Broker.IBKR.Client;
+using Broker.MarketData.Providers;
+using Broker.Orders;
 
-namespace TradingBot.Broker
+namespace Broker
 {
     public interface IBroker
     {
