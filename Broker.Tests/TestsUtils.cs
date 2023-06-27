@@ -5,7 +5,7 @@ using Broker.MarketData;
 using Broker.Utils;
 using Microsoft.Data.Sqlite;
 using NLog;
-using NLog.TradingBot;
+using NLog.NUnit;
 using NUnit.Framework;
 
 namespace Broker.Tests

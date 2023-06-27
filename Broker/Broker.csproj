@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NLog.TradingBot\NLog.TradingBot.csproj" />
     <ProjectReference Include="C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj" />
   </ItemGroup>
 

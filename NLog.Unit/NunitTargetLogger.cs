@@ -1,7 +1,7 @@
 ﻿using NLog.Targets;
 using NUnit.Framework;
 
-namespace NLog.TradingBot
+namespace NLog.NUnit
 {
     [Target("NunitLogger")]
     public sealed class NunitTargetLogger : TargetWithLayout
