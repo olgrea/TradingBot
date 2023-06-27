@@ -10,7 +10,7 @@ using NUnit.Framework;
 
 namespace Broker.Tests
 {
-    internal static class TestsUtils
+    public static class TestsUtils
     {
         public const string TestDbPath = @"C:\tradingbot\db\tests.sqlite3";
         public const string TestDataDbPath = @"C:\tradingbot\db\testsdata.sqlite3";

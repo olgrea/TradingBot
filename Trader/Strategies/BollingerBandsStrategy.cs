@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics;
-using Broker.Indicators;
 using Broker.MarketData;
 using Broker.Orders;
 using Broker.Utils;
+using Trader.Indicators;
 
-namespace Broker.Strategies
+namespace Trader.Strategies
 {
     /// <summary>
     /// Naive strategy for testing purpose

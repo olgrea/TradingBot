@@ -1,9 +1,8 @@
-﻿using Broker;
-using Broker.Backtesting;
-using Broker.Reports;
-using Broker.Strategies;
+﻿using Broker.Backtesting;
 using Broker.Utils;
 using NLog;
+using Trader.Reports;
+using Trader.Strategies;
 
 namespace BacktesterApp
 {
@@ -21,7 +20,7 @@ namespace BacktesterApp
 
             var broker = new Backtester(latestTradingDay, logger);
             broker.TimeCompression.Factor = 0.0015;
-            var trader = new Trader(broker, logger);
+            var trader = new Trader.Trader(broker, logger);
 
             var marketHours = latestTradingDay.ToMarketHours();
             trader.AddStrategy(new BollingerBandsStrategy(marketHours.Item1, marketHours.Item2, "GME", trader));

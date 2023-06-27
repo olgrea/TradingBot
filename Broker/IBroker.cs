@@ -1,8 +1,10 @@
-﻿using Broker.Accounts;
+﻿using System.Runtime.CompilerServices;
+using Broker.Accounts;
 using Broker.IBKR.Client;
 using Broker.MarketData.Providers;
 using Broker.Orders;
 
+[assembly: InternalsVisibleTo("Broker.Tests")]
 namespace Broker
 {
     public interface IBroker

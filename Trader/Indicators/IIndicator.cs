@@ -1,7 +1,7 @@
 ﻿using Broker.MarketData;
 using Skender.Stock.Indicators;
 
-namespace Broker.Indicators
+namespace Trader.Indicators
 {
     public interface IIndicator
     {

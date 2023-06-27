@@ -1,9 +1,8 @@
-﻿using Broker;
-using Broker.IBKR;
-using Broker.Reports;
-using Broker.Strategies;
+﻿using Broker.IBKR;
 using Broker.Utils;
 using NLog;
+using Trader.Reports;
+using Trader.Strategies;
 
 namespace TraderApp
 {
@@ -15,7 +14,7 @@ namespace TraderApp
         {
             var logger = LogManager.GetLogger($"Trader");
             var broker = new IBBroker(1337, logger);
-            var trader = new Trader(broker, logger);
+            var trader = new Trader.Trader(broker, logger);
             var today = DateTime.Now.ToMarketHours();
             trader.AddStrategy(new BollingerBandsStrategy(today.Item1, today.Item2, "GME", trader));
             var results = await trader.Start();

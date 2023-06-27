@@ -8,7 +8,6 @@ using Broker.MarketData.Providers;
 using Broker.Orders;
 using NLog;
 
-[assembly: InternalsVisibleTo("Broker.Tests")]
 namespace Broker.IBKR
 {
     public class IBBroker : IBroker

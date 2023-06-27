@@ -1,4 +1,4 @@
-﻿namespace Broker.Reports
+﻿namespace Trader.Reports
 {
     internal interface IReportGenerator
     {

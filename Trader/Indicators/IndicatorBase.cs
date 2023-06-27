@@ -1,7 +1,7 @@
 ﻿using Broker.MarketData;
 using Skender.Stock.Indicators;
 
-namespace Broker.Indicators
+namespace Trader.Indicators
 {
     public abstract class IndicatorBase<TResult, TSignal> : IIndicator where TResult : ResultBase
     {

@@ -1,6 +1,6 @@
-﻿using Broker.Indicators;
+﻿using Trader.Indicators;
 
-namespace Broker.Strategies
+namespace Trader.Strategies
 {
     public interface IStrategy
     {

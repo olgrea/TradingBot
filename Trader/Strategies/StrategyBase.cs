@@ -1,11 +1,11 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading.Tasks.Dataflow;
-using Broker.Indicators;
 using Broker.MarketData;
 using Broker.Utils;
+using Trader.Indicators;
 
-namespace Broker.Strategies
+namespace Trader.Strategies
 {
     public abstract class StrategyBase : IStrategy
     {

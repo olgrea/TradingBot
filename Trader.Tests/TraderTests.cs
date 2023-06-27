@@ -1,12 +1,12 @@
 ﻿using System.Diagnostics;
 using Broker;
-using Broker.Indicators;
 using Broker.MarketData;
 using Broker.Orders;
-using Broker.Strategies;
+using Broker.Tests;
 using NLog;
 using NUnit.Framework;
-using Broker.Tests;
+using Trader.Indicators;
+using Trader.Strategies;
 
 namespace TraderTests
 {
@@ -15,7 +15,7 @@ namespace TraderTests
         const string Ticker = "GME";
         ILogger _logger;
         IBroker _broker;
-        Trader _trader;
+        Trader.Trader _trader;
         TestStrategy _testStrategy;
 
         [SetUp]
@@ -23,7 +23,7 @@ namespace TraderTests
         {
             _logger = TestsUtils.CreateLogger();
             _broker = TestsUtils.CreateBroker();
-            _trader = new Trader(_broker, _logger);
+            _trader = new Trader.Trader(_broker, _logger);
 
             var now = DateTime.Now;
             var later = now.AddSeconds(60);
@@ -146,7 +146,7 @@ namespace TraderTests
 
         class TestStrategy : StrategyBase
         {
-            public TestStrategy(DateTime startTime, DateTime endTime, string ticker, Trader trader) : base(startTime, endTime, ticker, trader)
+            public TestStrategy(DateTime startTime, DateTime endTime, string ticker, Trader.Trader trader) : base(startTime, endTime, ticker, trader)
             {
                 Indicators = new List<IIndicator>() { new BollingerBands(BarLength._5Sec) };
             }

@@ -1,7 +1,6 @@
 ﻿using System.Text;
-using Broker;
 
-namespace Broker.Reports
+namespace Trader.Reports
 {
     public class CSVReportGenerator : IReportGenerator
     {
