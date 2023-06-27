@@ -23,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broker\Broker.csproj" />
     <ProjectReference Include="..\NLog.TradingBot\NLog.TradingBot.csproj" />
-    <ProjectReference Include="..\TradingBot\TradingBot.csproj" />
   </ItemGroup>
 
 </Project>

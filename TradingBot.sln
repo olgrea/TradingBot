@@ -5,9 +5,9 @@ VisualStudioVersion = 17.2.32630.192
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpAPI", "C:\TWS API\source\CSharpClient\client\CSharpAPI.csproj", "{30E7C221-6D45-4BA8-AC36-51C06ECC7C66}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot", "TradingBot\TradingBot.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broker", "Broker\Broker.csproj", "{B9A3413C-100F-4DC9-BF7C-83B6B43F3770}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot.Tests", "TradingBot.Tests\TradingBot.Tests.csproj", "{70A524DB-BDE5-4B5E-A223-65575CECA0B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Broker.Tests", "Broker.Tests\Broker.Tests.csproj", "{70A524DB-BDE5-4B5E-A223-65575CECA0B5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HistoricalDataGetterApp", "HistoricalDataGetterApp\HistoricalDataGetterApp.csproj", "{311D6756-8E9D-40BF-BC1A-8FAA1E39F752}"
 EndProject

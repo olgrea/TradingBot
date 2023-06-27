@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Threading.Tasks.Dataflow;
 using TradingBot.Broker.MarketData;
 using TradingBot.Broker.Orders;
 using TradingBot.Indicators;
@@ -7,6 +6,9 @@ using TradingBot.Utils;
 
 namespace TradingBot.Strategies
 {
+    /// <summary>
+    /// Naive strategy for testing purpose
+    /// </summary>
     public class BollingerBandsStrategy : StrategyBase
     {
         LinkedList<Last> _lasts;

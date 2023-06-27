@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\TradingBot.Private\TradingBot.Private\TradingBot.Private.csproj" />
-    <ProjectReference Include="..\TradingBot\TradingBot.csproj" />
+    <ProjectReference Include="..\Broker\Broker.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using NLog;
 using TradingBot.Broker;
 using TradingBot.Broker.Accounts;
@@ -8,6 +9,7 @@ using TradingBot.Broker.MarketData.Providers;
 using TradingBot.Broker.Orders;
 using TradingBot.IBKR.Client;
 
+[assembly: InternalsVisibleTo("Broker.Tests")]
 namespace TradingBot.IBKR
 {
     public class IBBroker : IBroker
