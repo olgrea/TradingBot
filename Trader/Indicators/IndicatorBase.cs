@@ -28,7 +28,7 @@ namespace Trader.Indicators
         public IEnumerable<TResult> Results => _results;
         public IEnumerable<TSignal> Signals => _signals;
 
-        public void Compute(IEnumerable<IQuote> quotes)
+        public virtual void Compute(IEnumerable<IQuote> quotes)
         {
             _quotes = quotes;
             _results = ComputeResults();
