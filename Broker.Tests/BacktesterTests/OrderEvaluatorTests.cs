@@ -4,29 +4,30 @@ using Broker.IBKR;
 using Broker.MarketData;
 using Broker.Orders;
 using Broker.Tests;
+using Broker.Utils;
 using NUnit.Framework;
 
 namespace BacktesterTests
 {
     internal class OrderEvaluatorTests
     {
-        class SpyTestData
+        internal class SpyTestData
         {
             public const string Ticker = "SPY";
-            public static readonly (DateTime, DateTime) Downward =   (new DateTime(2023, 04, 10, 11, 50, 00), new DateTime(2023, 04, 10, 12, 10, 00));
-            public static readonly (DateTime, DateTime) Upward =     (new DateTime(2023, 04, 10, 12, 30, 00), new DateTime(2023, 04, 10, 12, 45, 00));
-            public static readonly (DateTime, DateTime) DownThenUp = (new DateTime(2023, 04, 10, 12, 00, 00), new DateTime(2023, 04, 10, 12, 20, 00));
-            public static readonly (DateTime, DateTime) UpThenDown = (new DateTime(2023, 04, 10, 10, 00, 00), new DateTime(2023, 04, 10, 10, 30, 00));
+            public static readonly (DateTime, DateTime) Downward =   (new DateTime(2024, 01, 10, 15, 14, 00), new DateTime(2024, 01, 10, 15, 25, 00));
+            public static readonly (DateTime, DateTime) Upward =     (new DateTime(2024, 01, 10, 14, 07, 00), new DateTime(2024, 01, 10, 14, 15, 00));
+            public static readonly (DateTime, DateTime) DownThenUp = (new DateTime(2024, 01, 10, 13, 04, 00), new DateTime(2024, 01, 10, 13, 17, 00));
+            public static readonly (DateTime, DateTime) UpThenDown = (new DateTime(2024, 01, 10, 14, 47, 00), new DateTime(2024, 01, 10, 15, 20, 00));
         }
 
         // Needed test data with larger spread for relative orders
-        class GrndTestData
+        internal class AfrmTestData
         {
-            public const string Ticker = "GRND";
-            public static readonly (DateTime, DateTime) Upward = (new DateTime(2023, 05, 26, 15, 33, 00), new DateTime(2023, 05, 26, 15, 45, 00));
-            public static readonly (DateTime, DateTime) UpThenDown = (new DateTime(2023, 05, 26, 15, 33, 00), new DateTime(2023, 05, 26, 15, 54, 00));
-            public static readonly (DateTime, DateTime) Downward = (new DateTime(2023, 05, 26, 13, 12, 00), new DateTime(2023, 05, 26, 13, 28, 00));
-            public static readonly (DateTime, DateTime) DownThenUp = (new DateTime(2023, 05, 26, 13, 18, 00), new DateTime(2023, 05, 26, 14, 14, 00));
+            public const string Ticker = "AFRM";
+            public static readonly (DateTime, DateTime) Upward =        (new DateTime(2024, 01, 10, 10, 33, 00), new DateTime(2024, 01, 10, 10, 55, 00));
+            public static readonly (DateTime, DateTime) Downward =      (new DateTime(2024, 01, 10, 09, 41, 00), new DateTime(2024, 01, 10, 09, 57, 00));
+            public static readonly (DateTime, DateTime) DownThenUp =    (new DateTime(2024, 01, 10, 09, 50, 00), new DateTime(2024, 01, 10, 10, 15, 00));
+            public static readonly (DateTime, DateTime) UpThenDown =    (new DateTime(2024, 01, 10, 10, 42, 00), new DateTime(2024, 01, 10, 11, 16, 00));
         }
 
         Backtester _backtester;
@@ -823,8 +824,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Buy_PriceFollowsBidWhenMarketRises()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.Upward;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.Upward;
+            string ticker = AfrmTestData.Ticker;
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
             
@@ -855,8 +856,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Buy_PriceCappedAtPriceCap()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.Upward;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.Upward;
+            string ticker = AfrmTestData.Ticker;
 
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
@@ -886,8 +887,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Sell_PriceFollowsAskWhenMarketFalls()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.Downward;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.Downward;
+            string ticker = AfrmTestData.Ticker;
 
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
@@ -919,8 +920,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Sell_PriceCappedAtPriceCap()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.Downward;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.Downward;
+            string ticker = AfrmTestData.Ticker;
 
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
@@ -950,8 +951,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Buy_GetsFilledWhenMarketChangesDirection_UpThenDown()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.UpThenDown;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.UpThenDown;
+            string ticker = AfrmTestData.Ticker;
 
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
@@ -984,8 +985,8 @@ namespace BacktesterTests
         public async Task RelativeOrder_Sell_GetsFilledWhenMarketChangesDirection_DownThenUp()
         {
             // Setup
-            (DateTime, DateTime) timerange = GrndTestData.DownThenUp;
-            string ticker = GrndTestData.Ticker;
+            (DateTime, DateTime) timerange = AfrmTestData.DownThenUp;
+            string ticker = AfrmTestData.Ticker;
 
             _backtester = await CreateBacktesterAndConnect(timerange);
             DateTime timeOfOrderPlacement = timerange.Item1;
@@ -1031,7 +1032,7 @@ namespace BacktesterTests
             await tcs.Task;
         }
 
-        public async Task FillTestDataDb()
+        public static IEnumerable<(string, DateRange)> GetRequiredTestData()
         {
             (DateTime, DateTime)[] timeranges = new (DateTime, DateTime)[4]
             {
@@ -1042,17 +1043,18 @@ namespace BacktesterTests
             };
 
             foreach (var timerange in timeranges) 
-            {
-                await using(var backtester = await CreateBacktesterAndConnect(timerange))
-                {
-                    var provider = backtester.HistoricalDataProvider as IBHistoricalDataProvider;
-                    provider.DbPath = TestsUtils.TestDataDbPath;
+                yield return (SpyTestData.Ticker, timerange);
 
-                    await provider.GetHistoricalDataAsync<Bar>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
-                    await provider.GetHistoricalDataAsync<BidAsk>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
-                    await provider.GetHistoricalDataAsync<Last>(SpyTestData.Ticker, timerange.Item1, timerange.Item2);
-                }
-            }
+            timeranges = new (DateTime, DateTime)[4]
+            {
+                AfrmTestData.Downward,
+                AfrmTestData.Upward,
+                AfrmTestData.DownThenUp,
+                AfrmTestData.UpThenDown,
+            };
+
+            foreach (var timerange in timeranges)
+                yield return (AfrmTestData.Ticker, timerange);
         }
     }
 }

@@ -1,6 +1,12 @@
-﻿namespace Broker.Utils
+﻿using static System.Runtime.InteropServices.JavaScript.JSType;
+
+namespace Broker.Utils
 {
-    public record struct DateRange(DateTime From, DateTime To);
+    public record struct DateRange(DateTime From, DateTime To)
+    {
+        public static implicit operator DateRange((DateTime, DateTime) t) => new DateRange(t.Item1, t.Item2);
+        public static implicit operator (DateTime, DateTime)(DateRange r) => (r.From, r.To);
+    }
 
     public static class DateTimeUtils
     {

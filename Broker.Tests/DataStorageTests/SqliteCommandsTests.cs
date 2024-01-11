@@ -18,7 +18,7 @@ namespace SqliteCommandsTests
         const string Ticker = "GME";
         protected DbCommandFactory _commandFactory;
         IBHistoricalDataProvider _historicalProvider;
-        DateRange _dateRange = new DateRange(new DateTime(2023, 04, 06, 10, 30, 0), new DateTime(2023, 04, 06, 11, 00, 00));
+        static DateRange _dateRange = new DateRange(new DateTime(2023, 04, 06, 10, 30, 0), new DateTime(2023, 04, 06, 11, 00, 00));
 
         [OneTimeSetUp]
         public void OneTimeSetup()
@@ -220,18 +220,9 @@ namespace SqliteCommandsTests
             return null;
         }
 
-        async Task FillTestDataDb()
+        public static IEnumerable<(string, DateRange)> GetRequiredTestData()
         {
-            var path = _historicalProvider.DbPath;
-            try
-            {
-                _historicalProvider.DbPath = TestsUtils.TestDataDbPath;
-                await _historicalProvider.GetHistoricalDataAsync<TData>(Ticker, _dateRange.From, _dateRange.To);
-            }
-            finally
-            {
-                _historicalProvider.DbPath = path;
-            }
+            yield return (Ticker, _dateRange);
         }
     }
 }
