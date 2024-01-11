@@ -50,6 +50,7 @@ namespace Broker.IBKR
         IBClient _client;
         IBBroker _broker;
         ILogger? _logger;
+        internal LogLevel _logLevel = LogLevel.Trace;
         private string dbPath = DefaultDbPath;
         static SemaphoreSlim s_sem = new(1, 1);
 
@@ -60,7 +61,17 @@ namespace Broker.IBKR
             _broker = broker;
             _client = broker.Client;
             _logger = logger;
-            _pvc = new PacingViolationChecker(logger);
+            _pvc = new PacingViolationChecker(logger, _logLevel);
+        }
+
+        internal LogLevel LogLevel
+        {
+            get => _logLevel;
+            set
+            {
+                _logLevel = value;
+                _pvc.LogLevel = value;
+            }
         }
 
         internal ILogger? Logger
@@ -123,8 +134,8 @@ namespace Broker.IBKR
             else if (!MarketDataUtils.WasMarketOpen(from, to, extendedHours: true))
                 throw new ArgumentException($"Market was closed from {from} to {to}");
 
-            _logger?.Trace($"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
-            _logger?.Trace($"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
+            _logger?.Log(_logLevel, $"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
+            _logger?.Log(_logLevel, $"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
 
             _token = token;
             _pvc.Token = token;
@@ -186,7 +197,7 @@ namespace Broker.IBKR
                 _token?.ThrowIfCancellationRequested();
                 if (!dataCache.Cache.TryGetValue(i, out IEnumerable<IMarketData>? value))
                 {
-                    _logger?.Trace($"Timestamp {i} not in cache. Can't retrieve whole timerange.");
+                    _logger?.Log(_logLevel, $"Timestamp {i} not in cache. Can't retrieve whole timerange.");
                     data = null;
                     return false;
                 }
@@ -197,7 +208,7 @@ namespace Broker.IBKR
 
             int count = data.Count();
             _lastOperationStats.NbRetrievedFromCache += count;
-            _logger?.Trace($"Timestamps in cache. {count} retrieved.");
+            _logger?.Log(_logLevel, $"Timestamps in cache. {count} retrieved.");
             return true;
         }
 
@@ -241,7 +252,7 @@ namespace Broker.IBKR
 
             _lastOperationStats.NbInsertedInCache += nbInserted;
             if (nbInserted > 0)
-                _logger?.Trace($"{nbInserted} {typeof(TData).Name} inserted into cache.");
+                _logger?.Log(_logLevel, $"{nbInserted} {typeof(TData).Name} inserted into cache.");
         }
 
         bool TryGetFromDb<TData>(string ticker, DateTime from, DateTime to, DbCommandFactory cmdFactory, [NotNullWhen(true)] out IEnumerable<IMarketData>? data) where TData : IMarketData, new()
@@ -256,7 +267,7 @@ namespace Broker.IBKR
             DbCommand<bool> existsCmd = cmdFactory.CreateExistsCommand(ticker, new DateRange(from, to));
             if (!existsCmd.Execute())
             {
-                _logger?.Trace($"Data not in db.");
+                _logger?.Log(_logLevel, $"Data not in db.");
                 data = null;
                 return false;
             }
@@ -267,7 +278,7 @@ namespace Broker.IBKR
             _lastOperationStats.NbRetrievedFromDb += data.Count();
 
             var dateStr = from.Date.ToShortDateString();
-            _logger?.Trace($"Timestamps in db. {_lastOperationStats.NbRetrievedFromDb} retrieved.");
+            _logger?.Log(_logLevel, $"Timestamps in db. {_lastOperationStats.NbRetrievedFromDb} retrieved.");
 
             return true;
         }
@@ -286,7 +297,7 @@ namespace Broker.IBKR
             {
                 _lastOperationStats.NbInsertedInDb += iCmd.NbInserted;
                 if (iCmd.NbInserted > 0)
-                    _logger?.Trace($"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
+                    _logger?.Log(_logLevel, $"{iCmd.NbInserted} {typeof(TData).Name} inserted into db.");
             }
         }
 
@@ -303,7 +314,7 @@ namespace Broker.IBKR
                 {
                     if (!_broker.IsConnected())
                     {
-                        _logger?.Trace($"Connecting to TWS.");
+                        _logger?.Log(_logLevel, $"Connecting to TWS.");
                         await _broker.ConnectAsync(_token!.Value);
                     }
                 }
@@ -345,7 +356,7 @@ namespace Broker.IBKR
                     int count = data.Count();
                     _lastOperationStats.NbRetrievedFromIBKR += count;
 
-                    _logger?.Trace($"{chunkBegin}-{chunkEnd} received from TWS (count: {count}).");
+                    _logger?.Log(_logLevel, $"{chunkBegin}-{chunkEnd} received from TWS (count: {count}).");
 
                     _token?.ThrowIfCancellationRequested();
                     Debug.Assert(data != null);
@@ -362,7 +373,7 @@ namespace Broker.IBKR
                 current = current.AddSeconds(-chunkSizeInSec);
             }
 
-            _logger?.Trace($"{_lastOperationStats.NbRetrievedFromIBKR} retrieved from TWS server.");
+            _logger?.Log(_logLevel, $"{_lastOperationStats.NbRetrievedFromIBKR} retrieved from TWS server.");
         }
 
         async Task<IEnumerable<IMarketData>> FetchBars<TData>(string ticker, DateTime from, DateTime to) where TData : IMarketData, new()
@@ -456,7 +467,7 @@ namespace Broker.IBKR
 
             string edt = endDateTime == DateTime.MinValue ? string.Empty : $"{endDateTime.ToString("yyyyMMdd HH:mm:ss")} US/Eastern";
 
-            _logger?.Trace($"Retrieving {count} bars from TWS for '{ticker}' descending from {endDateTime}.");
+            _logger?.Log(_logLevel, $"Retrieving {count} bars from TWS for '{ticker}' descending from {endDateTime}.");
             var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             BarRequest req = new(contract, edt, durationStr, barSizeStr, "TRADES");
             _pvc.CheckRequest(req);
@@ -559,7 +570,7 @@ namespace Broker.IBKR
                     tcs.TrySetException(msg);
             });
 
-            _logger?.Trace($"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
+            _logger?.Log(_logLevel, $"Retrieving {count} Bid/Ask from TWS for '{ticker}' descending from {time}.");
             var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "BID_ASK");
             _pvc.CheckRequest(req);
@@ -624,7 +635,7 @@ namespace Broker.IBKR
                     tcs.TrySetException(msg);
             });
 
-            _logger?.Trace($"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
+            _logger?.Log(_logLevel, $"Retrieving {count} 'Lasts' from TWS for '{ticker}' descending from {time}.");
             var contract = _client.ContractsCache.Get(ticker, _token!.Value);
             TickRequest req = new(contract, string.Empty, $"{time.ToString("yyyyMMdd HH:mm:ss")} US/Eastern", count, "TRADES");
             _pvc.CheckRequest(req);
@@ -668,6 +679,7 @@ namespace Broker.IBKR
             const string RequestFileName = "pvc";
 
             ILogger? _logger;
+            LogLevel _logLevel;
             int _nbRequest = 0;
             int _nbRequestIn10Mins = 0;
 
@@ -676,15 +688,16 @@ namespace Broker.IBKR
             List<DateTime> _requestTimes;
             CancellationToken? _token;
 
-            public PacingViolationChecker(ILogger? logger)
+            public PacingViolationChecker(ILogger? logger, LogLevel logLevel)
             {
                 _logger = logger;
+                _logLevel = logLevel;
                 ReadRequestFile();
             }
 
             internal ILogger? Logger { get => _logger; set => _logger = value; }
+            internal LogLevel LogLevel { get => _logLevel; set => _logLevel = value; }
             internal CancellationToken? Token { get => _token; set => _token = value; }
-
 
             [MemberNotNull(nameof(_requestTimes))]
             void ReadRequestFile()
@@ -717,7 +730,7 @@ namespace Broker.IBKR
                 {
                     _nbRequest = value;
                     _nbRequestIn10Mins = value;
-                    _logger?.Trace($"Current nb of requests : {_nbRequest}.");
+                    _logger?.Log(_logLevel, $"Current nb of requests : {_nbRequest}.");
                     _requestTimes.Add(DateTime.Now);
                     WriteRequestFile();
 
@@ -744,7 +757,7 @@ namespace Broker.IBKR
                     if (elapsed < _15sec)
                     {
                         TimeSpan toWait = _15sec - elapsed + TimeSpan.FromMilliseconds(250);
-                        _logger?.Trace($"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
+                        _logger?.Log(_logLevel, $"Same request made within 15 seconds. Waiting {Math.Round(toWait.TotalSeconds, 1)} seconds...");
 
                         Task.Delay(toWait).Wait(_token ?? CancellationToken.None);
                     }
@@ -757,7 +770,7 @@ namespace Broker.IBKR
             {
                 if (_nbRequestIn10Mins != 0 && _nbRequestIn10Mins % 60 == 0)
                 {
-                    _logger?.Trace($"60 requests made within 10 min.");
+                    _logger?.Log(_logLevel, $"60 requests made within 10 min.");
 
                     var now = DateTime.Now;
                     var times = _requestTimes.SkipWhile(t => now - t > TimeSpan.FromMinutes(10));
@@ -766,18 +779,18 @@ namespace Broker.IBKR
                     var toWait = TimeSpan.FromSeconds(10);
                     var countUnder10Sec = times.TakeWhile(rt => rt - first < toWait).Count();
 
-                    _logger?.Trace($"Waiting 10 seconds...");
+                    _logger?.Log(_logLevel, $"Waiting 10 seconds...");
                     WaitFor(toWait);
-                    _logger?.Trace($"Resuming.");
+                    _logger?.Log(_logLevel, $"Resuming.");
 
                     _nbRequestIn10Mins -= countUnder10Sec;
                     _requestTimes = times.Skip(countUnder10Sec).ToList();
                 }
                 else if (_nbRequest != 0 && _nbRequest % 5 == 0)
                 {
-                    _logger?.Trace($"5 requests made : waiting 2 seconds...");
+                    _logger?.Log(_logLevel, $"5 requests made : waiting 2 seconds...");
                     Task.Delay(2000).Wait(_token ?? CancellationToken.None);
-                    _logger?.Trace($"Resuming.");
+                    _logger?.Log(_logLevel, $"Resuming.");
                 }
             }
 
@@ -799,7 +812,7 @@ namespace Broker.IBKR
                     }
 
                     if (current > TimeSpan.Zero)
-                        _logger?.Trace($"{current} left...");
+                        _logger?.Log(_logLevel, $"{current} left...");
                 }
             }
         }
