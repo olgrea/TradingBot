@@ -22,7 +22,9 @@ namespace Broker.IBKR
             public ConcurrentDictionary<DateTime, IEnumerable<IMarketData>> Cache = new();
 
             //debug
+#if DEBUG
             List<DateTime> KeysDebug => Cache.Keys.OrderBy(k => k).ToList();
+#endif
         }
 
         record struct BarRequest(IBApi.Contract Contract, string EndDateTime, string DurationStr, string BarSizeStr, string WhatToShow);
@@ -114,6 +116,13 @@ namespace Broker.IBKR
 
         public async Task<IEnumerable<IMarketData>> GetHistoricalDataAsync<TData>(string ticker, DateTime from, DateTime to, CancellationToken token) where TData : IMarketData, new()
         {
+            if (from >= to)
+                throw new ArgumentException("Starting date is after or equal to ending date");
+            else if(DateTime.Now < to)
+                throw new ArgumentException("Date is in the future!");
+            else if (!MarketDataUtils.WasMarketOpen(from, to, extendedHours: true))
+                throw new ArgumentException($"Market was closed from {from} to {to}");
+
             _logger?.Trace($"Getting {typeof(TData).Name} for {ticker} from {from} to {to}");
             _logger?.Trace($"Cache {(CacheEnabled ? "enabled" : "disabled")}. Db {(DbEnabled ? "enabled" : "disabled")}.");
 
@@ -121,7 +130,6 @@ namespace Broker.IBKR
             _pvc.Token = token;
 
             _token?.ThrowIfCancellationRequested();
-            ValidateDates(from, to);
 
             _lastOperationStats.NbRetrievedFromCache = 0;
             _lastOperationStats.NbRetrievedFromDb = 0;
@@ -285,6 +293,8 @@ namespace Broker.IBKR
         async Task GetFromServer<TData>(string ticker, DateTime from, DateTime to, Action<DateTime, DateTime, IEnumerable<IMarketData>> onChunckReceived) where TData : IMarketData, new()
         {
             _token?.ThrowIfCancellationRequested();
+            CheckDataAvailability(from);
+
             if (!_broker.IsConnected())
             {
                 // Equivalent to lock(){ await ... }
@@ -641,18 +651,11 @@ namespace Broker.IBKR
             return tcs.Task.Result;
         }
 
-        static void ValidateDates(DateTime from, DateTime to)
+        private static void CheckDataAvailability(DateTime from)
         {
-            if (from >= to)
-                throw new ArgumentException("Starting date is after or equal to ending date");
-
             // https://interactivebrokers.github.io/tws-api/historical_limitations.html
             if (DateTime.Now - from > TimeSpan.FromDays(6 * 30))
                 throw new ArgumentException($"Bars whose size is 30 seconds or less older than six months are not available. {from}");
-
-            IEnumerable<(DateTime, DateTime)> days = MarketDataUtils.GetMarketDays(from, to, extendedHours: true).ToList();
-            if (!days.Any())
-                throw new ArgumentException($"Market was closed from {from} to {to}");
         }
 
         // TWS API limitations. Pacing violation occurs when : 

@@ -52,6 +52,12 @@ namespace Broker.Utils
             return WasMarketOpen(DateTime.Now, extendedHours);
         }
 
+        public static bool WasMarketOpen(DateTime from, DateTime to, bool extendedHours = false)
+        {
+            IEnumerable<(DateTime, DateTime)> days = GetMarketDays(from, to, extendedHours).ToList();
+            return days.Any();
+        }
+
         public static bool WasMarketOpen(DateOnly date, bool extendedHours = false)
         {
             var startTime = extendedHours ? PreMarketStartTime : MarketStartTime;
