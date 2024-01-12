@@ -307,22 +307,7 @@ namespace Broker.IBKR
             CheckDataAvailability(from);
 
             if (!_broker.IsConnected())
-            {
-                // Equivalent to lock(){ await ... }
-                await s_sem.WaitAsync();
-                try
-                {
-                    if (!_broker.IsConnected())
-                    {
-                        _logger?.Log(_logLevel, $"Connecting to TWS.");
-                        await _broker.ConnectAsync(_token!.Value);
-                    }
-                }
-                finally
-                {
-                    s_sem.Release();
-                }
-            }
+                await _broker.ConnectAsync(_token!.Value);
 
             DateTime current = to;
             while (current > from)

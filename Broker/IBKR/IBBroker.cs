@@ -12,6 +12,8 @@ namespace Broker.IBKR
 {
     public class IBBroker : IBroker
     {
+        static SemaphoreSlim s_sem = new(1, 1);
+
         int _clientId;
         int _port;
         IBClient _client;
@@ -89,6 +91,26 @@ namespace Broker.IBKR
         }
 
         async Task<string> ConnectAsync(TimeSpan timeout, CancellationToken token)
+        {
+            if (_client.IsConnected())
+                return _account!.Code;
+
+            // Equivalent to lock(){ await ... }
+            await s_sem.WaitAsync();
+            try
+            {
+                if (_client.IsConnected())
+                    return _account!.Code;
+
+                return await ConnectAsyncInternal(timeout, token);
+            }
+            finally
+            {
+                s_sem.Release();
+            }
+        }
+
+        async Task<string> ConnectAsyncInternal(TimeSpan timeout, CancellationToken token)
         {
             // NOTE : TaskCompletionSource should always be used with the RunContinuationsAsynchronously flag
             // https://devblogs.microsoft.com/premier-developer/the-danger-of-taskcompletionsourcet-class/
