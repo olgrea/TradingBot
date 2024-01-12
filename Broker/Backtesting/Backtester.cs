@@ -317,7 +317,7 @@ namespace Broker.Backtesting
 
                 _advanceTimeEvent.Reset();
 
-                _logger?.Debug($"Processing time {_currentTime}");
+                //_logger?.Debug($"Processing time {_currentTime}");
 
                 token.ThrowIfCancellationRequested();
                 ClockTick?.Invoke(_currentTime, token);
@@ -360,7 +360,7 @@ namespace Broker.Backtesting
                 Thread.SpinWait(10);
             _µsWaitStopwatch.Stop();
 
-            _logger?.Trace($"expected : {nbMicroSecToWait} µs, actual : {_µsWaitStopwatch.ElapsedTicks * microSecPerTick} µs");
+            //_logger?.Trace($"expected : {nbMicroSecToWait} µs, actual : {_µsWaitStopwatch.ElapsedTicks * microSecPerTick} µs");
         }
 
         bool IsDayOver() => _currentTime >= _end;
@@ -579,10 +579,12 @@ namespace Broker.Backtesting
             return Task.FromResult(_currentTime);
         }
 
-        internal IBApi.Contract GetContract(string ticker)
+        internal async Task<IBApi.Contract> GetContract(string ticker)
         {
             if (!_broker.IsConnected())
-                _broker.ConnectAsync().Wait();
+            {
+                await _broker.ConnectAsync();
+            }
 
             return _broker.Client.ContractsCache.Get(ticker);
         }

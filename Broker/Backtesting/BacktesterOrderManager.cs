@@ -2,6 +2,7 @@
 using Broker.Accounts;
 using Broker.MarketData;
 using Broker.Orders;
+using Broker.Utils;
 
 namespace Broker.Backtesting
 {
@@ -87,11 +88,20 @@ namespace Broker.Backtesting
                 }
                 else if (condition is IBApi.TimeCondition timeCond)
                 {
-                    var t = DateTime.Parse(timeCond.Time);
+                    DateTime t = default;
+                    try
+                    {
+                        t = DateTime.Parse(timeCond.Time);
+                    }
+                    catch (FormatException)
+                    {
+                        t = DateTime.ParseExact(timeCond.Time, MarketDataUtils.TWSTimeFormat, CultureInfo.InvariantCulture);
+                    }
+
                     if (timeCond.IsMore)
-                        condResult = t >= time;
-                    else
                         condResult = t <= time;
+                    else
+                        condResult = t >= time;
                 }
 
                 ret = previousOp ? ret & condResult : ret | condResult;
@@ -107,11 +117,11 @@ namespace Broker.Backtesting
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
-            Action request = new Action(() =>
+            Action request = new Action(async () =>
             {
                 try
                 {
-                    OrderPlacedResult result = PlaceOrderInternal(ticker, order);
+                    OrderPlacedResult result = await PlaceOrderInternal(ticker, order);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -363,7 +373,7 @@ namespace Broker.Backtesting
             }
         }
 
-        OrderPlacedResult PlaceOrderInternal(string ticker, Order order)
+        async Task<OrderPlacedResult> PlaceOrderInternal(string ticker, Order order)
         {
             order.Id = NextOrderId;
             _validator.ValidateOrderPlacement(order);
@@ -375,7 +385,7 @@ namespace Broker.Backtesting
 
             foreach (var cond in order.OrderConditions.OfType<IBApi.ContractCondition>())
             {
-                IBApi.Contract contract = _backtester.GetContract(ticker);
+                IBApi.Contract contract = await _backtester.GetContract(ticker);
                 cond.ConId = contract.ConId;
                 cond.Exchange = contract.Exchange;
             }
@@ -390,6 +400,7 @@ namespace Broker.Backtesting
                     Info = new RequestInfo()
                     {
                         OrderId = order.Id,
+                        Transmit = order.Info.Transmit,
                     },
                 },
                 OrderState = new OrderState()

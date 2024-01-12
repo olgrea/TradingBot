@@ -135,9 +135,7 @@ namespace Broker.Orders
             cond.IsMore = isMore;
             cond.Price = price;
             cond.IsConjunctionConnection = isConjunction;
-
-            OrderConditions.Add(cond);
-            //TODO : need to check if I can use this flag when using conditions
+            AddCondition(cond);
         }
 
         public void AddPercentCondition(bool isMore, double percent, bool isConjunction = true)
@@ -146,8 +144,7 @@ namespace Broker.Orders
             cond.IsMore = isMore;
             cond.ChangePercent = percent;
             cond.IsConjunctionConnection = isConjunction;
-
-            OrderConditions.Add(cond);
+            AddCondition(cond);
         }
 
         public void AddTimeCondition(bool isMore, DateTime time, bool isConjunction = true)
@@ -156,8 +153,18 @@ namespace Broker.Orders
             cond.IsMore = isMore;
             cond.Time = time.ToString(MarketDataUtils.TWSTimeFormat);
             cond.IsConjunctionConnection = isConjunction;
+            AddCondition(cond);
+        }
+
+        void AddCondition(OrderCondition cond)
+        {
+            throw new NotImplementedException("Feature not working correctly. Disabling it for now.");
 
             OrderConditions.Add(cond);
+
+            //TODO : need to check if I can use this flag when using conditions 
+            if (NeedsConditionFulfillmentToBeOpened)
+                Info.Transmit = false;
         }
 
         public static explicit operator Order(IBApi.Order ibo)
