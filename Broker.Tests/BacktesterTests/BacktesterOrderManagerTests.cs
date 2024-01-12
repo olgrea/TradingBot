@@ -2,20 +2,19 @@
 using Broker.Utils;
 using NUnit.Framework;
 using Broker.Tests;
+using Broker.IBKR;
 
 namespace BacktesterTests
 {
     internal class BacktesterOrderManagerTests : IBBrokerTests.OrderManagerTests
     {
+        static DateRange _dateRange= new DateTime(2024, 01, 10).ToMarketHours();
         Backtester _backtester;
 
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
-            // The 10:55:00 here is just so the order gets filled rapidly in test AwaitExecution_OrderGetsFilled_Returns ...
-            DateTime from = new DateTime(2023, 04, 10, 10, 55, 00);
-            DateTime to = new DateTime(2023, 04, 10).ToMarketHours().Item2;
-            _backtester = TestsUtils.CreateBacktester(from, to);
+            _backtester = TestsUtils.CreateBacktester(_dateRange.From, _dateRange.To);
             _backtester.TimeCompression.Factor = 0.002;
             _broker = _backtester;
 
@@ -28,6 +27,19 @@ namespace BacktesterTests
             await _broker.ConnectAsync();
             _backtester.Reset();
             _ = _backtester.Start();
+        }
+
+        [TearDown]
+        public override async Task TearDown()
+        {
+            Assert.IsTrue((_backtester.HistoricalDataProvider as IBHistoricalDataProvider)._lastOperationStats.NbRetrievedFromIBKR == 0);
+            await base.TearDown();
+        }
+
+        public static IEnumerable<(string, DateRange)> GetRequiredTestData()
+        {
+            yield return (TickerGME, _dateRange);
+            yield return (TickerAMC, _dateRange);
         }
     }
 }

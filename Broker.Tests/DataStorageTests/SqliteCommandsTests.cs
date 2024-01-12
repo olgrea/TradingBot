@@ -18,11 +18,12 @@ namespace SqliteCommandsTests
         const string Ticker = "GME";
         protected DbCommandFactory _commandFactory;
         IBHistoricalDataProvider _historicalProvider;
-        static DateRange _dateRange = new DateRange(new DateTime(2023, 04, 06, 10, 30, 0), new DateTime(2023, 04, 06, 11, 00, 00));
+        static DateRange _dateRange = new DateRange(new DateTime(2024, 01, 10, 10, 30, 00), new DateTime(2024, 01, 10, 11, 00, 00));
 
         [OneTimeSetUp]
         public void OneTimeSetup()
         {
+            TestsUtils.RestoreTestDb();
             _commandFactory = DbCommandFactory.Create<TData>(TestsUtils.TestDbPath);
             var broker = TestsUtils.CreateBroker();
             _historicalProvider = broker.HistoricalDataProvider as IBHistoricalDataProvider;

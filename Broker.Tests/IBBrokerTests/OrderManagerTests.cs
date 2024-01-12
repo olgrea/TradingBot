@@ -14,6 +14,8 @@ namespace IBBrokerTests
 {
     internal class OrderManagerTests
     {
+        protected const string TickerGME = "GME";
+        protected const string TickerAMC = "AMC";
         internal IBroker _broker;
         ILogger _logger;
 
@@ -56,7 +58,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             // Test
@@ -78,7 +80,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var account = await _broker.GetAccountAsync();
             var balance = account.CashBalances["BASE"];
             var bidAsk = await GetLatestBidAskAsync(ticker);
@@ -97,7 +99,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var account = await _broker.GetAccountAsync();
             var buyOrder = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
             await _broker.OrderManager.PlaceOrderAsync(ticker, buyOrder);
@@ -113,7 +115,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -137,7 +139,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -159,7 +161,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -182,7 +184,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string[] tickers = new string[2] { "GME", "AMC" };
+            string[] tickers = new string[2] { TickerGME, TickerAMC };
             foreach(string ticker in tickers)
             {
                 int randomQty = new Random().Next(3, 10);
@@ -210,7 +212,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
@@ -230,7 +232,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var bidAsk = await GetLatestBidAskAsync(ticker);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = bidAsk.Bid };
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -259,7 +261,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var bidAsk = await GetLatestBidAskAsync(ticker);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = bidAsk.Bid - 5 };
             OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
@@ -281,7 +283,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var currentTime = await _broker.GetServerTimeAsync();
@@ -314,7 +316,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
@@ -345,7 +347,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
@@ -376,7 +378,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -421,7 +423,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -465,7 +467,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -509,7 +511,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
 
             var bas = await GetLatestBidAskAsync(ticker);
@@ -544,7 +546,7 @@ namespace IBBrokerTests
             TestsUtils.Assert.MarketIsOpen();
 
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
 
             var bas = await GetLatestBidAskAsync(ticker);
@@ -577,7 +579,7 @@ namespace IBBrokerTests
         public async Task MarketOnOpenOrder_BecomesActiveOnMarketOpen()
         {
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new MarketOnOpen() { Action = OrderAction.BUY, TotalQuantity = 5};
             await _broker.OrderManager.PlaceOrderAsync(ticker, order);
         }
@@ -586,7 +588,7 @@ namespace IBBrokerTests
         public async Task AdaptiveAlgo()
         {
             // Setup
-            string ticker = "GME";
+            string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 1 };
             order.AsAdaptiveAlgo(AdaptiveAlgorithmPriority.Urgent);
 

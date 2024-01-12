@@ -32,6 +32,12 @@ namespace BacktesterTests
 
         Backtester _backtester;
 
+        [OneTimeSetUp]
+        public void OneTimeSetUp()
+        {
+            TestsUtils.RestoreTestDb();
+        }
+
         [TearDown]
         public async Task TearDown()
         {

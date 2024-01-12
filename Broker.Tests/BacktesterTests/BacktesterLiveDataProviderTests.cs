@@ -2,6 +2,7 @@
 using NUnit.Framework;
 using Broker.Tests;
 using Broker.Utils;
+using Broker.IBKR;
 
 namespace BacktesterTests
 {
@@ -12,6 +13,7 @@ namespace BacktesterTests
         [OneTimeSetUp]
         public override async Task OneTimeSetUp()
         {
+            TestsUtils.RestoreTestDb();
             _backtester = TestsUtils.CreateBacktester(new DateOnly(2024, 01, 10));
             _broker = _backtester;
             await _broker.ConnectAsync();
@@ -27,6 +29,7 @@ namespace BacktesterTests
         [TearDown]
         public void TearDown()
         {
+            Assert.IsTrue((_backtester.HistoricalDataProvider as IBHistoricalDataProvider)._lastOperationStats.NbRetrievedFromIBKR == 0);
             _backtester.Stop();
         }
 

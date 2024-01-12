@@ -20,6 +20,7 @@ namespace IBBrokerTests
         [OneTimeSetUp]
         public async Task OneTimeSetUp()
         {
+            TestsUtils.RestoreTestDb();
             _logger = TestsUtils.CreateLogger();
             _broker = TestsUtils.CreateBroker(_logger);
             _historicalProvider = (IBHistoricalDataProvider)_broker.HistoricalDataProvider;

@@ -14,7 +14,17 @@ namespace UtilsTests
 {
     internal class TestDataDbFiller
     {
-        //[Test, Explicit]
+        static List<(string, DateRange)> GetRequiredTestData()
+        {
+            List<(string, DateRange)> data = new();
+            data.AddRange(BacktesterLiveDataProviderTests.GetRequiredTestData());
+            data.AddRange(BacktesterOrderManagerTests.GetRequiredTestData());
+            data.AddRange(OrderEvaluatorTests.GetRequiredTestData());
+            data.AddRange(BarCommandsTests.GetRequiredTestData());
+            return data;
+        }
+
+        [Test, Explicit]
         public async Task FillTestDataDb()
         {
             var logger = TestsUtils.CreateLogger();
@@ -23,12 +33,9 @@ namespace UtilsTests
             hdp.DbPath = TestsUtils.TestDataDbPath;
             hdp.LogLevel = LogLevel.Debug;
 
-            List<(string, DateRange)> data = new ();
-            data.AddRange(BacktesterLiveDataProviderTests.GetRequiredTestData());
-            data.AddRange(OrderEvaluatorTests.GetRequiredTestData());
-            data.AddRange(BarCommandsTests.GetRequiredTestData());
-            
-            foreach(var d in data.Distinct())
+            List<(string, DateRange)> data = GetRequiredTestData();
+
+            foreach (var d in data.Distinct())
             {
                 await hdp.GetHistoricalDataAsync<Bar>(d.Item1, d.Item2.From, d.Item2.To);
                 await hdp.GetHistoricalDataAsync<BidAsk>(d.Item1, d.Item2.From, d.Item2.To);
