@@ -4,6 +4,7 @@ using Broker.MarketData;
 using NLog;
 using NUnit.Framework;
 using Broker.Tests;
+using Broker.Utils;
 
 namespace IBBrokerTests
 {
@@ -49,17 +50,32 @@ namespace IBBrokerTests
         }
 
         // Test data in Db (GME) : 
-        // 2023/04/03 : full day (9:30 to 16:00)
-        // 2023/04/04 : full day
-        // 2023/04/05 : full day
-        // 2023/04/06 : 10:00 to 11:00
-        // 2023/04/07 : holiday
+        // 2024/01/01 : holiday
+        // 2024/01/02 : full day (9:30 to 16:00)
+        // 2024/01/03 : full day
+        // 2024/01/04 : full day
+        // 2024/01/05 : 10:00 to 11:00
+
+        const string Ticker = "GME";
+        static DateOnly Holiday = new DateOnly(2024, 01, 01);
+        static DateOnly FullDay1 = new DateOnly(2024, 01, 02);
+        static DateOnly FullDay2 = new DateOnly(2024, 01, 03);
+        static DateOnly FullDay3 = new DateOnly(2024, 01, 04);
+        static DateRange PartialDay = (new DateTime(2024, 01, 05, 10, 00, 00), new DateTime(2024, 01, 05, 11, 00, 00));
+
+        public static IEnumerable<(string, DateRange)> GetRequiredTestData()
+        {
+            yield return (Ticker, FullDay1.ToMarketHours());
+            yield return (Ticker, FullDay2.ToMarketHours());
+            yield return (Ticker, FullDay3.ToMarketHours());
+            yield return (Ticker, PartialDay);
+        }
 
         [Test]
         public async Task GetHistoricalData_Holiday_ShouldThrow()
         {
-            string ticker = "GME";
-            DateOnly date = new DateOnly(2023, 04, 07);
+            string ticker = Ticker;
+            DateOnly date = Holiday;
 
             Assert.ThrowsAsync<ArgumentException>(async () => await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, date));
             await Task.CompletedTask;
@@ -68,8 +84,8 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_SpecificDate()
         {
-            string ticker = "GME";
-            DateOnly date = new DateOnly(2023, 04, 03);
+            string ticker = Ticker;
+            DateOnly date = FullDay1;
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, date);
 
@@ -81,9 +97,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_DateRange_IntraDay()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 03, 10, 13, 00);
-            DateTime to = new DateTime(2023, 04, 03, 11, 47, 53);
+            string ticker = Ticker;
+            DateOnly day = FullDay1;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 10, 13, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 11, 47, 53);
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -95,9 +112,9 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_DateRange_MultipleDays()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 03, 12, 0, 0);
-            DateTime to = new DateTime(2023, 04, 05, 10, 30, 0);
+            string ticker = Ticker;
+            DateTime from = new DateTime(FullDay1.Year, FullDay1.Month, FullDay1.Day, 12, 0, 0);
+            DateTime to = new DateTime(FullDay3.Year, FullDay3.Month, FullDay3.Day, 10, 30, 0);
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
 
@@ -109,9 +126,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheDisabled_DbDisabled_RetrievesThemFromIBKR()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 03, 10, 0, 0);
-            DateTime to = new DateTime(2023, 04, 03, 11, 0, 0);
+            string ticker = Ticker;
+            DateOnly day = FullDay1;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 10, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 11, 00, 00);
             _historicalProvider.CacheEnabled = false;
             _historicalProvider.DbEnabled = false;
 
@@ -125,9 +143,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheDisabled_DbEnabled_RetrievesThemFromDb()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 03, 10, 0, 0);
-            DateTime to = new DateTime(2023, 04, 03, 11, 0, 0);
+            string ticker = Ticker;
+            DateOnly day = FullDay1;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 10, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 11, 00, 00);
             _historicalProvider.CacheEnabled = false;
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
@@ -140,9 +159,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheDisabled_DbEnabled_DataNotInDb_InsertsItInDb()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
-            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            string ticker = Ticker;
+            DateTime day = PartialDay.From.Date;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 13, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 14, 00, 00);
             TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
 
             var results = await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, from, to);
@@ -162,9 +182,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheEnabled_DataNotInCache_InsertsItInCache()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
-            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            string ticker = Ticker;
+            DateTime day = PartialDay.From.Date;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 13, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 14, 00, 00);
             TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = true;
             _historicalProvider.ClearCache();
@@ -186,9 +207,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheEnabled_DataInCache_RetrievesItFromCache()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
-            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            string ticker = Ticker;
+            DateTime day = PartialDay.From.Date;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 13, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 14, 00, 00);
             TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = true;
 
@@ -214,9 +236,10 @@ namespace IBBrokerTests
         [Test]
         public async Task GetHistoricalData_CacheDisabled_DbDisabled_DataNotInDbOrCache_DoesntInsertsItAnywhere()
         {
-            string ticker = "GME";
-            DateTime from = new DateTime(2023, 04, 06, 13, 0, 0);
-            DateTime to = new DateTime(2023, 04, 06, 14, 0, 0);
+            string ticker = Ticker;
+            DateTime day = PartialDay.From.Date;
+            DateTime from = new DateTime(day.Year, day.Month, day.Day, 13, 00, 00);
+            DateTime to = new DateTime(day.Year, day.Month, day.Day, 14, 00, 00);
             TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
             _historicalProvider.CacheEnabled = false;
             _historicalProvider.DbEnabled = false;
@@ -233,25 +256,6 @@ namespace IBBrokerTests
             finally
             {
                 TestsUtils.DeleteDataInTestDb<TData>(ticker, new(from, to));
-            }
-        }
-
-        public async Task FillTestDataDb()
-        {
-            string ticker = "GME";
-
-            var path = _historicalProvider.DbPath;
-            try
-            {
-                _historicalProvider.DbPath = TestsUtils.TestDataDbPath;
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 03));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 04));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateOnly(2023, 04, 05));
-                await _historicalProvider.GetHistoricalDataAsync<TData>(ticker, new DateTime(2023, 04, 06, 10, 00, 00), new DateTime(2023, 04, 06, 11, 00, 00));
-            }
-            finally
-            {
-                _historicalProvider.DbPath = path;
             }
         }
     }

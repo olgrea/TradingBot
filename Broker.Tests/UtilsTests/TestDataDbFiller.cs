@@ -4,6 +4,7 @@ using Broker.IBKR;
 using Broker.MarketData;
 using Broker.Tests;
 using Broker.Utils;
+using IBBrokerTests;
 using Microsoft.Data.Sqlite;
 using NLog;
 using NUnit.Framework;
@@ -21,6 +22,7 @@ namespace UtilsTests
             data.AddRange(BacktesterOrderManagerTests.GetRequiredTestData());
             data.AddRange(OrderEvaluatorTests.GetRequiredTestData());
             data.AddRange(BarCommandsTests.GetRequiredTestData());
+            data.AddRange(HistoricalOneSecBarsTests.GetRequiredTestData());
             return data;
         }
 
