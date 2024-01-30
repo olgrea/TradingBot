@@ -15,13 +15,18 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TraderApp", "TraderApp\Trad
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BacktesterApp", "BacktesterApp\BacktesterApp.csproj", "{2C3E092B-208A-4ADA-A388-4CA187330B99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TradingBot.Private", "..\TradingBot.Private\TradingBot.Private\TradingBot.Private.csproj", "{AD7C4042-0E8A-4677-9F33-3492F90BE7B0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TradingBot.Private", "..\TradingBot.Private\TradingBot.Private\TradingBot.Private.csproj", "{AD7C4042-0E8A-4677-9F33-3492F90BE7B0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NLog.NUnit", "NLog.Unit\NLog.NUnit.csproj", "{C222926D-6892-4EE3-870C-51883DC37F74}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trader", "Trader\Trader.csproj", "{D794C22D-3694-4FA0-BA2A-9F3D0D5F3D81}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Trader", "Trader\Trader.csproj", "{D794C22D-3694-4FA0-BA2A-9F3D0D5F3D81}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Trader.Tests", "Trader.Tests\Trader.Tests.csproj", "{D9174BA8-286F-4D7E-B0F3-818883F6D9FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Trader.Tests", "Trader.Tests\Trader.Tests.csproj", "{D9174BA8-286F-4D7E-B0F3-818883F6D9FB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9FC1AD8C-5116-4023-8466-049989250388}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
