@@ -1,4 +1,4 @@
-﻿namespace Broker.Orders
+﻿namespace Broker.IBKR.Orders
 {
     public class OrderStatus
     {

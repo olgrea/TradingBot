@@ -1,13 +1,13 @@
 ﻿using Broker;
 using Broker.Accounts;
 using Broker.IBKR.Client;
-using Broker.Orders;
 using Broker.Utils;
 using NLog;
 using NUnit.Framework;
 using Broker.Tests;
 using Broker.IBKR;
 using Broker.IBKR.Accounts;
+using Broker.IBKR.Orders;
 
 namespace IBBrokerTests
 {

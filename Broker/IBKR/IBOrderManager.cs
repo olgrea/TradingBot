@@ -1,6 +1,6 @@
 ﻿using Broker.Accounts;
 using Broker.IBKR.Client;
-using Broker.Orders;
+using Broker.IBKR.Orders;
 using NLog;
 
 namespace Broker.IBKR

@@ -6,7 +6,7 @@ using Broker.Accounts;
 using Broker.IBKR;
 using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
-using Broker.Orders;
+using Broker.IBKR.Orders;
 using NLog;
 using Trader.Strategies;
 

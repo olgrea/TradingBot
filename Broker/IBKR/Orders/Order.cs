@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using Broker.Utils;
 using IBApi;
 
-namespace Broker.Orders
+namespace Broker.IBKR.Orders
 {
     public enum OrderAction
     {

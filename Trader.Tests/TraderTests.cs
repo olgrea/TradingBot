@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using Broker.IBKR;
+using Broker.IBKR.Orders;
 using Broker.MarketData;
-using Broker.Orders;
 using Broker.Tests;
 using NLog;
 using NUnit.Framework;

@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using Broker.Utils;
 
-namespace Broker.Orders
+namespace Broker.IBKR.Orders
 {
     public class OrderExecution
     {

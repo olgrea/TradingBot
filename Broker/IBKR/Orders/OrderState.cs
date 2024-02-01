@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Broker.Orders
+namespace Broker.IBKR.Orders
 {
     public enum Status
     {
