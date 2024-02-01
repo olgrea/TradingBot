@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
-using Broker.IBKR;
+using Broker.IBKR.Contracts;
 using IBApi;
 using NLog;
+
+using Contract = IBApi.Contract;
 
 namespace Broker.IBKR.Client
 {
@@ -146,7 +148,7 @@ namespace Broker.IBKR.Client
             _socket.reqAccountUpdates(false, accountCode);
         }
 
-        public int RequestContractDetails(Contract contract)
+        public int RequestContractDetails(IBApi.Contract contract)
         {
             int reqId = NextValidId;
             _logger?.Trace($"{nameof(_socket.reqContractDetails)}(reqId : {reqId}, ConId : {contract.ConId})");
