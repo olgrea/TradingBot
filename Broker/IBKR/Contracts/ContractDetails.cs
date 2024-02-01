@@ -1,4 +1,4 @@
-﻿namespace Broker.Contracts
+﻿namespace Broker.IBKR.Contracts
 {
     public class ContractDetails
     {

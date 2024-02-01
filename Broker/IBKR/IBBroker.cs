@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using Broker.Accounts;
-using Broker.Contracts;
 using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
+using Broker.IBKR.Contracts;
 using Broker.MarketData.Providers;
 using Broker.Orders;
 using NLog;
