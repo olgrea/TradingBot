@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Broker;
 using Broker.Accounts;
 using Broker.IBKR;
+using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
 using Broker.Orders;
 using NLog;
@@ -29,7 +30,7 @@ namespace Trader
 
         ILogger? _logger;
         IIBBroker _broker;
-        Account? _account;
+        IAccount? _account;
         List<IStrategy> _strategies = new();
         TradeResults _results = new();
         CancellationTokenSource _cancellation = new();
@@ -49,7 +50,7 @@ namespace Trader
 
         public ILogger? Logger => _logger;
         public IIBBroker Broker => _broker;
-        public Account Account => _account!;
+        public IAccount Account => _account!;
 
         public void AddStrategy(IStrategy newStrat)
         {

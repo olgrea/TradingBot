@@ -1,6 +1,6 @@
-﻿using Broker.IBKR.Client;
+﻿using Broker.Accounts;
 
-namespace Broker.Accounts
+namespace Broker.IBKR.Accounts
 {
     public enum AccountValueKey
     {
@@ -29,7 +29,7 @@ namespace Broker.Accounts
         }
     }
 
-    public class Account
+    public class IBAccount : IAccount
     {
         public const double MinimumUSDCashBalance = 500.0d;
 
@@ -40,7 +40,7 @@ namespace Broker.Accounts
         public Dictionary<string, double> RealizedPnL { get; set; } = new Dictionary<string, double>();
         public Dictionary<string, double> UnrealizedPnL { get; set; } = new Dictionary<string, double>();
 
-        public Account(string code)
+        public IBAccount(string code)
         {
             Code = code;
         }
@@ -62,7 +62,7 @@ namespace Broker.Accounts
 
         public override bool Equals(object? obj)
         {
-            var a = obj as Account;
+            var a = obj as IBAccount;
             return a != null && a.Time == Time;
         }
     }

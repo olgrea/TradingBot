@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Broker.Accounts;
+using Broker.IBKR.Accounts;
 using Broker.MarketData;
 using Broker.Orders;
 using NLog;
@@ -249,7 +250,7 @@ namespace Broker.Backtesting
             _logger?.Debug($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
-            Account account = _backtester.Account;
+            IBAccount account = _backtester.Account;
             if (!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
             {
                 position = _backtester.Account.Positions[ticker] = new Position(ticker);

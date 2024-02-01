@@ -7,6 +7,7 @@ using NLog;
 using NUnit.Framework;
 using Broker.Tests;
 using Broker.IBKR;
+using Broker.IBKR.Accounts;
 
 namespace IBBrokerTests
 {
@@ -43,7 +44,7 @@ namespace IBBrokerTests
         [Test]
         public async Task GetAccountAsync_WithValidAccountCode_GetsTheAccount()
         {
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
             Assert.IsNotNull(account);
             Assert.AreEqual(_accountCode, account.Code);
             Assert.AreNotEqual(account.Time, default(DateTime));
@@ -58,7 +59,7 @@ namespace IBBrokerTests
             var randomQty = new Random().Next(2, 10);
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
             double currentPos = 0;
             if (account.Positions.TryGetValue(ticker, out Position pos))
                 currentPos = pos.PositionAmount;
@@ -96,7 +97,7 @@ namespace IBBrokerTests
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await _broker.OrderManager.SellAllPositionsAsync();
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
 
             int receiveUntil = 5;
             int nbPnLReceived = 0;

@@ -1,4 +1,5 @@
-﻿using Broker.IBKR.Client;
+﻿using Broker.Accounts;
+using Broker.IBKR.Client;
 using Broker.Orders;
 using NLog;
 
@@ -239,7 +240,7 @@ namespace Broker.IBKR
         {
             var list = new List<OrderExecutedResult>();
             var account = await _broker.GetAccountAsync();
-            foreach (KeyValuePair<string, Accounts.Position> pos in account.Positions)
+            foreach (KeyValuePair<string, Position> pos in account.Positions)
             {
                 if (pos.Value.PositionAmount <= 0)
                     continue;

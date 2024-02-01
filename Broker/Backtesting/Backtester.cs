@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Broker.Accounts;
 using Broker.IBKR;
+using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
 using Broker.MarketData;
 using Broker.MarketData.Providers;
@@ -31,7 +32,7 @@ namespace Broker.Backtesting
     public class Backtester : IIBBroker, IAsyncDisposable
     {
         private const string FakeAccountCode = "FAKEACCOUNT123";
-        Account _fakeAccount = new Account(FakeAccountCode)
+        IBAccount _fakeAccount = new IBAccount(FakeAccountCode)
         {
             Code = FakeAccountCode,
             CashBalances = new Dictionary<string, double>()
@@ -119,7 +120,7 @@ namespace Broker.Backtesting
         internal DateTime CurrentTime => _currentTime;
         internal DateTime? LastProcessedTime => _lastProcessedTime;
         internal ILogger? Logger { get => _logger; set => _logger = value; }
-        internal Account Account => _fakeAccount;
+        internal IBAccount Account => _fakeAccount;
         internal event Action<DateTime, CancellationToken>? ClockTick;
 
         internal string? DbPath
@@ -444,13 +445,13 @@ namespace Broker.Backtesting
             });
         }
 
-        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
-        public Task<Account> GetAccountAsync(CancellationToken token)
+        public async Task<IAccount> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public Task<IAccount> GetAccountAsync(CancellationToken token)
         {
             _lastAccountUpdateTime = _currentTime;
             _accountUpdatesRequested = true;
             SendAccountUpdates();
-            return Task.FromResult(_fakeAccount);
+            return Task.FromResult(_fakeAccount as IAccount);
         }
 
         public void RequestAccountUpdates()

@@ -160,11 +160,11 @@ namespace Broker.Orders
         {
             throw new NotImplementedException("Feature not working correctly. Disabling it for now.");
 
-            OrderConditions.Add(cond);
+            //OrderConditions.Add(cond);
 
-            //TODO : need to check if I can use this flag when using conditions 
-            if (NeedsConditionFulfillmentToBeOpened)
-                Info.Transmit = false;
+            ////TODO : need to check if I can use this flag when using conditions 
+            //if (NeedsConditionFulfillmentToBeOpened)
+            //    Info.Transmit = false;
         }
 
         public static explicit operator Order(IBApi.Order ibo)

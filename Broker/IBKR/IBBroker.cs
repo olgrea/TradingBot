@@ -2,6 +2,7 @@
 using System.Globalization;
 using Broker.Accounts;
 using Broker.Contracts;
+using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
 using Broker.MarketData.Providers;
 using Broker.Orders;
@@ -17,7 +18,7 @@ namespace Broker.IBKR
         int _port;
         IBClient _client;
         ILogger? _logger;
-        Account? _account;
+        IBAccount? _account;
         HashSet<string> _pnlSubscriptions = new HashSet<string>();
 
         public IBBroker(int clientId, ILogger? logger = null)
@@ -152,7 +153,7 @@ namespace Broker.IBKR
                 _client.Connect(IBClient.DefaultIP, _port, _clientId);
 
                 await tcs.Task;
-                _account = new Account(tcs.Task.Result);
+                _account = new IBAccount(tcs.Task.Result);
                 _logger?.Debug($"Connected. Account Code : {_account.Code}");
             }
             finally
@@ -216,13 +217,13 @@ namespace Broker.IBKR
             }
         }
 
-        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
-        public async Task<Account> GetAccountAsync(CancellationToken token)
+        public async Task<IAccount> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public async Task<IAccount> GetAccountAsync(CancellationToken token)
         {
             Debug.Assert(_account != null);
             await ValidateAccount(token);
 
-            var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBAccount>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             bool accDownloaded = false;
