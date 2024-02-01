@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using Broker;
+using Broker.IBKR;
 using Broker.IBKR.Client;
 using Broker.Orders;
 using IBApi;
@@ -16,7 +16,7 @@ namespace IBBrokerTests
     {
         protected const string TickerGME = "GME";
         protected const string TickerAMC = "AMC";
-        internal IBroker _broker;
+        internal IIBBroker _broker;
         ILogger _logger;
 
         [OneTimeSetUp]

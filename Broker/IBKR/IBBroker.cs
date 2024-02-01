@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using Broker.Accounts;
 using Broker.Contracts;
 using Broker.IBKR.Client;
@@ -10,7 +9,7 @@ using NLog;
 
 namespace Broker.IBKR
 {
-    public class IBBroker : IBroker
+    public class IBBroker : IIBBroker
     {
         static SemaphoreSlim s_sem = new(1, 1);
 

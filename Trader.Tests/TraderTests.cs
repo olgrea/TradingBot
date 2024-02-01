@@ -1,5 +1,5 @@
 ﻿using System.Diagnostics;
-using Broker;
+using Broker.IBKR;
 using Broker.MarketData;
 using Broker.Orders;
 using Broker.Tests;
@@ -14,7 +14,7 @@ namespace TraderTests
     {
         const string Ticker = "GME";
         ILogger _logger;
-        IBroker _broker;
+        IIBBroker _broker;
         Trader.Trader _trader;
         TestStrategy _testStrategy;
 

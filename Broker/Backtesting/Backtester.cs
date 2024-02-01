@@ -28,7 +28,7 @@ namespace Broker.Backtesting
         public TimeSpan RunTime { get; set; }
     }
 
-    public class Backtester : IBroker, IAsyncDisposable
+    public class Backtester : IIBBroker, IAsyncDisposable
     {
         private const string FakeAccountCode = "FAKEACCOUNT123";
         Account _fakeAccount = new Account(FakeAccountCode)

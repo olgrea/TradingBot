@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Broker;
 using Broker.Accounts;
+using Broker.IBKR;
 using Broker.IBKR.Client;
 using Broker.Orders;
 using NLog;
@@ -27,7 +28,7 @@ namespace Trader
         const string PaperTradingAccountCodeFilePath = "./../../../../paper-trading-account.txt";
 
         ILogger? _logger;
-        IBroker _broker;
+        IIBBroker _broker;
         Account? _account;
         List<IStrategy> _strategies = new();
         TradeResults _results = new();
@@ -38,7 +39,7 @@ namespace Trader
         bool IsConnectionLost => !_twsConnectionTcs.Task.IsCompletedSuccessfully || !_marketDataConnectionTcs.Task.IsCompletedSuccessfully;
         readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
-        public Trader(IBroker broker, ILogger? logger = null)
+        public Trader(IIBBroker broker, ILogger? logger = null)
         {
             _broker = broker;
             _logger = logger;
@@ -47,7 +48,7 @@ namespace Trader
         }
 
         public ILogger? Logger => _logger;
-        public IBroker Broker => _broker;
+        public IIBBroker Broker => _broker;
         public Account Account => _account!;
 
         public void AddStrategy(IStrategy newStrat)

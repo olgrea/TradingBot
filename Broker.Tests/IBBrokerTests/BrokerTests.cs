@@ -6,6 +6,7 @@ using Broker.Utils;
 using NLog;
 using NUnit.Framework;
 using Broker.Tests;
+using Broker.IBKR;
 
 namespace IBBrokerTests
 {
@@ -13,7 +14,7 @@ namespace IBBrokerTests
     public class BrokerTests
     {
         protected string _accountCode;
-        protected IBroker _broker;
+        protected IIBBroker _broker;
         protected ILogger _logger;
 
         [SetUp]
