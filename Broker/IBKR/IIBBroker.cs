@@ -17,7 +17,7 @@ namespace Broker.IBKR
         public event Action<Message>? MessageReceived;
 
         public ILiveDataProvider LiveDataProvider { get; }
-        public IHistoricalDataProvider HistoricalDataProvider { get; }
+        public IIBHistoricalDataProvider HistoricalDataProvider { get; }
         public IOrderManager OrderManager { get; }
 
         public void RequestAccountUpdates();

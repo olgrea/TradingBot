@@ -133,7 +133,7 @@ namespace Broker.Backtesting
         }
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
-        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
+        public IIBHistoricalDataProvider HistoricalDataProvider { get; init; }
         public IOrderManager OrderManager { get; init; }
         public event Action<Exception>? ErrorOccured;
         public event Action<Message>? MessageReceived;

@@ -12,7 +12,7 @@ using NLog;
 
 namespace Broker.IBKR
 {
-    internal class IBHistoricalDataProvider : IHistoricalDataProvider
+    internal class IBHistoricalDataProvider : IIBHistoricalDataProvider
     {
         public const string DefaultDbPath = Constants.DbPath;
         TimeSpan Timeout => !Debugger.IsAttached ? TimeSpan.FromSeconds(15) : TimeSpan.FromMilliseconds(-1);
