@@ -6,11 +6,10 @@ using Broker.DataStorage.Sqlite.DbCommandFactories;
 using Broker.DataStorage.Sqlite.DbCommands;
 using Broker.IBKR.Client;
 using Broker.MarketData;
-using Broker.MarketData.Providers;
 using Broker.Utils;
 using NLog;
 
-namespace Broker.IBKR
+namespace Broker.IBKR.Providers
 {
     internal class IBHistoricalDataProvider : IIBHistoricalDataProvider
     {
@@ -129,7 +128,7 @@ namespace Broker.IBKR
         {
             if (from >= to)
                 throw new ArgumentException("Starting date is after or equal to ending date");
-            else if(DateTime.Now < to)
+            else if (DateTime.Now < to)
                 throw new ArgumentException("Date is in the future!");
             else if (!MarketDataUtils.WasMarketOpen(from, to, extendedHours: true))
                 throw new ArgumentException($"Market was closed from {from} to {to}");

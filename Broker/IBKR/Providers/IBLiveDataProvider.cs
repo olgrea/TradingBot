@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using Broker.IBKR.Client;
 
-namespace Broker.IBKR
+namespace Broker.IBKR.Providers
 {
     internal class IBLiveDataProvider : LiveDataProviderBase
     {

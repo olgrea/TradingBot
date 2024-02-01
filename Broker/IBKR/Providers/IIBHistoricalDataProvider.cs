@@ -1,4 +1,6 @@
-﻿namespace Broker.MarketData.Providers
+﻿using Broker.MarketData;
+
+namespace Broker.IBKR.Providers
 {
     public interface IIBHistoricalDataProvider
     {
