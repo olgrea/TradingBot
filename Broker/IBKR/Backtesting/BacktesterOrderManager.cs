@@ -4,7 +4,7 @@ using Broker.IBKR.Orders;
 using Broker.MarketData;
 using Broker.Utils;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     internal class BacktesterOrderManager : IOrderManager
     {

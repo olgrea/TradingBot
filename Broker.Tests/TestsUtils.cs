@@ -1,6 +1,6 @@
 ﻿using System.Data;
-using Broker.Backtesting;
 using Broker.IBKR;
+using Broker.IBKR.Backtesting;
 using Broker.IBKR.Providers;
 using Broker.MarketData;
 using Broker.Utils;

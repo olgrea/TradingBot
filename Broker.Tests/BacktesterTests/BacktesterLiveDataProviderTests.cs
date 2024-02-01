@@ -1,8 +1,8 @@
-﻿using Broker.Backtesting;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using Broker.Tests;
 using Broker.Utils;
 using Broker.IBKR.Providers;
+using Broker.IBKR.Backtesting;
 
 namespace BacktesterTests
 {

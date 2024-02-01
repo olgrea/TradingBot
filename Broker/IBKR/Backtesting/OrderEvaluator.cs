@@ -5,7 +5,7 @@ using Broker.IBKR.Orders;
 using Broker.MarketData;
 using NLog;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     internal class OrderEvaluator
     {

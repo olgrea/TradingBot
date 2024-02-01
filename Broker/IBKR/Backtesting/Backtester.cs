@@ -11,7 +11,7 @@ using Broker.MarketData;
 using Broker.Utils;
 using NLog;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     public class TimeCompression
     {
