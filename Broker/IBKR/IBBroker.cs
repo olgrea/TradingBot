@@ -58,7 +58,7 @@ namespace Broker.IBKR
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
         public IIBHistoricalDataProvider HistoricalDataProvider { get; init; }
-        public IOrderManager OrderManager { get; init; }
+        public IOrderManager<IBOrder> OrderManager { get; init; }
 
         int GetPort()
         {

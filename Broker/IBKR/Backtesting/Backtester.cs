@@ -136,7 +136,7 @@ namespace Broker.IBKR.Backtesting
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
         public IIBHistoricalDataProvider HistoricalDataProvider { get; init; }
-        public IOrderManager OrderManager { get; init; }
+        public IOrderManager<IBOrder> OrderManager { get; init; }
         public event Action<Exception>? ErrorOccured;
         public event Action<Message>? MessageReceived;
         public event Action<AccountValue>? AccountValueUpdated;

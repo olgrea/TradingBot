@@ -2,6 +2,7 @@
 using Broker.Accounts;
 using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
+using Broker.IBKR.Orders;
 using Broker.IBKR.Providers;
 using Broker.Orders;
 
@@ -19,7 +20,7 @@ namespace Broker.IBKR
 
         public ILiveDataProvider LiveDataProvider { get; }
         public IIBHistoricalDataProvider HistoricalDataProvider { get; }
-        public IOrderManager OrderManager { get; }
+        public IOrderManager<IBOrder> OrderManager { get; }
 
         public void RequestAccountUpdates();
         public void CancelAccountUpdates();

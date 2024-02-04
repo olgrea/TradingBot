@@ -7,7 +7,7 @@ using Broker.Utils;
 
 namespace Broker.IBKR.Backtesting
 {
-    internal class BacktesterOrderManager : IOrderManager
+    internal class BacktesterOrderManager : IOrderManager<IBOrder>
     {
         OrderEvaluator _orderEvaluator;
         OrderTracker _orderTracker;

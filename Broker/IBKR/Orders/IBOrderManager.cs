@@ -5,7 +5,7 @@ using NLog;
 
 namespace Broker.IBKR.Orders
 {
-    internal class IBOrderManager : IOrderManager
+    internal class IBOrderManager : IOrderManager<IBOrder>
     {
         ILogger? _logger;
         IBroker _broker;

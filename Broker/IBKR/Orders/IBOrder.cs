@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Security.Cryptography;
+using Broker.Orders;
 using Broker.Utils;
 using IBApi;
 
@@ -49,7 +50,7 @@ namespace Broker.IBKR.Orders
 
     // TODO : to investigate/implement : 
     // Order conditioning
-    public abstract class IBOrder
+    public abstract class IBOrder : IOrder
     {
         class IBAlgorithm
         {
