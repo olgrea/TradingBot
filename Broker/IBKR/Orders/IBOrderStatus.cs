@@ -1,6 +1,6 @@
 ﻿namespace Broker.IBKR.Orders
 {
-    public class OrderStatus
+    public class IBOrderStatus
     {
         internal RequestInfo Info { get; set; } = new RequestInfo();
         public Status Status { get; set; }
@@ -15,9 +15,9 @@
             return $"[{Info.OrderId}] : {Status} filled={Filled:c} remaining={Remaining:c} avgFillprice={AvgFillPrice:c} lastFillPrice={LastFillPrice:c}";
         }
 
-        public static explicit operator OrderStatus(IBApi.OrderStatus status)
+        public static explicit operator IBOrderStatus(IBApi.OrderStatus status)
         {
-            return new OrderStatus()
+            return new IBOrderStatus()
             {
                 Info = new RequestInfo()
                 {

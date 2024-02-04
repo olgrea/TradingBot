@@ -1,8 +1,8 @@
 ﻿namespace Broker.IBKR.Orders
 {
-    public class CommissionInfo
+    public class IBCommissionInfo
     {
-        public CommissionInfo(string execId)
+        public IBCommissionInfo(string execId)
         {
             ExecId = execId;
         }
@@ -18,9 +18,9 @@
             return $"commission={Commission:C} {Currency} {realizedPNL} (execId={ExecId})";
         }
 
-        public static explicit operator CommissionInfo(IBApi.CommissionReport report)
+        public static explicit operator IBCommissionInfo(IBApi.CommissionReport report)
         {
-            return new CommissionInfo(report.ExecId)
+            return new IBCommissionInfo(report.ExecId)
             {
                 Commission = report.Commission,
                 Currency = report.Currency,

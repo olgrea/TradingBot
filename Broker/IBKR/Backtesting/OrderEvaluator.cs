@@ -10,11 +10,11 @@ namespace Broker.IBKR.Backtesting
     internal class OrderEvaluator
     {
         Backtester _backtester;
-        OrderTracker _orderTracker;
+        IBOrderTracker _orderTracker;
         ILogger? _logger;
         int _execId = 1;
 
-        public OrderEvaluator(Backtester backtester, OrderTracker orderTracker)
+        public OrderEvaluator(Backtester backtester, IBOrderTracker orderTracker)
         {
             _backtester = backtester;
             _logger = backtester.Logger;
@@ -25,7 +25,7 @@ namespace Broker.IBKR.Backtesting
         }
 
         int NextExecId => _execId++;
-        internal event Action<string, OrderExecution>? OrderExecuted;
+        internal event Action<string, IBOrderExecution>? OrderExecuted;
         internal event Action<Position>? PositionUpdated;
 
         void OnClockTick_EvaluateOrders(DateTime newTime, CancellationToken token)
@@ -297,7 +297,7 @@ namespace Broker.IBKR.Backtesting
             _logger?.Debug($"Account {account.Code} :  New USD cash balance : {account.CashBalances["USD"]:c}");
 
             string nextExecId = NextExecId.ToString();
-            var oe = new OrderExecution(nextExecId, order.Id)
+            var oe = new IBOrderExecution(nextExecId, order.Id)
             {
                 AcctNumber = account.Code,
                 Time = _backtester.CurrentTime,
@@ -305,7 +305,7 @@ namespace Broker.IBKR.Backtesting
                 Shares = order.TotalQuantity,
                 Price = total,
                 AvgPrice = price,
-                CommissionInfo = new CommissionInfo(nextExecId)
+                CommissionInfo = new IBCommissionInfo(nextExecId)
                 {
                     Commission = commission,
                     Currency = "USD",

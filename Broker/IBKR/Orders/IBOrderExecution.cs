@@ -3,9 +3,9 @@ using Broker.Utils;
 
 namespace Broker.IBKR.Orders
 {
-    public class OrderExecution
+    public class IBOrderExecution
     {
-        public OrderExecution(string execId, int orderId)
+        public IBOrderExecution(string execId, int orderId)
         {
             ExecId = execId;
             OrderId = orderId;
@@ -20,18 +20,18 @@ namespace Broker.IBKR.Orders
         public double Shares { get; set; }
         public double Price { get; set; }
         public double AvgPrice { get; set; }
-        public CommissionInfo? CommissionInfo { get; set; }
+        public IBCommissionInfo? CommissionInfo { get; set; }
 
         public override string ToString()
         {
             return $"[{OrderId}] : {Action} {Shares} price={Price:c} avgPrice={AvgPrice:c} exchange={Exchange} time={Time} execId={ExecId}";
         }
 
-        public static explicit operator OrderExecution(IBApi.Execution exec)
+        public static explicit operator IBOrderExecution(IBApi.Execution exec)
         {
             var time = exec.Time.Substring(0, exec.Time.Length - exec.Time.LastIndexOf(' '));
 
-            return new OrderExecution(exec.ExecId, exec.OrderId)
+            return new IBOrderExecution(exec.ExecId, exec.OrderId)
             {
                 Exchange = exec.Exchange,
                 Action = exec.Side == "BOT" ? OrderAction.BUY : OrderAction.SELL,

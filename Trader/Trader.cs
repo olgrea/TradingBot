@@ -176,7 +176,7 @@ namespace Trader
             );
         }
 
-        void OrderExecuted(string ticker, OrderExecution oe)
+        void OrderExecuted(string ticker, IBOrderExecution oe)
         {
             _logger?.Info($"{oe}");
             _results.Trades.Add(new Trade(

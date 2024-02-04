@@ -10,8 +10,8 @@ namespace Broker.IBKR.Backtesting
     internal class BacktesterOrderManager : IOrderManager<IBOrder>
     {
         OrderEvaluator _orderEvaluator;
-        OrderTracker _orderTracker;
-        OrderValidator _validator;
+        IBOrderTracker _orderTracker;
+        IBOrderValidator _validator;
         Backtester _backtester;
 
         int _nextOrderId = 1;
@@ -20,8 +20,8 @@ namespace Broker.IBKR.Backtesting
 
         public BacktesterOrderManager(Backtester backtester)
         {
-            _orderTracker = new OrderTracker();
-            _validator = new OrderValidator(_orderTracker);
+            _orderTracker = new IBOrderTracker();
+            _validator = new IBOrderValidator(_orderTracker);
 
             _backtester = backtester;
             _backtester.ClockTick += OnClockTick_EvaluateConditions;
@@ -29,8 +29,8 @@ namespace Broker.IBKR.Backtesting
             _orderEvaluator.OrderExecuted += OnOrderExecuted;
         }
 
-        public event Action<string, IBOrder, OrderStatus>? OrderUpdated;
-        public event Action<string, OrderExecution>? OrderExecuted;
+        public event Action<string, IBOrder, IBOrderStatus>? OrderUpdated;
+        public event Action<string, IBOrderExecution>? OrderExecuted;
 
         int NextOrderId => _nextOrderId++;
 
@@ -176,17 +176,17 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        public async Task<OrderStatus> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
-        public async Task<OrderStatus> CancelOrderAsync(int orderId, CancellationToken token)
+        public async Task<IBOrderStatus> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
+        public async Task<IBOrderStatus> CancelOrderAsync(int orderId, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<OrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBOrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             Action request = () =>
             {
                 try
                 {
-                    OrderStatus os = CancelOrderInternal(orderId, out IBOrder order);
+                    IBOrderStatus os = CancelOrderInternal(orderId, out IBOrder order);
                     tcs.TrySetResult(os);
                 }
                 catch (Exception e)
@@ -208,18 +208,18 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
-        public async Task<IEnumerable<OrderStatus>> CancelAllOrdersAsync(CancellationToken token)
+        public async Task<IEnumerable<IBOrderStatus>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
+        public async Task<IEnumerable<IBOrderStatus>> CancelAllOrdersAsync(CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<IEnumerable<OrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IEnumerable<IBOrderStatus>>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             Action request = () =>
             {
-                var list = new List<OrderStatus>();
+                var list = new List<IBOrderStatus>();
                 foreach (IBOrder order in _orderTracker.OpenOrders.Values)
                 {
-                    var os = new OrderStatus()
+                    var os = new IBOrderStatus()
                     {
                         Status = Status.Cancelled,
                         Remaining = order.TotalQuantity,
@@ -278,7 +278,7 @@ namespace Broker.IBKR.Backtesting
                 }
             };
 
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
             {
                 if (oe.OrderId == order.Id)
                 {
@@ -291,7 +291,7 @@ namespace Broker.IBKR.Backtesting
                 }
             });
 
-            var orderUpdated = new Action<string, IBOrder, OrderStatus>((ticker, o, os) =>
+            var orderUpdated = new Action<string, IBOrder, IBOrderStatus>((ticker, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
@@ -343,7 +343,7 @@ namespace Broker.IBKR.Backtesting
             };
 
             var execList = new List<OrderExecutedResult>();
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
             {
                 if (ordersPlaced.ContainsKey(oe.OrderId))
                 {
@@ -394,7 +394,7 @@ namespace Broker.IBKR.Backtesting
             var result = new OrderPlacedResult()
             {
                 Order = order,
-                OrderStatus = new OrderStatus()
+                OrderStatus = new IBOrderStatus()
                 {
                     Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                     Remaining = order.TotalQuantity,
@@ -404,7 +404,7 @@ namespace Broker.IBKR.Backtesting
                         Transmit = order.Info.Transmit,
                     },
                 },
-                OrderState = new OrderState()
+                OrderState = new IBOrderState()
                 {
                     Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                 },
@@ -428,7 +428,7 @@ namespace Broker.IBKR.Backtesting
             var result = new OrderPlacedResult()
             {
                 Order = order,
-                OrderStatus = new OrderStatus()
+                OrderStatus = new IBOrderStatus()
                 {
                     Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                     Remaining = order.TotalQuantity,
@@ -437,7 +437,7 @@ namespace Broker.IBKR.Backtesting
                         OrderId = order.Id,
                     },
                 },
-                OrderState = new OrderState()
+                OrderState = new IBOrderState()
                 {
                     Status = order.Info.Transmit ? Status.Submitted : Status.Inactive,
                 },
@@ -449,7 +449,7 @@ namespace Broker.IBKR.Backtesting
             return result;
         }
 
-        OrderStatus CancelOrderInternal(int orderId, out IBOrder order)
+        IBOrderStatus CancelOrderInternal(int orderId, out IBOrder order)
         {
             _validator.ValidateOrderCancellation(orderId);
 
@@ -457,7 +457,7 @@ namespace Broker.IBKR.Backtesting
 
             _orderTracker.TrackCancellation(order);
 
-            OrderStatus os = new OrderStatus()
+            IBOrderStatus os = new IBOrderStatus()
             {
                 Status = Status.Cancelled,
                 Remaining = order.TotalQuantity,
@@ -487,7 +487,7 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        void OnOrderExecuted(string ticker, OrderExecution execution)
+        void OnOrderExecuted(string ticker, IBOrderExecution execution)
         {
             _orderTracker.TrackExecution(execution);
             OrderExecuted?.Invoke(ticker, execution);

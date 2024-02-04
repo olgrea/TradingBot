@@ -7,7 +7,7 @@ using NUnit.Framework;
 using Broker.Tests;
 using BidAsk = Broker.MarketData.BidAsk;
 using IBOrder = Broker.IBKR.Orders.IBOrder;
-using OrderStatus = Broker.IBKR.Orders.OrderStatus;
+using IBOrderStatus = Broker.IBKR.Orders.IBOrderStatus;
 using Broker.IBKR.Orders;
 
 namespace IBBrokerTests
@@ -148,7 +148,7 @@ namespace IBBrokerTests
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            OrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
+            IBOrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
 
             // Assert
             Assert.NotNull(orderStatus);
@@ -170,7 +170,7 @@ namespace IBBrokerTests
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
-            OrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
+            IBOrderStatus orderStatus = await _broker.OrderManager.CancelOrderAsync(openOrderMsg.Order.Id);
             Assert.NotNull(orderStatus);
             Assert.IsTrue(orderStatus.Status == Status.Cancelled);
 
@@ -269,7 +269,7 @@ namespace IBBrokerTests
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
-            OrderStatus status = await _broker.OrderManager.CancelOrderAsync(order.Id);
+            IBOrderStatus status = await _broker.OrderManager.CancelOrderAsync(order.Id);
             Assert.NotNull(status);
             Assert.IsTrue(status.Status == Status.Cancelled || status.Status == Status.ApiCancelled);
 
@@ -386,7 +386,7 @@ namespace IBBrokerTests
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
+            var orderPlaced = new Action<string, IBOrder, IBOrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);
@@ -432,7 +432,7 @@ namespace IBBrokerTests
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
+            var orderPlaced = new Action<string, IBOrder, IBOrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);
@@ -477,7 +477,7 @@ namespace IBBrokerTests
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
+            var orderPlaced = new Action<string, IBOrder, IBOrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);

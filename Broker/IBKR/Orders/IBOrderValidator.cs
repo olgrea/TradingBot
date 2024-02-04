@@ -1,10 +1,10 @@
 ﻿namespace Broker.IBKR.Orders
 {
-    internal class OrderValidator
+    internal class IBOrderValidator
     {
-        OrderTracker _orderTracker;
+        IBOrderTracker _orderTracker;
 
-        public OrderValidator(OrderTracker orderTracker)
+        public IBOrderValidator(IBOrderTracker orderTracker)
         {
             _orderTracker = orderTracker;
         }

@@ -1,15 +1,15 @@
 ﻿namespace Broker.IBKR.Orders
 {
-    public class OrderChain
+    public class IBOrderChain
     {
-        public OrderChain(IBOrder order, params OrderChain[] attachedOrders)
+        public IBOrderChain(IBOrder order, params IBOrderChain[] attachedOrders)
         {
             Order = order;
 
             if (attachedOrders.Length > 0)
             {
                 AttachedOrders.AddRange(attachedOrders);
-                foreach (OrderChain attachedOrder in AttachedOrders)
+                foreach (IBOrderChain attachedOrder in AttachedOrders)
                 {
                     attachedOrder.Parent = order;
                 }
@@ -18,9 +18,9 @@
 
         public IBOrder Order { get; }
         public IBOrder? Parent { get; set; }
-        public List<OrderChain> AttachedOrders { get; } = new List<OrderChain>();
+        public List<IBOrderChain> AttachedOrders { get; } = new List<IBOrderChain>();
 
-        public static implicit operator OrderChain(IBOrder o) => new OrderChain(o);
+        public static implicit operator IBOrderChain(IBOrder o) => new IBOrderChain(o);
 
         public override string ToString()
         {
@@ -38,10 +38,10 @@
             return list;
         }
 
-        void Flatten(OrderChain o, List<IBOrder> list)
+        void Flatten(IBOrderChain o, List<IBOrder> list)
         {
             list.Add(o.Order);
-            foreach (OrderChain order in o.AttachedOrders)
+            foreach (IBOrderChain order in o.AttachedOrders)
             {
                 Flatten(order, list);
             }

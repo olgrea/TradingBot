@@ -49,7 +49,7 @@ namespace TraderTests
             await _broker.DisconnectAsync();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) => 
+            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) => 
             {
                 if (ticker == Ticker && oe.Shares >= 5)
                     tcs.TrySetResult();
@@ -75,7 +75,7 @@ namespace TraderTests
             TestsUtils.Assert.MarketIsOpen();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
             {
                 if (ticker == Ticker)
                 {
@@ -90,7 +90,7 @@ namespace TraderTests
             var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = price });
             await _broker.DisconnectAsync();
 
-            var orderStatusChanged = new Action<string, IBOrder, OrderStatus>((ticker, o, os) =>
+            var orderStatusChanged = new Action<string, IBOrder, IBOrderStatus>((ticker, o, os) =>
             {
                 if (ticker == Ticker && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                 {
