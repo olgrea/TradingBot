@@ -2,7 +2,7 @@
 {
     public class OrderChain
     {
-        public OrderChain(Order order, params OrderChain[] attachedOrders)
+        public OrderChain(IBOrder order, params OrderChain[] attachedOrders)
         {
             Order = order;
 
@@ -16,29 +16,29 @@
             }
         }
 
-        public Order Order { get; }
-        public Order? Parent { get; set; }
+        public IBOrder Order { get; }
+        public IBOrder? Parent { get; set; }
         public List<OrderChain> AttachedOrders { get; } = new List<OrderChain>();
 
-        public static implicit operator OrderChain(Order o) => new OrderChain(o);
+        public static implicit operator OrderChain(IBOrder o) => new OrderChain(o);
 
         public override string ToString()
         {
-            List<Order> list = Flatten();
+            List<IBOrder> list = Flatten();
             string str = $"Order chain [{list[0]}";
             for (int i = 1; i < list.Count; i++)
                 str += $", {list[i]}";
             return str + "]";
         }
 
-        public List<Order> Flatten()
+        public List<IBOrder> Flatten()
         {
-            var list = new List<Order>();
+            var list = new List<IBOrder>();
             Flatten(this, list);
             return list;
         }
 
-        void Flatten(OrderChain o, List<Order> list)
+        void Flatten(OrderChain o, List<IBOrder> list)
         {
             list.Add(o.Order);
             foreach (OrderChain order in o.AttachedOrders)

@@ -6,7 +6,7 @@ using NLog;
 using NUnit.Framework;
 using Broker.Tests;
 using BidAsk = Broker.MarketData.BidAsk;
-using Order = Broker.IBKR.Orders.Order;
+using IBOrder = Broker.IBKR.Orders.IBOrder;
 using OrderStatus = Broker.IBKR.Orders.OrderStatus;
 using Broker.IBKR.Orders;
 
@@ -385,8 +385,8 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
+            var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);
@@ -431,8 +431,8 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
+            var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);
@@ -476,8 +476,8 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
-            var tcs = new TaskCompletionSource<Order>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderPlaced = new Action<string, Order, OrderStatus>((t, o, os) =>
+            var tcs = new TaskCompletionSource<IBOrder>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var orderPlaced = new Action<string, IBOrder, OrderStatus>((t, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetResult(o);

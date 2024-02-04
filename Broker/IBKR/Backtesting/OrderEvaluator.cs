@@ -30,7 +30,7 @@ namespace Broker.IBKR.Backtesting
 
         void OnClockTick_EvaluateOrders(DateTime newTime, CancellationToken token)
         {
-            foreach (Order o in _orderTracker.OpenOrders.Values)
+            foreach (IBOrder o in _orderTracker.OpenOrders.Values)
             {
                 token.ThrowIfCancellationRequested();
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
@@ -48,7 +48,7 @@ namespace Broker.IBKR.Backtesting
 
         // TODO : check if I need to implement specific trigger methods
         // https://interactivebrokers.github.io/tws-api/trigger_method_limit.html
-        void EvaluateOrder(string ticker, Order order, BidAsk bidAsk)
+        void EvaluateOrder(string ticker, IBOrder order, BidAsk bidAsk)
         {
             _logger?.Debug($"Evaluating Order {order} at BidAsk : {bidAsk}");
 
@@ -243,7 +243,7 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        void ExecuteOrder(string ticker, Order order, double price)
+        void ExecuteOrder(string ticker, IBOrder order, double price)
         {
             Debug.Assert(!_orderTracker.IsExecuted(order, out _));
 

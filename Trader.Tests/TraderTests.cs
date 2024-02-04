@@ -90,7 +90,7 @@ namespace TraderTests
             var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = price });
             await _broker.DisconnectAsync();
 
-            var orderStatusChanged = new Action<string, Order, OrderStatus>((ticker, o, os) =>
+            var orderStatusChanged = new Action<string, IBOrder, OrderStatus>((ticker, o, os) =>
             {
                 if (ticker == Ticker && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                 {

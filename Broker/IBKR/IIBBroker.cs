@@ -2,8 +2,8 @@
 using Broker.Accounts;
 using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
-using Broker.IBKR.Orders;
 using Broker.IBKR.Providers;
+using Broker.Orders;
 
 [assembly: InternalsVisibleTo("Broker.Tests")]
 [assembly: InternalsVisibleTo("Trader.Tests")]

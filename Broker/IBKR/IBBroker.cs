@@ -6,6 +6,7 @@ using Broker.IBKR.Client;
 using Broker.IBKR.Contracts;
 using Broker.IBKR.Orders;
 using Broker.IBKR.Providers;
+using Broker.Orders;
 using NLog;
 
 namespace Broker.IBKR

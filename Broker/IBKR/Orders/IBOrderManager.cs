@@ -1,5 +1,6 @@
 ﻿using Broker.Accounts;
 using Broker.IBKR.Client;
+using Broker.Orders;
 using NLog;
 
 namespace Broker.IBKR.Orders
@@ -26,12 +27,12 @@ namespace Broker.IBKR.Orders
             _client.Responses.CommissionReport += OnCommissionInfo;
         }
 
-        public event Action<string, Order, OrderStatus>? OrderUpdated;
+        public event Action<string, IBOrder, OrderStatus>? OrderUpdated;
         public event Action<string, OrderExecution>? OrderExecuted;
 
         // TODO : re-implement client-side order chains?
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, Order order, CancellationToken token)
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, IBOrder order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
+        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, IBOrder order, CancellationToken token)
         {
             if (order.Id < 0)
                 order.Id = await GetNextValidOrderIdAsync(token);
@@ -41,15 +42,15 @@ namespace Broker.IBKR.Orders
             return await PlaceOrderInternalAsync(ticker, order, token);
         }
 
-        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order) => await ModifyOrderAsync(order, CancellationToken.None);
-        public async Task<OrderPlacedResult> ModifyOrderAsync(Order order, CancellationToken token)
+        public async Task<OrderPlacedResult> ModifyOrderAsync(IBOrder order) => await ModifyOrderAsync(order, CancellationToken.None);
+        public async Task<OrderPlacedResult> ModifyOrderAsync(IBOrder order, CancellationToken token)
         {
             _validator.ValidateOrderModification(order);
             return await PlaceOrderInternalAsync(_orderTracker.OrderIdsToTicker[order.Id], order, token);
         }
 
         // TODO : investigate/implement/test partially filled orders
-        async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, Order order, CancellationToken token)
+        async Task<OrderPlacedResult> PlaceOrderInternalAsync(string ticker, IBOrder order, CancellationToken token)
         {
             var orderPlacedResult = new OrderPlacedResult();
             var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -65,7 +66,7 @@ namespace Broker.IBKR.Orders
                 if (order.Id == o.OrderId)
                 {
                     orderPlacedResult.Ticker = c.Symbol;
-                    orderPlacedResult.Order = (Order)o;
+                    orderPlacedResult.Order = (IBOrder)o;
                     orderPlacedResult.OrderState = (OrderState)oState;
                 }
             });
@@ -255,8 +256,8 @@ namespace Broker.IBKR.Orders
             return list;
         }
 
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order) => await AwaitExecutionAsync(order, CancellationToken.None);
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(Order order, CancellationToken token)
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(IBOrder order) => await AwaitExecutionAsync(order, CancellationToken.None);
+        public async Task<OrderExecutedResult> AwaitExecutionAsync(IBOrder order, CancellationToken token)
         {
             _validator.ValidateExecutionAwaiting(order.Id);
             if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
@@ -285,7 +286,7 @@ namespace Broker.IBKR.Orders
                 }
             });
 
-            var orderUpdated = new Action<string, Order, OrderStatus>((ticker, o, os) =>
+            var orderUpdated = new Action<string, IBOrder, OrderStatus>((ticker, o, os) =>
             {
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
@@ -309,7 +310,7 @@ namespace Broker.IBKR.Orders
         void OnOrderOpened(IBApi.Contract c, IBApi.Order o, IBApi.OrderState s)
         {
             var ticker = c.Symbol;
-            var order = (Order)o;
+            var order = (IBOrder)o;
             var state = (OrderState)s;
 
             if (state.Status == Status.Submitted || state.Status == Status.PreSubmitted /*for paper trading accounts*/)
@@ -337,7 +338,7 @@ namespace Broker.IBKR.Orders
         void OnOrderStatus(IBApi.OrderStatus status)
         {
             OrderStatus os = (OrderStatus)status;
-            if (!_orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out Order? order))
+            if (!_orderTracker.OrdersOpened.TryGetValue(os.Info.OrderId, out IBOrder? order))
                 throw new ArgumentException($"Unknown order id {os.Info.OrderId}");
 
             if (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled)
@@ -403,7 +404,7 @@ namespace Broker.IBKR.Orders
                     orderPlacedResults[o.OrderId] = new OrderPlacedResult();
 
                 orderPlacedResults[o.OrderId].Ticker = c.Symbol;
-                orderPlacedResults[o.OrderId].Order = (Order)o;
+                orderPlacedResults[o.OrderId].Order = (IBOrder)o;
                 orderPlacedResults[o.OrderId].OrderState = (OrderState)oState;
             });
 

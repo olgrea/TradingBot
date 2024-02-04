@@ -8,6 +8,7 @@ using Broker.IBKR.Client;
 using Broker.IBKR.Orders;
 using Broker.IBKR.Providers;
 using Broker.MarketData;
+using Broker.Orders;
 using Broker.Utils;
 using NLog;
 
@@ -494,7 +495,7 @@ namespace Broker.IBKR.Backtesting
             EnqueueRequest(() => _accountUpdatesRequested = false);
         }
 
-        internal double UpdateCommissions(Order order, double price)
+        internal double UpdateCommissions(IBOrder order, double price)
         {
             double commission = GetCommission(order, price);
             Logger?.Debug($"{order} : commission : {commission:c}");
@@ -536,7 +537,7 @@ namespace Broker.IBKR.Backtesting
             //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
 
-        double GetCommission(Order order, double price)
+        double GetCommission(IBOrder order, double price)
         {
             //https://www.interactivebrokers.ca/en/index.php?f=1590
 

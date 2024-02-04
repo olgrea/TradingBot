@@ -9,7 +9,7 @@
             _orderTracker = orderTracker;
         }
 
-        internal void ValidateOrderPlacement(Order order)
+        internal void ValidateOrderPlacement(IBOrder order)
         {
             if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
                 throw new ArgumentException($"This order ({order.Id}) has already been executed.");
@@ -25,7 +25,7 @@
             // not enough positions when selling
         }
 
-        internal void ValidateOrderModification(Order order)
+        internal void ValidateOrderModification(IBOrder order)
         {
             if (order.Id < 0)
                 throw new ArgumentException("Invalid order (order id not set).");
@@ -45,7 +45,7 @@
                 throw new ArgumentException($"This order ({orderId}) has already been executed.");
             else if (_orderTracker.OrdersCancelled.ContainsKey(orderId))
                 throw new ArgumentException($"This order ({orderId}) has already been cancelled.");
-            else if (!_orderTracker.OpenOrders.ContainsKey(orderId) && _orderTracker.OrdersRequested.TryGetValue(orderId, out Order? o) && o.Info.Transmit)
+            else if (!_orderTracker.OpenOrders.ContainsKey(orderId) && _orderTracker.OrdersRequested.TryGetValue(orderId, out IBOrder? o) && o.Info.Transmit)
                 throw new ArgumentException($"No opened order with id {orderId} to modify.");
         }
 

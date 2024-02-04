@@ -49,7 +49,7 @@ namespace Broker.IBKR.Orders
 
     // TODO : to investigate/implement : 
     // Order conditioning
-    public abstract class Order
+    public abstract class IBOrder
     {
         class IBAlgorithm
         {
@@ -58,8 +58,8 @@ namespace Broker.IBKR.Orders
             public List<TagValue> Params { get; set; } = new List<TagValue>();
         }
 
-        protected Order() { }
-        protected Order(IBApi.Order ibo)
+        protected IBOrder() { }
+        protected IBOrder(IBApi.Order ibo)
         {
             Action = Enum.Parse<OrderAction>(ibo.Action);
             TotalQuantity = Convert.ToDouble(ibo.TotalQuantity);
@@ -108,7 +108,7 @@ namespace Broker.IBKR.Orders
         public override bool Equals(object? obj)
         {
             Debug.Assert(Id > 0);
-            var other = obj as Order;
+            var other = obj as IBOrder;
             return other != null && other.Id == Id;
         }
 
@@ -167,7 +167,7 @@ namespace Broker.IBKR.Orders
             //    Info.Transmit = false;
         }
 
-        public static explicit operator Order(IBApi.Order ibo)
+        public static explicit operator IBOrder(IBApi.Order ibo)
         {
             switch (ibo.OrderType)
             {
@@ -220,7 +220,7 @@ namespace Broker.IBKR.Orders
             };
         }
 
-        public static explicit operator IBApi.Order(Order order)
+        public static explicit operator IBApi.Order(IBOrder order)
         {
             return order.ToIBApi();
         }
@@ -238,7 +238,7 @@ namespace Broker.IBKR.Orders
         }
     }
 
-    public class MarketOrder : Order
+    public class MarketOrder : IBOrder
     {
         public MarketOrder() { }
         public MarketOrder(IBApi.Order ibo) : base(ibo) { }
@@ -250,12 +250,12 @@ namespace Broker.IBKR.Orders
             SetAdaptiveAlgoParams(priority);
         }
 
-        public static explicit operator IBApi.Order(MarketOrder order) => (IBApi.Order)(order as Order);
+        public static explicit operator IBApi.Order(MarketOrder order) => (IBApi.Order)(order as IBOrder);
 
         public static explicit operator MarketOrder(IBApi.Order ibo) => new MarketOrder(ibo);
     }
 
-    public class MarketIfTouchedOrder : Order
+    public class MarketIfTouchedOrder : IBOrder
     {
         public MarketIfTouchedOrder() { }
         public MarketIfTouchedOrder(IBApi.Order ibo) : base(ibo)
@@ -287,7 +287,7 @@ namespace Broker.IBKR.Orders
         public static explicit operator MarketIfTouchedOrder(IBApi.Order ibo) => new MarketIfTouchedOrder(ibo);
     }
 
-    public class LimitOrder : Order
+    public class LimitOrder : IBOrder
     {
         public LimitOrder() { }
         public LimitOrder(IBApi.Order ibo) : base(ibo)
@@ -324,7 +324,7 @@ namespace Broker.IBKR.Orders
         public static explicit operator LimitOrder(IBApi.Order ibo) => new LimitOrder(ibo);
     }
 
-    public class StopOrder : Order
+    public class StopOrder : IBOrder
     {
         public StopOrder() { }
         public StopOrder(IBApi.Order ibo) : base(ibo)
@@ -361,7 +361,7 @@ namespace Broker.IBKR.Orders
         Percent
     }
 
-    public class TrailingStopOrder : Order
+    public class TrailingStopOrder : IBOrder
     {
         double? _trailingAmount;
         TrailingAmountUnits? _units;
@@ -455,7 +455,7 @@ namespace Broker.IBKR.Orders
         public static explicit operator TrailingStopOrder(IBApi.Order ibo) => new TrailingStopOrder(ibo);
     }
 
-    public class RelativeOrder : Order
+    public class RelativeOrder : IBOrder
     {
         public RelativeOrder() { }
 
