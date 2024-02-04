@@ -2,6 +2,7 @@
 using Broker.IBKR;
 using Broker.IBKR.Orders;
 using Broker.MarketData;
+using Broker.Orders;
 using Broker.Tests;
 using NLog;
 using NUnit.Framework;
@@ -49,8 +50,9 @@ namespace TraderTests
             await _broker.DisconnectAsync();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) => 
+            var orderExecuted = new Action<string, IOrderResult>((ticker, r) => 
             {
+                IBOrderExecution oe = r as IBOrderExecution;
                 if (ticker == Ticker && oe.Shares >= 5)
                     tcs.TrySetResult();
             });
@@ -75,7 +77,7 @@ namespace TraderTests
             TestsUtils.Assert.MarketIsOpen();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IOrderResult>((ticker, r) =>
             {
                 if (ticker == Ticker)
                 {
@@ -90,8 +92,9 @@ namespace TraderTests
             var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = price });
             await _broker.DisconnectAsync();
 
-            var orderStatusChanged = new Action<string, IBOrder, IBOrderStatus>((ticker, o, os) =>
+            var orderStatusChanged = new Action<string, IBOrder, IOrderResult>((ticker, o, r) =>
             {
+                IBOrderStatus os = r as IBOrderStatus;
                 if (ticker == Ticker && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                 {
                     tcs.TrySetResult();

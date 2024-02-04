@@ -27,8 +27,8 @@ namespace Broker.IBKR.Orders
             _client.Responses.CommissionReport += OnCommissionInfo;
         }
 
-        public event Action<string, IBOrder, IBOrderStatus>? OrderUpdated;
-        public event Action<string, IBOrderExecution>? OrderExecuted;
+        public event Action<string, IBOrder, IOrderResult>? OrderUpdated;
+        public event Action<string, IOrderResult>? OrderExecuted;
 
         // TODO : re-implement client-side order chains?
         public async Task<IOrderResult> PlaceOrderAsync(string ticker, IBOrder order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
@@ -116,8 +116,8 @@ namespace Broker.IBKR.Orders
             }
         }
 
-        public async Task<IBOrderStatus> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
-        public async Task<IBOrderStatus> CancelOrderAsync(int orderId, CancellationToken token)
+        public async Task<IOrderResult> CancelOrderAsync(int orderId) => await CancelOrderAsync(orderId, CancellationToken.None);
+        public async Task<IOrderResult> CancelOrderAsync(int orderId, CancellationToken token)
         {
             _validator.ValidateOrderCancellation(orderId);
             var tcs = new TaskCompletionSource<IBOrderStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -155,8 +155,8 @@ namespace Broker.IBKR.Orders
             }
         }
 
-        public async Task<IEnumerable<IBOrderStatus>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
-        public async Task<IEnumerable<IBOrderStatus>> CancelAllOrdersAsync(CancellationToken token)
+        public async Task<IEnumerable<IOrderResult>> CancelAllOrdersAsync() => await CancelAllOrdersAsync(CancellationToken.None);
+        public async Task<IEnumerable<IOrderResult>> CancelAllOrdersAsync(CancellationToken token)
         {
             int nbRetries = 0;
             const int maxRetries = 5;
@@ -273,8 +273,9 @@ namespace Broker.IBKR.Orders
             var tcs = new TaskCompletionSource<IBOrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
-            var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IOrderResult>((ticker, r) =>
             {
+                IBOrderExecution oe = (r as IBOrderExecution)!;
                 if (oe.OrderId == order.Id)
                 {
                     tcs.TrySetResult(new IBOrderExecutedResult()
@@ -286,8 +287,9 @@ namespace Broker.IBKR.Orders
                 }
             });
 
-            var orderUpdated = new Action<string, IBOrder, IBOrderStatus>((ticker, o, os) =>
+            var orderUpdated = new Action<string, IBOrder, IOrderResult>((ticker, o, r) =>
             {
+                IBOrderStatus os = (r as IBOrderStatus)!;
                 if (o.Id == order.Id && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                     tcs.TrySetException(new Exception($"The order {order.Id} has been cancelled."));
             });

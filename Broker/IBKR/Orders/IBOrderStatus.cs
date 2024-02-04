@@ -1,6 +1,8 @@
-﻿namespace Broker.IBKR.Orders
+﻿using Broker.Orders;
+
+namespace Broker.IBKR.Orders
 {
-    public class IBOrderStatus
+    public class IBOrderStatus : IOrderResult
     {
         internal RequestInfo Info { get; set; } = new RequestInfo();
         public Status Status { get; set; }

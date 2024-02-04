@@ -7,6 +7,7 @@ using Broker.IBKR;
 using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
 using Broker.IBKR.Orders;
+using Broker.Orders;
 using NLog;
 using Trader.Strategies;
 
@@ -176,8 +177,10 @@ namespace Trader
             );
         }
 
-        void OrderExecuted(string ticker, IBOrderExecution oe)
+        void OrderExecuted(string ticker, IOrderResult result)
         {
+            IBOrderExecution oe = (result as IBOrderExecution)!;
+
             _logger?.Info($"{oe}");
             _results.Trades.Add(new Trade(
                 Action: oe.Action,

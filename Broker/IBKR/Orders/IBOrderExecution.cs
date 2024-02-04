@@ -1,9 +1,10 @@
 ﻿using System.Globalization;
+using Broker.Orders;
 using Broker.Utils;
 
 namespace Broker.IBKR.Orders
 {
-    public class IBOrderExecution
+    public class IBOrderExecution : IOrderResult
     {
         public IBOrderExecution(string execId, int orderId)
         {
