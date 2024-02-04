@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
-using Broker.IBKR;
+using Broker.IBKR.Providers;
 using Broker.MarketData;
 using Broker.Utils;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     internal class BacktesterLiveDataProvider : LiveDataProviderBase
     {

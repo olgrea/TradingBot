@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
-using Broker;
+using Broker.IBKR;
+using Broker.IBKR.Orders;
 using Broker.MarketData;
 using Broker.Orders;
 using Broker.Tests;
@@ -14,7 +15,7 @@ namespace TraderTests
     {
         const string Ticker = "GME";
         ILogger _logger;
-        IBroker _broker;
+        IIBBroker _broker;
         Trader.Trader _trader;
         TestStrategy _testStrategy;
 
@@ -44,13 +45,14 @@ namespace TraderTests
             TestsUtils.Assert.MarketIsOpen();
 
             await _broker.ConnectAsync();
-            var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 });
+            IBOrderPlacedResult placedOrder = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(Ticker, new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 });
             await _broker.OrderManager.AwaitExecutionAsync(placedOrder.Order);
             await _broker.DisconnectAsync();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) => 
+            var orderExecuted = new Action<string, IOrderResult>((ticker, r) => 
             {
+                IBOrderExecution oe = r as IBOrderExecution;
                 if (ticker == Ticker && oe.Shares >= 5)
                     tcs.TrySetResult();
             });
@@ -75,7 +77,7 @@ namespace TraderTests
             TestsUtils.Assert.MarketIsOpen();
 
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var orderExecuted = new Action<string, OrderExecution>((ticker, oe) =>
+            var orderExecuted = new Action<string, IOrderResult>((ticker, r) =>
             {
                 if (ticker == Ticker)
                 {
@@ -90,8 +92,9 @@ namespace TraderTests
             var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = price });
             await _broker.DisconnectAsync();
 
-            var orderStatusChanged = new Action<string, Order, OrderStatus>((ticker, o, os) =>
+            var orderStatusChanged = new Action<string, IBOrder, IOrderResult>((ticker, o, r) =>
             {
+                IBOrderStatus os = r as IBOrderStatus;
                 if (ticker == Ticker && (os.Status == Status.Cancelled || os.Status == Status.ApiCancelled))
                 {
                     tcs.TrySetResult();

@@ -1,8 +1,7 @@
 ﻿using Broker.MarketData;
-using Broker.MarketData.Providers;
 using Broker.Utils;
 
-namespace Broker.IBKR
+namespace Broker.IBKR.Providers
 {
     internal abstract class LiveDataProviderBase : ILiveDataProvider
     {

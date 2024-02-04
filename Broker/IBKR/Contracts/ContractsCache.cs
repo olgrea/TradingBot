@@ -1,27 +1,27 @@
 ﻿using Broker.IBKR.Client;
 using IBApi;
 
-namespace Broker.IBKR
+namespace Broker.IBKR.Contracts
 {
     internal class ContractsCache
     {
         IBClient _client;
-        Dictionary<string, Contract> _cache = new Dictionary<string, Contract>();
+        Dictionary<string, IBApi.Contract> _cache = new Dictionary<string, IBApi.Contract>();
 
         public ContractsCache(IBClient client)
         {
             _client = client;
         }
 
-        public Contract Get(string ticker)
+        public IBApi.Contract Get(string ticker)
         {
             return Get(ticker, CancellationToken.None);
         }
 
-        public Contract Get(string ticker, CancellationToken token)
+        public IBApi.Contract Get(string ticker, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if (!_cache.TryGetValue(ticker, out Contract? contract))
+            if (!_cache.TryGetValue(ticker, out IBApi.Contract? contract))
             {
                 lock (_cache)
                 {
@@ -38,9 +38,9 @@ namespace Broker.IBKR
             return _cache[ticker];
         }
 
-        async Task<Contract> GetContractAsync(string symbol, string exchange, CancellationToken token)
+        async Task<IBApi.Contract> GetContractAsync(string symbol, string exchange, CancellationToken token)
         {
-            var sampleContract = new Contract()
+            var sampleContract = new IBApi.Contract()
             {
                 Currency = "USD",
                 Exchange = exchange,
@@ -53,7 +53,7 @@ namespace Broker.IBKR
             return contractDetails.First().Contract;
         }
 
-        async Task<List<ContractDetails>> GetContractDetailsAsync(Contract contract, CancellationToken token)
+        async Task<List<ContractDetails>> GetContractDetailsAsync(IBApi.Contract contract, CancellationToken token)
         {
             int reqId = -1;
 

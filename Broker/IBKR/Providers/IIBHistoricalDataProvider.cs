@@ -1,6 +1,8 @@
-﻿namespace Broker.MarketData.Providers
+﻿using Broker.MarketData;
+
+namespace Broker.IBKR.Providers
 {
-    public interface IHistoricalDataProvider
+    public interface IIBHistoricalDataProvider
     {
         /// <summary>
         /// Retrieves market data of the specified type at the specified date, from market opening to closing.

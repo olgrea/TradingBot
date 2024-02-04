@@ -1,13 +1,13 @@
 ﻿using System;
 
-namespace Broker.Orders
+namespace Broker.IBKR.Orders
 {
     public enum Status
     {
         Unknown, ApiPending, PendingSubmit, PendingCancel, PreSubmitted, Submitted, ApiCancelled, Cancelled, Filled, Inactive
     }
 
-    public class OrderState
+    public class IBOrderState
     {
         public Status Status { get; set; }
         public string? WarningText { get; set; }
@@ -19,9 +19,9 @@ namespace Broker.Orders
         public double MaxCommission { get; set; }
         public string? CommissionCurrency { get; set; }
 
-        public static explicit operator OrderState(IBApi.OrderState ibo)
+        public static explicit operator IBOrderState(IBApi.OrderState ibo)
         {
-            return new OrderState()
+            return new IBOrderState()
             {
                 Status = Enum.Parse<Status>(ibo.Status),
                 WarningText = ibo.WarningText,

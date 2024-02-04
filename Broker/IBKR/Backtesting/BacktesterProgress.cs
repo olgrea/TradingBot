@@ -1,4 +1,4 @@
-﻿namespace Broker.Backtesting
+﻿namespace Broker.IBKR.Backtesting
 {
     //TODO : inherit from IProgress instead?
     public struct BacktesterProgress

@@ -3,14 +3,16 @@ using System.Diagnostics;
 using System.Reflection;
 using Broker.Accounts;
 using Broker.IBKR;
+using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
+using Broker.IBKR.Orders;
+using Broker.IBKR.Providers;
 using Broker.MarketData;
-using Broker.MarketData.Providers;
 using Broker.Orders;
 using Broker.Utils;
 using NLog;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     public class TimeCompression
     {
@@ -28,10 +30,10 @@ namespace Broker.Backtesting
         public TimeSpan RunTime { get; set; }
     }
 
-    public class Backtester : IBroker, IAsyncDisposable
+    public class Backtester : IIBBroker, IAsyncDisposable
     {
         private const string FakeAccountCode = "FAKEACCOUNT123";
-        Account _fakeAccount = new Account(FakeAccountCode)
+        IBAccount _fakeAccount = new IBAccount(FakeAccountCode)
         {
             Code = FakeAccountCode,
             CashBalances = new Dictionary<string, double>()
@@ -119,7 +121,7 @@ namespace Broker.Backtesting
         internal DateTime CurrentTime => _currentTime;
         internal DateTime? LastProcessedTime => _lastProcessedTime;
         internal ILogger? Logger { get => _logger; set => _logger = value; }
-        internal Account Account => _fakeAccount;
+        internal IBAccount Account => _fakeAccount;
         internal event Action<DateTime, CancellationToken>? ClockTick;
 
         internal string? DbPath
@@ -133,8 +135,8 @@ namespace Broker.Backtesting
         }
 
         public ILiveDataProvider LiveDataProvider { get; private set; }
-        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
-        public IOrderManager OrderManager { get; init; }
+        public IIBHistoricalDataProvider HistoricalDataProvider { get; init; }
+        public IOrderManager<IBOrder> OrderManager { get; init; }
         public event Action<Exception>? ErrorOccured;
         public event Action<Message>? MessageReceived;
         public event Action<AccountValue>? AccountValueUpdated;
@@ -444,13 +446,13 @@ namespace Broker.Backtesting
             });
         }
 
-        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
-        public Task<Account> GetAccountAsync(CancellationToken token)
+        public async Task<IAccount> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public Task<IAccount> GetAccountAsync(CancellationToken token)
         {
             _lastAccountUpdateTime = _currentTime;
             _accountUpdatesRequested = true;
             SendAccountUpdates();
-            return Task.FromResult(_fakeAccount);
+            return Task.FromResult(_fakeAccount as IAccount);
         }
 
         public void RequestAccountUpdates()
@@ -493,7 +495,7 @@ namespace Broker.Backtesting
             EnqueueRequest(() => _accountUpdatesRequested = false);
         }
 
-        internal double UpdateCommissions(Order order, double price)
+        internal double UpdateCommissions(IBOrder order, double price)
         {
             double commission = GetCommission(order, price);
             Logger?.Debug($"{order} : commission : {commission:c}");
@@ -535,7 +537,7 @@ namespace Broker.Backtesting
             //_logger.Debug($"Account {_fakeAccount.Code} :  Unrealized PnL  : {Position.UnrealizedPNL:c}  (position value : {positionValue:c} market value : {Position.MarketValue:c})");
         }
 
-        double GetCommission(Order order, double price)
+        double GetCommission(IBOrder order, double price)
         {
             //https://www.interactivebrokers.ca/en/index.php?f=1590
 

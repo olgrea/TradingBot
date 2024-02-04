@@ -1,19 +1,20 @@
 ﻿using System.Diagnostics;
 using Broker.Accounts;
+using Broker.IBKR.Accounts;
+using Broker.IBKR.Orders;
 using Broker.MarketData;
-using Broker.Orders;
 using NLog;
 
-namespace Broker.Backtesting
+namespace Broker.IBKR.Backtesting
 {
     internal class OrderEvaluator
     {
         Backtester _backtester;
-        OrderTracker _orderTracker;
+        IBOrderTracker _orderTracker;
         ILogger? _logger;
         int _execId = 1;
 
-        public OrderEvaluator(Backtester backtester, OrderTracker orderTracker)
+        public OrderEvaluator(Backtester backtester, IBOrderTracker orderTracker)
         {
             _backtester = backtester;
             _logger = backtester.Logger;
@@ -24,12 +25,12 @@ namespace Broker.Backtesting
         }
 
         int NextExecId => _execId++;
-        internal event Action<string, OrderExecution>? OrderExecuted;
+        internal event Action<string, IBOrderExecution>? OrderExecuted;
         internal event Action<Position>? PositionUpdated;
 
         void OnClockTick_EvaluateOrders(DateTime newTime, CancellationToken token)
         {
-            foreach (Order o in _orderTracker.OpenOrders.Values)
+            foreach (IBOrder o in _orderTracker.OpenOrders.Values)
             {
                 token.ThrowIfCancellationRequested();
                 var ticker = _orderTracker.OrderIdsToTicker[o.Id];
@@ -47,7 +48,7 @@ namespace Broker.Backtesting
 
         // TODO : check if I need to implement specific trigger methods
         // https://interactivebrokers.github.io/tws-api/trigger_method_limit.html
-        void EvaluateOrder(string ticker, Order order, BidAsk bidAsk)
+        void EvaluateOrder(string ticker, IBOrder order, BidAsk bidAsk)
         {
             _logger?.Debug($"Evaluating Order {order} at BidAsk : {bidAsk}");
 
@@ -242,14 +243,14 @@ namespace Broker.Backtesting
             }
         }
 
-        void ExecuteOrder(string ticker, Order order, double price)
+        void ExecuteOrder(string ticker, IBOrder order, double price)
         {
             Debug.Assert(!_orderTracker.IsExecuted(order, out _));
 
             _logger?.Debug($"{order} : Executing at price {price:c}");
             var total = order.TotalQuantity * price;
 
-            Account account = _backtester.Account;
+            IBAccount account = _backtester.Account;
             if (!_backtester.Account.Positions.TryGetValue(ticker, out Position? position))
             {
                 position = _backtester.Account.Positions[ticker] = new Position(ticker);
@@ -296,7 +297,7 @@ namespace Broker.Backtesting
             _logger?.Debug($"Account {account.Code} :  New USD cash balance : {account.CashBalances["USD"]:c}");
 
             string nextExecId = NextExecId.ToString();
-            var oe = new OrderExecution(nextExecId, order.Id)
+            var oe = new IBOrderExecution(nextExecId, order.Id)
             {
                 AcctNumber = account.Code,
                 Time = _backtester.CurrentTime,
@@ -304,7 +305,7 @@ namespace Broker.Backtesting
                 Shares = order.TotalQuantity,
                 Price = total,
                 AvgPrice = price,
-                CommissionInfo = new CommissionInfo(nextExecId)
+                CommissionInfo = new IBCommissionInfo(nextExecId)
                 {
                     Commission = commission,
                     Currency = "USD",

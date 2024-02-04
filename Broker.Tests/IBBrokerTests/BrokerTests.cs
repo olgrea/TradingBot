@@ -1,11 +1,13 @@
 ﻿using Broker;
 using Broker.Accounts;
 using Broker.IBKR.Client;
-using Broker.Orders;
 using Broker.Utils;
 using NLog;
 using NUnit.Framework;
 using Broker.Tests;
+using Broker.IBKR;
+using Broker.IBKR.Accounts;
+using Broker.IBKR.Orders;
 
 namespace IBBrokerTests
 {
@@ -13,7 +15,7 @@ namespace IBBrokerTests
     public class BrokerTests
     {
         protected string _accountCode;
-        protected IBroker _broker;
+        protected IIBBroker _broker;
         protected ILogger _logger;
 
         [SetUp]
@@ -42,7 +44,7 @@ namespace IBBrokerTests
         [Test]
         public async Task GetAccountAsync_WithValidAccountCode_GetsTheAccount()
         {
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
             Assert.IsNotNull(account);
             Assert.AreEqual(_accountCode, account.Code);
             Assert.AreNotEqual(account.Time, default(DateTime));
@@ -57,7 +59,7 @@ namespace IBBrokerTests
             var randomQty = new Random().Next(2, 10);
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
             double currentPos = 0;
             if (account.Positions.TryGetValue(ticker, out Position pos))
                 currentPos = pos.PositionAmount;
@@ -95,7 +97,7 @@ namespace IBBrokerTests
             var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await _broker.OrderManager.SellAllPositionsAsync();
-            Account account = await _broker.GetAccountAsync();
+            IBAccount account = (IBAccount)await _broker.GetAccountAsync();
 
             int receiveUntil = 5;
             int nbPnLReceived = 0;
@@ -207,7 +209,7 @@ namespace IBBrokerTests
             });
 
             DateTime timeAtRequest = default;
-            OrderExecutedResult? execResult = null;
+            IBOrderExecutedResult? execResult = null;
 
             _broker.AccountValueUpdated += accValueUpdated;
             _broker.ErrorOccured += error;
@@ -218,7 +220,7 @@ namespace IBBrokerTests
                 
                 MarketOrder order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
                 await _broker.OrderManager.PlaceOrderAsync("GME", order);
-                execResult = await _broker.OrderManager.AwaitExecutionAsync(order);
+                execResult = (IBOrderExecutedResult) await _broker.OrderManager.AwaitExecutionAsync(order);
                 await Task.Delay(5*1000);
                 tcs.TrySetResult();
             }

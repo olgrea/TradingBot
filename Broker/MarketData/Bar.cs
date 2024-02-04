@@ -75,10 +75,6 @@ namespace Broker.MarketData
 
         public static explicit operator Bar(IBApi.Bar bar)
         {
-            // Non .NET supported timezone string... : "yyyyMMdd HH:mm:ss TimeZoneString"
-            // ex : "20230510 09:30:00 America/New_York"
-            // But when retrieving an IBApi.Bar from historicalData(), it uses the timezone selected when loggin into TWS
-            // so it will always be local
             var time = bar.Time.Substring(0, bar.Time.Length - bar.Time.LastIndexOf(' '));
 
             return new Bar()

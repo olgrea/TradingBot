@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-namespace Broker.Contracts
+namespace Broker.IBKR.Contracts
 {
     public enum OptionType
     {

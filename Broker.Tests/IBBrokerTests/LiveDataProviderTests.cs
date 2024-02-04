@@ -3,13 +3,14 @@ using Broker.IBKR.Client;
 using Broker.MarketData;
 using NUnit.Framework;
 using Broker.Tests;
+using Broker.IBKR;
 
 namespace IBBrokerTests
 {
     [TestFixture]
     public class LiveDataProviderTests
     {
-        internal IBroker _broker;
+        internal IIBBroker _broker;
 
         [OneTimeSetUp]
         public virtual async Task OneTimeSetUp()

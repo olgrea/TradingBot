@@ -1,16 +1,17 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using Broker.Accounts;
-using Broker.Contracts;
+using Broker.IBKR.Accounts;
 using Broker.IBKR.Client;
-using Broker.MarketData.Providers;
+using Broker.IBKR.Contracts;
+using Broker.IBKR.Orders;
+using Broker.IBKR.Providers;
 using Broker.Orders;
 using NLog;
 
 namespace Broker.IBKR
 {
-    public class IBBroker : IBroker
+    public class IBBroker : IIBBroker
     {
         static SemaphoreSlim s_sem = new(1, 1);
 
@@ -18,7 +19,7 @@ namespace Broker.IBKR
         int _port;
         IBClient _client;
         ILogger? _logger;
-        Account? _account;
+        IBAccount? _account;
         HashSet<string> _pnlSubscriptions = new HashSet<string>();
 
         public IBBroker(int clientId, ILogger? logger = null)
@@ -56,8 +57,8 @@ namespace Broker.IBKR
 
         internal IBClient Client => _client;
         public ILiveDataProvider LiveDataProvider { get; init; }
-        public IHistoricalDataProvider HistoricalDataProvider { get; init; }
-        public IOrderManager OrderManager { get; init; }
+        public IIBHistoricalDataProvider HistoricalDataProvider { get; init; }
+        public IOrderManager<IBOrder> OrderManager { get; init; }
 
         int GetPort()
         {
@@ -153,7 +154,7 @@ namespace Broker.IBKR
                 _client.Connect(IBClient.DefaultIP, _port, _clientId);
 
                 await tcs.Task;
-                _account = new Account(tcs.Task.Result);
+                _account = new IBAccount(tcs.Task.Result);
                 _logger?.Debug($"Connected. Account Code : {_account.Code}");
             }
             finally
@@ -217,13 +218,13 @@ namespace Broker.IBKR
             }
         }
 
-        public async Task<Account> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
-        public async Task<Account> GetAccountAsync(CancellationToken token)
+        public async Task<IAccount> GetAccountAsync() => await GetAccountAsync(CancellationToken.None);
+        public async Task<IAccount> GetAccountAsync(CancellationToken token)
         {
             Debug.Assert(_account != null);
             await ValidateAccount(token);
 
-            var tcs = new TaskCompletionSource<Account>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBAccount>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             bool accDownloaded = false;
