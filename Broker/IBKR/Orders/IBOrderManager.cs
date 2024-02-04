@@ -1,9 +1,8 @@
 ﻿using Broker.Accounts;
 using Broker.IBKR.Client;
-using Broker.IBKR.Orders;
 using NLog;
 
-namespace Broker.IBKR
+namespace Broker.IBKR.Orders
 {
     internal class IBOrderManager : IOrderManager
     {
