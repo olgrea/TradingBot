@@ -1,6 +1,8 @@
-﻿namespace Broker.IBKR.Orders
+﻿using Broker.Orders;
+
+namespace Broker.IBKR.Orders
 {
-    public class OrderPlacedResult
+    public class IBOrderPlacedResult : IOrderResult
     {
         public string? Ticker { get; set; }
         public IBOrder? Order { get; set; }
@@ -11,7 +13,7 @@
         public DateTime? Time { get; set; }
     }
 
-    public class OrderExecutedResult
+    public class IBOrderExecutedResult : IOrderResult
     {
         public string? Ticker { get; set; }
         public IBOrder? Order { get; set; }

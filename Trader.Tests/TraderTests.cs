@@ -44,7 +44,7 @@ namespace TraderTests
             TestsUtils.Assert.MarketIsOpen();
 
             await _broker.ConnectAsync();
-            var placedOrder = await _broker.OrderManager.PlaceOrderAsync(Ticker, new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 });
+            IBOrderPlacedResult placedOrder = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(Ticker, new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 });
             await _broker.OrderManager.AwaitExecutionAsync(placedOrder.Order);
             await _broker.DisconnectAsync();
 

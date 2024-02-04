@@ -209,7 +209,7 @@ namespace IBBrokerTests
             });
 
             DateTime timeAtRequest = default;
-            OrderExecutedResult? execResult = null;
+            IBOrderExecutedResult? execResult = null;
 
             _broker.AccountValueUpdated += accValueUpdated;
             _broker.ErrorOccured += error;
@@ -220,7 +220,7 @@ namespace IBBrokerTests
                 
                 MarketOrder order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5 };
                 await _broker.OrderManager.PlaceOrderAsync("GME", order);
-                execResult = await _broker.OrderManager.AwaitExecutionAsync(order);
+                execResult = (IBOrderExecutedResult) await _broker.OrderManager.AwaitExecutionAsync(order);
                 await Task.Delay(5*1000);
                 tcs.TrySetResult();
             }

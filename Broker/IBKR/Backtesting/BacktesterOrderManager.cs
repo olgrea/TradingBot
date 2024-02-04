@@ -112,17 +112,17 @@ namespace Broker.IBKR.Backtesting
             return ret;
         }
 
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, IBOrder order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
-        public async Task<OrderPlacedResult> PlaceOrderAsync(string ticker, IBOrder order, CancellationToken token)
+        public async Task<IOrderResult> PlaceOrderAsync(string ticker, IBOrder order) => await PlaceOrderAsync(ticker, order, CancellationToken.None);
+        public async Task<IOrderResult> PlaceOrderAsync(string ticker, IBOrder order, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBOrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             Action request = new Action(async () =>
             {
                 try
                 {
-                    OrderPlacedResult result = await PlaceOrderInternal(ticker, order);
+                    IBOrderPlacedResult result = await PlaceOrderInternal(ticker, order);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -144,17 +144,17 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        public async Task<OrderPlacedResult> ModifyOrderAsync(IBOrder order) => await ModifyOrderAsync(order, CancellationToken.None);
-        public async Task<OrderPlacedResult> ModifyOrderAsync(IBOrder order, CancellationToken token)
+        public async Task<IOrderResult> ModifyOrderAsync(IBOrder order) => await ModifyOrderAsync(order, CancellationToken.None);
+        public async Task<IOrderResult> ModifyOrderAsync(IBOrder order, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<OrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBOrderPlacedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             Action request = () =>
             {
                 try
                 {
-                    OrderPlacedResult result = ModifyOrderInternal(order);
+                    IBOrderPlacedResult result = ModifyOrderInternal(order);
                     tcs.TrySetResult(result);
                 }
                 catch (Exception e)
@@ -251,10 +251,10 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(IBOrder order) => await AwaitExecutionAsync(order, CancellationToken.None);
-        public async Task<OrderExecutedResult> AwaitExecutionAsync(IBOrder order, CancellationToken token)
+        public async Task<IOrderResult> AwaitExecutionAsync(IBOrder order) => await AwaitExecutionAsync(order, CancellationToken.None);
+        public async Task<IOrderResult> AwaitExecutionAsync(IBOrder order, CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<OrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IBOrderExecutedResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             Action request = () =>
@@ -264,7 +264,7 @@ namespace Broker.IBKR.Backtesting
                     _validator.ValidateExecutionAwaiting(order.Id);
                     if (_orderTracker.OrdersExecuted.ContainsKey(order.Id))
                     {
-                        tcs.TrySetResult(new OrderExecutedResult()
+                        tcs.TrySetResult(new IBOrderExecutedResult()
                         {
                             Ticker = _orderTracker.OrderIdsToTicker[order.Id],
                             Order = order,
@@ -282,7 +282,7 @@ namespace Broker.IBKR.Backtesting
             {
                 if (oe.OrderId == order.Id)
                 {
-                    tcs.TrySetResult(new OrderExecutedResult()
+                    tcs.TrySetResult(new IBOrderExecutedResult()
                     {
                         Ticker = _orderTracker.OrderIdsToTicker[order.Id],
                         Order = order,
@@ -314,10 +314,10 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync() => await SellAllPositionsAsync(CancellationToken.None);
-        public async Task<IEnumerable<OrderExecutedResult>> SellAllPositionsAsync(CancellationToken token)
+        public async Task<IEnumerable<IOrderResult>> SellAllPositionsAsync() => await SellAllPositionsAsync(CancellationToken.None);
+        public async Task<IEnumerable<IOrderResult>> SellAllPositionsAsync(CancellationToken token)
         {
-            var tcs = new TaskCompletionSource<IEnumerable<OrderExecutedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var tcs = new TaskCompletionSource<IEnumerable<IBOrderExecutedResult>>(TaskCreationOptions.RunContinuationsAsynchronously);
             token.Register(() => tcs.TrySetCanceled());
 
             var ordersPlaced = new Dictionary<int, IBOrder>();
@@ -327,7 +327,7 @@ namespace Broker.IBKR.Backtesting
                 {
                     var positions = _backtester.Account.Positions.Where(p => p.Value.PositionAmount > 0);
                     if (!positions.Any())
-                        tcs.TrySetResult(Enumerable.Empty<OrderExecutedResult>());
+                        tcs.TrySetResult(Enumerable.Empty<IBOrderExecutedResult>());
 
                     foreach (KeyValuePair<string, Position> pos in positions)
                     {
@@ -342,12 +342,12 @@ namespace Broker.IBKR.Backtesting
                 }
             };
 
-            var execList = new List<OrderExecutedResult>();
+            var execList = new List<IBOrderExecutedResult>();
             var orderExecuted = new Action<string, IBOrderExecution>((ticker, oe) =>
             {
                 if (ordersPlaced.ContainsKey(oe.OrderId))
                 {
-                    execList.Add(new OrderExecutedResult()
+                    execList.Add(new IBOrderExecutedResult()
                     {
                         Ticker = _orderTracker.OrderIdsToTicker[oe.OrderId],
                         Order = ordersPlaced[oe.OrderId],
@@ -374,7 +374,7 @@ namespace Broker.IBKR.Backtesting
             }
         }
 
-        async Task<OrderPlacedResult> PlaceOrderInternal(string ticker, IBOrder order)
+        async Task<IBOrderPlacedResult> PlaceOrderInternal(string ticker, IBOrder order)
         {
             order.Id = NextOrderId;
             _validator.ValidateOrderPlacement(order);
@@ -391,7 +391,7 @@ namespace Broker.IBKR.Backtesting
                 cond.Exchange = contract.Exchange;
             }
 
-            var result = new OrderPlacedResult()
+            var result = new IBOrderPlacedResult()
             {
                 Order = order,
                 OrderStatus = new IBOrderStatus()
@@ -415,7 +415,7 @@ namespace Broker.IBKR.Backtesting
             return result;
         }
 
-        OrderPlacedResult ModifyOrderInternal(IBOrder order)
+        IBOrderPlacedResult ModifyOrderInternal(IBOrder order)
         {
             _validator.ValidateOrderModification(order);
 
@@ -425,7 +425,7 @@ namespace Broker.IBKR.Backtesting
             if (_orderTracker.OpenOrders.ContainsKey(order.Id) || order.Info.Transmit)
                 _orderTracker.TrackOpening(order);
 
-            var result = new OrderPlacedResult()
+            var result = new IBOrderPlacedResult()
             {
                 Order = order,
                 OrderStatus = new IBOrderStatus()

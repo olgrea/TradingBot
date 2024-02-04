@@ -70,8 +70,8 @@ namespace BacktesterTests
             _ = _backtester.Start();
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(placedResult);
@@ -108,8 +108,8 @@ namespace BacktesterTests
             _ = _backtester.Start();
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(placedResult);
@@ -145,8 +145,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResults = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResults = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -181,8 +181,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -223,8 +223,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -265,8 +265,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -301,8 +301,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -337,8 +337,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -379,8 +379,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -421,8 +421,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -457,8 +457,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var execResult = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult execResult = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(execResult);
@@ -493,8 +493,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -535,8 +535,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -577,8 +577,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             Assert.NotNull(result);
@@ -619,7 +619,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -654,7 +654,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -695,7 +695,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -736,7 +736,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
             await backtestingTask;
 
             // Assert
@@ -769,8 +769,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
@@ -813,8 +813,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(SpyTestData.Ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             bidAsks = await _backtester.GetAsync<BidAsk>(SpyTestData.Ticker, result.OrderExecution.Time);
@@ -850,7 +850,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
             await backtestingTask;
 
             // Assert
@@ -881,7 +881,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
             await backtestingTask;
 
             // Assert
@@ -914,7 +914,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
             await backtestingTask;
 
             // Assert
@@ -945,7 +945,7 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
             await backtestingTask;
 
             // Assert
@@ -975,8 +975,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, result.OrderExecution.Time);
@@ -1015,8 +1015,8 @@ namespace BacktesterTests
             await WaitUntilTimeIsReached(timeOfOrderPlacement);
 
             // Test
-            var placedResult = await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
-            var result = await _backtester.OrderManager.AwaitExecutionAsync(order);
+            IBOrderPlacedResult placedResult = (IBOrderPlacedResult)await _backtester.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _backtester.OrderManager.AwaitExecutionAsync(order);
 
             // Assert
             var bidAsks = await _backtester.GetAsync<BidAsk>(ticker, result.OrderExecution.Time);

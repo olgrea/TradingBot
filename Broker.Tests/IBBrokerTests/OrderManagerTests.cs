@@ -62,7 +62,7 @@ namespace IBBrokerTests
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = 5 };
 
             // Test
-            OrderPlacedResult orderPlacedResult = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult orderPlacedResult = (IBOrderPlacedResult) await _broker.OrderManager.PlaceOrderAsync(ticker, order);
 
             // Assert
             Assert.NotNull(orderPlacedResult);
@@ -118,14 +118,14 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult) await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
             order.LmtPrice = 6;
-            OrderPlacedResult result = await _broker.OrderManager.ModifyOrderAsync(order);
+            IBOrderPlacedResult result = (IBOrderPlacedResult) await _broker.OrderManager.ModifyOrderAsync(order);
 
             // Assert
             Assert.NotNull(result?.OrderStatus);
@@ -142,7 +142,7 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -164,7 +164,7 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             int randomQty = new Random().Next(3, 10);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = randomQty, LmtPrice = 5 };
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -194,8 +194,8 @@ namespace IBBrokerTests
             }
 
             // Test
-            IEnumerable<OrderExecutedResult>? execResults = null;
-            execResults = await _broker.OrderManager.SellAllPositionsAsync();
+            IEnumerable<IBOrderExecutedResult>? execResults = null;
+            execResults = (await _broker.OrderManager.SellAllPositionsAsync()).Cast<IBOrderExecutedResult>();
 
             // Assert
             var account = await _broker.GetAccountAsync();
@@ -214,14 +214,14 @@ namespace IBBrokerTests
             // Setup
             string ticker = TickerGME;
             var order = new MarketOrder() { Action = OrderAction.BUY, TotalQuantity = 5};
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
 
             // Test
             await Task.Delay(500);
-            var result = await _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order);
+            IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order);
             Assert.NotNull(result);
             Assert.AreEqual(order.Id, result.Order.Id);
         }
@@ -235,7 +235,7 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             var bidAsk = await GetLatestBidAskAsync(ticker);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = bidAsk.Bid };
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -245,7 +245,7 @@ namespace IBBrokerTests
             try
             {
                 var task = _broker.OrderManager.AwaitExecutionAsync(openOrderMsg.Order);
-                OrderExecutedResult result = await task.WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await task.WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
             }
@@ -264,7 +264,7 @@ namespace IBBrokerTests
             string ticker = TickerGME;
             var bidAsk = await GetLatestBidAskAsync(ticker);
             var order = new LimitOrder() { Action = OrderAction.BUY, TotalQuantity = 5, LmtPrice = bidAsk.Bid - 5 };
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.PreSubmitted || openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -291,7 +291,7 @@ namespace IBBrokerTests
             DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
@@ -300,7 +300,7 @@ namespace IBBrokerTests
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
                 Assert.AreEqual(condTime.Ticks, result.Time.Ticks, TimeSpan.TicksPerMillisecond*1000);
@@ -324,7 +324,7 @@ namespace IBBrokerTests
             var bas = await GetLatestBidAskAsync(ticker);
             order.AddPriceCondition(isMore: true, bas.Ask + 0.02);
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
@@ -333,7 +333,7 @@ namespace IBBrokerTests
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
             }
@@ -356,7 +356,7 @@ namespace IBBrokerTests
             var bas = await GetLatestBidAskAsync(ticker);
             order.AddPercentCondition(isMore: true, 0.001);
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
@@ -365,7 +365,7 @@ namespace IBBrokerTests
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
             }
@@ -400,7 +400,7 @@ namespace IBBrokerTests
             order.AddTimeCondition(isMore: true, condTime);
             order.ConditionsTriggerOrderCancellation = true;
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -445,7 +445,7 @@ namespace IBBrokerTests
             order.AddPriceCondition(isMore: true, bas.Ask + 0.02);
             order.ConditionsTriggerOrderCancellation = true;
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -490,7 +490,7 @@ namespace IBBrokerTests
             order.AddPercentCondition(isMore: true, 0.001);
             order.ConditionsTriggerOrderCancellation = true;
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted);
@@ -528,7 +528,7 @@ namespace IBBrokerTests
             DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
@@ -537,7 +537,7 @@ namespace IBBrokerTests
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
             }
@@ -564,7 +564,7 @@ namespace IBBrokerTests
             DateTime condTime = currentTime.AddSeconds(Debugger.IsAttached ? 60 : 10);
             order.AddTimeCondition(isMore: true, condTime);
 
-            OrderPlacedResult openOrderMsg = await _broker.OrderManager.PlaceOrderAsync(ticker, order);
+            IBOrderPlacedResult openOrderMsg = (IBOrderPlacedResult)await _broker.OrderManager.PlaceOrderAsync(ticker, order);
             Assert.NotNull(openOrderMsg);
             Assert.NotNull(openOrderMsg.OrderStatus);
             Assert.IsTrue(openOrderMsg.OrderStatus.Status == Status.Submitted || openOrderMsg.OrderStatus.Status == Status.PreSubmitted);
@@ -573,7 +573,7 @@ namespace IBBrokerTests
             TimeSpan timeout = TimeSpan.FromMilliseconds(Debugger.IsAttached ? -1 : 120 * 1000);
             try
             {
-                var result = await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
+                IBOrderExecutedResult result = (IBOrderExecutedResult)await _broker.OrderManager.AwaitExecutionAsync(order).WaitAsync(timeout);
                 Assert.NotNull(result);
                 Assert.AreEqual(order.Id, result.Order.Id);
             }
